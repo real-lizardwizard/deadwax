@@ -185,7 +185,8 @@ struct PlayerBar: View {
                 .accessibilityLabel(track.title)
                 .accessibilityValue(next.map { BarDisplay.Words.nextSpoken($0.title) } ?? "")
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Self.rowGap) {
+                    // on the byline's baseline (25 Nov): centred, the readout's shorter line would sit it higher
+                    HStack(alignment: .firstTextBaseline, spacing: Self.rowGap) {
                         byline(track)
                             .frame(minWidth: 0, idealWidth: Self.bylineLeast, maxWidth: .infinity, alignment: .leading)
                         if let readout {

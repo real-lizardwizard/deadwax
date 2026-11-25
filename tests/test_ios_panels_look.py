@@ -292,7 +292,11 @@ def test_the_drag_down_still_closes_now_playing():
 #? (R3b) EQScreen's List - the Mac's side panel's page, `listPage` and its sections, and (R3b's review) its filter row,
 #? EQFilterRowView - with its comments blanked, as R3 left it: R3b redrew the phone's EQ as groups of its own beside it
 #? (test_ios_nowplaying_pages_look.py; the phone's filter row is EQPhoneFilterRow), and left the Mac's List alone.
-EQ_SCREEN_LIST = "a6bca7868807bcd99772dfbd3c9fa7180bc44fe39a7b29b969e1c03b48767bee"
+#? (the app's fonts, 25 Nov) only these changed since: the hand preamp's value, deadwax's own preamp's (iEQ's mono) and
+#? a filter row's numbers in the readout face (`.monospacedDigit()` did nothing in Libre Franklin) - test_ios_palette.py's
+#? TICKING - and both preamp rows on their label's baseline (`.labeledContentStyle(.readout)`: centred, a readout's
+#? shorter line set it higher - test_ios_readout_rows.py).
+EQ_SCREEN_LIST = "d3d92f6a41ac5e514ff0156197ea5fe1db8f58a2087585669c46c4a9535a966b"
 
 
 def mac_filter_row(text: str) -> str:
@@ -319,7 +323,7 @@ def test_eq_screens_list_is_as_r3_left_it():
     row = mac_filter_row(text)
     for reset in (".font(nil", ".tint(", "phone", "Phone", "PhoneLook", "toggleStyle", "Platform."):
         assert reset not in row, reset
-    assert re.findall(r"\.font\(([^()]*(?:\([^()]*\))?[^()]*)\)", row) == ["Typeface.footnote.monospacedDigit()",
+    assert re.findall(r"\.font\(([^()]*(?:\([^()]*\))?[^()]*)\)", row) == ["Typeface.readout(.footnote)",
                                                                            "Typeface.footnote"]
     #? the Mac's List draws the Mac's row; the phone's groups the phone's, never the Mac's
     groups = code(EQ_SCREEN)[text.index("    // MARK: the phone's groups"):]

@@ -835,7 +835,9 @@ private struct PlaylistSongRow: View {
         let line = PlaylistRules.songLine(song)
         HStack(spacing: 0) {
             Button(action: play) {
-                HStack(spacing: 0) {
+                // (25 Nov) beside the title alone, the length sits on its baseline: Courier Prime's line is shorter
+                // than Libre Franklin's, so centred it would sit higher. Beside two lines it is centred, as drawn.
+                HStack(alignment: line.isEmpty ? .firstTextBaseline : .center, spacing: 0) {
                     VStack(alignment: .leading, spacing: 1) {
                         HStack(alignment: .firstTextBaseline, spacing: AlbumPageLook.chipGap) {
                             if current {

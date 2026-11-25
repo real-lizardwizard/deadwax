@@ -39,6 +39,7 @@ def _load(name: str):
 reader = _load("test_ios_no_web_app")
 phone_look = _load("test_ios_phone_look")
 mac_look = _load("test_ios_mac_look")
+fonts = _load("ios_fonts")
 
 
 def bare(text: str) -> str:
@@ -352,8 +353,10 @@ def test_nothing_in_the_macs_progress_column_draws_past_it():
     assert ".fixedSize()" not in progress
     assert progress.count(".lineLimit(1)") == 5, "the files, a wait, a refusal, a note, when"
     assert progress.count(".help(") == 4, "each kind of row's whole words"
-    # the meter keeps its least width; its words give way
+    # the meter keeps its least width; its words give way (the meter centred on their line, the row on their baseline -
+    # test_ios_readout_rows.py)
     assert ("DWMeter(fraction: row.progress / 100) .frame(minWidth: CGFloat(RequestColumns.meterLeast)) "
+            ".centredOnWords(CGFloat(Typeface.Mac.Size.base.rawValue)) "
             'Text(row.progressWords ?? "") .font(Typeface.Mac.mono(.label)) .foregroundStyle(DWPalette.t2) '
             ".lineLimit(1) .layoutPriority(1)") in progress
     # the chip (DWChip's fixed size) first, what's beside it giving way
@@ -365,7 +368,12 @@ def test_nothing_in_the_macs_progress_column_draws_past_it():
     assert words == {"In their library", "In your library", "Added to their library", "Added to your library",
                      "Not added", "You already had it", "Partly in their library", "Partly in your library",
                      "Stopped"}, words
-    cell = 226 - 2 * 10
+    # (the app's fonts, 25 Nov) the Progress column's width read from Core's table (RequestColumns.widths: Artist,
+    # From, Progress, Speed, the buttons), its 10 either side - a narrower column is measured, not assumed
+    code = FILTER.read_text(encoding="utf-8")
+    columns = [float(n) for n in re.findall(r"\.fixed\((\d+)\),", code[code.index("public static let widths"):])[:5]]
+    assert len(columns) == 5, columns
+    cell = columns[2] - 2 * 10
     for chip in words:
         assert estimate(chip, 11.5) + 2 * 7 <= cell, chip
     # and the whole sentence stays the row's: its help, and VoiceOver's
@@ -374,10 +382,11 @@ def test_nothing_in_the_macs_progress_column_draws_past_it():
     assert "case .done: said += [row.line, note]" in spoken
 
 
-def estimate(words: str, size: float) -> float:
-    """A width for `words` at `size` in Noto Sans, from above: 0.55 of the size a letter (its mixed text runs nearer 0.45;
-    the mono face is 0.6 exactly)."""
-    return len(words) * size * 0.55
+def estimate(words: str, size: float, weight: str = "semibold") -> float:
+    """A width for `words` at `size` in Libre Franklin, measured from the bundled face (tests/ios_fonts.py, 25 Nov - it
+    was 0.55 of the size a letter in Noto Sans until then): SemiBold unless said - a chip's, a segment's and a primary
+    button's weight, the heaviest these words take - so from above for the 500 of a plain button too."""
+    return fonts.words(words, size, weight)
 
 
 def test_the_table_fits_its_page_and_the_toolbar_folds_to_every_page():
@@ -486,8 +495,10 @@ def test_the_macs_toolbar_and_status_bar():
     cancel = body(page, "private func tappedCancel(_ row: RequestRow) {")
     assert "ConfirmCancel.read(UserDefaults.standard.string(forKey: ConfirmCancel.storageKey))" in cancel
     assert "Button(RequestWords.keepIt, role: .cancel) {} .returnCancels()" in page
-    # the status bar: the counts and the speed summed, Core's
-    assert ".macStatus(MacStatusItems.Items(leading: reachability.online ? RequestFilter.status(board) : []))" in page
+    # the status bar: the counts and the speed summed, Core's - (the app's fonts, 25 Nov) the speed in the readout face,
+    # as it ticks (test_ios_palette.py's TICKING)
+    assert (".macStatus(MacStatusItems.Items(leading: reachability.online ? RequestFilter.status(board) : [], "
+            "readouts: [RequestWords.speed(RequestFilter.speed(board))]))") in page
 
 
 def test_the_toolbars_fields_take_tab_and_return_as_the_phones_form_does():

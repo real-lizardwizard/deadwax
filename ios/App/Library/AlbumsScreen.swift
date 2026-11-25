@@ -543,7 +543,6 @@ struct PlaceRow: View {
                     Spacer(minLength: 8)
                     if let count {
                         Text("\(count)")
-                            .monospacedDigit()
                             .foregroundStyle(Palette.quiet)
                             .accessibilityHidden(true)
                     }

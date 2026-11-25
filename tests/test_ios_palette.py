@@ -693,16 +693,30 @@ def test_the_transport_and_the_librarys_icon_have_actual_corners():
     assert "case .library: return .library" in routes
 
 
-# Noto Sans (15 Nov): James chose "Noto Sans (the web's)". The phone's four faces are the web's own seven files made into
-# one font per weight (ios/scripts/make-fonts.py), named by Info.plist's UIAppFonts, and every text style the app sets is
-# ios/App/Shared/Typeface.swift's - nothing in ios/App names a system text font of its own. A symbol drawn alone keeps
-# iOS's own font (Typeface.symbol), which is how an SF Symbol is sized, and data the system's monospace (Typeface.mono).
+# The app's fonts (25 Nov - notes/ios.md "The app's fonts: Libre Franklin and Courier Prime (2026-11-25)"): James chose
+# "libre franklin", then "Adopt it", in place of Noto Sans (15 Nov, the web's) and Noto Sans Mono (24 Nov, R1's "Bundle
+# Noto Sans Mono"). Libre Franklin's four faces are its variable font pinned at 400, 500, 600 and 700, Courier Prime's two
+# its own files (ios/scripts/make-fonts.py, from ios/scripts/fonts), named by Info.plist's UIAppFonts, and every text
+# style the app sets is ios/App/Shared/Typeface.swift's - nothing in ios/App names a system text font of its own. A
+# symbol drawn alone keeps iOS's own font (Typeface.symbol), which is how an SF Symbol is sized, and data a slice hasn't
+# redrawn the system's monospace (Typeface.mono).
 
 TYPEFACE = APP / "Shared" / "Typeface.swift"
 FONTS = APP / "Fonts"
-WEB_FONTS = REPO / "interface" / "styles" / "font" / "noto-sans"
-#? (the Mac redesign, R1) James, 24 Nov: "Bundle Noto Sans Mono" - the Mac's data face, made from the web's own
-WEB_MONO = REPO / "interface" / "styles" / "font" / "noto-sans-mono"
+SOURCES = REPO / "ios" / "scripts" / "fonts"
+MAKE_FONTS = REPO / "ios" / "scripts" / "make-fonts.py"
+#? the files as downloaded (google/fonts at 6ebe737e44fd64ee736bbc6feed6136a6dbfd222 - ios/scripts/fonts/README.md),
+#? each to its hash: a source that changes is a decision, not an accident
+SOURCE_HASHES = {
+    "librefranklin/LibreFranklin[wght].ttf": "2329f394b10ed1c71107df20fddc11e2bb1b68c1ecbb385f975b36fd64a971f8",
+    "librefranklin/OFL.txt": "2710268527181a27b8e938617551bae29e714e6525247be6679bf897a9942a60",
+    "courierprime/CourierPrime-Regular.ttf": "72f793376f8e2841656bf21d77a5de010f2929bd6956a22ee848ad0c7eb978af",
+    "courierprime/CourierPrime-Bold.ttf": "ff1f38786c849d1c41fa8e447960abdb2bd75fdfb0cfcdeb524fad65a5af3638",
+    "courierprime/OFL.txt": "9a755af092b494944c99f471be6fddd19b006a448fefdc4717e4ee0aa09a97b0",
+}
+WORDS_FACES = {"LibreFranklin-Regular": 400, "LibreFranklin-Medium": 500, "LibreFranklin-SemiBold": 600,
+               "LibreFranklin-Bold": 700}
+READOUT_FACES = {"CourierPrime-Regular": 400, "CourierPrime-Bold": 700}
 INFO_PLIST = REPO / "ios" / "Config" / "Info.plist"
 INFO_MAC_PLIST = REPO / "ios" / "Config" / "Info-Mac.plist"
 STYLES = ("largeTitle", "title", "title2", "title3", "headline", "body", "callout", "subheadline", "footnote", "caption",
@@ -770,65 +784,295 @@ def font_characters(path: Path) -> set:
     raise AssertionError(f"{path.name} has no (3, 1) cmap")
 
 
-def web_characters(folder: str) -> set:
-    """Every character the web's files of a family claim (tests/fixtures/font_cmaps.json, read from the woff2s)."""
-    import json
-    web = json.loads((REPO / "tests" / "fixtures" / "font_cmaps.json").read_text(encoding="utf-8"))
-    wanted = set()
-    for key, entry in web.items():
-        if key.startswith(folder + "/"):
-            for part in entry["cmap"].split(","):
-                low, _, high = part.strip()[2:].partition("-")
-                wanted |= set(range(int(low, 16), int(high or low, 16) + 1))
-    return wanted
+def os2_weight(path: Path) -> int:
+    # the OS/2 table's usWeightClass: its third field, after its version and xAvgCharWidth
+    data = path.read_bytes()
+    start = sfnt_tables(data)["OS/2"]
+    return int.from_bytes(data[start + 4:start + 6], "big")
 
 
-def test_the_fonts_are_the_webs_own_noto_sans():
+def sha256(path: Path) -> str:
+    import hashlib
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_the_sources_are_the_files_as_downloaded():
+    found = sorted(str(path.relative_to(SOURCES)) for path in SOURCES.rglob("*")
+                   if path.is_file() and not path.name.startswith(".") and path.name != "README.md")
+    assert found == sorted(SOURCE_HASHES)
+    readme = (SOURCES / "README.md").read_text(encoding="utf-8")
+    assert "github.com/google/fonts" in readme and "6ebe737e44fd64ee736bbc6feed6136a6dbfd222" in readme
+    for name, digest in SOURCE_HASHES.items():
+        assert sha256(SOURCES / name) == digest, name
+        # and the README's table says the same
+        assert f"| {name} | {(SOURCES / name).stat().st_size} | {digest} |" in readme, name
+    # each family its own licence, its own copyright line
+    libre = (SOURCES / "librefranklin" / "OFL.txt").read_text(encoding="utf-8")
+    courier = (SOURCES / "courierprime" / "OFL.txt").read_text(encoding="utf-8")
+    assert libre.startswith("Copyright 2020 The Libre Franklin Project Authors")
+    assert courier.startswith("Copyright 2015 The Courier Prime Project Authors")
+    for licence in (libre, courier):
+        assert "SIL OPEN FONT LICENSE Version 1.1" in licence
+
+
+def test_the_fonts_are_libre_franklin_and_courier_prime():
     import plistlib
-    files = sorted(path.name for path in FONTS.glob("*.ttf"))
-    words = ["NotoSans-Bold.ttf", "NotoSans-Medium.ttf", "NotoSans-Regular.ttf", "NotoSans-SemiBold.ttf"]
-    #? (the Mac redesign, R1) and Noto Sans Mono's three, the drawings' 400, 500 and 600
-    mono = ["NotoSansMono-Medium.ttf", "NotoSansMono-Regular.ttf", "NotoSansMono-SemiBold.ttf"]
-    assert files == sorted(words + mono)
+    faces = sorted([*WORDS_FACES, *READOUT_FACES])
+    fonts = sorted(f"{face}.ttf" for face in faces)
+    # the folder is exactly what make-fonts.py makes: six faces and each family's licence, under the family's name -
+    # every file in App/ lands at the bundle's root, so two OFL.txt would collide (check_project.py)
+    files = sorted(path.name for path in FONTS.iterdir() if not path.name.startswith("."))
+    assert files == sorted(fonts + ["CourierPrime-OFL.txt", "LibreFranklin-OFL.txt"])
     # Info.plist names each (the synchronized folder copies them to the bundle's root, where UIAppFonts looks) - and
     # Info-Mac.plist the same (check_project.py holds the two plists in step)
     for plist in (INFO_PLIST, INFO_MAC_PLIST):
-        assert sorted(plistlib.loads(plist.read_bytes())["UIAppFonts"]) == files, plist.name
-    # the licence goes with them: the web's own - the same file beside both families
-    assert (FONTS / "OFL.txt").read_bytes() == (WEB_FONTS / "OFL.txt").read_bytes() == (WEB_MONO / "OFL.txt").read_bytes()
-    # each face is of the family Typeface asks for, under the PostScript name Typeface gives UIKit
+        assert sorted(plistlib.loads(plist.read_bytes())["UIAppFonts"]) == fonts, plist.name
+    # the licences and Courier Prime's two faces, byte for byte as downloaded
+    assert (FONTS / "LibreFranklin-OFL.txt").read_bytes() == (SOURCES / "librefranklin" / "OFL.txt").read_bytes()
+    assert (FONTS / "CourierPrime-OFL.txt").read_bytes() == (SOURCES / "courierprime" / "OFL.txt").read_bytes()
+    for face in READOUT_FACES:
+        assert (FONTS / f"{face}.ttf").read_bytes() == (SOURCES / "courierprime" / f"{face}.ttf").read_bytes(), face
     source = TYPEFACE.read_text(encoding="utf-8")
-    assert re.search(r'static let family = "([^"]+)"', source).group(1) == "Noto Sans"
-    faces = sorted(re.findall(r'case \w+ = "(NotoSans-\w+)"', source))
-    assert len(faces) == 4
-    named = []
-    for name in words:
-        table = font_names(FONTS / name)
-        assert table.get(16, table[1]) == "Noto Sans", name
-        named.append(table[6])
-    assert sorted(named) == faces
-    # (R1) the mono faces: of the family Typeface.Mac asks for, under Typeface.Mac.MonoFace's names
-    assert re.search(r'static let monoFamily = "([^"]+)"', source).group(1) == "Noto Sans Mono"
-    mono_faces = sorted(re.findall(r'case \w+ = "(NotoSansMono-\w+)"', source))
-    assert len(mono_faces) == 3
-    named = []
-    for name in mono:
-        table = font_names(FONTS / name)
-        assert table.get(16, table[1]) == "Noto Sans Mono", name
-        named.append(table[6])
-    assert sorted(named) == mono_faces
-    # every character of the web's seven files, in every face: one font per weight, the web's whole range
-    wanted = web_characters("noto-sans")
-    assert len(wanted) > 1600
-    for name in words:
-        assert font_characters(FONTS / name) == wanted, name
-    wanted = web_characters("noto-sans-mono")
-    assert len(wanted) > 1600
-    for name in mono:
-        assert font_characters(FONTS / name) == wanted, name
+    # the words: of the family Typeface asks for, under the PostScript names Typeface.Face gives UIKit, each at the
+    # weight make-fonts.py pins it at, with every character of the variable font it was pinned from
+    assert re.search(r'static let family = "([^"]+)"', source).group(1) == "Libre Franklin"
+    assert sorted(re.findall(r'case \w+ = "(LibreFranklin-\w+)"', source)) == sorted(WORDS_FACES)
+    script = MAKE_FONTS.read_text(encoding="utf-8")
+    words = script[script.index("\nWORDS = ("):script.index("\nREADOUTS = (")]
+    pinned = {f"LibreFranklin-{style}": int(weight) for weight, style in re.findall(r'(\d{3}): "(\w+)"', words)}
+    assert pinned == WORDS_FACES
+    whole = font_characters(SOURCES / "librefranklin" / "LibreFranklin[wght].ttf")
+    assert len(whole) > 900
+    for face, weight in WORDS_FACES.items():
+        table = font_names(FONTS / f"{face}.ttf")
+        assert table.get(16, table[1]) == "Libre Franklin", face
+        assert table[6] == face
+        assert os2_weight(FONTS / f"{face}.ttf") == weight, face
+        assert font_characters(FONTS / f"{face}.ttf") == whole, face
+    # the readouts: of the family Typeface.Mac asks for, under Typeface.Mac.MonoFace's names - Regular and Bold, no more
+    assert re.search(r'static let monoFamily = "([^"]+)"', source).group(1) == "Courier Prime"
+    assert sorted(re.findall(r'case \w+ = "(CourierPrime-\w+)"', source)) == sorted(READOUT_FACES)
+    for face, weight in READOUT_FACES.items():
+        table = font_names(FONTS / f"{face}.ttf")
+        assert table.get(16, table[1]) == "Courier Prime", face
+        assert table[6] == face and os2_weight(FONTS / f"{face}.ttf") == weight, face
+    # nothing of Noto is left in the app's fonts nor named by its code
+    assert not [path.name for path in FONTS.iterdir() if "Noto" in path.name]
+    assert not [f"{name}:{number}" for name, number, code in app_code() if "Noto" in code]
 
 
-def test_every_text_style_is_noto_sans_scaled_as_ios_scales_it():
+#? (25 Nov, narrowed after review) The readouts that change as you watch them. A number is in the readout face,
+#? Courier Prime, where the drawings set it in mono, or where it changes continuously while you watch it and stands on
+#? its own - a clock, a speed, a value being dragged or held, a size growing as a download comes: Libre Franklin has no
+#? tabular figures (`.monospacedDigit()` does nothing in it), so in the words its figures would shift as it counts. A
+#? step count inside a sentence ("Downloading - 4 of 12 songs", "30 of 140", a place in the queue) stays in the words,
+#? as drawn - its small shift as a digit changes accepted - and so do the Mac Queue's time left (once a minute; R3b's
+#? review set it in the words), Settings > Downloads' amount, line and fetching counts, and an album footer's download
+#? line. Each: (file, what draws it, the departure it is from the drawings - a readout they set in the words' face or
+#? don't draw - or None). notes/ios.md lists them.
+TICKING = [
+    # the players' clocks: the phone's scrubber, the mini player's held time, the Mac bar's
+    ("Player/ScrubberView.swift", "            Text(remaining)\n        }\n        .font(Typeface.readout(.caption))",
+     None),
+    ("Player/MiniPlayerView.swift", "        Text(words)\n            .font(Typeface.Phone.mono(.extraSmall))", None),
+    ("Player/PlayerBar.swift",
+     "            Text(PlayerWords.remaining(shown: shown, length: length))\n        }\n        .font(Typeface.Mac.mono(.label))",
+     None),
+    # the Queue's time left on the phone, as iQueue draws it (the Mac's is in the words, as drawn)
+    ("UpNext/UpNextScreen.swift",
+     ".font(Platform.mac ? Typeface.Look.text(.chip) : Typeface.Phone.mono(.extraSmall))", None),
+    # Requests: a download's progress and its speed, the page's speed in the status bar (the drawing's words)
+    ("Mac/Requests/MacRequestsPage.swift", "Text(row.progressWords ?? \"\")\n                    .font(Typeface.Mac.mono(.label))",
+     None),
+    ("Mac/Requests/MacRequestsPage.swift",
+     "return Text(RequestFilter.speedText(row))\n            .font(Typeface.Mac.mono(.small))", None),
+    ("Mac/Requests/MacRequestsPage.swift", "readouts: [RequestWords.speed(RequestFilter.speed(board))]",
+     "the Mac status bar's speed"),
+    ("Mac/Components/MacStatusBar.swift",
+     "if items.readouts.contains(fact) {\n                    Text(fact).font(Typeface.Mac.mono(.label))",
+     "the Mac status bar's speed"),
+    ("Requests/RequestCards.swift", "Text(row.data ?? \" \")\n                                .font(Typeface.Phone.mono(.extraSmall))",
+     None),
+    # what this device holds, growing as songs come: You's Downloads row (the drawings have no figure there)
+    ("You/DownloadsRow.swift", "Text(Bytes.words(downloads.bytesHere))\n                            .font(Typeface.readout(.body))",
+     "You's Downloads value"),
+    # Library care's facts: the scan's age
+    ("Manage/LibraryCareScreen.swift",
+     "Text(care.facts(now: context.date.timeIntervalSince1970 * 1000))\n                    .font(Typeface.readout(.footnote))",
+     None),
+    # the EQ's values under a finger: a held slider's, a stepper's (the accessibility sizes' row, not drawn), the
+    # selected handle's, the hand preamp's, a filter's row - and deadwax's own preamp, which moves as a band is dragged
+    # (iEQ draws it in mono)
+    ("EQ/EQSliders.swift", ".font(EQSliders.phone ? Typeface.Phone.mono(.extraSmall).weight(.semibold)\n"
+                           "                                          : Typeface.readout(.caption).weight(.semibold))", None),
+    ("EQ/EQSliders.swift", "Text(EQWords.held(gain))\n                .font(Typeface.readout(.body))", "the EQ stepper's value"),
+    ("EQ/EQCurveView.swift", "Text(text ?? \" \")\n            .font(Typeface.readout(.caption))", None),
+    ("EQ/EQScreen.swift", "Text(EQWords.Preamp.value(hand))\n                            .font(Typeface.readout(.body))", None),
+    ("EQ/EQScreen.swift", "Text(EQWords.Preamp.value(hand))\n                            .font(Typeface.Phone.mono(.small))",
+     None),
+    ("EQ/EQScreen.swift",
+     "Text(EQWords.Preamp.value(setting.on ? drawing.preamp : automaticPreamp(output, setting)))\n"
+     "                        .font(Typeface.readout(.body))", None),
+    ("EQ/EQScreen.swift",
+     "value: EQWords.Preamp.value(setting.on ? drawing.preamp : automaticPreamp(output, setting)),\n"
+     "                        mono: true)", None),
+    ("EQ/EQScreen.swift", "Text(EQWords.Advanced.detail(f))\n                        .font(Typeface.readout(.footnote))", None),
+    ("EQ/EQScreen.swift", "Text(EQWords.Advanced.detail(f))\n                        .font(Typeface.Phone.mono(.extraSmall))",
+     None),
+    # Debug's measurements (not drawn): every one, below
+    ("You/DebugView.swift", "Text(row.value).font(Typeface.readout(.footnote))", "Debug's measurements"),
+]
+#? (a readout face, or what chooses one: a status bar fact named a readout, a fact's row set in mono)
+READOUT_FONT = re.compile(r"Typeface\.readout\(|Typeface\.(Mac|Phone|Look)\.mono\(|readouts: |mono: true")
+#? the four departures from the drawings, for James
+DEPARTURES = {"the Mac status bar's speed", "You's Downloads value", "the EQ stepper's value", "Debug's measurements"}
+#? what went back to the words, as drawn, after review (25 Nov): none of it is in the readout face again
+BACK_IN_WORDS = [
+    ("UpNext/UpNextScreen.swift", "Typeface.Look.mono(.chip)"),
+    ("Downloads/DownloadsScreen.swift", "Typeface.readout("),
+    ("Downloads/DownloadsScreen.swift", "Typeface.Phone.mono("),
+    ("Album/AlbumView.swift", "Typeface.Phone.mono("),
+]
+
+
+def test_every_number_that_ticks_is_in_the_readout_face():
+    for name, drawn, _ in TICKING:
+        text = (APP / name).read_text(encoding="utf-8")
+        assert drawn in text, f"{name}: {drawn!r}"
+        assert READOUT_FONT.search(drawn), drawn
+    # the departures, said: those the drawings set in the words' face, or don't draw
+    assert {departs for _, _, departs in TICKING if departs} == DEPARTURES
+    # the narrowed rule: a step count in a sentence, the Mac's time left and an album's footer stay in the words
+    for name, face in BACK_IN_WORDS:
+        assert face not in "\n".join(code for file, _, code in app_code() if file == name), f"{name}: {face}"
+    # PhoneKV's `mono` is the readout face at the small 13, as `.mono.s` is
+    kv = (APP / "Phone" / "PhoneCard.swift").read_text(encoding="utf-8")
+    kv = kv[kv.index("struct PhoneKV: View {"):]
+    kv = kv[:kv.index("\n}\n")]
+    assert "var mono = false" in kv
+    assert "if mono {\n                Text(value)\n                    .font(Typeface.Phone.mono(.small))" in kv
+    # Debug's measurements, every one (`.monospacedDigit()` held them still in Noto Sans)
+    debug = (APP / "You" / "DebugView.swift").read_text(encoding="utf-8")
+    assert debug.count(".font(Typeface.readout(.footnote))") == 18
+    # and nothing in the app asks `.monospacedDigit()` of a face where it does nothing: Libre Franklin has no tabular
+    # figures, Courier Prime's are all one width, and every Text takes one or the other (DeadwaxApp's root font)
+    assert not [f"{name}:{number}" for name, number, code in app_code() if ".monospacedDigit()" in code]
+    # the readout at a text style: Courier Prime at the style's size, scaled as the style scales, as the words are
+    source = TYPEFACE.read_text(encoding="utf-8")
+    readout = source[source.index("static func readout(_ style: Font.TextStyle) -> Font {"):]
+    readout = readout[:readout.index("\n    }\n") + 6]
+    sizes = dict(re.findall(r"case \.(\w+): size = (\d+)", readout))
+    assert {style: int(size) for style, size in sizes.items()} == IOS_SIZES
+    assert "return .custom(Mac.monoFamily, size: size, relativeTo: style)" in readout
+
+
+def _swift():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_palette_ios_swift", Path(__file__).resolve().parent / "ios_swift.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+#? a readout's face, named
+READOUT_CALL = re.compile(r"Typeface\.(?:readout|Mac\.mono|Phone\.mono|Look\.mono)\(")
+MEDIUM = re.compile(r"\.medium\b")
+FONT_WEIGHT_MEDIUM = re.compile(r"\.fontWeight\([^()]*\.medium\b")
+
+
+def readout_scopes(code: str) -> list[tuple[int, str]]:
+    """Every readout's scope in one file's code: (where its face is named, the code it is in force over) - the whole view
+    its `.font(...)` is set on, that view's every modifier before and after it, the font's own; a Font property's own
+    expression and every view that takes it; and the modifiers of every block around it (a container's `.fontWeight`)."""
+    swift = _swift()
+    scopes = []
+    aliases = set()
+    for found in READOUT_CALL.finditer(code):
+        call = swift.opener_before(code, found.start())
+        if call >= 0 and code[call] == "(" and code[:call].rstrip().endswith(".font"):
+            link = code[:call].rstrip().rfind(".font")
+            start = swift.expression_start(code, link)
+            end = swift.chain_end(code, swift.closer(code, call) + 1)
+            scope = code[start:end]
+        else:
+            # a Font made apart (`var labelFont: Font { ... }`): its own expression, and every `.font` that takes it
+            block = swift.opener_before(code, found.start(), "{")
+            scope = code[block:swift.closer(code, block) + 1] if block >= 0 else code[found.start():found.end()]
+            named = re.search(r"var (\w+): Font\s*$", code[:block]) if block >= 0 else None
+            if named:
+                aliases.add(named.group(1))
+        around = [code[close + 1:swift.chain_end(code, close + 1)] for _, _, close in swift.blocks_around(code, found.start())]
+        scopes.append((found.start(), scope + "\n" + "\n".join(part for part in around if FONT_WEIGHT_MEDIUM.search(part))))
+    for alias in aliases:
+        for found in re.finditer(rf"\.font\((?:\w+\.)?{alias}\)", code):
+            call = found.start() + len(".font")
+            start = swift.expression_start(code, found.start())
+            end = swift.chain_end(code, swift.closer(code, call) + 1)
+            scopes.append((found.start(), code[start:end]))
+    return scopes
+
+
+def test_no_readout_asks_for_medium():
+    # Courier Prime has no Medium: asked for one, CoreText draws its Bold (measured, 25 Nov), not the Regular the
+    # drawings' browser draws at 500 - so nothing in force over a readout asks for Medium: not its font's own
+    # `.weight(...)` (a ternary's either side), not a `.fontWeight(...)` anywhere in its view's chain, before its
+    # `.font` or after, nor one on a block around it - and MonoFace has none to name
+    swift = _swift()
+    asks = []
+    for path in sorted(APP.rglob("*.swift")):
+        name = str(path.relative_to(APP))
+        if name == "Shared/Typeface.swift":
+            continue
+        code = swift.code_only(path.read_text(encoding="utf-8"))
+        for at, scope in readout_scopes(code):
+            if MEDIUM.search(scope):
+                asks.append(f"{name}:{code.count(chr(10), 0, at) + 1}")
+    assert not asks, asks
+    # the rule, rehearsed on what review found passed the line-at-a-time check
+    def caught(swift_code: str) -> bool:
+        code = swift.code_only(swift_code)
+        return any(MEDIUM.search(scope) for _, scope in readout_scopes(code))
+    assert caught("        Text(text ?? \" \")\n            .font(Typeface.readout(.caption))\n            .fontWeight(.medium)\n")
+    assert caught("        Text(x)\n            .font(Typeface.Mac.mono(.label).weight(held ? .medium : .bold))\n")
+    assert caught("        Text(x)\n            .fontWeight(.medium)\n            .lineLimit(1)\n            .font(Typeface.Phone.mono(.small))\n")
+    assert caught("        HStack {\n            Text(a)\n            Text(b)\n        }\n        .font(Typeface.readout(.body))\n"
+                  "        .fontWeight(.medium)\n")
+    assert caught("        VStack {\n            Text(a).font(Typeface.readout(.body))\n        }\n        .fontWeight(.medium)\n")
+    assert caught("    var labelFont: Font { Typeface.Phone.mono(.small) }\n    var body: some View {\n"
+                  "        Text(a).font(labelFont).fontWeight(.medium)\n    }\n")
+    assert not caught("        Text(x)\n            .font(Typeface.Mac.text(.label).weight(.medium))\n")
+    assert not caught("        Text(x)\n            .font(Typeface.readout(.body).weight(.semibold))\n"
+                      "        Text(y)\n            .font(Typeface.Mac.text(.label).weight(.medium))\n")
+    source = TYPEFACE.read_text(encoding="utf-8")
+    mono = source[source.index("enum MonoFace: String, CaseIterable {"):]
+    assert "medium" not in mono[:mono.index("}")]
+
+
+def test_each_face_is_named_for_its_own_weight():
+    # Typeface.Face and Mac.MonoFace, case by case: each case's PostScript name is the file of that weight - its name
+    # table's, its OS/2 weight's - so UIKit's `.semibold` (a bar's title, a chosen segment) is SemiBold, not Bold
+    source = TYPEFACE.read_text(encoding="utf-8")
+    face = source[source.index("enum Face: String, CaseIterable {"):]
+    face = face[:face.index("}")]
+    mono = source[source.index("enum MonoFace: String, CaseIterable {"):]
+    mono = mono[:mono.index("}")]
+    weights = {"regular": 400, "medium": 500, "semibold": 600, "bold": 700}
+    words = dict(re.findall(r'case (\w+) = "([\w-]+)"', face))
+    readouts = dict(re.findall(r'case (\w+) = "([\w-]+)"', mono))
+    assert words == {"regular": "LibreFranklin-Regular", "medium": "LibreFranklin-Medium",
+                     "semibold": "LibreFranklin-SemiBold", "bold": "LibreFranklin-Bold"}
+    assert readouts == {"regular": "CourierPrime-Regular", "bold": "CourierPrime-Bold"}
+    for case, postscript in [*words.items(), *readouts.items()]:
+        path = FONTS / f"{postscript}.ttf"
+        assert font_names(path)[6] == postscript, case
+        assert os2_weight(path) == weights[case], case
+    # and UIKit asks by case: the bars' titles and a chosen segment SemiBold, the large title Bold, the rest Regular
+    assert "uiFont(.bold, size: 34, style: .largeTitle, capped: false)" in source
+    assert "uiFont(.semibold, size: 17, style: .headline)" in source
+    assert "uiFont(.semibold, size: 13, style: .footnote)" in source
+
+
+def test_every_text_style_is_libre_franklin_scaled_as_ios_scales_it():
     source = TYPEFACE.read_text(encoding="utf-8")
     for style in STYLES:
         found = re.search(rf"static let {style} = text\(([0-9]+), \.([a-zA-Z0-9]+)\)", source)
@@ -861,8 +1105,9 @@ def test_no_system_text_font_is_left_in_the_app():
         if name == "Shared/Typeface.swift":
             continue
         where = f"{name}:{number}"
-        # a symbol drawn alone and data keep the system's faces - but only through Typeface, by name
-        plain = re.sub(r"Typeface\.(symbol|mono)\([^()]*\)", "Typeface.kept", code)
+        # a symbol drawn alone and data keep the system's faces - but only through Typeface, by name - and a readout
+        # names its text style only through Typeface.readout (Courier Prime at that style)
+        plain = re.sub(r"Typeface\.(symbol|mono|readout)\([^()]*\)", "Typeface.kept", code)
         for found in re.finditer(r"\.font\(", plain):
             depth, end = 0, len(plain)
             for end in range(found.start() + len(".font"), len(plain)):
@@ -886,7 +1131,7 @@ def test_no_system_text_font_is_left_in_the_app():
     assert "UIFont.monospacedSystemFont(ofSize: CGFloat(points), weight: .regular)" in turntable
 
 
-def test_every_list_sections_header_and_footer_is_noto_sans():
+def test_every_list_sections_header_and_footer_is_libre_franklin():
     # a header's or footer's words take the face at footnote's size (iOS's own for both), never the list's own font;
     # a section titled by a string is a menu's (QueueMenu, DownloadControl: UIMenu's titles take no font)
     lines = app_code()

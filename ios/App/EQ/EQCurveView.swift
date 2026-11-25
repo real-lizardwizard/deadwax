@@ -124,7 +124,7 @@ struct EQCurveView: View {
     /// The labels', and a correction's and the tone's lines'.
     private var labelColour: Color { well ? DWPalette.t3 : Palette.quiet }
     /// The labels' face: in mono, in a well.
-    private var labelFont: Font { well ? Typeface.Phone.mono(.extraSmall) : Typeface.caption2.monospacedDigit() }
+    private var labelFont: Font { well ? Typeface.Phone.mono(.extraSmall) : Typeface.caption2 }
 
     private func style(_ line: EQDrawing.Line) -> StrokeStyle {
         switch line.kind {
@@ -333,16 +333,16 @@ struct EQHandles {
     let hold: (Bool) -> Void
 }
 
-/// The selected filter's numbers, above the plot (3.8): `.caption.monospacedDigit()` semibold on a chip of
-/// `barTrack` (a control's corners since the squared look), as a held slider's value is - stopped at `.xxxLarge` and
-/// cut in the middle (3.15); the filter's row says it in full. Its room is kept while nothing is selected, so the plot
-/// never moves.
+/// The selected filter's numbers, above the plot (3.8): the caption's readout (Courier Prime since 25 Nov: they move as
+/// a handle is dragged) semibold on a chip of `barTrack` (a control's corners since the squared look), as a held
+/// slider's value is - stopped at `.xxxLarge` and cut in the middle (3.15); the filter's row says it in full. Its room
+/// is kept while nothing is selected, so the plot never moves.
 struct EQHandleCapsule: View {
     let text: String?
 
     var body: some View {
         Text(text ?? " ")
-            .font(Typeface.caption.monospacedDigit())
+            .font(Typeface.readout(.caption))
             .fontWeight(.semibold)
             .lineLimit(1)
             .truncationMode(.middle)

@@ -1,30 +1,46 @@
 import SwiftUI
 import UIKit
 
-/// The app's type, one place for every screen (Noto Sans, 15 Nov - notes/ios.md "Noto Sans"). James chose "Noto Sans
-/// (the web's)": the web app's own face, made for the phone from the web's own files (ios/scripts/make-fonts.py) -
-/// four faces in ios/App/Fonts, Regular, Medium, SemiBold and Bold, each the web's seven scripts merged into one font
-/// (Latin, Latin Extended, Vietnamese, Greek and Cyrillic, with their extensions), registered by Info.plist's
-/// UIAppFonts. Nothing in ios/App names a system text font of its own (tests/test_ios_palette.py holds that).
+/// The app's type, one place for every screen, on the iPhone and the Mac (notes/ios.md "The app's fonts: Libre Franklin
+/// and Courier Prime (2026-11-25)"). James chose them on 25 Nov ("libre franklin", then "Adopt it"), in place of Noto
+/// Sans (15 Nov) and Noto Sans Mono (24 Nov): **Libre Franklin** for the words and **Courier Prime** for the readouts.
+/// ios/scripts/make-fonts.py makes them from ios/scripts/fonts (google/fonts at 6ebe737e) - Libre Franklin's variable
+/// font pinned at 400, 500, 600 and 700, Courier Prime's Regular and Bold as they are - six faces in ios/App/Fonts,
+/// registered by Info.plist's UIAppFonts. Nothing in ios/App names a system text font of its own
+/// (tests/test_ios_palette.py holds that).
 ///
 /// - Each of iOS's text styles is here at its size at the standard text size (Large: body 17, footnote 13...),
 ///   `relativeTo:` its style, so it grows and shrinks with the phone's text size exactly as iOS's own did.
 ///   `.weight()`, `.bold()` and `Text.fontWeight()` pick the family's face (measured on this Mac: each draws the
 ///   named face pixel for pixel) - Regular, Medium, SemiBold, Bold; a heavier weight takes Bold.
-/// - Noto Sans's figures are tabular as they are (every digit 572 thousandths wide), so a time or a track number
-///   holds still with or without `.monospacedDigit()`, kept where it was.
-/// - `mono`: data - ids, paths, versions, an error's detail - in the system's monospace, as before (the web's
-///   Noto Sans Mono is bundled since the Mac redesign's R1, for the Mac's views: `Typeface.Mac.mono`, below - and,
-///   from R1b, the readouts a slice redraws on the phone: `Typeface.Phone.mono`).
+/// - **Libre Franklin's figures are proportional** (a 1 is 465 thousandths wide, a 0 688) and it has no tabular ones
+///   (no `tnum`), so `.monospacedDigit()` changes nothing drawn in it (measured: "1111" 82.5 pt, "0000" 118.5, at 40),
+///   and the app asks it of nothing. A number is in the readout face, Courier Prime, whose every character is 1228/2048
+///   of an em, where the drawings set it in mono, or where it changes continuously while you watch it and stands on its
+///   own - a clock, a speed, a value being dragged or held, a size growing as a download comes: `readout(_:)` at a text
+///   style, or Mac.mono, Phone.mono and Look.mono where a slice redrew it. A step count inside a sentence
+///   ("Downloading - 4 of 12 songs", "30 of 140", a place in the queue) stays in the words, as drawn: its small shift
+///   as a digit changes is accepted. tests/test_ios_palette.py's `TICKING` lists the readouts that change as you watch.
+/// - **A readout beside words sits on their first text baseline** (`HStack(alignment: .firstTextBaseline)`, the
+///   `.readout` LabeledContent style): Courier Prime's line is shorter than Libre Franklin's (1.123 of an em to 1.212)
+///   and its baseline nearer its centre (0.22 of an em under it, to 0.36), so a row centring the two would set the
+///   readout 1 to 2 points high. A piece with no words of its own in such a row - a divider, a meter - is centred on
+///   the words' line by `centredOnWords(_:)`. tests/test_ios_readout_rows.py holds every readout beside words to it.
+/// - `mono`: data - ids, paths, versions, an error's detail - in the system's monospace, as before, wherever a slice
+///   hasn't redrawn it (the readouts a slice redraws take Courier Prime: `Typeface.Mac.mono`, `Typeface.Phone.mono`).
 /// - `symbol`: what sizes an SF Symbol drawn alone (an Image) - iOS's own text style, as before, so every symbol is
 ///   the size and weight it was. A symbol inside a Label takes the Label's font, as any text beside it.
+/// - A character neither face has falls back to iOS's own font, character by character - CoreText's own cascade, as
+///   the families are registered (seen on this Mac: Greek in Libre Franklin draws in the system's sans, and Greek,
+///   Cyrillic and Vietnamese's ơ and ư in Courier Prime in the system's monospace; nothing draws as a missing glyph).
+///   Libre Franklin has Latin, Latin Extended, Vietnamese and Cyrillic but no Greek; Courier Prime Latin alone.
 ///
 /// What UIKit draws for SwiftUI - the navigation bars' titles and buttons, the search fields, the segmented
 /// controls - takes the same faces from `configureUIKit()` at launch. Menus, alerts, confirmation dialogs, swipe
 /// actions and the Paste button are iOS's own and can't be given a font: they stay in iOS's.
 enum Typeface {
-    /// The family the four faces share (their name table's, and SwiftUI's lookup).
-    static let family = "Noto Sans"
+    /// The family the four words faces share (their name table's, and SwiftUI's lookup).
+    static let family = "Libre Franklin"
 
     static let largeTitle = text(34, .largeTitle)
     static let title = text(28, .title)
@@ -39,9 +55,32 @@ enum Typeface {
     static let caption = text(12, .caption)
     static let caption2 = text(11, .caption2)
 
-    /// A text style's size in Noto Sans, scaled as that style scales.
+    /// A text style's size in Libre Franklin, scaled as that style scales.
     private static func text(_ size: CGFloat, _ style: Font.TextStyle) -> Font {
         .custom(family, size: size, relativeTo: style)
+    }
+
+    /// A readout - a number that changes while it is on screen - at a text style: Courier Prime at the style's size,
+    /// scaled as the style scales, so it grows with the text size as the words beside it do and its figures hold still
+    /// as they count. `.weight(.semibold)` and `.bold()` draw its Bold; Courier Prime has no Medium, and asked for one
+    /// it draws Bold too (measured), so nothing asks a readout for Medium.
+    static func readout(_ style: Font.TextStyle) -> Font {
+        let size: CGFloat
+        switch style {
+        case .largeTitle: size = 34
+        case .title: size = 28
+        case .title2: size = 22
+        case .title3: size = 20
+        case .headline: size = 17
+        case .body: size = 17
+        case .callout: size = 16
+        case .subheadline: size = 15
+        case .footnote: size = 13
+        case .caption: size = 12
+        case .caption2: size = 11
+        default: size = 17
+        }
+        return .custom(Mac.monoFamily, size: size, relativeTo: style)
     }
 
     /// Data: the system's monospace at a text style (ids, paths, versions, an error's detail, the turntable's line).
@@ -63,10 +102,10 @@ enum Typeface {
 
     /// The faces by their PostScript names (each file's name table; test_ios_palette.py checks them).
     enum Face: String, CaseIterable {
-        case regular = "NotoSans-Regular"
-        case medium = "NotoSans-Medium"
-        case semibold = "NotoSans-SemiBold"
-        case bold = "NotoSans-Bold"
+        case regular = "LibreFranklin-Regular"
+        case medium = "LibreFranklin-Medium"
+        case semibold = "LibreFranklin-SemiBold"
+        case bold = "LibreFranklin-Bold"
     }
 
     /// A face for UIKit at a text style's size, scaled for the text size in use - iOS's own font if the face somehow
@@ -115,14 +154,14 @@ enum Typeface {
 
 extension Typeface {
     /// (The Mac redesign, slice R1 - notes/ios.md "The Mac redesign, slice R1: the frame and the shared pieces") The
-    /// Mac's type as James approved it on the design canvas (ios/design/dw.css): Noto Sans for words and Noto Sans Mono for
-    /// data - numbers, lengths, paths, formats ("Bundle Noto Sans Mono", 24 Nov: the web's own, made for the app by
-    /// ios/scripts/make-fonts.py - Regular, Medium and SemiBold) - at the drawings' fixed sizes, as a Mac's own windows
-    /// draw theirs. Only the Mac's views (ios/App/Mac) use it; the iPhone's sizes above are as they were.
-    /// `.weight()` picks the face, as for the iPhone's.
+    /// Mac's type as James approved it on the design canvas (ios/design/dw.css): the words in Libre Franklin and the data -
+    /// numbers, lengths, paths, formats - in Courier Prime (25 Nov, "Adopt it": in place of R1's Noto Sans and its "Bundle
+    /// Noto Sans Mono" of 24 Nov), at the drawings' fixed sizes, as a Mac's own windows draw theirs. Only the Mac's views
+    /// (ios/App/Mac) use it; the iPhone's sizes above are as they were. `.weight()` picks the face, as for the iPhone's.
     enum Mac {
-        /// The family the three mono faces share (their name table's, and SwiftUI's lookup).
-        static let monoFamily = "Noto Sans Mono"
+        /// The readouts' family, Courier Prime - the two faces' name table's, and SwiftUI's lookup - for the Mac's data,
+        /// Look.mono, Phone.mono and Typeface.readout alike.
+        static let monoFamily = "Courier Prime"
 
         /// The drawings' sizes, in points (dw.css's px; tests/test_ios_mac_look.py holds each to it).
         enum Size: Double, CaseIterable {
@@ -154,16 +193,19 @@ extension Typeface {
             .custom(family, fixedSize: CGFloat(size.rawValue))
         }
 
-        /// Data at a size, in Noto Sans Mono.
+        /// Data at a size, in Courier Prime.
         static func mono(_ size: Size) -> Font {
             .custom(monoFamily, fixedSize: CGFloat(size.rawValue))
         }
 
-        /// The mono faces by their PostScript names (each file's name table; test_ios_palette.py checks them).
+        /// The mono faces by their PostScript names (each file's name table; test_ios_palette.py checks them). Courier
+        /// Prime has no Medium or SemiBold: as the drawings' browser does, a rule asking 500 is drawn Regular and one
+        /// asking 600 Bold - `.weight(.semibold)` and `.bold()` draw Bold (measured). Asked for `.medium`, Apple's
+        /// CoreText draws Bold too, not Regular (measured on this Mac), so nothing in the app asks a readout for Medium
+        /// (test_ios_palette.py holds that): a readout the drawings set at 500 is drawn at the default, Regular.
         enum MonoFace: String, CaseIterable {
-            case regular = "NotoSansMono-Regular"
-            case medium = "NotoSansMono-Medium"
-            case semibold = "NotoSansMono-SemiBold"
+            case regular = "CourierPrime-Regular"
+            case bold = "CourierPrime-Bold"
         }
     }
 }
@@ -223,7 +265,7 @@ extension Typeface {
             Platform.mac ? Mac.text(role.mac) : .custom(family, size: role.phone.points, relativeTo: role.phone.style)
         }
 
-        /// Data in a role (a count), in Noto Sans Mono, on this device.
+        /// Data in a role (a count), in Courier Prime, on this device.
         static func mono(_ role: Role) -> Font {
             Platform.mac ? Mac.mono(role.mac)
                 : .custom(Mac.monoFamily, size: role.phone.points, relativeTo: role.phone.style)
@@ -232,10 +274,9 @@ extension Typeface {
 
     /// (R1b) The phone's own pieces' type (ios/App/Phone), the phone's alone: dw.css's `.dw.ph` sizes - each scaled
     /// `relativeTo:` the text style nearest it, the smaller on a tie (R2's titled top's 28, iLibrary's own, went with it
-    /// in R2b). `mono` is
-    /// Noto Sans Mono, the bundled face, scaled the same way: for the readouts a slice redraws in mono ("3 of 11",
-    /// "FLAC 16/44.1", "8 songs · 33 min left"). Typeface.mono, the system's, stays wherever a slice hasn't redrawn the
-    /// data.
+    /// in R2b). `mono` is Courier Prime, the readout face, scaled the same way: for the readouts a slice redraws in mono
+    /// ("3 of 11", "FLAC 16/44.1", "8 songs · 33 min left"). Typeface.mono, the system's, stays wherever a slice hasn't
+    /// redrawn the data.
     enum Phone {
         enum Size: CaseIterable {
             /// A one-tap strip's button (.chips > button).
@@ -279,9 +320,61 @@ extension Typeface {
             .custom(family, size: size.scaled.points, relativeTo: size.scaled.style)
         }
 
-        /// A readout at a size, in Noto Sans Mono, scaled.
+        /// A readout at a size, in Courier Prime, scaled.
         static func mono(_ size: Size) -> Font {
             .custom(Mac.monoFamily, size: size.scaled.points, relativeTo: size.scaled.style)
         }
     }
+}
+
+// MARK: a readout beside words (25 Nov)
+
+extension Typeface {
+    /// How far Libre Franklin's baseline sits under the centre of its line, in ems: its ascender 966 and descender 246
+    /// of 1000, no line gap - (966 - 246) / 2. Courier Prime's sits 0.22 under (its ascender 1600 and descender 700 of
+    /// 2048), so the two centred side by side would set the readout's baseline higher (test_ios_palette.py measures
+    /// both from the files).
+    static let wordsBaselineUnderCentre: CGFloat = 0.36
+}
+
+extension View {
+    /// A piece with no words of its own - a divider, a meter - in a row set on the first text baseline, centred on the
+    /// line of the words at `size` points, where it was while the row was centred. Without it the row would stand the
+    /// piece on the baseline (a view without text has its bottom for one). (The Mac's views pass one of its sizes'
+    /// points: Typeface.Mac is named only from the Mac's own files - test_ios_mac_reach.py.)
+    func centredOnWords(_ size: CGFloat) -> some View {
+        alignmentGuide(.firstTextBaseline) { (piece: ViewDimensions) -> CGFloat in
+            piece[VerticalAlignment.center] + size * Typeface.wordsBaselineUnderCentre
+        }
+    }
+}
+
+/// (25 Nov) A fact's row with its value on its label's first text baseline - laid out as a list's own LabeledContent
+/// is, the label leading and the value trailing in the secondary colour, but never centred on the label, which would
+/// set a readout (Courier Prime) 1 to 2 points above the words beside it. Where the two don't fit side by side (the
+/// accessibility sizes) the value goes under its label. One element for VoiceOver, its label then its value, as a
+/// LabeledContent is. `.labeledContentStyle(.readout)`, on the row or on what holds it.
+struct ReadoutLabeledContentStyle: LabeledContentStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                configuration.label
+                Spacer(minLength: 8)
+                configuration.content
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                configuration.label
+                configuration.content
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension LabeledContentStyle where Self == ReadoutLabeledContentStyle {
+    /// A fact's row with its value on its label's baseline (ReadoutLabeledContentStyle).
+    static var readout: ReadoutLabeledContentStyle { ReadoutLabeledContentStyle() }
 }

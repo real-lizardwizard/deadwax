@@ -304,8 +304,11 @@ def test_a_rows_words_sit_in_its_middle():
     columns = bare(source(COLUMN_LIST))
     line = body(columns, "private func line(")
     assert off_centre(line) == [], off_centre(line)
-    # the row's own stack and frames: centred - a leading frame leads across, never up or down
-    assert calls(line, "HStack") == ["spacing: 0"], calls(line, "HStack")
+    # the row's own stack and frames: centred - a leading frame leads across, never up or down. (The fonts commit, 25
+    # Nov) The cells on one first text baseline - Courier Prime's shorter line, centred, sat a readout 1-2 pt above the
+    # words beside it - and the row's frame centres that line in the row's height, whatever the size: never the top or
+    # the foot (tests/test_ios_readout_rows.py holds every readout beside words to the baseline)
+    assert calls(line, "HStack") == ["alignment: .firstTextBaseline, spacing: 0"], calls(line, "HStack")
     assert calls(line, ".frame") == ["width: CGFloat(index < widths.count ? widths[index] : 0), alignment: .leading",
                                      "height: CGFloat(rowSize.rowHeight)",
                                      "maxWidth: .infinity, alignment: .leading"], calls(line, ".frame")
@@ -315,7 +318,7 @@ def test_a_rows_words_sit_in_its_middle():
         assert "maxHeight" not in drawn and "minHeight" not in drawn, name
     requests = bare(source(REQUESTS))
     row = body(requests, "private func rowLine(")
-    assert off_centre(row) == [] and calls(row, "HStack") == ["spacing: 0"], off_centre(row)
+    assert off_centre(row) == [] and calls(row, "HStack") == ["alignment: .firstTextBaseline, spacing: 0"], off_centre(row)
     # every column's cell through cell(), leading or trailing across and centred up and down
     placed = calls(row, "cell")
     assert len(placed) == 6 and all(not OFF_CENTRE.search(args) for args in placed), placed
@@ -334,12 +337,18 @@ def test_a_rows_words_sit_in_its_middle():
 
 def test_a_downloads_meter_sits_in_the_rows_middle():
     # Requests' meter (DWMeter) and its words: one stack in the cell's middle - no frame or stack of theirs pinned to
-    # the row's top or foot, nothing as tall as the row, its least width the only frame
+    # the row's top or foot, nothing as tall as the row, its least width the only frame. (The fonts commit) The words on
+    # the row's baseline, and the meter - no words of its own, so its foot would be its baseline - centred on their line
+    # by centredOnWords at the row's words' size, where the centred stack had it
     progress = body(bare(source(REQUESTS)), "@ViewBuilder private func progressCell(")
     downloading = progress[progress.index("case .downloading:"):progress.index("case .waiting:")]
     assert calls(downloading, ".frame") == ["minWidth: CGFloat(RequestColumns.meterLeast)"], calls(downloading, ".frame")
-    assert calls(downloading, "HStack") == ["spacing: 8"], calls(downloading, "HStack")
-    assert off_centre(downloading) == [] and "alignment" not in downloading
+    assert calls(downloading, "HStack") == ["alignment: .firstTextBaseline, spacing: 8"], calls(downloading, "HStack")
+    assert calls(downloading, ".centredOnWords") == ["CGFloat(Typeface.Mac.Size.base.rawValue)"], downloading
+    assert ("DWMeter(fraction: row.progress / 100) .frame(minWidth: CGFloat(RequestColumns.meterLeast)) "
+            ".centredOnWords(CGFloat(Typeface.Mac.Size.base.rawValue))") in flat(downloading)
+    assert off_centre(downloading) == []
+    assert "alignment" not in downloading.replace("HStack(alignment: .firstTextBaseline, spacing: 8)", "HStack(spacing: 8)")
     assert flat(downloading).count("DWMeter(fraction: row.progress / 100)") == 1
     # the cell it sits in is centred too (test_a_rows_words_sit_in_its_middle), and so is the row
     row = flat(body(bare(source(REQUESTS)), "private func rowLine("))

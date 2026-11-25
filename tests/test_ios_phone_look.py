@@ -287,7 +287,7 @@ def test_the_cascade_is_specificity_then_order():
     # a font shorthand as its size, weight and family, `var()` read from the root's own: .count's 600 11px var(--mono)
     count = resolved(".count")
     assert (count["font-size"], count["font-weight"]) == ("11px", "600"), count
-    assert count["font-family"].startswith('"Noto Sans Mono"'), count["font-family"]
+    assert count["font-family"].startswith('"Courier Prime"'), count["font-family"]
     synthetic = css_rules('.dw { --m: "Mono", monospace; } .dw .f { font: 600 11px var(--m); } .dw .f.g { font-size: 12px; }')
     assert resolved(".f", MAC_ROOT, synthetic) == {"font-size": "11px", "font-weight": "600",
                                                   "font-family": '"Mono", monospace'}
@@ -390,7 +390,7 @@ def test_the_looks_phone_type_is_the_phones_rules_scaled():
     for name, points, style, selector, prop in lines:
         assert float(points) == px(css(selector, prop)), f"Typeface.Look {name} is not .dw.ph {selector}'s size"
         assert style == nearest(float(points)), f"{name}: {points} scales with .{nearest(float(points))}, not .{style}"
-    # the Mac's fixed, as R1's; the phone's scaled, Noto Sans and Noto Sans Mono
+    # the Mac's fixed, as R1's; the phone's scaled, Libre Franklin and Courier Prime
     assert "Platform.mac ? Mac.text(role.mac) : .custom(family, size: role.phone.points, relativeTo: role.phone.style)" in look
     assert ".custom(Mac.monoFamily, size: role.phone.points, relativeTo: role.phone.style)" in look
 

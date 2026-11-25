@@ -138,14 +138,21 @@ def test_each_page_draws_the_sheets_top():
 #? words - Typeface.Phone's .back and Typeface.Look's .smallButton scale relative to them)
 HEADLINE = {"large": 17, "xLarge": 19, "xxLarge": 21, "xxxLarge": 23}
 FOOTNOTE = {"large": 13, "xLarge": 15, "xxLarge": 17, "xxxLarge": 19}
-#? a proportional face's mean advance as a share of its size: Noto Sans's is about 0.5 em - taken wide
-ADVANCE = 0.55
 PHONE = 375
 BAR_SIDE = 16
+#? (the app's fonts, 25 Nov) the words' widths measured from the faces the app bundles - tests/ios_fonts.py. Measured,
+#? Libre Franklin is narrower than the 0.55 em a letter these were first worked out with, and each top would still fit
+#? whole one size past its fold - the Queue's at xLarge with 12 points to spare, the EQ's at xxxLarge with 22. The
+#? folds stay where R3b put them: a top that leaves under FOLD_SPARE folds, room for what's worked out rather than
+#? measured (the back link's chevron is an SF Symbol, the ••• a glyph's guess, the buttons' sides the style's padding).
+fonts = _load("ios_fonts")
+FOLD_SPARE = 24
 
 
-def words_width(words: str, points: float) -> float:
-    return len(words) * ADVANCE * points
+def words_width(words: str, points: float, weight: str = "regular") -> float:
+    """`words` across at `points`, in Libre Franklin at a weight: the back link and the switch's words Regular, a
+    button's Medium (DWButtonStyle's .normal)."""
+    return fonts.words(words, points, weight)
 
 
 def test_the_queues_top_fits_a_375_point_phone_and_folds_from_xlarge():
@@ -165,7 +172,7 @@ def test_the_queues_top_fits_a_375_point_phone_and_folds_from_xlarge():
     pad, gap = 11, 8
 
     def button(words: str, size: str) -> float:
-        return words_width(words, 13.5 * FOOTNOTE[size] / 13) + 2 * pad
+        return words_width(words, 13.5 * FOOTNOTE[size] / 13, "medium") + 2 * pad
 
     def width(size: str, folded: bool) -> float:
         back = words_width("‹ Now Playing", 17 * HEADLINE[size] / 17)
@@ -175,9 +182,9 @@ def test_the_queues_top_fits_a_375_point_phone_and_folds_from_xlarge():
             right = button("History", size) + gap + button("Clear", size) + gap + button("Edit", size)
         return BAR_SIDE + back + gap + right + BAR_SIDE
 
-    assert width("large", folded=False) <= PHONE, width("large", folded=False)
-    #? and at xLarge the three wouldn't: the fold is where it has to be, no later
-    assert width("xLarge", folded=False) > PHONE, width("xLarge", folded=False)
+    assert width("large", folded=False) <= PHONE - FOLD_SPARE, width("large", folded=False)
+    #? and at xLarge the three would leave under FOLD_SPARE: the fold is where it has to be, no later
+    assert width("xLarge", folded=False) > PHONE - FOLD_SPARE, width("xLarge", folded=False)
     for size in ("xLarge", "xxLarge", "xxxLarge"):
         assert width(size, folded=True) <= PHONE, (size, width(size, folded=True))
 
@@ -228,6 +235,7 @@ def test_the_time_left_is_a_small_view_of_its_own_reading_the_rows_drawn():
     outside = queue.replace(line, "")
     assert "shownPosition" not in outside and "player.speed" not in outside
     #? (R3b's review) on the Mac the status bar's 11.5 in its own type - not mono - leading; the phone's mono, trailing
+    #? (the app's fonts, 25 Nov: it changes once a minute, so the Mac's stays in the words, as drawn)
     assert ".font(Platform.mac ? Typeface.Look.text(.chip) : Typeface.Phone.mono(.extraSmall))" in line
     assert ".multilineTextAlignment(Platform.mac ? .leading : .trailing)" in line
     words = bare(TIME_LEFT)
@@ -331,9 +339,9 @@ def test_the_eqs_top_fits_a_375_point_phone_and_folds_at_xxxlarge():
         return BAR_SIDE + back + gap + words + gap + face + gap + more + BAR_SIDE
 
     for size in ("large", "xLarge", "xxLarge"):
-        assert width(size, folded=False) <= PHONE - spare, (size, width(size, folded=False))
-    #? and at xxxLarge it wouldn't, with a margin: the fold is where it has to be, no earlier
-    assert width("xxxLarge", folded=False) > PHONE - spare, width("xxxLarge", folded=False)
+        assert width(size, folded=False) <= PHONE - FOLD_SPARE, (size, width(size, folded=False))
+    #? and at xxxLarge it would leave under FOLD_SPARE: the fold is where it has to be, no earlier
+    assert width("xxxLarge", folded=False) > PHONE - FOLD_SPARE, width("xxxLarge", folded=False)
     assert width("xxxLarge", folded=True) <= PHONE - 3 * spare, width("xxxLarge", folded=True)
 
 

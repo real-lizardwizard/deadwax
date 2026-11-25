@@ -178,7 +178,6 @@ struct EditAlbumSheet: View {
         Spacer()
         Text(nav.place)
             .font(Typeface.footnote)
-            .monospacedDigit()
             .foregroundStyle(Palette.quiet)
         Spacer()
         Button(nav.forward) {

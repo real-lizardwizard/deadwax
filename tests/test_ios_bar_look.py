@@ -38,6 +38,7 @@ def _load(name: str):
 reader = _load("test_ios_no_web_app")
 phone_look = _load("test_ios_phone_look")
 mac_look = _load("test_ios_mac_look")
+fonts = _load("ios_fonts")
 
 BAR = "Player/PlayerBar.swift"
 MINI = "Player/MiniPlayerView.swift"
@@ -91,10 +92,11 @@ def look_size(enum: str, name: str, file: str) -> float:
     return float(re.search(rf"public static let {name}: Double = (-?[0-9.]+)\b", text).group(1))
 
 
-def estimate(words: str, size: float, mono: bool = False) -> float:
-    """A width for `words` at `size`, from above: 0.55 of the size a letter in Noto Sans, the mono face's 0.6 exactly
-    (test_ios_requests_look.py's)."""
-    return len(words) * size * (0.6 if mono else 0.55)
+def estimate(words: str, size: float, mono: bool = False, weight: str = "semibold") -> float:
+    """A width for `words` at `size`, measured from the bundled faces (tests/ios_fonts.py, 25 Nov - it was 0.55 of the
+    size a letter in Noto Sans until then): Libre Franklin at `weight` - SemiBold unless said, the heaviest the bar's
+    words take, so from above - or the readout face, Courier Prime, for `mono`."""
+    return fonts.readout(words, size) if mono else fonts.words(words, size, weight)
 
 
 def tabs_bar() -> str:

@@ -122,7 +122,7 @@ struct EQSliders: View {
     }
 
     /// The scale's and the names' face and colour: the third colour in mono on the phone.
-    static var labelFont: Font { phone ? Typeface.Phone.mono(.extraSmall) : Typeface.caption2.monospacedDigit() }
+    static var labelFont: Font { phone ? Typeface.Phone.mono(.extraSmall) : Typeface.caption2 }
     static var labelColour: Color { phone ? DWPalette.t3 : Palette.quiet }
 
     private func drag(column: CGFloat) -> some Gesture {
@@ -200,7 +200,7 @@ private struct EQBandColumn: View {
             if held {
                 Text(EQWords.held(gain))
                     .font(EQSliders.phone ? Typeface.Phone.mono(.extraSmall).weight(.semibold)
-                                          : Typeface.caption.monospacedDigit().weight(.semibold))
+                                          : Typeface.readout(.caption).weight(.semibold))
                     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .fixedSize()
                     .padding(.horizontal, 6)
@@ -291,10 +291,12 @@ struct EQStepperRow: View {
 
     /// The words, for the eye: the Stepper says them to VoiceOver.
     private var words: some View {
-        HStack(spacing: 12) {
+        // on the band's baseline (25 Nov): centred, Courier Prime's shorter line would sit the gain higher
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(EQWords.Tone.bandLabel(band))
+            // the gain in the readout face (25 Nov): it counts as the stepper is held
             Text(EQWords.held(gain))
-                .monospacedDigit()
+                .font(Typeface.readout(.body))
                 .foregroundStyle(Palette.quiet)
         }
         .accessibilityHidden(true)

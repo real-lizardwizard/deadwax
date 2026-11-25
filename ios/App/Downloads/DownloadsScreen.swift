@@ -318,7 +318,6 @@ private struct StorageSection: View {
                         Text(Bytes.words(downloads.otherBytes))
                             .font(Typeface.subheadline)
                             .foregroundStyle(Palette.quiet)
-                            .monospacedDigit()
                     }
                     .accessibilityElement(children: .combine)
                     Spacer(minLength: 8)
@@ -556,7 +555,6 @@ private struct PlaylistLineRow: View {
                     Text(row.line)
                         .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
-                        .monospacedDigit()
                         .fixedSize(horizontal: false, vertical: true)
                     if let fraction = row.fraction {
                         DownloadBar(fraction: fraction)
@@ -858,7 +856,6 @@ private struct DownloadedSection: View {
                     Text(row.line)
                         .font(Typeface.subheadline)
                         .foregroundStyle(Palette.quiet)
-                        .monospacedDigit()
                     if large { verdict(row.verdict).padding(.top, 2) }
                 } trailing: {
                     if !large { verdict(row.verdict) }

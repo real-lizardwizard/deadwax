@@ -153,7 +153,9 @@ struct MacColumnList<Row: Identifiable, Cell: View, Menu: ViewModifier>: View wh
 
     private func line(_ row: Row, striped: Bool, widths: [Double]) -> some View {
         let on = row.id == selected
-        return HStack(spacing: 0) {
+        // (25 Nov) the cells on one first text baseline: a readout's (Courier Prime's) shorter line would sit it higher
+        // in a centred row
+        return HStack(alignment: .firstTextBaseline, spacing: 0) {
             ForEach(columns.indices, id: \.self) { (index: Int) in
                 cell(row, index)
                     .lineLimit(1)

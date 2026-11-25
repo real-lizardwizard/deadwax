@@ -69,7 +69,9 @@ struct MacRequestsPage: View {
         } content: {
             content(board)
         }
-        .macStatus(MacStatusItems.Items(leading: reachability.online ? RequestFilter.status(board) : []))
+        // the downloads' speed in the readout face (25 Nov): it changes with every poll
+        .macStatus(MacStatusItems.Items(leading: reachability.online ? RequestFilter.status(board) : [],
+                                        readouts: [RequestWords.speed(RequestFilter.speed(board))]))
         // the sheet let go - closed, or a Get asked for: its search goes as the dismissal begins
         .appSheet(item: Binding(get: { getting }, set: { (next: GetRequest?) in
             if next == nil { getting?.search.close() }
@@ -412,7 +414,9 @@ struct MacRequestsPage: View {
     private func rowLine(_ row: RequestRow, widths: [CGFloat], striped: Bool) -> some View {
         let on = selected == row.key
         let offered = RequestAction.offered(row, gets: server.access.can(.request), online: reachability.online)
-        return HStack(spacing: 0) {
+        // (25 Nov) the cells on one first text baseline: a readout's (Courier Prime's) shorter line would sit it higher
+        // in a centred row
+        return HStack(alignment: .firstTextBaseline, spacing: 0) {
             cell(widths[0]) { albumCell(row) }
             cell(widths[1]) {
                 Text(row.artist)
@@ -502,9 +506,11 @@ struct MacRequestsPage: View {
     @ViewBuilder private func progressCell(_ row: RequestRow) -> some View {
         switch row.section {
         case .downloading:
-            HStack(spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                // centred on the row's words, as it was while the row was centred (25 Nov)
                 DWMeter(fraction: row.progress / 100)
                     .frame(minWidth: CGFloat(RequestColumns.meterLeast))
+                    .centredOnWords(CGFloat(Typeface.Mac.Size.base.rawValue))
                 Text(row.progressWords ?? "")
                     .font(Typeface.Mac.mono(.label))
                     .foregroundStyle(DWPalette.t2)

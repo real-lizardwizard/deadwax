@@ -221,7 +221,6 @@ struct EQFilterEditor: View {
                     }), prompt: placeholder.map { Text($0) })
                     .keyboardType(.numbersAndPunctuation)
                     .multilineTextAlignment(.trailing)
-                    .monospacedDigit()
                     .foregroundStyle(problem == nil ? Color.primary : Palette.danger)
                     .focused($focus, equals: field)
                     .submitLabel(.done)

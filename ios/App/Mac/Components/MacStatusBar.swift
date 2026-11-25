@@ -10,7 +10,9 @@ struct MacStatusBar: View {
     let items: MacStatusItems.Items
 
     var body: some View {
-        HStack(spacing: 0) {
+        // (25 Nov) on the facts' first text baseline: a readout among them (Courier Prime, its line shorter than Libre
+        // Franklin's) would sit higher in a centred row. The dividers are centred on the words' line, as they were.
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
             facts(items.leading)
             Spacer(minLength: 0)
             facts(items.trailing)
@@ -31,8 +33,14 @@ struct MacStatusBar: View {
 
     private func facts(_ facts: [String]) -> some View {
         ForEach(Array(facts.enumerated()), id: \.offset) { (index: Int, fact: String) in
-            Text(fact)
-                .font(Typeface.Mac.text(.label))
+            Group {
+                // a fact that ticks in the readout face (25 Nov): Libre Franklin's figures would shift as it counts
+                if items.readouts.contains(fact) {
+                    Text(fact).font(Typeface.Mac.mono(.label))
+                } else {
+                    Text(fact).font(Typeface.Mac.text(.label))
+                }
+            }
                 .foregroundStyle(DWPalette.t3)
                 .lineLimit(1)
                 .padding(.horizontal, 10)
@@ -40,6 +48,7 @@ struct MacStatusBar: View {
             if index < facts.count - 1 {
                 DWRule(colour: MacPalette.divider, vertical: true)
                     .frame(height: 14)
+                    .centredOnWords(CGFloat(Typeface.Mac.Size.label.rawValue))
             }
         }
     }

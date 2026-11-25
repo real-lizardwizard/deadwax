@@ -17,7 +17,7 @@
   --selbg: linear-gradient(to bottom, rgba(168, 85, 247, 0.22), rgba(168, 85, 247, 0.1));
   --selbd: rgba(192, 132, 252, 0.5);
   --well: #09080d;
-  --mono: "Noto Sans Mono", ui-monospace, Menlo, monospace;
+  --mono: "Courier Prime", ui-monospace, Menlo, monospace;
   width: 1280px;
   height: 852px;
   display: flex;
@@ -25,7 +25,7 @@
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font: 400 13px/1.35 "Noto Sans", system-ui, -apple-system, sans-serif;
+  font: 400 13px/1.35 "Libre Franklin", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 .dw * { box-sizing: border-box; }

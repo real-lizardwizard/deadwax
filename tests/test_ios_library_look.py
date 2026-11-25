@@ -35,6 +35,7 @@ def _load(name: str):
 
 
 phone_look = _load("test_ios_phone_look")
+fonts = _load("ios_fonts")
 bare = phone_look.bare
 css = phone_look.css
 px = phone_look.px
@@ -412,7 +413,6 @@ def test_white_is_where_you_are_and_purple_what_a_tap_goes_to():
 
 # ----------------------------------------------------------------------------- the row and the line fit, by arithmetic
 
-FONTS = APP / "Fonts"
 #? Dynamic Type's footnote and body at each size (Apple's table): the row and the line are capped at xxxLarge, so every
 #? accessibility size draws them as xxxLarge does
 FOOTNOTE = {"xSmall": 12, "small": 12, "medium": 12, "large": 13, "xLarge": 15, "xxLarge": 17, "xxxLarge": 19}
@@ -425,42 +425,10 @@ CARET = 8
 NARROW = 375
 
 
-def advances(name: str) -> tuple[float, dict[int, int], list[int]]:
-    """A TrueType face's units per em, its character map (format 4, Windows Unicode BMP) and its glyphs' advances."""
-    data = (FONTS / name).read_bytes()
-    u16 = lambda at: int.from_bytes(data[at:at + 2], "big")  # noqa: E731
-    tables = {data[12 + 16 * i:16 + 16 * i].decode(): int.from_bytes(data[20 + 16 * i:24 + 16 * i], "big")
-              for i in range(u16(4))}
-    units = u16(tables["head"] + 18)
-    widths = [u16(tables["hmtx"] + 4 * i) for i in range(u16(tables["hhea"] + 34))]
-    cmap, chars = tables["cmap"], {}
-    for i in range(u16(cmap + 2)):
-        record = cmap + 4 + 8 * i
-        if (u16(record), u16(record + 2)) != (3, 1):
-            continue
-        sub = cmap + int.from_bytes(data[record + 4:record + 8], "big")
-        count = u16(sub + 6) // 2
-        ends, starts = sub + 14, sub + 16 + 2 * count
-        deltas, offsets = starts + 2 * count, starts + 4 * count
-        for k in range(count):
-            for char in range(u16(starts + 2 * k), u16(ends + 2 * k) + 1):
-                if char == 0xFFFF:
-                    continue
-                if u16(offsets + 2 * k) == 0:
-                    glyph = (char + u16(deltas + 2 * k)) & 0xFFFF
-                else:
-                    glyph = u16(offsets + 2 * k + u16(offsets + 2 * k) + 2 * (char - u16(starts + 2 * k)))
-                    glyph = (glyph + u16(deltas + 2 * k)) & 0xFFFF if glyph else 0
-                chars[char] = glyph
-    return units, chars, widths
-
-
-FACES = {weight: advances(f"NotoSans-{weight}.ttf") for weight in ("Regular", "SemiBold")}
-
-
 def words_width(words: str, points: float, weight: str = "Regular") -> float:
-    units, chars, widths = FACES[weight]
-    return sum(widths[min(chars[ord(char)], len(widths) - 1)] for char in words) / units * points
+    """`words`' width at `points` in the app's words face, "Regular" or "SemiBold": the bundled face's advances, read by
+    tests/ios_fonts.py (Libre Franklin since 25 Nov - R2b measured in Noto Sans, the face before it)."""
+    return fonts.words(words, points, weight.lower())
 
 
 def phone_number(name: str) -> float:
@@ -605,14 +573,15 @@ def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
     # Albums' line with Yours | All - its fullest - at the standard size and at xLarge, on each phone (F one line, S one
     # line with the count's noun dropped, f folded, s folded with it dropped): a three- and a four-figure library, and
     # Find's "N of M" in each, under the default order ("Artist"), "Recently added" and the longest. Counts are Core's
-    # own (no thousands separator). In Noto Sans, the face drawn today: another face moves these, and this table with it
+    # own (no thousands separator). In Libre Franklin (25 Nov), the face drawn today: another face moves these, and this
+    # table with it - Libre Franklin moved two from R2b's Noto Sans, said beside them
     expected = {
         "large": {"140 albums": ("FFF", "SFF", "SSF"),
                   "2318 albums": ("FFF", "SFF", "SSS"),
                   "12 of 140 albums": ("FFF", "SSS", "fSS"),
                   "12 of 2318 albums": ("FFF", "fSS", "fSS"),
-                  "1234 of 2318 albums": ("SFF", "fSS", "fff")},
-        "xLarge": {"140 albums": ("FFF", "SSS", "SSS"),
+                  "1234 of 2318 albums": ("SFF", "ffS", "fff")},  # Noto Sans: "fSS" - 393 held it
+        "xLarge": {"140 albums": ("FFF", "SSS", "fSS"),  # Noto Sans: "SSS" - 375 held it
                    "2318 albums": ("FFF", "SSS", "fSS"),
                    "12 of 140 albums": ("SFF", "ffS", "fff"),
                    "12 of 2318 albums": ("SSF", "fff", "fff"),
@@ -627,9 +596,10 @@ def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
                 got = "".join(fit(full, short, end, phone - lead - trail) for phone in PHONES)
                 assert got == want, (size, count, order, got)
     # so, at the standard size: a library's count never folds the line on any of them, under any order - the review's
-    # "140 albums · Recently added" (351 of 343 on 375) now "140 · Recently added"; on 393 and 402 Find's first keystroke
-    # never folds it either but for a four-figure find under the longest order; on 375, with "Recently added", only in a
-    # four-figure library (notes/ios.md "The redesign, slice R2b": what is left)
+    # "140 albums · Recently added" (352 of 343 on 375; 351 in Noto Sans) now "140 · Recently added"; on 402 Find's
+    # first keystroke never folds it either but for a four-figure find under the longest order, on 393 under "Recently
+    # added" too; on 375, with "Recently added", only in a four-figure library (notes/ios.md "The redesign, slice R2b":
+    # what is left)
     points = FOOTNOTE["large"]
     for count in ("140 albums", "2318 albums"):
         for order in album_orders:

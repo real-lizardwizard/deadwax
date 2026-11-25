@@ -42,13 +42,15 @@ BINARY_SUFFIXES = {".png", ".woff2", ".flac"}
 # kept whole for three cases, written by ios/scripts/export-deck-vectors.cjs and checked against it byte for byte by
 # ui/test/iosdeck.sim.cjs - base64 in JSON would take the folder past its 3 MB budget. A .f32 anywhere else is a new
 # decision, as a new suffix is.
-# .ttf: the iPhone app's Noto Sans, one TrueType font per weight made from the web's own woff2 by ios/scripts/make-fonts.py
-# (notes/ios.md "Noto Sans (15 Nov)") and held to the web's by tests/test_ios_palette.py.
+# .ttf: the iPhone and Mac app's fonts, Libre Franklin and Courier Prime (notes/ios.md "The app's fonts: Libre Franklin
+# and Courier Prime (2026-11-25)"): the files as downloaded, in ios/scripts/fonts/, and the faces
+# ios/scripts/make-fonts.py makes from them, in ios/App/Fonts/ - both held by tests/test_ios_palette.py, the sources to
+# their hashes.
 # .icns: the Mac app's icon, AppIcon.icns, made by ios/scripts/make-icon.py beside the phone's PNGs and checked by
 # ios/scripts/check_project.py - its images, their sizes, the 1024 one's centre and corners (notes/ios.md "The Mac app,
 # slice 1: it runs and plays").
-BINARY_IN = {".f32": "ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice/", ".ttf": "ios/App/Fonts/",
-             ".icns": "ios/App/Icon/"}
+BINARY_IN = {".f32": ("ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/deck/voice/",),
+             ".ttf": ("ios/App/Fonts/", "ios/scripts/fonts/"), ".icns": ("ios/App/Icon/",)}
 
 
 def _binary(rel):
@@ -102,10 +104,11 @@ def test_the_binary_skip_list_only_covers_real_binaries():
     assert BINARY_SUFFIXES <= suffixes, (
         "BINARY_SUFFIXES lists a format no longer tracked: %s" % (BINARY_SUFFIXES - suffixes)
     )
-    for suffix, folder in BINARY_IN.items():
-        assert any(p.startswith(folder) and p.endswith(suffix) for p in tracked), (
-            "BINARY_IN lists %s in %s, which no longer holds one" % (suffix, folder)
-        )
+    for suffix, folders in BINARY_IN.items():
+        for folder in folders:
+            assert any(p.startswith(folder) and p.endswith(suffix) for p in tracked), (
+                "BINARY_IN lists %s in %s, which no longer holds one" % (suffix, folder)
+            )
 
 
 def test_a_binary_allowed_in_one_folder_is_checked_everywhere_else():
@@ -115,3 +118,6 @@ def test_a_binary_allowed_in_one_folder_is_checked_everywhere_else():
     assert _binary("interface/player/icon.png")
     assert _binary("ios/App/Icon/AppIcon.icns")
     assert not _binary("ios/App/AppIcon.icns")
+    # (the app's fonts, 25 Nov) a font in either of its two folders, and nowhere else
+    assert _binary("ios/App/Fonts/LibreFranklin-Bold.ttf") and _binary("ios/scripts/fonts/courierprime/CourierPrime-Bold.ttf")
+    assert not _binary("ios/App/LibreFranklin-Bold.ttf") and not _binary("ios/scripts/CourierPrime-Bold.ttf")

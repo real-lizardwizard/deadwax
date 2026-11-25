@@ -244,7 +244,7 @@ for ([404-415](#the-mac-apps-checks-404-415),
 [416-423](#the-mac-apps-menus-keys-and-window-checks-416-423), [424-433](#the-mac-apps-desktop-frame-checks-424-433),
 [434-438](#the-mac-apps-words-checks-434-438), [439-446](#the-mac-apps-sleep-power-and-downloads-checks-439-446),
 [447-451](#the-mac-apps-eq-files-checks-447-451), [452-458](#the-mac-apps-managing-checks-452-458) and
-[518-525, 532-540 and 608-609](#the-mac-redesigns-checks-518-609)).
+[518-525, 532-540 and 608-609](#the-mac-redesigns-checks-518-611)).
 
 **What it is today.** The window is laid out as the web app's desktop is, whatever its size: the **sidebar** at the
 left, the **page** you're on beside it, the **side panel** at the right when you open it - Queue, Lyrics, Info or EQ - and the
@@ -659,14 +659,24 @@ corners, everywhere they're drawn - the album page, Now Playing, the tiles and t
 buttons and chips small square ones. The mini player is square, as the tab bar it sits on. Artists' pictures,
 the avatar, and the two buttons at the top of the Library stay round.
 
-The app's words are in **Noto Sans**, the web app's face, since the build after the squared look (still 0.11): every
-screen's titles, rows, buttons and notes, the navigation bars' titles, and the search fields. It covers the same
-letters the web app's does: Latin with every European language's accents, Vietnamese, Greek and Cyrillic.
-Anything else, such as Japanese, Korean or Arabic, is drawn in iOS's own face. It grows and shrinks with your text
-size as iOS's own did. Times and track numbers keep their place as they count. A few things are still in iOS's
-face: the symbols, the menus, alerts and swipe buttons (iOS draws those itself), and ids, paths and versions,
-which keep the phone's monospace. **Bold Text** (the iPhone's Settings > Accessibility > Display & Text Size) makes iOS's face
-heavier, but not Noto Sans.
+The app's words are in **Libre Franklin**, on the iPhone and the Mac, since the build after the Mac redesign's
+slices (still 0.13): every screen's titles, rows, buttons and notes, the navigation bars' titles, and the search
+fields. Its readouts are in **Courier Prime**, a typewriter face: the numbers the new look draws as data (a song's
+length, its number on the album, the time left in the Queue on the iPhone, a download's progress in Requests), and
+the ones that change as you watch them - the clocks under the scrubber and in the player bar, the speeds in Requests
+and the Mac's status bar, the EQ's values (deadwax's own preamp too), the size of this device's downloads in
+Settings, Library care's last scan and Debug's measurements. Every Courier Prime letter is the same width, so a
+number that changes keeps its place as it counts. A count inside a sentence stays in Libre Franklin, as the new look
+draws it - "Downloading - 4 of 12 songs", Settings > Downloads' amount and counts while songs come, an album's
+download line, the Mac Queue's time left - so its figures can shift a little as they change. A readout beside words
+sits on the same line as them. (Until this build the app was in Noto Sans, the web app's face, which the web app
+keeps.) Libre Franklin covers Latin with every European
+language's accents, Vietnamese and Cyrillic, but not Greek; Courier Prime covers Latin. Anything either face hasn't
+got - Greek, Japanese, Korean, Arabic, or Cyrillic in a readout - is drawn in iOS's own face, a letter at a time. Both
+grow and shrink with your text size as iOS's own did. A few things are still in iOS's face: the symbols, the menus,
+alerts and swipe buttons (iOS draws those itself), and ids, paths and versions on screens the new look hasn't
+redrawn, which keep the phone's monospace. **Bold Text** (the iPhone's Settings > Accessibility > Display & Text Size)
+makes iOS's face heavier, but not Libre Franklin or Courier Prime.
 
 ## The Library
 
@@ -6315,7 +6325,7 @@ Ethan's phone as a listener (the one that sees no foot line). Say "pass", or wha
 - **487 [key] VoiceOver.** A top song reads its title and line ("Let It Happen, Currents · 2015"); a missing one
   "…, Not in your library"; "From Last.fm" reads as a link; the listeners line is read under the name.
 
-### The Mac redesign's checks (518-609)
+### The Mac redesign's checks (518-611)
 
 The new look, drawn on the design canvas and built a slice at a time (still app 0.13 (13)): the Mac's first, and the
 phones' from the slices after 524-525, each screen redrawn in its own slice. No server change is needed. Until a slice
@@ -6618,6 +6628,34 @@ between them. Nothing on the phone changes. Have a few albums, a playlist and a 
   scrolling. An album with many songs in a window made short (about 600 tall) at Large: Properties is still on the
   page, the songs scrolling inside their box. Select a row far down a long list, then change the size: the row is
   still in view. Rows still select, open and right-click as before, and VoiceOver reads each as before.)
+
+#### The new faces: Libre Franklin and Courier Prime (610-611)
+
+**Not done yet.** The app's words in Libre Franklin and its readouts in Courier Prime, on the iPhone and the Mac, in
+place of Noto Sans. Nothing else should have moved: the same sizes, the same layouts.
+
+- **610 The faces.** **Not done yet.** On both phones and the Mac, the words are Libre Franklin and the readouts
+  Courier Prime, as the design canvas draws them, and both read well at the largest text size too. (Look at a page of
+  each kind: the Library, an album, Now Playing, the Queue, the EQ, Requests, Settings. Words are the titles, rows,
+  buttons and notes; readouts are the clocks, the time left on the phone's Queue, a song's length and number on a
+  redrawn album page, Requests' progress and speeds, the EQ's values and its preamp, and the size in Settings'
+  Downloads row - Settings > Downloads' own amount and counts are words, as drawn. Where a readout sits beside words,
+  in Settings' Downloads row, the EQ's preamp, Info's facts, the Mac's tables and status bar and the player bar's
+  line under the title, both sit on one line, the readout not a point or two higher. At the largest text size, under
+  Settings > Accessibility > Display & Text Size > Larger Text, nothing is cut off or overlapping that wasn't before,
+  and on the phone the Queue's and the EQ's tops still fold where they
+  did: the Queue's History and Clear into its ••• from one size above the standard, the EQ's "EQ on" at the largest
+  size before the accessibility ones. Say anything that looks too heavy, too light or out of place.)
+- **611 Numbers that hold still, and other alphabets.** **Not done yet.** Numbers that change hold still, and a
+  Greek or Cyrillic artist's name draws. (Play a song and watch the scrubber's clocks and, on the phone, the Queue's
+  time left: their figures don't shift sideways as they count. On the Mac, the same for the player bar's clocks and
+  Requests' speed in the status bar while something downloads; the Mac Queue's time left is in words, as drawn, and
+  changes once a minute. Drag an EQ slider or handle: the value over it, and deadwax's own preamp, keep their width.
+  A count inside a sentence - Settings > Downloads while songs come - is in words and may shift a little: that's as
+  the new look draws it.
+  Then find an artist or album with a Greek name and one with a Cyrillic name (in Search, if the library has none):
+  every letter draws - none is a box or a question mark - though a Greek name, and Cyrillic in a readout, is in iOS's
+  own face.)
 
 ## What it can't do yet
 

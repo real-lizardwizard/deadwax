@@ -13,10 +13,12 @@ import SwiftUI
 @MainActor
 @Observable
 final class MacStatusItems {
-    /// A page's facts: those at the bar's left, and those at its right.
+    /// A page's facts: those at the bar's left, and those at its right - and (the app's fonts, 25 Nov) those of them
+    /// that tick, a speed that changes as it's read, which the bar sets in the readout face so their figures hold still.
     struct Items: Equatable, Sendable {
         var leading: [String]
         var trailing: [String] = []
+        var readouts: Set<String> = []
 
         var isEmpty: Bool { leading.isEmpty && trailing.isEmpty }
     }

@@ -8704,6 +8704,9 @@ only in the compiler.
 
 ## Noto Sans (15 Nov)
 
+(Replaced on 25 Nov by Libre Franklin and Courier Prime - "The app's fonts: Libre Franklin and Courier Prime
+(2026-11-25)", at the end of this file. What follows is how Noto Sans came in.)
+
 James chose the app's face from six set side by side, each drawn as the squared Library's top
 (~/Library/Caches/deadwax-build/fonts/font-options.html). His pick was "Noto Sans (the web's)". The whole app now draws
 its words in it. Fonts weren't part of the squared look; they were chosen separately and come after it, on the same
@@ -18987,16 +18990,21 @@ two circles.
 
 ### Fitting, by arithmetic (test_ios_library_look.py)
 
-Measured in the bundled Noto Sans's own advances (the test reads the TTFs' hmtx), at Apple's footnote and body sizes,
-on 375 pt (an SE, a 13 mini) - the row and the line are capped at xxxLarge, so the accessibility sizes draw as it does:
-- **The row** leaves the switch 251 pt (375 - 2 x (16 + 34 + 12)). Three pages need 3 x the widest + 2: 169.5 at the
-  standard size, 246.9 at xxxLarge - never folded. Four pages (logins off, the break-glass sign-in) need 225.4 at the
-  standard size and fold from xLarge (259.8); folded they have 343, and need 328.5 at xxxLarge.
+Measured in the bundled faces' own advances (the test reads the TTFs' hmtx), at Apple's footnote and body sizes, on 375
+pt (an SE, a 13 mini) - the row and the line are capped at xxxLarge, so the accessibility sizes draw as it does. R2b
+measured in Noto Sans; **re-measured in Libre Franklin** when the fonts commit was rebased onto R2b (25 Nov, through
+tests/ios_fonts.py, the one place every fit test takes a width from): the numbers below are Libre Franklin's, Noto
+Sans's beside them where they moved, and two ways in the tables changed, marked.
+- **The row** leaves the switch 251 pt (375 - 2 x (16 + 34 + 12)). Three pages need 3 x the widest + 2: 172.2 at the
+  standard size (Noto Sans 169.5), 250.8 at xxxLarge (246.9) - never folded, but with 0.2 pt left at xxxLarge by the
+  advances' sum (CoreText's kerning draws "Playlists" 0.6% narrower: 1.8 pt). Four pages (logins off, the break-glass
+  sign-in) need 229.0 at the standard size (225.4) and fold from xLarge, as before (263.9; 259.8); folded they have
+  343, and need 333.7 at xxxLarge (328.5).
 - **The line** has 343 pt on 375, 361 on 393 (a 16), 370 on James's 402 (a 17 Pro). Songs', Artists' and Playlists'
   hold one line at the standard size and at xLarge on 375, a four-figure find dropping its noun at xLarge. Albums' with
   Yours | All is the fullest: "140 albums · Artist" (the default order) is one line on all three; the review's "140
-  albums · Recently added" is 351 of 343 on 375, so it is drawn "140 · Recently added" (302.7). At the standard size -
-  F one line, S the count's noun dropped, f folded, on 375 / 393 / 402:
+  albums · Recently added" is 352 of 343 on 375 (Noto Sans 351), so it is drawn "140 · Recently added" (305.2; 302.7).
+  At the standard size - F one line, S the count's noun dropped, f folded, on 375 / 393 / 402:
 
   | count | Artist | Recently added | Year, newest first |
   | --- | --- | --- | --- |
@@ -19004,28 +19012,33 @@ on 375 pt (an SE, a 13 mini) - the row and the line are capped at xxxLarge, so t
   | 2318 albums | F F F | S F F | S S S |
   | 12 of 140 albums | F F F | S S S | f S S |
   | 12 of 2318 albums | F F F | f S S | f S S |
-  | 1234 of 2318 albums | S F F | f S S | f f f |
+  | 1234 of 2318 albums | S F F | **f f S** (Noto Sans f S S) | f f f |
 
   and at xLarge:
 
   | count | Artist | Recently added | Year, newest first |
   | --- | --- | --- | --- |
-  | 140 albums | F F F | S S S | S S S |
+  | 140 albums | F F F | S S S | **f S S** (Noto Sans S S S) |
   | 2318 albums | F F F | S S S | f S S |
   | 12 of 140 albums | S F F | f f S | f f f |
   | 12 of 2318 albums | S S F | f f f | f f f |
   | 1234 of 2318 albums | S S S | f f f | f f f |
 
-  So at the standard size a library's count never folds the line on any of the three, under any order; on 393 and 402
-  Find's first keystroke folds it only for a four-figure find under the longest order; on 375 it still folds it for a
-  find under "Year, newest first", and in a four-figure library under "Recently added" or "Year, oldest first" (never
-  under "Artist" or "Title") - the 32 pt drop the review saw, left there
+  So at the standard size a library's count never folds the line on any of the three, under any order; on 402 Find's
+  first keystroke folds it only for a four-figure find under the longest order, and on 393 for a four-figure find under
+  "Recently added" and "Year, oldest first" too (Libre Franklin's "Recently added"; "Year, oldest first" folded there in
+  Noto Sans as well - this paragraph said only the longest order before); on 375 it still folds it for a find under
+  "Year, newest first", and in a four-figure library under "Recently added" or "Year, oldest first" (never under
+  "Artist" or "Title") - the 32 pt drop the review saw, left there
   (dropping Find's "of 2318" too would say less than Find means: James's to choose). Counts are Core's own, without a
   thousands separator ("2318", not "2,318"). R2b's first write-up said "on James's 402 pt iPhone 17 Pro it fits, 370 of
   room": it had checked "Recently added" alone - "1,234 albums · Year, newest first" was 374 of 370 - and the line
   folded at the standard size on all three phones.
-- At xxxLarge every page but Songs folds; folded, each end fits its own line (Albums' 174) and no word of the line is
-  wider than it, so a wrap never cuts one.
+- At xxxLarge every page but Songs folds; folded, each end fits its own line (Albums' 175.6; Noto Sans 173.7) and no
+  word of the line is wider than it, so a wrap never cuts one.
+- In Libre Franklin every piece measured here (the pages' names and Yours | All in SemiBold and Regular, the orders,
+  the counts in full and short, New playlist…, the dot) was laid out by CoreText with the bundled faces at or under its
+  sum of advances, so the arithmetic is the wider of the two.
 
 ### Departures from the drawing
 
@@ -19073,7 +19086,8 @@ survives it: behaviour, layout and tests. The circles' and the well's faces are 
 
 Left for the flat restyle, from the review:
 - The switch's segments have no room inside them: `largeSegmentPadding` is 0 on the phone (dw.ph's `.seg.lg`), so at
-  xxxLarge on 375 pt "Playlists" has 0.7 pt to spare in its segment.
+  xxxLarge on 375 pt "Playlists" has 0.7 pt to spare in its segment - either side, in Noto Sans; in Libre Franklin (the
+  fonts commit) 0.04 either side by the sum of its advances, about 0.3 as CoreText kerns it (0.07 and 0.6 in all).
 - No Large Content Viewer on the segments; James's 14 Nov switch had one.
 - No open state on the •••: the flat design draws it in the accent while its menu is open, and SwiftUI's Menu tells its
   label nothing of that.
@@ -19143,3 +19157,248 @@ each side), and three of the line's new rule:
   targets at the row's foot.
 - The Mac: the phone's row draws over the Mac's borrowed Songs page and Downloaded (built for Mac Catalyst, not looked
   at).
+
+## The app's fonts: Libre Franklin and Courier Prime (2026-11-25)
+
+James, 25 Nov: "let's try some different fonts as well, give me some choices" - six pairs drawn on the canvas (the
+`f*.dc.html` boards) - then "libre franklin", then "Adopt it", answering "Adopt Libre Franklin for both apps?". So the
+iPhone and Mac app's **words are Libre Franklin** (400, 500, 600, 700) and its **readouts Courier Prime** (400, 700),
+wherever the drawings use the mono face, at the sizes they had. It replaces Noto Sans (15 Nov, "Noto Sans (the
+web's)") and Noto Sans Mono (24 Nov, R1's "Bundle Noto Sans Mono"). The web app keeps Noto Sans: that's undecided, and
+nothing in `interface/` or `ui/` changed. The plan: deadwax-plans/mac-redesign.md "Fonts, decided 25 Nov".
+
+### What was downloaded, and from where
+
+Five files, once, with James's OK, from Google Fonts' repository, github.com/google/fonts at commit
+`6ebe737e44fd64ee736bbc6feed6136a6dbfd222`: `ofl/librefranklin/LibreFranklin[wght].ttf` and its `OFL.txt`,
+`ofl/courierprime/CourierPrime-Regular.ttf`, `CourierPrime-Bold.ttf` and its `OFL.txt`. Their hashes were checked
+before use, and they are kept as downloaded in `ios/scripts/fonts/` (README.md there names the commit, sizes and
+hashes; test_ios_palette.py's `SOURCE_HASHES` holds each file to its hash). They were read with fontTools only, from a
+script outside that folder run with `python -I`. Libre Franklin's OFL.txt has Windows line endings, as downloaded, and
+is kept byte for byte; Courier Prime's has no newline at its end.
+
+### The faces, as `ios/scripts/make-fonts.py` makes them
+
+- **Libre Franklin** is one variable font, wght 100-900, whose default master is **Thin (100)** - the digit widths the
+  plan was first given were that master's. Pinned at 400, 500, 600 and 700 with fontTools' instancer
+  (`updateFontNames=True`, the STAT table's names), each a static TrueType font: `LibreFranklin-Regular`, `-Medium`,
+  `-SemiBold`, `-Bold`, PostScript names as Typeface.Face has them, OS/2 weights 400-700, under the one family
+  "Libre Franklin" (name 1 for Regular and Bold; name 16 for Medium and SemiBold, whose name 1 is "Libre Franklin
+  Medium" / "SemiBold" - as Noto Sans's were). 1007 glyphs and 918 characters each, about 113 KB each. Made twice:
+  byte for byte the same (`recalcTimestamp=False`, the variable font's own dates).
+- **Courier Prime** is its two files copied as they are: 415 glyphs, 383 characters, every advance 1228/2048 =
+  0.5996 em (Noto Sans Mono's was 0.6: a readout is as wide as it was). No Medium or SemiBold.
+- Each family's licence goes beside it as `LibreFranklin-OFL.txt` and `CourierPrime-OFL.txt`: App/ is a synchronized
+  folder, so every resource lands at the bundle's root, and two `OFL.txt` would collide. check_project.py now asks
+  for each family's own licence and flags a stray one. The Noto files and their `OFL.txt` are gone from App/Fonts.
+- **Figures, read from the font**: Libre Franklin's are proportional - at 400 a 1 is 0.465 em, the rest 0.599 to
+  0.688 - and it has **no tabular figures**: `.monospacedDigit()` changes nothing drawn in it (measured with
+  ImageRenderer: "1111" 82.5 pt, "0000" 118.5 pt at 40). Noto Sans's digits were tabular by default.
+- **Lines**: Libre Franklin's hhea line is 1.212 em, Courier Prime's 1.123 em, Noto Sans's was 1.362 - a line of
+  text is shorter than it was. Every row with a height of its own (lookHeight) keeps it; a row that takes its text's
+  height is a little shorter. Not seen on a screen.
+- **Scripts**: Libre Franklin has Latin, Latin Extended, Vietnamese and Cyrillic, but **no Greek**; Courier Prime is
+  Latin only (no Greek, no Cyrillic, not Vietnamese's ơ and ư). Noto Sans had all of them.
+
+### How SwiftUI draws them (measured on this Mac, the fonts registered as the app registers them)
+
+- `.weight(.medium)`, `.semibold`, `.bold` and `.bold()` on `.custom("Libre Franklin", ...)` each draw the named face,
+  pixel for pixel against the face asked for by its PostScript name.
+- **Courier Prime asked for `.medium` draws Bold** on CoreText - not Regular, as the drawings' browser draws a 500.
+  `.semibold` draws Bold, as the browser does. So nothing asks a readout for Medium: a readout the drawings set at 500
+  is drawn at the default, Regular. Grep found no ask; `test_no_readout_asks_for_medium` keeps it so.
+- **Fallback**: CoreText's own cascade, as registered - no cascade list was built. On this Mac, Greek in Libre
+  Franklin drew in the system's sans (Helvetica), and Greek, Cyrillic and ơ ư in Courier Prime in its monospace
+  (Menlo); nothing drew as a missing glyph. iOS's cascade (SF, SF Mono) wasn't seen: check 611.
+- Dynamic Type is as it was: every text style `relativeTo:` its style; the new `Typeface.readout(_:)` is Courier Prime
+  at a style's size, relative to the style, so a readout grows with the words beside it.
+
+### Numbers in the readout face (narrowed after review)
+
+The rule, after review (25 Nov): a number is in Courier Prime **where the drawings set it in mono**, or **where it
+changes continuously while you watch it and stands on its own** - a clock, a speed, a value being dragged or held, a
+size growing as a download comes. Libre Franklin's figures would shift sideways as such a number counts. **A step count
+inside a sentence** ("Downloading - 4 of 12 songs", "4 of 14", "30 of 140", a place in the queue) **stays in Libre
+Franklin, as drawn**: its small shift as a digit changes is accepted. The first version of this change set every number
+that ticks in the readout face, a Bold Courier Prime amount mid-sentence in Settings > Downloads among them - the most
+visible change of the lot, for a number that was static on the canvas - and review narrowed it, so the app departs
+from the drawings less. test_ios_palette.py's `TICKING` lists every readout that changes as you watch it, with the
+departure each is (or None), and `BACK_IN_WORDS` keeps what went back from coming back.
+
+In the mono face as drawn (no departure): the phone's scrubber clocks (`mono xs` in iNowPlaying - they were
+`caption.monospacedDigit()` in the words), the mini player's held time, the Mac bar's clocks and readout, the phone
+Queue's time left, Requests' progress, speeds and the card's data line, Library care's facts (`mono xs` in
+LibraryCare), the EQ's values (iEQ and the Mac's EQ draw them mono: the phone's, and the Mac's held slider value, the
+selected handle's capsule, the hand preamp and a filter row's numbers) - and, since review, **deadwax's own preamp**,
+the automatic one, which moves as a band is dragged and iEQ sets in mono ("13 filters · preamp -6.4 dB"): on the Mac
+`Typeface.readout(.body)` (its `.monospacedDigit()` did nothing), on the phone PhoneKV's new `mono: true` (Courier
+Prime at the small 13, `.mono.s`, as the hand preamp's).
+
+**The four departures, for James** - set in the words' face on the canvas, or not drawn, and in Courier Prime:
+
+- the Mac Requests' speed in the status bar ("244 KB/s": the drawing's `.status` words) - MacStatusItems.Items has
+  `readouts`, the facts the bar draws in the readout face; the counts beside it stay words;
+- You's Downloads row's value ("2.1 GB", growing as songs come; not drawn);
+- the EQ's tone stepper value at the accessibility sizes ("+3.5 dB", under a held stepper; not drawn);
+- You's Debug, every measurement (not drawn; it was `.monospacedDigit()` throughout).
+
+**Back in the words, as drawn, after review**: the Mac Queue's time left ("8 songs · 33 min left": it changes once a
+minute, and R3b's review set it in the words - the drawing's `f xs q3`); Settings > Downloads' amount ("1.2 GB" of "of
+8 GB"), the line under it ("12 albums · 148 songs · 41.2 GB free on this phone") and a fetching album's, playlist's or
+library's count ("3 of 11 songs", "38 of 412 albums to go · 12.4 GB"); an album's footer's download line ("4 of 12
+songs on this iPhone · 120 MB"), so it agrees with the hero above it. Each is byte for byte as it was before this
+change, but for its `.monospacedDigit()` (below).
+
+**Left in the words** throughout (a sentence with a number in it, or a number that changes only when you do something
+or go somewhere): the album's download line wherever it's drawn ("Downloading - 4 of 12 songs": the hero, the Mac
+album's chip, the Mac playlist page, Playlists' On this Mac column); "Reading your library - 30 of 140 albums";
+Settings' Downloads footer ("Downloading - 6 songs to go"); the Stop buttons of Library care's runs and Retime ("Stop
+after this album · 4 of 14"); "Checked 3 minutes ago" and every relative age; a waiting download's place in the queue;
+the Requests status bar's counts; track numbers, lengths and counts in the screens not redrawn yet (Search's songs, a
+Library count, Needs a look's count in You).
+
+**`.monospacedDigit()` is gone from the app**: it was written in twelve places (the eleven left after the first version,
+and Settings > Downloads' playlist row's, back with its words), every one on Libre Franklin - an explicit
+`Typeface.<style>`, or a Text or TextField taking DeadwaxApp's root `.font(Typeface.body)` - where it does nothing, so
+nobody takes it for something that matters. None was on a system font, where it would still work. The palette test
+holds the app to none.
+
+### A readout beside words, on their baseline (after review)
+
+Review measured, with a Catalyst ImageRenderer probe, readouts sitting **1 to 2 points higher than the words beside
+them**: 2 px at 17 points in an HStack or a LabeledContent, 1 to 2 at 11.5 and 12. Noto Sans Mono had Noto Sans's own
+vertical metrics, so a centred row set the two on one baseline; Courier Prime's line is ascender 1600 and descender 700
+of 2048 (1.123 em, its baseline 0.22 em under its line's centre), Libre Franklin's 966 and 246 of 1000 (1.212 em, 0.36
+under), so a row that centres the two sets the readout's baseline 0.14 em high. Every row that sets a readout beside
+words is now on the first text baseline:
+
+- **HStacks**: the EQ stepper row's words (EQStepperRow), the phone's hand preamp, the Mac player bar's byline beside
+  "3 of 11 · FLAC", the Mac status bar (its dividers centred on the words' line at `.label`'s 11.5), the Requests table's row (its
+  meter at `.base`'s 13), **MacColumnList's row** - every Mac table: Albums, Artists, Playlists, an album, a playlist
+  - and PhoneKV, which is `.kv`, and dw.css's `.kv` is `align-items: baseline`. Info's facts (InfoKV,
+  `HStackLayout(alignment: .firstTextBaseline)`), also `.kv`.
+- **Rows of one line or two**: a playlist's song row and the phone Queue's rows are on the title's baseline when the
+  words are one line (`line.isEmpty ? .firstTextBaseline : .center`), and centred on the title and its line when they
+  are two, as iPlaylist and iQueue draw them (`.row`, `align-items: center`). TrackRow already was.
+- **LabeledContent**: Typeface.swift's `ReadoutLabeledContentStyle` (`.labeledContentStyle(.readout)`) - a list's own
+  layout, the label leading and the value trailing in the secondary colour, on one first text baseline, the value
+  under the label where the two don't fit side by side; one element for VoiceOver. On You's Downloads row, both Mac
+  EQ preamp rows, and Debug's whole Form.
+- **A piece with no words** in a baseline row would stand its bottom on the baseline (a view without text has its
+  bottom for its baseline): `centredOnWords(_:)` lifts it by Libre Franklin's 0.36 em of the words' size in points
+  (a Mac view passes its size's, `CGFloat(Typeface.Mac.Size.label.rawValue)`: test_ios_mac_reach.py keeps
+  Typeface.Mac out of the shared files), so it is centred on the words'
+  line, where the centred row had it.
+
+Measured with the same kind of probe (ImageRenderer, Catalyst, scale 2, the bundled faces registered; each row built
+as the app builds it): an HStack, LF 16 beside CP 13, centred 2.5 points apart, on the baseline 0; a LabeledContent, LF
+17 and CP 17, its own style 2.5 apart, `.readout` 0; the status bar, 1.5 apart, now 0, its two dividers at one height,
+centred on the words' line (the whole bar 0.5 points higher than before: Courier Prime's deeper descent widens the
+row's box); the Requests row, 2.5 apart, now 0, its cover unmoved and its meter 0.5 lower than the row's centre (on
+the words' line); a Mac table's row, cover cell, mono cells, a button's label, all on one baseline, the cover 0.5
+higher; the player bar's byline, a plain Button's label, 2 apart, now 0; PhoneKV and InfoKV, now 0.
+
+Left centred, each said in tests/test_ios_readout_rows.py's `ALONE` with why: the EQ curve's axis labels and the
+bands' frequencies (rows of labels only), a held slider's chip (alone over the knob), a count's badge (DWCount, a box
+of its own, as `.count`), the mini player's time over the finger (a tag), a Requests card's disclosure detail (a line
+of its own), the song playing's length in the Queue (centred on its cover and two lines, as iQueue draws it) and the
+phone's time left (beside the Shuffle and Repeat buttons' boxes, centred on them as iQueue draws it).
+
+**The test** (tests/test_ios_readout_rows.py, its Swift reading in tests/ios_swift.py): every readout's font in the
+app is followed from where it is set, through the blocks it is in - a branch, a group, a loop, a button's label, a
+cell's padding, a helper's call, a view property, a view to where it is made in its file - to what lays it out: an
+HStack must be on a baseline, a LabeledContent must have the `.readout` style on it or on what holds it, a VStack, a
+section or a list is a line of its own, a stack every word of which takes the readout has nothing beside it, and
+MacColumnList's closure is MacColumnList's row (checked by name). Anything else must be in `ALONE`, which must span the
+readout's own code, so a centred row can't hide behind another's entry.
+
+### Medium, and the faces' names (after review)
+
+- `test_no_readout_asks_for_medium` read a line at a time: a `.fontWeight(.medium)` on the line under
+  `.font(Typeface.readout(.caption))` passed it, and `.weight(x ? .medium : ...)` would have. It now follows each
+  readout's whole scope: the view its `.font(...)` is set on with every modifier before and after it, the font's own
+  expression (a ternary's either side), a Font property's expression and every `.font` that takes it, and a
+  `.fontWeight(.medium)` on any block around it. It rehearses each of those.
+- `test_each_face_is_named_for_its_own_weight`: Typeface.Face's and Mac.MonoFace's cases, each pinned to its own
+  PostScript name, that file's name table and OS/2 weight - swapping `.semibold`'s and `.bold`'s names passed the
+  sorted list before - and UIKit's asks (a bar's title and a chosen segment `.semibold`, the large title `.bold`).
+- make-fonts.py's docstring and ios/scripts/fonts/README.md pin **fontTools 4.68.0**, the version that made the files
+  byte for byte; another's instancer may write other bytes.
+
+### Widths, re-measured
+
+- **One helper**: tests/ios_fonts.py reads the advances from the bundled TTFs (cmap and hmtx, by hand - the suite has
+  no fontTools) - `words(text, points, weight)` and `readout(text, points, bold)`, failing on a character neither face
+  has. The fit tests in test_ios_bar_look.py, test_ios_requests_look.py and test_ios_nowplaying_pages_look.py take
+  every width from it, so after a merge or another font the whole re-measure is a re-run of those tests.
+- **Kerning** isn't in the sums. Every (string, face) the fit tests measure - 35 of them - was laid out by CoreText on
+  this Mac, kerning on: each came out at or under its sum (the most it narrowed one, "Active" SemiBold, 2.75%), and the
+  sums matched CoreText's own exactly (`WIDEST_KERNED_OVER = 0.0`).
+- Measured, Libre Franklin is narrower than the 0.55 em a letter the tests had taken for Noto Sans. Everything fits
+  as before; **no layout gave way**. The widest chip in the Mac Requests' Progress column is 125 of its 206.
+- **Room gained, folds kept**: the phone Queue's top would fit whole at xLarge with 12 points to spare, the EQ's at
+  xxxLarge with 22. Both folds stay where R3b put them; the tests fold a top that leaves under 24 points
+  (`FOLD_SPARE`: the back link's chevron is an SF Symbol and the buttons' sides are worked out, not measured).
+- The Mac's column widths (`MacTable.widths`, RequestColumns, MacAlbumFacts) are the drawings' own numbers, not
+  measured to a face; their readouts are as wide as before (0.5996 em against 0.6) and their words narrower.
+  Unchanged. The speed chip on Now Playing (test_ios_nowplaying_row.py) is the system's monospace, unchanged.
+
+### Rebased onto the Mac's Row Size and R2b (25 Nov)
+
+The fonts commit was written on R3b and moved onto Row Size (4d097b3c) and R2b (75ea812e) once they landed; what they
+added was re-measured in the new faces.
+
+- **R2b's fits** (test_ios_library_look.py) had their own TrueType reader and Noto Sans's Regular and SemiBold: they
+  take their widths from tests/ios_fonts.py now, like every other fit test. Core's MetaLine and LibraryTopFit hold
+  only the rules (their tests' numbers - 200, 131, 343, needs 240 - are worked examples, no face's), and Core keeps no
+  table of measured widths, so nothing in DeadwaxKit changed. Re-run in Libre Franklin, both of R2b's rules hold: the
+  row folds the switch only where it can't hold it - three pages never (250.8 of 251 at xxxLarge, by the sum of the
+  advances: 0.2 pt left; 1.8 as CoreText kerns "Playlists"), four from xLarge, as in Noto Sans - and the quiet line
+  drops its count's noun before it folds. **Two ways in R2b's table moved**, both a fold where Noto Sans held: at the
+  standard size "1234 of 2318 albums · Recently added" on a 393 pt phone (`f f S`, was `f S S`), and at xLarge "140
+  albums · Year, newest first" on 375 (`f S S`, was `S S S`) - both marked in R2b's tables above, and its numbers
+  given in both faces. The same arithmetic, run again in Noto Sans from the files before this commit, reproduces
+  every number R2b wrote, so only the face moved them. Every piece it measures (54, both weights) was laid out by
+  CoreText at or under its sum.
+- **Row Size's rows** on the first text baseline (MacColumnList's row, Requests' row, its meter `centredOnWords`):
+  measured with a Catalyst ImageRenderer at 2x, Small, Medium and Large, each row built as the pages build it. A row
+  with a cover - Albums, Artists, Playlists, Requests - has its words and its cover exactly where a centred row has
+  them at all three sizes (the cover centred on its title in the cell's own centred stack, the cell's baseline the
+  title's), and its readouts on the words' baseline (their ink's foot with the words', where centred it was 2.5 pt
+  higher). A row with no cover - an album's or a playlist's songs - sits its words **0.5 pt (a pixel) above the row's
+  middle** at each size: Courier Prime's deeper descent (0.34 em, Libre Franklin's 0.25) makes the baseline-aligned
+  stack taller below its words, and the row centres the stack. Placing the row by its words' line instead (a guide at
+  the baseline less 0.36 em) moved the songs' rows by nothing a 2x screen shows and set the covered rows half a point
+  high, so it wasn't kept. The song playing's ▶ (SharpSymbol, an SF Symbol's frame) and a song's ••• (a Menu of an SF
+  Symbol) report a text baseline of their own (the ▶'s 11.5 of its 13, the •••'s 7 under its 4.5) and ride the words'
+  baseline - each as near the words as in the centred row (0.25 pt above them and below them). The status bar is the
+  same as a song's row: with a readout among its facts (Requests' speed) the whole bar sits 0.5 pt higher than with
+  words alone. tests/test_ios_mac_rows.py's pins say the rows' stacks are on the first text baseline, and the meter
+  centred on the words; test_ios_readout_rows.py's `test_a_tables_cover_rides_on_its_title` holds each cover beside its
+  title in a centred stack.
+
+### Everything renamed
+
+Typeface.family "Libre Franklin", Face's four PostScript names, Mac.monoFamily "Courier Prime", MonoFace Regular and
+Bold (it had Medium and SemiBold: nothing asked for them), every doc comment naming the faces; UIAppFonts in
+Info.plist and Info-Mac.plist (nothing else in either); ios/design/dw.css's `.dw` font and `--mono`;
+test_ios_palette.py's font tests (the sources' hashes, Courier Prime and the licences byte for byte, each face's
+family, PostScript name and OS/2 weight against make-fonts.py's, each Libre Franklin face's characters against the
+variable font's, the plists, no Noto left), test_ios_mac_look.py, test_ios_phone_look.py, test_source_bytes.py (a
+`.ttf` in either folder). The words fixtures (iphone.json, mac.json) name no font and are unchanged. The app has no
+licence page of its own.
+
+### Not verified
+
+- **Nothing was seen on a screen**: no Simulator, no phone, no Mac run. Checks 610 (the faces, at the largest text
+  size too) and 611 (numbers that hold still; Greek and Cyrillic names) are James's.
+- iOS's fallback for Greek and Cyrillic, and that iOS's CoreText also draws Courier Prime's `.medium` Bold, are
+  assumed from this Mac.
+- The shorter lines (above), and Courier Prime's look at the sizes the readouts are drawn at.
+- The baselines were measured in ImageRenderer, which can't draw a List or a Form: the `.readout` LabeledContent
+  style's rows (You's Downloads, the Mac EQ's preamps, Debug) were measured outside one, and it lays them out itself
+  rather than a list's own way - their look in Settings, the Mac's EQ and Debug, at the accessibility sizes too, is
+  for a screen.
+- R2b's row in Libre Franklin at xxxLarge on a 375 pt phone: three pages hold the switch beside the circles by 0.2 pt
+  of arithmetic (1.8 kerned) - SwiftUI's own measure of DWSegmentedNeed decides it on the phone, and a fold there
+  would be the switch under the circles, not a cut word. Row Size's rows in the new faces on a Mac's screen.

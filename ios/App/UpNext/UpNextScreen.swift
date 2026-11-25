@@ -771,7 +771,10 @@ struct UpNextScreen: View {
     @ViewBuilder
     private func rowLabel(_ track: QueueTrack, lines: Bool) -> some View {
         if phone {
-            HStack(spacing: Self.footGap) {
+            // (25 Nov) beside one line, the length sits on the title's baseline: Courier Prime's line is shorter than
+            // Libre Franklin's, so centred it would sit higher. Beside two it is centred on them, as iQueue draws it.
+            let oneLine = !lines || UpNextWords.songLine(artist: track.artist, album: track.album).isEmpty
+            HStack(alignment: oneLine ? .firstTextBaseline : .center, spacing: Self.footGap) {
                 text(track, lines: lines)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Text(AboutCard.trackTime(track.duration))

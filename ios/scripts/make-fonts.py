@@ -1,109 +1,92 @@
 #!/usr/bin/env python3
 """
-Makes the iPhone app's Noto Sans (ios/App/Fonts) from the web app's own files, interface/styles/font/noto-sans/ -
-nothing is fetched. James chose it on 15 Nov: "Noto Sans (the web's)". And (the Mac redesign's R1, 24 Nov, James:
-"Bundle Noto Sans Mono") its Noto Sans Mono, the same way from interface/styles/font/noto-sans-mono/: the Mac's data
-face (Typeface.Mac.mono) - numbers, lengths, paths, formats, as the redesign draws them.
+Makes the iPhone and Mac app's fonts (ios/App/Fonts) from the files in ios/scripts/fonts/ - nothing is fetched. James
+chose them on 25 Nov 2026 ("libre franklin", then "Adopt it"): Libre Franklin for the words (Typeface's text styles,
+Typeface.Mac.text, Typeface.Phone.text, Typeface.Look.text) and Courier Prime for the readouts (Typeface.Mac.mono,
+Phone.mono, Look.mono and Typeface.readout). They replace Noto Sans (15 Nov) and Noto Sans Mono (24 Nov), which this
+script made from the web app's files until then; the web app keeps Noto Sans. ios/scripts/fonts/README.md says where
+the sources came from (google/fonts at 6ebe737e, downloaded once with James's OK) and holds their hashes.
 
-The web serves Noto Sans as seven variable-weight woff2 files, one per script (latin, latin-ext-europe, vietnamese,
-greek, greek-ext, cyrillic, cyrillic-ext), each claiming its own unicode-range, and the browser takes each
-character from the file whose range holds it. iOS has no unicode-range: every one of the seven calls itself
-NotoSans-Regular (and its other named instances), so registering them side by side, only the first would register.
-So each weight the app draws - 400, 500, 600, 700 - is made one font: each subset pinned at that weight
-(fontTools' instancer), then the seven merged into one TrueType font (fontTools' merger), latin first, so its
-glyph wins for a character two subsets share and its tables' header and names are the font's. The web's range
-whole, as one face per weight under one family, "Noto Sans": SwiftUI's .weight() and .bold() pick the face. Noto Sans
-Mono is served the same way (seven variable woff2 files, every one NotoSansMono-Regular) and made the same way: 400, 500
-and 600, the weights the redesign's drawings load, under the family "Noto Sans Mono". Both licences are the one OFL.txt
-(the web keeps the same file, byte for byte, beside each family), copied once.
+- Libre Franklin is one variable font, wght 100-900. Each weight the app draws - 400, 500, 600 and 700 - is pinned with
+  fontTools' instancer into a static TrueType font named as the app asks for it (LibreFranklin-Regular, -Medium,
+  -SemiBold and -Bold), under the one family "Libre Franklin": SwiftUI's .weight() and .bold() pick the face, as they
+  did Noto Sans's. Static rather than variable: the app names a face by its PostScript name (Typeface.Face, for UIKit),
+  and a static file per weight is what UIAppFonts registered before and is known to work on the phones.
+- Courier Prime comes as two static fonts, Regular and Bold, copied as they are. It has no 500 or 600: the drawings'
+  browser draws a readout at 500 Regular and one at 600 Bold. Apple's CoreText draws SemiBold Bold too, but Medium Bold
+  as well (measured), so the app never asks a readout for Medium (Typeface.Mac.MonoFace; test_ios_palette.py holds it).
+- Each family's licence, its own OFL.txt with its own copyright line, is copied beside its fonts under the family's
+  name (LibreFranklin-OFL.txt, CourierPrime-OFL.txt): every file in App/ lands at the bundle's root, so two of one name
+  would collide (check_project.py).
+- Anything else in App/Fonts is removed, so the folder is exactly what this makes.
 
-Static rather than variable: fontTools' merger takes no variable font. TrueType rather than woff2: iOS is only
-known to read a woff2 from this Mac's CoreText, not the phone's. The files come out the same byte for byte from the
-same inputs (no timestamp written).
+The files come out the same byte for byte from the same inputs: the variable font's own dates, never the time it ran.
 
-Needs fontTools and brotli (a woff2's tables are brotli'd) - neither in the repo's .venv nor the image. In a venv
-of their own, outside the repo:
+Needs fontTools - not in the repo's .venv nor the image - in a venv of its own, outside the repo, at the version that
+made the files in App/Fonts (another's instancer may write other bytes):
 
     python3 -m venv ~/Library/Caches/deadwax-build/fonttools-venv
-    ~/Library/Caches/deadwax-build/fonttools-venv/bin/pip install fonttools brotli
+    ~/Library/Caches/deadwax-build/fonttools-venv/bin/pip install fonttools==4.68.0
     ~/Library/Caches/deadwax-build/fonttools-venv/bin/python -I ios/scripts/make-fonts.py
 """
 
+import io
 import shutil
 import sys
-import tempfile
 from pathlib import Path
 
-from fontTools.merge import Merger
 from fontTools.ttLib import TTFont
 from fontTools.varLib import instancer
 
 HERE = Path(__file__).resolve().parent
-FONTS = HERE.parent.parent / "interface" / "styles" / "font"
+SOURCES = HERE / "fonts"
 OUT = HERE.parent / "App" / "Fonts"
 
-# Each family: the web's folder, the files' names, its subsets - latin first: the merger keeps the first font's glyph
-# for a code point two subsets share, and its header and names - and the weights the app draws.
-FAMILIES = [
-    # Typeface.swift's words: Regular, Medium, SemiBold and Bold
-    ("noto-sans", "NotoSans", [
-        "noto-sans-latin",
-        "noto-sans-latin-ext-europe",
-        "noto-sans-vietnamese",
-        "noto-sans-greek",
-        "noto-sans-greek-ext",
-        "noto-sans-cyrillic",
-        "noto-sans-cyrillic-ext",
-    ], {400: "Regular", 500: "Medium", 600: "SemiBold", 700: "Bold"}),
-    # (the Mac redesign's R1) Typeface.Mac.mono's: Regular, Medium and SemiBold - the drawings' 400, 500 and 600
-    ("noto-sans-mono", "NotoSansMono", [
-        "noto-sans-mono-latin",
-        "noto-sans-mono-latin-ext",
-        "noto-sans-mono-vietnamese",
-        "noto-sans-mono-greek",
-        "noto-sans-mono-greek-ext",
-        "noto-sans-mono-cyrillic",
-        "noto-sans-mono-cyrillic-ext",
-    ], {400: "Regular", 500: "Medium", 600: "SemiBold"}),
-]
+# Typeface.swift's words: Regular, Medium, SemiBold and Bold - Libre Franklin's variable font pinned at each weight
+WORDS = ("librefranklin", "LibreFranklin[wght].ttf", "LibreFranklin",
+         {400: "Regular", 500: "Medium", 600: "SemiBold", 700: "Bold"})
+# Typeface's readouts: Courier Prime's own two files, as they are
+READOUTS = ("courierprime", ["CourierPrime-Regular.ttf", "CourierPrime-Bold.ttf"], "CourierPrime")
 
 
-def make(folder: str, name: str, subsets: list, weights: dict, work: Path) -> None:
-    source = FONTS / folder
-    for weight, style in weights.items():
-        pinned = []
-        for subset in subsets:
-            font = TTFont(source / f"{subset}.woff2", recalcTimestamp=False)
-            static = instancer.instantiateVariableFont(font, {"wght": weight}, updateFontNames=True)
-            static.flavor = None
-            path = work / f"{subset}-{weight}.ttf"
-            static.save(path)
-            pinned.append(str(path))
-        merged = Merger().merge(pinned)
-        merged.flavor = None
-        # the latin file's own dates, never the time it was made: the same inputs, the same bytes
-        latin = TTFont(source / f"{subsets[0]}.woff2")["head"]
-        merged["head"].created = latin.created
-        merged["head"].modified = latin.modified
-        merged.recalcTimestamp = False
-        target = OUT / f"{name}-{style}.ttf"
-        merged.save(target)
-        print(f"{target.relative_to(HERE.parent.parent)}: {target.stat().st_size} bytes, "
-              f"{len(merged.getGlyphOrder())} glyphs, {len(merged.getBestCmap())} characters")
+def pin(source: Path, weight: int) -> bytes:
+    """The variable font pinned at `weight`, as a static TrueType font's bytes - its names the weight's own (its STAT
+    table's: LibreFranklin-Medium under the family Libre Franklin), its dates the variable font's."""
+    font = TTFont(source, recalcTimestamp=False)
+    static = instancer.instantiateVariableFont(font, {"wght": weight}, updateFontNames=True)
+    static.recalcTimestamp = False
+    data = io.BytesIO()
+    static.save(data)
+    return data.getvalue()
 
 
 def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory() as work:
-        for folder, name, subsets, weights in FAMILIES:
-            make(folder, name, subsets, weights, Path(work))
-    # the licence goes with the fonts, as the web keeps it beside its files - one file for both families: the web's
-    # two copies are the same, byte for byte (said here, so a licence that ever differs is never dropped unseen)
-    licences = {(FONTS / folder / "OFL.txt").read_bytes() for folder, _, _, _ in FAMILIES}
-    if len(licences) != 1:
-        print("the families' OFL.txt files differ: App/Fonts holds one", file=sys.stderr)
-        return 1
-    shutil.copyfile(FONTS / FAMILIES[0][0] / "OFL.txt", OUT / "OFL.txt")
+    made = []
+    folder, variable, name, weights = WORDS
+    for weight, style in weights.items():
+        target = OUT / f"{name}-{style}.ttf"
+        target.write_bytes(pin(SOURCES / folder / variable, weight))
+        made.append(target)
+    shutil.copyfile(SOURCES / folder / "OFL.txt", OUT / f"{name}-OFL.txt")
+    made.append(OUT / f"{name}-OFL.txt")
+    folder, files, name = READOUTS
+    for file in files:
+        shutil.copyfile(SOURCES / folder / file, OUT / file)
+        made.append(OUT / file)
+    shutil.copyfile(SOURCES / folder / "OFL.txt", OUT / f"{name}-OFL.txt")
+    made.append(OUT / f"{name}-OFL.txt")
+    for stale in sorted(set(OUT.iterdir()) - set(made)):
+        if stale.is_file():
+            stale.unlink()
+            print(f"removed {stale.relative_to(HERE.parent.parent)}")
+    for target in made:
+        line = f"{target.relative_to(HERE.parent.parent)}: {target.stat().st_size} bytes"
+        if target.suffix == ".ttf":
+            font = TTFont(target)
+            line += (f", {len(font.getGlyphOrder())} glyphs, {len(font.getBestCmap())} characters, "
+                     f"weight {font['OS/2'].usWeightClass}, {font['name'].getDebugName(6)}")
+        print(line)
     return 0
 
 

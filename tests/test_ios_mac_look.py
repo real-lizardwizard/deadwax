@@ -346,9 +346,12 @@ def test_every_dw_css_token_is_in_the_palette():
         assert token[2:] in lines and lines[token[2:]][1] == token, f"DWPalette has no {token}"
     # one set, both devices': the Mac's own palette holds none of them
     assert not [name for name, (_, source) in palette(MAC_PALETTE).items() if source.startswith("--")]
-    # --mono is the type's: the bundled face's family
-    assert rule(".dw")["--mono"].startswith('"Noto Sans Mono"')
-    assert re.search(r'static let monoFamily = "Noto Sans Mono"', TYPEFACE.read_text(encoding="utf-8"))
+    # --mono is the type's: the bundled readout face's family - and .dw's font names the words' (25 Nov: Libre Franklin
+    # and Courier Prime, in place of Noto Sans and Noto Sans Mono)
+    assert rule(".dw")["--mono"].startswith('"Courier Prime"')
+    assert re.search(r'static let monoFamily = "Courier Prime"', TYPEFACE.read_text(encoding="utf-8"))
+    assert '"Libre Franklin"' in rule(".dw")["font"]
+    assert re.search(r'static let family = "Libre Franklin"', TYPEFACE.read_text(encoding="utf-8"))
 
 
 def test_the_faded_opacity_is_the_web_apps():
@@ -492,7 +495,7 @@ def test_the_macs_type_is_dw_css_size_by_size():
     assert float(sizes["count"]) == px(count[1]) and count[2] == "var(--mono)"
     # the plan's: 13, 12.5, 12, 11.5, 14, 18, 19, 20 and 28 - and the count's 11
     assert sorted(float(v) for v in sizes.values()) == [11, 11.5, 12, 12.5, 13, 14, 18, 19, 20, 28]
-    # at fixed sizes, as a Mac's own windows draw theirs; the words Noto Sans, the data Noto Sans Mono
+    # at fixed sizes, as a Mac's own windows draw theirs; the words Libre Franklin, the data Courier Prime
     assert ".custom(family, fixedSize: CGFloat(size.rawValue))" in mac
     assert ".custom(monoFamily, fixedSize: CGFloat(size.rawValue))" in mac
     # the iPhone's sizes as they were: its styles' sizes, relative to the style

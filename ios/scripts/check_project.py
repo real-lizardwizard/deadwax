@@ -530,7 +530,10 @@ def check_mac_icon(problems: list) -> None:
 def check_fonts(info: dict, problems: list) -> None:
     """(Noto Sans, 15 Nov) UIAppFonts names exactly the fonts in App/Fonts - the synchronized folder copies each to
     the bundle's root, which is where UIAppFonts looks - each a TrueType font, with the licence beside them. A font
-    not named is never registered (its text falls back to iOS's face without a word); one named but missing, the same."""
+    not named is never registered (its text falls back to iOS's face without a word); one named but missing, the same.
+    (Libre Franklin and Courier Prime, 25 Nov) Each family has its own licence, with its own copyright line, beside its
+    fonts as <Family>-OFL.txt - a font LibreFranklin-Bold.ttf, its family's LibreFranklin-OFL.txt - and no licence is
+    left for a family no font is of."""
     fonts = IOS / "App" / "Fonts"
     named = list(info.get("UIAppFonts", []))
     present = sorted(path.name for path in fonts.glob("*.ttf")) if fonts.is_dir() else []
@@ -540,8 +543,15 @@ def check_fonts(info: dict, problems: list) -> None:
         with open(fonts / name, "rb") as file:
             if file.read(4) != b"\x00\x01\x00\x00":
                 problems.append(f"App/Fonts/{name} isn't a TrueType font")
-    if present and not (fonts / "OFL.txt").is_file():
-        problems.append("App/Fonts: no OFL.txt beside the fonts (the SIL Open Font License goes with them)")
+    families = sorted({name.split("-")[0] for name in present})
+    for family in families:
+        if not (fonts / f"{family}-OFL.txt").is_file():
+            problems.append(f"App/Fonts: no {family}-OFL.txt beside {family}'s fonts (the SIL Open Font License goes with "
+                            "them, each family's own)")
+    licences = sorted(path.name for path in fonts.glob("*OFL*.txt")) if fonts.is_dir() else []
+    for licence in licences:
+        if licence.removesuffix("-OFL.txt") not in families:
+            problems.append(f"App/Fonts: {licence} is no family's licence here - one for each family of the fonts")
     # the synchronized folder copies every resource to the bundle's root: two of one name would collide there
     seen: dict = {}
     for path in (IOS / "App").rglob("*"):

@@ -117,10 +117,11 @@ struct LibraryCareScreen: View {
 
     private func rescanSection(online: Bool) -> some View {
         Section {
-            // the scan's age moves on while the page shows
+            // the scan's age moves on while the page shows - in the readout face (25 Nov), as Library care's drawings
+            // set it (`mono xs`)
             TimelineView(.periodic(from: .now, by: 30)) { (context: TimelineViewDefaultContext) in
                 Text(care.facts(now: context.date.timeIntervalSince1970 * 1000))
-                    .font(Typeface.footnote)
+                    .font(Typeface.readout(.footnote))
                     .foregroundStyle(Palette.quiet)
                     .fixedSize(horizontal: false, vertical: true)
             }

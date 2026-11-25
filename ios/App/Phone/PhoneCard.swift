@@ -53,20 +53,30 @@ struct PhoneGroup<Content: View>: View {
 }
 
 /// A fact's row (.kv): its label at the left, white, 116 wide at least, and its value at the right in the second colour -
-/// 42 tall at least at the row's 16, on its hairline. One element for VoiceOver: its label, then its value.
+/// 42 tall at least at the row's 16, on its hairline - the value on the label's first baseline, as `.kv` is (25 Nov).
+/// `mono`, a value the drawings set in the readout face (`.mono.s`: Courier Prime at the small 13). One element for
+/// VoiceOver: its label, then its value.
 struct PhoneKV: View {
     let label: String
     let value: String
+    var mono = false
 
     var body: some View {
-        HStack(spacing: CGFloat(PhoneLook.kvGap)) {
+        HStack(alignment: .firstTextBaseline, spacing: CGFloat(PhoneLook.kvGap)) {
             Text(label)
                 .foregroundStyle(DWPalette.kvLabel)
                 .frame(minWidth: CGFloat(PhoneLook.kvLabelWidth), alignment: .leading)
             Spacer(minLength: 0)
-            Text(value)
-                .foregroundStyle(DWPalette.t2)
-                .multilineTextAlignment(.trailing)
+            if mono {
+                Text(value)
+                    .font(Typeface.Phone.mono(.small))
+                    .foregroundStyle(DWPalette.t2)
+                    .multilineTextAlignment(.trailing)
+            } else {
+                Text(value)
+                    .foregroundStyle(DWPalette.t2)
+                    .multilineTextAlignment(.trailing)
+            }
         }
         .font(Typeface.Phone.text(.row))
         .lookHeight(PhoneLook.kvRow)

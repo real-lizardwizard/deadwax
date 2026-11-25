@@ -42,7 +42,6 @@ struct ManageSection: View {
                         NavigationLink(value: AppRoute.needsALook) {
                             LabeledContent(ManagingWords.label(tool)) {
                                 Text(queueCount.count.value)
-                                    .monospacedDigit()
                             }
                             // read once: "Needs a look, 3 albums" (needsLookLabel)
                             .accessibilityElement(children: .ignore)

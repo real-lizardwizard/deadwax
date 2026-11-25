@@ -15,10 +15,13 @@ struct DownloadsRow: View {
                     if downloads.storeProblem != nil {
                         Text("\u{2026}")
                     } else if downloads.bytesHere > 0 {
+                        // in the readout face (25 Nov): it grows as songs come, at the row's right
                         Text(Bytes.words(downloads.bytesHere))
-                            .monospacedDigit()
+                            .font(Typeface.readout(.body))
                     }
                 }
+                // on the label's baseline: a list's own row centres the two, which would set the readout higher
+                .labeledContentStyle(.readout)
             }
         }
     }

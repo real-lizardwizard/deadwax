@@ -561,8 +561,9 @@ private struct DebugRowView: View {
 
 /// (R3b) One of iInfo's facts (`.kv`): its label white at the row's 16, 116 wide at least, its value at the right in the
 /// second colour at the small 13 - monospaced where the fact is a number, a time or a path (`.mono.s`), and selectable,
-/// to copy - 42 tall at least on its hairline, as PhoneKV is. At the accessibility sizes the value goes under its label,
-/// where a long label and its value both have the page's width. One element for VoiceOver: its label, then its value.
+/// to copy - 42 tall at least on its hairline, as PhoneKV is - on its label's baseline, as `.kv` is (25 Nov: centred, a
+/// readout's shorter line set it higher). At the accessibility sizes the value goes under its label, where a long label
+/// and its value both have the page's width. One element for VoiceOver: its label, then its value.
 private struct InfoKV: View {
     let row: InfoRow
 
@@ -571,7 +572,7 @@ private struct InfoKV: View {
     var body: some View {
         let stacked = typeSize.isAccessibilitySize
         let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: CGFloat(PhoneLook.kvGap) / 2))
-                             : AnyLayout(HStackLayout(spacing: CGFloat(PhoneLook.kvGap)))
+                             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: CGFloat(PhoneLook.kvGap)))
         layout {
             Text(row.label)
                 .font(Typeface.Phone.text(.row))

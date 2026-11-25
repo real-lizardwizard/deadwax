@@ -431,16 +431,21 @@ struct EQScreen: View {
                     eq.setHandPreamp(now, for: output)
                 }), in: -30...12, step: 0.1, onEditingChanged: { (down: Bool) -> Void in hold(down) }) {
                     LabeledContent(EQWords.Preamp.row) {
+                        // in the readout face (25 Nov), as the phone's: it counts as the stepper is held - on the
+                        // label's baseline, where a centred row would set it higher
                         Text(EQWords.Preamp.value(hand))
-                            .monospacedDigit()
+                            .font(Typeface.readout(.body))
                     }
+                    .labeledContentStyle(.readout)
                 }
                 .accessibilityValue(EQWords.decibelsSaid(hand))
             } else {
+                // deadwax's own preamp, in the readout face as iEQ draws it (25 Nov): it moves as a band is dragged
                 LabeledContent(EQWords.Preamp.row) {
                     Text(EQWords.Preamp.value(setting.on ? drawing.preamp : automaticPreamp(output, setting)))
-                        .monospacedDigit()
+                        .font(Typeface.readout(.body))
                 }
+                .labeledContentStyle(.readout)
             }
         } header: {
             Text(EQWords.Preamp.header)
@@ -805,7 +810,8 @@ struct EQScreen: View {
                 Stepper(value: Binding<Double>(get: { hand }, set: { (now: Double) -> Void in
                     eq.setHandPreamp(now, for: output)
                 }), in: -30...12, step: 0.1, onEditingChanged: { (down: Bool) -> Void in hold(down) }) {
-                    HStack(spacing: CGFloat(PhoneLook.kvGap)) {
+                    // on the label's baseline, as `.kv` is (25 Nov): centred, the readout would sit higher
+                    HStack(alignment: .firstTextBaseline, spacing: CGFloat(PhoneLook.kvGap)) {
                         Text(EQWords.Preamp.row)
                             .foregroundStyle(DWPalette.kvLabel)
                         Spacer(minLength: 0)
@@ -819,8 +825,10 @@ struct EQScreen: View {
                 .lookHeight(PhoneLook.kvRow)
                 .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
             } else {
+                // deadwax's own preamp, in the readout face as iEQ draws it (25 Nov): it moves as a band is dragged
                 PhoneKV(label: EQWords.Preamp.row,
-                        value: EQWords.Preamp.value(setting.on ? drawing.preamp : automaticPreamp(output, setting)))
+                        value: EQWords.Preamp.value(setting.on ? drawing.preamp : automaticPreamp(output, setting)),
+                        mono: true)
             }
         }
         cardNote(hand == nil ? EQWords.Preamp.automaticFooter : EQWords.Preamp.handFooter)
@@ -982,7 +990,7 @@ struct EQSuggestionRow: View {
 }
 
 /// One correction filter's row (3.8): its type, and under it "105 Hz · +2.6 dB · Q 0.70" (its ear after it when it is
-/// one ear's) in `.footnote.monospacedDigit()` `quiet` - a filter left out at this rate saying so in amber - tapped
+/// one ear's) in the footnote's readout `quiet` - a filter left out at this rate saying so in amber - tapped
 /// for its editor; its switch at the right. For VoiceOver the row is one element, "Filter 3: peak at 8903 hertz, plus
 /// 6 decibels, Q 1.66", its value On or Off, its actions Delete and Turn Off (or On); the switch is its own, "Filter 3
 /// on".
@@ -999,8 +1007,9 @@ struct EQFilterRowView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(EQWords.Advanced.type(f.kind))
                         .foregroundStyle(.primary)
+                    // (25 Nov) the readout face, as the phone's row: its numbers move as a handle on the curve is dragged
                     Text(EQWords.Advanced.detail(f))
-                        .font(Typeface.footnote.monospacedDigit())
+                        .font(Typeface.readout(.footnote))
                         .foregroundStyle(Palette.quiet)
                         .fixedSize(horizontal: false, vertical: true)
                     if row.leftOut {

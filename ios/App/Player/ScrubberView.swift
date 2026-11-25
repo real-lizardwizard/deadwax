@@ -130,7 +130,8 @@ struct ScrubberView: View {
 }
 
 /// The scrubber's two clocks, "1:23" and "-3:33": the bar's own value in whole seconds, so this view is drawn again only
-/// when their words change - a second's step, not every frame the bar is.
+/// when their words change - a second's step, not every frame the bar is. In the readout face (25 Nov), as iNowPlaying
+/// draws them (`mono xs`): Libre Franklin has no tabular figures, so they'd shift as they count.
 private struct ScrubberClocks: View, Equatable {
     let elapsed: String
     let remaining: String
@@ -141,7 +142,7 @@ private struct ScrubberClocks: View, Equatable {
             Spacer()
             Text(remaining)
         }
-        .font(Typeface.caption.monospacedDigit())
+        .font(Typeface.readout(.caption))
         .foregroundStyle(Palette.quiet)
         .accessibilityHidden(true)
     }

@@ -572,7 +572,7 @@ private struct PressedTrackRow: View {
         VStack(spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(number)
-                    .font(Typeface.subheadline.monospacedDigit())
+                    .font(Typeface.subheadline)
                     .foregroundStyle(Palette.quiet)
                     .frame(minWidth: 22, alignment: .trailing)
                     .accessibilityHidden(left)
@@ -599,7 +599,7 @@ private struct PressedTrackRow: View {
                         .overlay(Corners.controlShape.strokeBorder(Palette.amberEdge))
                 }
                 Text(length)
-                    .font(Typeface.subheadline.monospacedDigit())
+                    .font(Typeface.subheadline)
                     .foregroundStyle(Palette.quiet)
             }
             .padding(.vertical, 8)
