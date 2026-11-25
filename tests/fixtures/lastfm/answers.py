@@ -1,5 +1,6 @@
 """
-The answers `GET /deadwax/lastfm/artist` gives (2.1.41, S2 - notes/lastfm.md), for the iPhone and Mac app's fixtures:
+The answers `GET /deadwax/lastfm/artist` gives (2.1.41, S2; similar artists and top albums since 2.1.43, S4 -
+notes/lastfm.md), for the iPhone and Mac app's fixtures:
 asked of the whole app, start(), over tests/test_lastfm_routes.py's stand-in Last.fm - which answers from
 tests/test_lastfm.py's ANSWERS - Last.fm's own, recorded by record.py on 2026-11-25 - with a real
 SQLite store of its own for each case, logins off (the route is a user's: the implicit admin asks). Written to
@@ -14,6 +15,11 @@ written again. The file says which fixtures it was made from (`fixtures`: "recor
 Last.fm's real answers; a recording made again changes them.
 
 Names outside ASCII are written as JSON escapes, so the file holds none raw.
+
+The same nine cases since 2.1.41 (the app's LastfmDecodeTests counts them): from 2.1.43 each answer also carries
+`similar` and `top_albums` - the three artists' whole, by id (and by name for the id Last.fm doesn't know); null where
+nothing could be had. getSimilar and getTopAlbums for the unknown id are SHAPED (tests/test_lastfm_routes.py
+UNRECORDED: Last.fm's not-known answer, as record.py recorded for its getTopTracks).
 """
 
 import json
@@ -42,9 +48,9 @@ def _real_refusal() -> tuple[int, object]:
 
 #? (what it is, the query, how Last.fm is set up, whether a key is set)
 CASES = [
-    ("Tame Impala, by MusicBrainz id: listeners, the page, ten top songs",
+    ("Tame Impala, by MusicBrainz id: listeners, the page, ten top songs, thirty similar artists, fifty albums",
      {"mbid": T.TAME, "name": "Tame Impala"}, None, True),
-    ("Dance Gavin Dance, by MusicBrainz id: ten top songs, nothing to fold",
+    ("Dance Gavin Dance, by MusicBrainz id: ten top songs, nothing to fold; similar artists and albums",
      {"mbid": T.DGD, "name": "Dance Gavin Dance"}, None, True),
     ("Portishead, by MusicBrainz id: ten top songs, its three live takes (#34, #45, #50) past them",
      {"mbid": T.PORTISHEAD, "name": "Portishead"}, None, True),
@@ -60,7 +66,7 @@ CASES = [
      {"mbid": T.TAME}, lambda fake: setattr(fake, "down", True), True),
     ("Last.fm refusing the key (its real answer, 403 with error 10) with nothing kept: off, and why",
      {"mbid": T.TAME},
-     lambda fake: fake.instead.update({"artist.getinfo": _real_refusal(), "artist.gettoptracks": _real_refusal()}),
+     lambda fake: fake.instead.update({method: _real_refusal() for method in T.METHODS}),
      True),
     ("no key: off, and where to add one", {"mbid": T.TAME, "name": "Tame Impala"}, None, False),
 ]

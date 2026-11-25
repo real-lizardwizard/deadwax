@@ -48,8 +48,8 @@ anything.
 - `cleaned()` is how a Last.fm message is kept: the key taken out (should Last.fm ever echo it) in any case -
   `without()` replaces it case-insensitively since 2.1.41's review, a key being hex Last.fm could quote back in
   capitals - control characters out, one line, at most 200 letters.
-- **The match keys** (the design's 2.4), with the contract `tests/fixtures/lastfm/match-vectors.json`: 57 titles, 27
-  names. `stripped` and `first` are hand-written in `tests/fixtures/lastfm/export-vectors.cjs`; each `key` is what
+- **The match keys** (the design's 2.4), with the contract `tests/fixtures/lastfm/match-vectors.json`: 66 titles
+  (57 until 2.1.43's dotted and dotless i - S4), 27 names. `stripped` and `first` are hand-written in `tests/fixtures/lastfm/export-vectors.cjs`; each `key` is what
   the web's own TypeScript answers - songs.ts `titleKey(stripped)`, owned.ts `foldName(name)` - compiled as the sims
   compile it. `tests/test_lastfm_vectors.py` holds `strip_title`, `title_key`, `match_key`, `name_key` and
   `first_credit` to it, and asserts the iPhone app's copy (on `ios`, under
@@ -67,7 +67,7 @@ anything.
   - Nothing runs `export-vectors.cjs --check` in CI yet: a change to titleKey or foldName needs the script run by
     hand, and the vectors then fail Python where it differs. A sim that runs `--check` would close that (it would
     touch ui/test, so it wasn't added in this slice).
-- `LASTFM_SHAPE = 1`: the first part of every kept row's key.
+- `LASTFM_SHAPE`: the first part of every kept row's key - 1 from 2.1.36, 2 from 2.1.43 (S4).
 
 ### The client: src/api/lastfm_endpoint.py
 
@@ -223,7 +223,7 @@ changes. `src/routes/lastfm.py`, a user's route (tests/test_logins.py ROUTES), i
   tasks are held in a set (asyncio keeps only weak references). `routes/lastfm.stop()` cancels them in the lifespan,
   before `lastfm_kept.stop()`.
 - **`similar` and `top_albums` are S4's**: until then they aren't in the answer at all. A `null` would say "couldn't
-  be had", which isn't what they are.
+  be had", which isn't what they are. (In the answer since 2.1.43: "S4" below.)
 - **`why`** follows Explained's rule: words for whoever runs deadwax, sent to everyone, drawn by the app only for
   `seesDetail`. With no key it is the design's "No Last.fm API key is set - add LASTFM_API_KEY in Server settings >
   Connections (a free key from last.fm/api/account/create)." While the client holds a refusal (`lastfm.held()`, or
@@ -616,3 +616,267 @@ after review, 37 caught:
   record.py recorded none); that deadwax reads a real `artist-credit` as the fake's (MusicBrainz's taking the inc
   is verified above, by the review; its credit here is shaped from the documented one); a description page drawn in a browser with Last.fm's words
   (ui/ didn't change, so only its words differ); how many artists' bios put a list straight after one paragraph.
+
+## S4 - similar artists and top albums (2.1.43)
+
+`GET /deadwax/lastfm/artist` gains the design's last two parts (its 2.5), for the app's Similar Artists row and the
+albums' "Most played" order (slice A2 draws them). Nothing on the web changes. No route, setting or table is new.
+
+### The answer, now
+
+    {..., "top_songs": [...],
+     "similar": [{"name": "Pond", "mbid": "69ac44f7-c80d-47b4-9bc8-fcc758d209e6", "match": 1.0,
+                  "url": "https://www.last.fm/music/Pond"}, ...],
+     "top_albums": [{"title": "Currents", "mbid": "031ecbde-35e1-4d3a-917f-f89f31aca1c9", "plays": 197990342,
+                     "counted": "plays"}, ...]}
+
+- **Four parts, asked at once**, each through `kept()` with S2's fallback (by mbid, then by name with autocorrect=1):
+  getInfo, getTopTracks (limit 50), **artist.getSimilar (`limit=30`) and artist.getTopAlbums (`limit=50`)** - exactly
+  record.py's parameters, since the tests' stand-in answers only those. The one `ARTIST_DEADLINE_S`, 4 s, covers all
+  four. A part not in by then is `null` with `unavailable`, and goes on and is kept, as S2's did. Four parts take all
+  four of the client's in-flight slots, so a second page's asks wait for the first's.
+- **Each part stands alone**: `null` when it couldn't be had (failed, late, Last.fm doesn't know the artist), `[]`
+  when Last.fm knows the artist and lists nothing. One failing leaves the other three as they are.
+- **An older app keeps decoding it**: the app's `LastfmArtist` (ios Lastfm.swift) reads its six fields by name and a
+  Decodable ignores keys it doesn't know. So the two new keys change nothing for A1's app.
+
+### `similar`
+
+- `similar_artists(body)` keeps `{artist, similar}`. `artist` is Last.fm's `@attr.artist`, the name it answered
+  for. `similar` is Last.fm's list in its order (match descending, as answered), each entry as follows:
+  - `name`: as Last.fm wrote it, ends trimmed; an entry with no name is dropped;
+  - `mbid`: `mbid_of()`, trimmed and lowercased, and only of MBID_PATTERN's shape, else `null`;
+  - `match`: `similarity()`, a float from 0 to 1. Last.fm writes it as a string ("0.706669"); words, "nan", a bool,
+    or a number past 1 or below 0 give `null`;
+  - `url`: `lastfm_url()`'s rule.
+
+  At most `SIMILAR_MAX` = 30. **Various Artists** (by MusicBrainz's id 89ad4ac3-... or by `name_key`) is dropped as
+  the answer is parsed. No images: Last.fm's are placeholders, and the design's 3.4 draws Navidrome's.
+- **The asked artist is dropped when the answer is made, not when it is parsed** (`similar_of(kept, mbid, name)`).
+  The kept row is shared by every page that asks by that id or name, so the asker's id and name aren't the row's to
+  hold. Dropped: an entry with the page's `mbid`, or one whose `name_key` is the asked name's or `@attr.artist`'s. A
+  name that folds to nothing ("!!!") drops nobody. The row is read back entry by entry through the same checks, at
+  most 30. No recording lists the artist among their own similar artists. The tests make one that does, an
+  "Impala, Tame" that only the id can drop.
+
+### `top_albums`
+
+- `top_albums(body)` keeps `{top_albums}`, in Last.fm's order, each `{title, mbid, plays, counted}`:
+  - `title`: ends trimmed, whole(); an album whose title folds to nothing (`name_key`) is dropped - see "After
+    review";
+  - `mbid`: `mbid_of()`. Last.fm's album ids are releases', not release groups': the app matches by title as well;
+  - `plays`: `count()`'s, never `int()`'s;
+  - `counted`.
+- **One count for the whole list**: the design's fork. With any album carrying a readable `playcount`, every
+  album's `plays` is its playcount, `counted: "plays"`. With none, it is each one's `listeners`, `counted:
+  "listeners"`. An album without the list's count is left out rather than set beside the others with another kind
+  of number. With neither count anywhere, `[]`. The read-back (`_kept_albums`) keeps only the first readable
+  entry's kind, so a kept row can't mix them either. At most `TOP_ALBUMS_MAX` = 50.
+- **What the recordings settled**: every getTopAlbums answer carries `playcount` (a JSON number, unlike every other
+  count Last.fm sends, which is a string) and **no `listeners` at all**, whereas the API page's sample shows listeners. So `counted` is "plays" for all three artists. The listeners
+  branch is held by inline cases written from the API page (`SHAPED`). Last.fm's order **isn't by plays**: 20 of
+  Tame Impala's 49 neighbours, 21 of Dance Gavin Dance's and 17 of Portishead's are out of order (Deadbeat 23.6M
+  before 29.9M). It is presumably by listeners, as with top tracks. deadwax keeps Last.fm's order and the plays, and
+  the app's "Most played" sorts by them.
+
+### What the recordings give (2026-11-25), by mbid and by name alike
+
+- **Similar**: 30 each, the first at match 1.0.
+  - Tame Impala: Pond, Melody's Echo Chamber, GUM, Temples, The Holydrug Couple.
+  - Dance Gavin Dance: Royal Coda, Eidola, Secret Band, Wolf & Bear, Emarosa.
+  - Portishead: The Funky Lowlives, Pati Yang, Hird, Soma Sonic, Marsmobil.
+
+  Two of each have no mbid: Melody's Echo Chamber and King Gizzard & The Lizard Wizard; Hail The Sun and Ghost
+  Runner On Third; Martina Topley-Bird and Dzihan & Kamien. The app drops theirs with no mbid (its 3.4). None
+  lists Various Artists or the artist themselves.
+- **Top albums**: 50 each, all counted by plays.
+  - Tame Impala: Currents 197,990,342 · The Slow Rush · Lonerism · Deadbeat; 38 with an mbid.
+  - Dance Gavin Dance: Downtown Battle Mountain 13,211,300 · Instant Gratification · Dance Gavin Dance · Downtown
+    Battle Mountain II; 33 with an mbid.
+  - Portishead: Dummy 64,559,236 · Third · Portishead · Roseland NYC Live; 22 with an mbid.
+- **Kept rows**: similar 3.9-4.0 KB, top albums 4.5-5.3 KB, against Last.fm's 32-50 KB answers.
+  `test_a_second_visit_is_answered_from_what_was_kept_and_asks_nothing` holds Tame Impala's under 6000 bytes, with
+  no `image`. Since the review each is bounded, so it always fits the keeping ("After review").
+
+### The dotted and the dotless i (match_key, from S2's review)
+
+songs.ts `SAME_SONG_ASIDE` is `/.../giu`. Python's port used `re.IGNORECASE`, which also folds **İ (U+0130) and ı
+(U+0131) into i**, both in the words ("live", "remaster") and in a class. JavaScript's `/iu` folds only **ſ
+(U+017F) into s and K (U+212A) into k**; nothing else becomes an ASCII letter. Both facts were read off Node and
+Python by trying every code point. So "Roads (LİVE)" keyed `roads` here and `roads (live)` in the TypeScript and
+the app's port. That is a song that matched on one side only.
+
+- **Fixed in Python**, to the vectors' (JavaScript's) behaviour. The pattern has no flag. Each word is spelled by
+  `_js_iu()` as `[lL][iI][vV][eE]`, with `[sSſ]` and `[kKK]`. `_B`'s class was already JavaScript's `\w` under `/iu`
+  (ASCII, ſ and K). A fuzz over 200,000 titles in the scratch dir (never committed) found 201 that the old pattern
+  keyed differently from the compiled songs.ts, and none with the new one.
+- **Steps 1-3 (`strip_title`) keep `re.IGNORECASE`**: they are Python's own, the app's port mirrors Python there,
+  and the vectors pin it ("Roads - Lİve" strips to "Roads").
+- **The vectors**: 9 titles added, written with `String.fromCharCode` in export-vectors.cjs, 66 in all:
+  - the five that failed on the old pattern: (LİVE), (lıve), (Lİve at Roseland), (Remasteredİ), (Remasteredı);
+  - what `/iu` does fold: (Remaſtered), and (LiveK) with the Kelvin sign;
+  - the two step 1-3 cases.
+
+  `test_the_folds_that_matter_most` asserts the dotted-I and dotless-i keys and the long s by hand.
+- **The app's copy must be recopied**: `ios/DeadwaxKit/Tests/DeadwaxCoreTests/Fixtures/lastfm/match-vectors.json`
+  is held byte-equal (`test_the_app_s_copy_is_this_one`, on ios after merging main). Read off the ios branch (not
+  run), the Swift `SongTitle.key` folds only ASCII case and ſ, and its word letters are ASCII, ſ and K. That is
+  JavaScript's, so the new vectors should pass there unchanged.
+- **LASTFM_SHAPE 1 -> 2.** A top tracks row folded by 1 can hold one song where 2 makes two, which is the rule's
+  case. The bump empties every kept row once at start-up (`at_start`): getInfo, top tracks and album.getInfo are
+  each asked again once.
+  - `KEPT_SHAPES` gains 2's digest, which now also covers similar_artists and top_albums over every recording, the
+    S4 inline cases, SIMILAR_MAX and TOP_ALBUMS_MAX, FOLD_CASES with the dotted and dotless i and the long s, and
+    **each FOLD_CASES title's match_key**. Nothing in 1's held them, so the fix alone left the digest where it was.
+    The keys were added after the first mutation run: the fold stops at TOP_SONGS, the new cases sit past its tenth
+    song, and so re.IGNORECASE put back failed the vectors but not the digest. With the keys it fails both.
+  - `KEPT_ALBUM_SHAPES` gains 2 with 1's digest, since album_info didn't change.
+  - tests/test_lastfm_kept.py reads `LASTFM_SHAPE` instead of a literal 1.
+
+### The app's fixtures
+
+answers.py's nine cases are unchanged in number and prefix (the app's LastfmDecodeTests counts 9), and each answer
+now carries `similar` and `top_albums`. The refused case refuses all four methods, since refusing two let the other
+two race it. **Run it on `ios` after merging main**: `artist.json` there is 2.1.41's.
+
+**The ios branch's `tests/test_ios_contract.py test_lastfms_answer_is_what_the_app_decodes` fails once main is
+merged.** It calls `artist_answer(info, tracks, refusal)`, which is now `(info, tracks, similar, albums,
+refusal)`, and it asserts the answer's keys are exactly `LastfmArtist`'s six. A2 updates it with the model.
+
+### After review (before 2.1.43's commit)
+
+The review found no fault in S4's own logic. It found one older fault that S4 widens, a bound S4 lacked, and a gap in
+which titles are dropped. Each is fixed and mutation-checked, and the digest covers them.
+
+- **A lone surrogate in a name 500'd the route on every visit.** JSON's `"\ud800"` with no pair after it is a lone
+  surrogate in Python. The parse and the keeper took it, and the keeper writes it back as it came (ASCII JSON).
+  Starlette's JSONResponse encodes UTF-8 and raised UnicodeEncodeError: a 500 at every visit while the row stood.
+  That was a week without asking Last.fm at all, then up to 30 days answered from the row while it was asked again
+  behind (lastfm_kept's standing). That held for top songs since 2.1.41, and S4 adds two more lists of names.
+  Fixed in layers:
+  - `lastfm.whole()` turns each lone surrogate into U+FFFD. A letter outside the BMP is one letter in Python (JSON's
+    pair is read as one), so it is never touched.
+  - `whole()` runs in `_name` (song titles, similar names, `@attr`, album titles) and `_bio_text` (getInfo's bio,
+    album.getInfo's wiki), so no row is kept with one.
+  - The read-back runs the same: `_kept_songs` and `_kept_albums` read titles through `_name`, and `similar_of`
+    through `_similar_entry`.
+  - descriptions.py's text exits do the same: `clean_text` (every paragraph: Last.fm's, Wikipedia's, Navidrome's)
+    and `english_description` (the subtitle). The description rows are kept 30 days, so the same fault was there for
+    every source.
+  - **The last guard**: `lastfm.answerable()` makes every string in an answer whole, keys included. It wraps the
+    artist route's answer and both describe routes'. Text any parse lets through degrades to U+FFFD rather than a
+    500.
+  - `why` was already safe: `cleaned()` turns anything unprintable into a space, and a surrogate is unprintable.
+  - Tested through the routes:
+    - `test_a_lone_surrogate_from_last_fm_is_answered_and_kept_whole`: a song, a similar artist and an album, kept
+      whole and answered from the row;
+    - `test_a_lone_surrogate_in_last_fm_s_bio_is_said_whole_and_kept_whole`;
+    - each guard alone, with the layers before it monkeypatched away:
+      `test_a_text_the_parse_let_through_is_still_never_a_500` and
+      `test_a_text_the_reading_let_through_is_still_never_a_500`.
+
+    The stand-in Last.fm sends a body given as bytes as it is, because httpx's `json=` can't send a lone surrogate.
+- **The rows are bounded.** A similar or top albums row is at most `LIST_ROW_BYTES` = 24 KB as kept. `_fitted()`
+  drops entries from the end until the row fits, working out each entry's size once.
+  - The bound plus the longest key there is, 6,827 bytes (a name of the route's 200 letters, each folding to at most
+    33 bytes, as `test_a_getinfo_row_always_fits_the_keeping` found), is under ROW_MAX_BYTES' 32 KB. So a row is
+    always kept, never asked again at every visit. lastfm.py can't import lastfm_kept (it imports lastfm), so the
+    bound is a constant and `test_a_similar_and_an_albums_row_always_fit_the_keeping` proves it.
+  - `@attr.artist` is the one field the bound couldn't drop. It is kept only up to `ANSWERED_NAME_MAX` = 200 letters,
+    the route's NAME_MAX; a longer one is no name a page asks by.
+  - One entry too big for any row on its own leaves `[]`, said as "lists nothing". The recordings are 4-5 KB and keep
+    every entry. `test_the_largest_similar_and_albums_rows_are_kept` runs 30 and 50 names of letters outside the BMP,
+    asked by the longest-key name, through the route.
+- **Album titles that fold to nothing are dropped** (`name_key` empty), in the parse and the read-back. "(null)" is
+  the case the review gave. The list's count is decided after the drop, so a "(null)" alone with plays decides
+  nothing.
+  - This takes **Sigur Ros's "( )"** and **!!!'s "!!!"** with it: `name_key` drops a bracketed aside and keeps only
+    letters and digits, so both fold to "".
+  - On their artist pages those albums get no plays from Last.fm, and the app's "Most played" puts them among the
+    albums with none, after those with plays, newest first.
+  - Kept, they would have met the page only by mbid. Last.fm's album mbid is a release's, as Navidrome's
+    musicBrainzId is. The app's title match is `Fold.key`, which folds them to "" too, so the title could never
+    place them.
+  - Keeping a nothing-title only when it has an mbid would save them. It wasn't done: the review asked for the drop.
+    Similar artists keep such names ("!!!" the band is a real similar artist, with an mbid).
+- **The upgrade re-asks every description row once.** The bump to shape 2 empties every kept row, the descriptions'
+  getInfo and album.getInfo rows among them. So the first visit to each artist or album description after the upgrade
+  asks Last.fm again, once.
+  - That's bounded by the client's pace (PER_SECOND 5, IN_FLIGHT 4, TURN_WAIT_S 2 s).
+  - An ask past it is Unreachable ("busy"), said without Last.fm's words and `unavailable`, so the app asks again
+    soon. Nothing is kept from it.
+- **Four parts can fill the client's four slots.** An artist page's four parts each take one of the client's
+  `IN_FLIGHT` = 4. While a slow page holds them (each up to FETCH_DEADLINE_S, 8 s), another Last.fm ask waits
+  TURN_WAIT_S and is then "busy": an album's description, another artist's page or description.
+  - It is answered without Last.fm, `unavailable`, and asked again on the next visit.
+  - The same artist's own description joins the page's getInfo ask (one ask per key), so it takes no slot.
+- **The dotted and dotless i in FEATURE_TAIL and CREDIT_CUT aren't covered.** Both use `re.IGNORECASE`, as Python's
+  own steps 1-3 do, so "One More Hour featurıng X" drops its tail and "Tame Impala FEATURİNG X" is cut at it. No
+  vector pins either. The vectors hold ı and İ only in FEATURE_ASIDE ("(Featurıng Someone Else)") and the dash takes'
+  TAKE_WORD ("Roads - Lİve"). So the app's port could differ there unseen. Two vectors would close it; they need the
+  app's copy recopied with them.
+- The docs said each album shows "how many times it has been played". That is untrue for a list counted by listeners,
+  and both now say "its plays on Last.fm, or its listeners where Last.fm gives no plays".
+
+### Tests, and the mutations they catch
+
+- tests/test_lastfm.py, 102 -> 174 (5 of them the review's). The S4 parses are tested over the recordings (the first five similar artists and
+  four albums of each pinned, the ones with no mbid named) and inline (`SHAPED`). Also covered: `mbid_of`,
+  `similarity`, the self-drop, Various Artists, the caps, one count per list, kept rows read back, the four-part
+  answer, and the digest.
+- tests/test_lastfm_routes.py, 38 -> 49 (3 the review's). Every recorded artist through the app, with each part failing alone (x4), a
+  late similar part kept, the artist among their own similar artists (`SHAPED`: kept 30, answered 28), albums by
+  listeners (`SHAPED`), and empty lists kept and not `unavailable`. Unrecorded asks, each marked `SHAPED`: getSimilar
+  and getTopAlbums for the unknown id and name are given the recorded not-known answer, and the misspelling empty
+  lists.
+- tests/test_lastfm_vectors.py, 87 -> 96 (the nine titles). tests/test_describe_lastfm.py, 70 -> 73 (the
+  review's surrogates). It and tests/test_lastfm_kept.py follow the bump and the four parts.
+- The whole suite: 5145 passed, 2 skipped. pyflakes is clean.
+
+Each was put in alone, then the Last.fm, describe and logins tests were run (652 tests). Each file was restored
+byte for byte afterwards. All 18 were caught:
+
+- **the artist themselves in `similar`**, three ways (no drop; by id only; by name only):
+  `test_the_asked_artist_is_never_similar_to_themselves` and the route's
+  `test_the_artist_is_never_among_their_own_similar_artists`.
+- **more than 30**, with both caps off or the read-back's alone: `test_no_more_than_thirty`.
+- **an mbid of the wrong shape passed on** (`mbid_of` taking any text): `test_an_mbid_of_any_other_shape_is_none` (13
+  failed).
+- **`top_albums` without `playcount` crashing** (`int(album["playcount"])`):
+  `test_top_albums_without_a_playcount_are_counted_by_listeners_and_never_crash`, the route's listeners test, and
+  the digest.
+- **`counted` wrong**, three ways (always "plays"; listeners chosen first; a mixed list): `test_one_count_for_the_whole_list`,
+  the listeners tests, `test_a_kept_row_read_back_carefully`, and the digest.
+- **Various Artists kept**, **a match not range-checked** and **a similar url not checked**: their parse tests, the
+  kept-row read-back, and the digest.
+- **a late part cancelled**: `test_a_late_part_goes_on_to_ask_by_name_and_that_is_kept_too`.
+- **one part failing taking the others down**: 13 tests.
+- **only S2's two parts asked**: 26 tests.
+- **SAME_SONG_ASIDE back to re.IGNORECASE**: the five vectors, `test_the_folds_that_matter_most`, and (after the keys
+  were added) the digest.
+- **LASTFM_SHAPE left at 1**: both digest tests.
+
+The review's 14, the same way (661 tests), each restored afterwards, all caught:
+
+- **`_name` not whole**, and **`_bio_text` not whole**: the surrogate parse tests, the route tests (artist and
+  describe), and the digest;
+- **the artist route's guard off**, and **the describe routes' guard off**: the two last-guard tests, and only
+  they, as the layers before the guard are monkeypatched away there;
+- **`clean_text` not whole**, and **the subtitle not whole**: `test_a_lone_surrogate_in_any_side_s_words_is_said_whole`;
+- **kept songs, or kept albums, read back not whole**: `test_a_kept_row_with_a_lone_surrogate_is_answered_whole`;
+- **the bound off**, **by letters not bytes**, and **at 32 KB**: `test_a_similar_and_an_albums_row_always_fit_the_keeping`,
+  the route's largest-rows test, and the digest;
+- **the answered name not capped**: the fit test;
+- **a title that folds to nothing kept**, in the parse (with the digest) or in the read-back:
+  `test_an_album_title_that_folds_to_nothing_is_left_out`.
+
+### Verified, and not
+
+- **Verified by the tests**: everything above, over Last.fm's recorded getSimilar and getTopAlbums answers through
+  httpx's MockTransport, with the request parameters exactly as recorded.
+- **Not verified**:
+  - deadwax asking the real Last.fm for these (no call was made here);
+  - how long four parts take cold;
+  - a getTopAlbums answer with listeners and no playcount (the API page's sample; no recording has one);
+  - getSimilar and getTopAlbums for an unknown artist (their error 6 is shaped from getTopTracks', recorded);
+  - the Swift port against the new vectors (not run: the ios branch wasn't checked out).

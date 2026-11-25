@@ -42,6 +42,7 @@ from src.api.musicbrainz_endpoint import MusicBrainzClient, RateLimit, ResponseC
 from src.api.navidrome_endpoint import navidrome
 from src.api.wikipedia_endpoint import wikipedia
 from src.config import Config
+from src import lastfm as lastfm_rules
 from src.lastfm import LASTFM_SHAPE, album_info, artist_info, name_key
 from src.lastfm_kept import artist_key, release_group_key
 from src.routes import describe as describe_route
@@ -50,7 +51,7 @@ from src.store import JobStore
 from tests.test_describe import (DUMMY, MB_DUMMY, ND_ALBUM_INFO, ND_ARTIST_INFO, ND_WORDS, NOBODY, PORTISHEAD,
                                  PORTISHEAD_WORDS, MusicBrainz, Wikimedia, found, relation)
 from tests.test_lastfm import REFUSED_INVALID_KEY, answer
-from tests.test_lastfm_routes import KEY, NOT_KNOWN, SHAPED_LIMITED, LastFm, serving, until
+from tests.test_lastfm_routes import KEY, NOT_KNOWN, SHAPED_LIMITED, LastFm, raw, serving, until
 from tests.test_navidrome import failed, ok
 
 TAME = "63aa26c3-d59b-4da4-84ac-716b54f1ef4d"
@@ -278,6 +279,22 @@ def test_a_page_that_only_begins_like_one_is_said():
         assert D.from_lastfm(bio(f"{words} {LINK}"), "artist")["text"] == words
 
 
+def test_a_lone_surrogate_in_any_side_s_words_is_said_whole():
+    """SHAPED (2.1.43's review): a lone surrogate - JSON's "\\ud800" with no pair after it - in Last.fm's words, in
+    Wikipedia's or Navidrome's, or in Wikidata's subtitle, is U+FFFD: no UTF-8 carries the surrogate, so the route's
+    encoder raised on it, a 500 for as long as the words were kept."""
+    lone, fffd = chr(0xD800), chr(0xFFFD)
+    words = "Portishead are an English band" + lone + " from Bristol."
+    said = D.from_lastfm({"bio": {"content": words}, "url": "https://www.last.fm/music/Portishead"}, "artist")
+    assert said["text"] == "Portishead are an English band" + fffd + " from Bristol."
+    #? and kept so: the getInfo row is whole before from_lastfm reads it
+    assert artist_info({"artist": {"bio": {"content": words}}})["bio"]["content"] == said["text"]
+    assert D.from_summary({"type": "standard", "extract": words}, "Portishead")["text"] == said["text"]
+    assert D.from_navidrome({"artistInfo2": {"biography": words}}, "biography")["text"] == said["text"]
+    subtitle = {"entities": {"Q1": {"descriptions": {"en": {"value": "English band" + lone}}}}}
+    assert D.english_description(subtitle, "Q1") == "English band" + fffd
+
+
 def test_the_order_with_a_key():
     heard = {"text": "L.", "source": "lastfm", "url": "https://www.last.fm/music/X"}
     said = {"text": "N.", "source": "lastfm", "url": None}
@@ -402,16 +419,20 @@ def test_one_getinfo_serves_the_artist_page_and_the_description(env):
     """The design's "one ask serves both": the description reads the row GET /deadwax/lastfm/artist kept, and the
     artist page the row the description kept."""
     assert env.client.get("/deadwax/lastfm/artist", params={"mbid": TAME}).status_code == 200
-    assert sorted(method for method, _ in env.fake.requests) == ["artist.getinfo", "artist.gettoptracks"]
+    assert sorted(method for method, _ in env.fake.requests) == ["artist.getinfo", "artist.getsimilar",
+                                                                 "artist.gettopalbums", "artist.gettoptracks"]
     got = describe(env, "artist", mbid=TAME)
     assert got["text"] == said_of("tame-impala.info.mbid", "artist")["text"] and got["source"] == "lastfm"
-    assert len(env.fake.requests) == 2, "the description asked Last.fm nothing more"
+    assert len(env.fake.requests) == 4, "the description asked Last.fm nothing more"
 
     describe(env, "artist", mbid=DGD)
     assert env.fake.asked("artist.getinfo")[-1] == {"mbid": DGD}
     asked = len(env.fake.requests)
     assert env.client.get("/deadwax/lastfm/artist", params={"mbid": DGD}).status_code == 200
-    assert env.fake.requests[asked:] == [("artist.gettoptracks", {"mbid": DGD, "limit": "50"})]
+    #? (2.1.43) the page's other three parts - its getInfo is the description's
+    assert sorted(env.fake.requests[asked:]) == [("artist.getsimilar", {"mbid": DGD, "limit": "30"}),
+                                                 ("artist.gettopalbums", {"mbid": DGD, "limit": "50"}),
+                                                 ("artist.gettoptracks", {"mbid": DGD, "limit": "50"})]
 
 
 def test_a_second_visit_asks_last_fm_nothing(env):
@@ -538,6 +559,36 @@ def test_last_fm_and_wikipedia_with_no_words_leave_navidrome_s(env):
     got = describe(env, "artist", mbid=NOBODY, navidrome_id="ar-1")
 
     assert got == found(ND_WORDS, "lastfm", "https://www.last.fm/music/Portishead")
+
+
+def lone_bio() -> dict:
+    """SHAPED: Portishead's recorded getInfo, a lone surrogate in its bio."""
+    body = answer("portishead.info.mbid")
+    body["artist"]["bio"]["content"] = "Portishead" + chr(0xD800) + " " + body["artist"]["bio"]["content"]
+    return body
+
+
+def test_a_lone_surrogate_in_last_fm_s_bio_is_said_whole_and_kept_whole(env):
+    """(2.1.43's review) Through the route: a 200, U+FFFD in the words, and the row kept whole."""
+    env.fake.instead["artist.getinfo"] = (200, raw(lone_bio()))
+    for _ in range(2):
+        got = describe(env, "artist", mbid=PORTISHEAD)
+        assert got["source"] == "lastfm" and got["text"].startswith("Portishead" + chr(0xFFFD) + " ")
+    row = lastfm_rows(env)[artist_key("artist.getinfo", mbid=PORTISHEAD)]
+    assert "\\ud800" not in row and "\\ufffd" in row
+    assert env.fake.requests == [("artist.getinfo", {"mbid": PORTISHEAD})]
+
+
+def test_a_text_the_reading_let_through_is_still_never_a_500(env, monkeypatch):
+    """The describe routes' last guard (lastfm.answerable): with the bio's cut and the description's reading both
+    letting a lone surrogate through, the answer is still a 200, U+FFFD in its place."""
+    monkeypatch.setattr(lastfm_rules, "_bio_text",
+                        lambda value, letters, most: value.strip() if isinstance(value, str) else None)
+    monkeypatch.setattr(D, "whole", lambda text: text)
+    env.fake.instead["artist.getinfo"] = (200, raw(lone_bio()))
+    got = describe(env, "artist", mbid=PORTISHEAD)
+    assert got["text"].startswith("Portishead" + chr(0xFFFD) + " ")
+    assert "\\ud800" in lastfm_rows(env)[artist_key("artist.getinfo", mbid=PORTISHEAD)]
 
 
 @pytest.mark.parametrize("trouble", ["down", "refused", "limited"])
