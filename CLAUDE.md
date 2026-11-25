@@ -211,13 +211,20 @@ src/
                    outage remembered briefly, one fetch per cover, six at once and 64 under way at most -
                    routes/coverart.py's
                    /deadwax/coverart/{kind}/{mbid}, see "The Cover Art Archive relay (2.1.24)".
+  lastfm.py        PURE. Last.fm (2.1.36): an answer's outcome (classify), the match keys, and (2.1.41) the artist
+                   page's parse - listeners, the bio cut to fit a kept row, the top songs folded (top_songs),
+                   addresses only https on last.fm - and LASTFM_SHAPE, bumped with what is kept - notes/lastfm.md.
+  lastfm_kept.py   Last.fm's answers kept for everyone (store.py lastfm_kept): parsed, by standing (3/7/30 days),
+                   one ask per key, shielded; a kept answer beats Last.fm down; emptied with no key - notes/lastfm.md.
   api/             musicbrainz_endpoint.py, slskd_endpoint.py, coverart_endpoint.py (and since 2.1.24
                    ArchiveFronts, the relay's: redirects only to the Archive's hosts, a size cap, a deadline),
                    artist_images_endpoint.py (Wikidata/Commons + TheAudioDB),
                    lrclib_endpoint.py (LRCLIB), wikipedia_endpoint.py (Wikidata's sitelinks and
                    descriptions, Wikipedia's summaries, for descriptions), autoeq_endpoint.py (GitHub, for
                    AutoEq's list and profiles at one commit: `deadwax/<version>` as its agent, never the
-                   MusicBrainz one; no redirects; a deadline on each whole fetch), navidrome_endpoint.py
+                   MusicBrainz one; no redirects; a deadline on each whole fetch), lastfm_endpoint.py (Last.fm,
+                   LASTFM_API_KEY's: one client, its pace, a refusal held an hour, the key never logged,
+                   `deadwax/<version>` as its agent), navidrome_endpoint.py
                    (Subsonic, for the player - holds the login; client_for(request) asks as the signed-in
                    user with logins on, SHARED_ACCOUNT_USES lists what asks as the shared one),
                    navidrome_admin.py (2.0.0-player.61: Navidrome's NATIVE account API for People,
@@ -254,7 +261,9 @@ src/
                    Art Archive relay (2.1.24)");
                    library's /queue/summary is the app's Needs-a-look count, from the saved
                    scan alone - see "Needs a look"; play_history (/deadwax/me/history, every song each
-                   person started, kept for ever - see notes/play-history.md)
+                   person started, kept for ever - see notes/play-history.md); lastfm
+                   (/deadwax/lastfm/artist, 2.1.41: an artist's listeners and ten top songs for the app's
+                   artist page, two kept parts asked at once, 4 s at most - see notes/lastfm.md "S2")
 interface/         the app's pages: player/ (the app, its stylesheets, manifest and icons),
                    player/lab/ (the bench), styles/theme.css and its fonts; `/` (and
                    /index.html) redirects to /player/ (307) - see "The main page retired".
@@ -409,7 +418,7 @@ section of that title in notes/: `grep -rn "### X" notes/` finds it.
 | the native iPhone app (ios/): DeadwaxKit, the audio engine, the project without Xcode, install.sh, ios.yml, the phases; the EQ's AutoEq routes on the server (2.1.7); the Cover Art Archive relay (2.1.24) | `notes/ios.md` |
 | lyrics for listeners: the route by song id, the view on Now Playing, the phone's (design and build) | `notes/app-lyrics.md` |
 | play history that lasts: every song started, per person, kept for ever - the table, the routes, Up Next's list | `notes/play-history.md` |
-| Last.fm: `LASTFM_API_KEY`, the client and its pace, refusals, the kept answers, the match keys and their vectors, the recorder | `notes/lastfm.md` |
+| Last.fm: `LASTFM_API_KEY`, the client and its pace, refusals, the kept answers, the match keys and their vectors, the recorder and what it recorded; the artist route (listeners, top songs) and its fold | `notes/lastfm.md` |
 
 **A change's write-up goes into its area's notes file** (a new file for a new area, added to the
 table above), never here. Add to this file only a rule that holds everywhere.

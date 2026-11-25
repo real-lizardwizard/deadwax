@@ -12,6 +12,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
 from src.routes import play_history
+from src.routes import lastfm as lastfm_route
 from src.routes import auth as auth_routes, coverart, describe, eq, held, my_library, own_password, people
 from src import auth, lastfm_kept, permissions, player_cache, stars
 from src.api import navidrome_admin
@@ -197,6 +198,8 @@ async def lifespan(app: FastAPI):
     await library.artist_images_client.close_client()
     await lrclib.close_client()
     await wikipedia.close_client()
+    #? the artist pages' parts a deadline left running first, then the asks they wait on
+    await lastfm_route.stop()
     await lastfm_kept.stop()
     await lastfm.close_client()
     await eq.stop_refreshing(app)
@@ -484,6 +487,9 @@ def start() -> FastAPI:
     #? (2.1.24) the Cover Art Archive's front covers passed on to the iPhone app, kept on disk - a user's, like
     #? AutoEq: an outside source the phone never talks to itself
     app.include_router(coverart.router, prefix="/deadwax/coverart", tags=["coverart"], dependencies=signed_in)
+    #? (2.1.41) Last.fm's listeners and top songs for the iPhone and Mac app's artist page - a user's, like the
+    #? descriptions: an outside source the phone never talks to itself (routes/lastfm.py)
+    app.include_router(lastfm_route.router, prefix="/deadwax/lastfm", tags=["lastfm"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
     app.include_router(auth_routes.router, prefix="/deadwax/auth", tags=["auth"])
 

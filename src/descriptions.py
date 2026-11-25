@@ -35,6 +35,8 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import quote, unquote, urlparse
 
+from src.lastfm import lastfm_url
+
 #? What a description answer is: the paragraph, whose words they are, and the page they came from (the link
 #? that credits them - Wikipedia's CC BY-SA asks for it), and Wikidata's one-line subtitle. `source` is
 #? "lastfm" (Navidrome's own, its link Last.fm's page) or "wikipedia"; every field None when there is none.
@@ -257,10 +259,8 @@ def from_navidrome(info: dict | None, field: str) -> dict | None:
     text = plain_text(body.get(field))
     if not text:
         return None
-    link = (body.get("lastFmUrl") or "").strip()
-    host = (urlparse(link).hostname or "").lower() if link else ""
-    url = link if link.startswith("https://") and (host == "last.fm" or host.endswith(".last.fm")) else None
-    return {"text": text, "source": "lastfm", "url": url}
+    #? (2.1.41) the one rule for a Last.fm address, src/lastfm.py's: https, on last.fm or a host under it
+    return {"text": text, "source": "lastfm", "url": lastfm_url(body.get("lastFmUrl"))}
 
 
 def is_fresh(found: bool, fetched_at: float, now: float) -> bool:

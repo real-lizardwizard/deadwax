@@ -1,0 +1,18 @@
+{
+ "recorded": "2026-11-25T02:25:44Z",
+ "method": "artist.gettoptracks",
+ "params": {
+  "artist": "Qzxvwy Nonexistent Ensemble 7731",
+  "autocorrect": "1",
+  "limit": "50"
+ },
+ "status": 200,
+ "headers": {
+  "Content-Type": "application/json"
+ },
+ "answer": {
+  "error": 6,
+  "message": "The artist you supplied could not be found",
+  "links": []
+ }
+}

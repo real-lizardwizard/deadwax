@@ -215,6 +215,8 @@ ROUTES = {
     ("GET", "/deadwax/eq/autoeq/{id}"): "user",
     #? (2.1.24) the Cover Art Archive's front covers for the iPhone app - tests/test_coverart_relay.py
     ("GET", "/deadwax/coverart/{kind}/{mbid}"): "user",
+    #? (2.1.41) Last.fm's listeners and top songs for the iPhone app's artist page - tests/test_lastfm_routes.py
+    ("GET", "/deadwax/lastfm/artist"): "user",
     #? each user's own library - their starred albums - and the admin's "held by nobody" (2.0.0-player.51,
     #? step 5 - tests/test_personal_libraries.py)
     ("GET", "/deadwax/me/library"): "user",
@@ -565,6 +567,34 @@ def test_the_cover_relay_is_refused_signed_out_and_the_archive_never_asked(on, m
     answer = ethan.get(path)
     assert answer.status_code == 200 and answer.headers["content-type"] == "image/jpeg"
     assert asked == ["coverartarchive.org"]
+
+
+def test_the_lastfm_artist_route_is_refused_signed_out_and_last_fm_never_asked(on, monkeypatch):
+    """(2.1.41) GET /deadwax/lastfm/artist with logins on and a key set: a 401 without a session, before anything is
+    asked of Last.fm - and a signed-in person answered (here with no key, so nothing is asked for them either:
+    tests/test_lastfm_routes.py holds the rest, logins off)."""
+    from src.api.lastfm_endpoint import lastfm
+
+    asked = []
+
+    def last_fm(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.host)
+        return httpx.Response(200, json={"artist": {"name": "Tame Impala"}})
+
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", "5e17e1d0b5e17e1d0b5e17e1d0b5e1ab")
+    monkeypatch.setattr(lastfm, "_client", httpx.AsyncClient(transport=httpx.MockTransport(last_fm),
+                                                             follow_redirects=False))
+    path = "/deadwax/lastfm/artist?mbid=63aa26c3-d59b-4da4-84ac-716b54f1ef4d&name=Tame%20Impala"
+
+    refused = on.client.get(path)
+    assert refused.status_code == 401
+    assert asked == []
+
+    ethan = signed_in(on, "ethan")
+    monkeypatch.setattr(Config, "LASTFM_API_KEY", None)
+    answer = ethan.get(path)
+    assert answer.status_code == 200 and answer.json()["enabled"] is False
+    assert asked == []
 
 
 def test_the_artist_picture_relay_is_edit_albums_and_nothing_is_asked_for_anyone_else(on, monkeypatch):
