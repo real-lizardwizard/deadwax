@@ -93,6 +93,17 @@ ALONE = [
     # centred on its label in the field's row and the words centred in the well, as the Mac's above
     ("Edit/ReleasePage.swift", "content.font(Typeface.Look.mono(.field))",
      "the years typed in their wells, beside their labels in Release's Fields"),
+    # (R14) a setting's field: the modifier's font, on SettingControl's TextField and SecureField, each the control's
+    # whole line at the top of SettingCard's and MacSettingBox's VStacks
+    ("Manage/ServerSettingsGroupScreen.swift", "            .textFieldStyle(.plain)\n            .font(Typeface.Look.mono(.field))",
+     "a setting's field in its own well (SettingWell): a line of its own in its card's or box's VStack"),
+    # (R14) Remove a person's typed name: PeopleSheetPage sets its parts down a VStack, the field one of them
+    ("Manage/PeopleSheets.swift", "TextField(People.typeTheName, text: people.typing(\\.removeTyped, at: .remove(id)))\n"
+                                  "                    .font(Typeface.Look.mono(.field))",
+     "the name typed to remove someone, in its own box: a line of its own in PeopleSheetPage's VStack"),
+    # (R14) a Mac setting box's legend on its edge (.legend.mono), as the drawing sets it
+    ("Mac/Manage/MacServerSettingsPage.swift", "Text(setting.key)\n                .font(Typeface.Mac.mono(.label).weight(.bold))",
+     "a setting box's name on its top edge: an overlay of its own, nothing beside it"),
 ]
 
 
@@ -266,6 +277,8 @@ def test_the_macs_tables_and_status_bar_are_set_on_one_baseline():
                      "Mac/Edit/MacFolderList.swift",
                      "Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift",
                      "Mac/Library/MacPlaylistsPage.swift",
+                     # (R14) People's list
+                     "Mac/Manage/MacPeoplePage.swift",
                      # (R7) Get's tracklist
                      "Mac/Search/MacGetPage.swift",
                      # (R9) Downloaded's albums and playlists

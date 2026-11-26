@@ -7006,6 +7006,54 @@ log.
   nobody's library scrolls smoothly with a few hundred albums.)
 - **597 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 596, or "not done yet".
 
+#### People and Server settings (598-602)
+
+**Not done yet.** People and Server settings in the new look: on the Mac one page each, on the phone flat. What they
+do hasn't changed - People still opens with your own Navidrome password, Save permissions still sends the boxes as
+they show, and a setting is still changed in drafts that one **Save changes** sends. Have a second Navidrome account
+that isn't an admin, and a setting you can safely change and put back (the lyrics lead, say).
+
+- **598 People.** **Not done yet.** On the Mac: unlock, change a permission and save; the person's next sign-in has it.
+  (Manage > People shows **Unlock People** until you type your Navidrome password. Unlocked, the list is at the left -
+  each person's round initial, their name and user name, **Role** (Admin or Person) and **Last signed in** (now,
+  2 hours ago, never) - and the person you click is at the right: their initial, name, user name, sign-ins and library,
+  their chips, and **Make admin** or **No longer admin**, which asks first. In a small window or beside a side panel
+  the list leaves out Last signed in, then Role, so a name always has room, and the chips and Make admin go under the
+  name; hover over a name for all of it - display name, user name, role and sign-ins. Under that **Permissions** - a
+  box per permission, hover for what it lets them do, every box ticked and dim for an admin - and **Account**: their
+  user name, **Reset password…** and **Remove…** (red), each opening its sheet, whose boxes are the Mac's own small
+  fields. Side by side in the window's first size; one over the other in a small window or beside a side panel. Tick or
+  untick a box: **Revert** puts the boxes back as saved, **Save permissions** sends them. If People locks again while
+  you're on someone, unlocking brings you back to them. Sign in as that person on the phone and check the page the
+  permission opens. **Add a person…** and **Lock** are in the toolbar; the status bar counts the people and admins and
+  says Navidrome's version.)
+- **599 Server settings.** **Not done yet.** On the Mac: override a setting and see its chip, then Revert it. (Manage >
+  Server settings has the three tabs - Library, Downloads, Connections - a tab with something to look at saying so after
+  its name. Each setting is a box with its name in the typewriter face set into its top edge; under it the value, its
+  chips (**Set here** in purple for one you've overridden, **From the container environment** for the rest, **Unsaved**,
+  **Needs attention**) and, for one set here, **Revert to …** (under the chips when it doesn't fit beside them, and cut
+  short if it's longer than the box - hover for all of it). Two columns of boxes in the window's first size, one in a
+  small window or beside a side panel. Change a value: **Unsaved** shows and the bar at the foot offers **Discard** and
+  **Save changes** (⌘S too). Save, and the chip is **Set here**; Revert, then Save, and it's back to the environment's.
+  The status bar counts the settings and those set here, and says deadwax's version.)
+- **600 People on the phone.** **Not done yet.** (People is flat now - no grey rows: Unlock People's password in a box
+  and the purple **Unlock**; then Everyone in Navidrome as rows like the Library's Artists - a round initial, the name,
+  the user name and chips under it, a ›. A person's page has their initial, name and sign-ins at the top with **Make
+  admin**, **Permissions** as purple switches with no lines under them (VoiceOver reads each line as the switch's hint),
+  **Account**'s rows (**Remove…** in red; with nothing to change, only why, there's no Account heading), and **Revert**
+  and **Save permissions** fixed at the foot. Make someone an admin from far down their page: the foot goes and the
+  page stays where it was. Add a person, Reset password and Remove are sheets on black, each field a box, the button
+  across the sheet - **Make account** and **Reset password** purple, **Remove** red.)
+- **601 Server settings on the phone.** **Not done yet.** (The three tabs are a strip of words over the chosen tab's
+  groups, each a row with a ›. A group's page has each setting on a thin line: its name in the typewriter face, its
+  value in a dark box (its edge purple while it's set here) or, for one with choices, its choice in purple with a
+  small ▾ - a tap anywhere along that line opens them - its chips as a dot and words, **Revert to …** in purple
+  words, and its note. The save bar at the foot is black under a thin line, **Save changes** the purple one. At the
+  largest text sizes a button too long for the screen - **Revert to …**, **Re-time saved lyrics** and its running
+  words, **Clear MusicBrainz's saved answers**, the save bar's - goes across it and wraps instead of running off the
+  edge. **Set up Navidrome** on the Library, when Navidrome isn't set up, is on black too.)
+- **602 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 600-601, or "not done yet".
+
 #### Row Size (608-609)
 
 **Not done yet.** On the Mac, **View > Row Size** makes every list's rows Small, Medium or Large, and ⌘+ and ⌘− step
@@ -7067,16 +7115,17 @@ track, a picture and anywhere you type keep a face. Nothing works any differentl
 download or two on Requests and something queued.
 
 **Not flat yet**, each until the slice that redraws it: Settings' Debug page;
-Edit album's Tags, Artwork, Lyrics and Delete pages (R11); Needs a look (R12); People and Server settings (R14);
-and the EQ's own pages - Correction's search and a filter's editor - an artist's Artist images and Move albums
-sheets, and the pages Edit album's Release opens (Choose a release, Changes, Compare covers), which no slice has
-taken yet. Those keep iOS's grouped lists and their grey rows for now: don't count
+Edit album's Tags, Artwork, Lyrics and Delete pages (R11); Needs a look (R12); and the EQ's own pages -
+Correction's search and a filter's editor - an artist's Artist images and Move albums sheets, and the pages Edit
+album's Release opens (Choose a release, Changes, Compare covers), which no slice has taken yet. Those keep iOS's
+grouped lists and their grey rows for now: don't count
 them in 612.
 
 - **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
   Requests, an album, a playlist, an artist's page, Now Playing's sheet, Search Soulseek…'s sheet, Search, an album
   you don't have, Choose a source, Settings and its pages (Debug aside), Settings > Downloads, Library care, In
-  nobody's library, the Event log, the sign-in and Edit album's first page - not the screens
+  nobody's library, the Event log, the sign-in, Edit album's first page, and People and Server settings
+  (598-602) - not the screens
   above that aren't flat yet: is anything still a grey box laid on top? Is every button still plainly a button, and
   does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while
   your finger is on it - an album's Shuffle, **Same source again**, a card's ✕, the EQ's output, Downloaded's **Not
@@ -7099,7 +7148,7 @@ them in 612.
   sunken box, its edge purple while it has the cursor), Search's field, Requests' **Search Soulseek…** sheet's Artist
   and Album, a playlist's Edit name and description, Edit album's fields, Server settings' values, the sign-in's
   three, Change address's, People's and Change password's (the sign-in's, Change address's and Change password's are
-  boxes of their own since 574-579). (The manual search's two and a playlist's Edit two are now dark sunken boxes like
+  boxes of their own since 574-579; People's and Server settings' since 598-602). (The manual search's two and a playlist's Edit two are now dark sunken boxes like
   Find's, square, the edge purple while you type in one, and a tap on the box or just above or below it puts the
   cursor there; a playlist's description grows a line at a time as before. Apart from those and Find, each is drawn as
   it was before this build.) Requests' **Search Soulseek…** row itself is purple words on a thin line, with no box -

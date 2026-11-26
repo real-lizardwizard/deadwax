@@ -223,6 +223,8 @@ PULLS = {
     "Library/LibraryView.swift": 1, "Library/SongsScreen.swift": 1, "Manage/HeldByNobodyScreen.swift": 1,
     "Manage/NeedsLookScreen.swift": 1, "Manage/PeopleScreen.swift": 2, "Playlists/PlaylistsScreen.swift": 1,
     "You/AccountSection.swift": 1, "You/GettingAlbumsSection.swift": 1, "You/YouView.swift": 2,
+    #? (the redesign, R14) the Mac's People: its View > Refresh (⌘R), as the phone's two pages' pulls
+    "Mac/Manage/MacPeoplePage.swift": 1,
 }
 
 
@@ -736,6 +738,8 @@ SHEET_ROOTS = {
     #? (the redesign, R10) the Mac's Edit album: a part still today's page (Tags, Artwork, Lyrics, Delete) or Compare
     #? covers, over the page - (its review) the editor's own sheet, MacAlbumEditor's
     "Mac/Edit/MacAlbumEditor.swift": 1,
+    #? (the redesign, R14) the Mac's People: Add a person, Reset password and Remove - the flow's one sheet, each its root
+    "Mac/Manage/MacPeoplePage.swift": 3,
 }
 
 
@@ -1654,7 +1658,7 @@ def test_file_save_changes_is_server_settings_own_button_from_its_page():
     assert perform.rstrip().endswith("case .saveChanges:\n            serverSettings.save()\n        }\n    }")
     # the save bar's button calls the same, under the same rule
     screen = bare(app["Manage/ServerSettingsScreen.swift"])
-    bar = _body(screen, "@ViewBuilder private func buttons(_ flow: SettingsFlow) -> some View")
+    bar = _body(screen, "@ViewBuilder private func buttons(_ flow: SettingsFlow, across: Bool) -> some View")
     assert "settings.save()\n            }" in bar and ".disabled(!settings.saveOpen(online: reachability.online))" in bar
     model = bare(app["Manage/ServerSettingsModel.swift"])
     assert model.count("func save() {") == 1 and "flow.save(online: reachability.online, allowed: parts.page)" in model

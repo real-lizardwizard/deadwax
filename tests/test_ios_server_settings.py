@@ -357,10 +357,10 @@ def test_the_screen_stays_on_only_through_screen_awake():
 def test_the_pages_draw_as_the_spec_says():
     screen = app_file("Manage", "ServerSettingsScreen.swift")
     group = app_file("Manage", "ServerSettingsGroupScreen.swift")
-    # Connections first on the root, then the verdict, then the tabs as sections of group rows
+    # Connections first on the root, then the verdict, then (R14) the tabs as a strip over the chosen tab's group rows
     listing = screen[screen.index("private func list("):]
     assert (listing.index("ConnectionsSection()") < listing.index("OrganizingVerdictView(")
-            < listing.index("ForEach(ServerSettings.tabs"))
+            < listing.index("PhoneStrip(options: tabs,") < listing.index("ForEach(sections.first { $0.tab == shown }"))
     assert "NavigationLink(value: AppRoute.serverSettingsGroup(group.id))" in listing
     assert "GroupRow(label: group.label, mark: marks[group.id])" in listing
     # a row's control: a menu Picker for choices, a SecureField for a secret, the URL keyboard for an address, no
@@ -372,7 +372,7 @@ def test_the_pages_draw_as_the_spec_says():
     assert "Text(ServerSettings.locked)" in group
     # the saved answers' Clear asks first; Re-time and the saved answers on their groups only
     assert ".confirmationDialog(SavedAnswers.clearQuestion, isPresented: $asking, titleVisibility: .visible)" in group
-    assert "if group.id == ServerSettings.lyricsGroup {\n                RetimeSection()" in group
+    assert "if group.id == ServerSettings.lyricsGroup {\n                    RetimePart()" in group
     assert "if group.id == ServerSettings.savedAnswersGroup && parts.answers {" in group
     # every page: told to the model, the save bar at its foot, the amber line out of reach - its frame on a ZStack
     # that stays as the spinner gives way (on a Group it went to each branch: hidden and shown again, read twice)
@@ -386,10 +386,11 @@ def test_the_pages_draw_as_the_spec_says():
     assert ".onAppear { settings.shows(page) }" in frame and ".onDisappear { settings.hides(page) }" in frame
     # the bar: a look at a save that never answered whose read failed offers Try again; the list doesn't say it twice
     bar = screen[screen.index("private struct SaveBar"):]
-    assert "if flow.checkStalled {\n            Button(ServerSettings.tryAgain) {\n                settings.retry()" in bar
+    assert ("if flow.checkStalled {\n            Button {\n                settings.retry()\n            } label: {\n"
+            "                ManageButtonWords(words: ServerSettings.tryAgain, across: across)") in bar
     assert "!settings.flow.checkStalled" in screen[screen.index("struct ServerSettingsRereadFailure"):]
     # VoiceOver reads a setting's name once, from its control: the section's header is hidden from it
-    section = group[group.index("private struct SettingSection"):]
+    section = group[group.index("struct SettingCard: View {"):]
     assert ".textSelection(.enabled)\n                .accessibilityHidden(true)" in section
     for control in ('.accessibilityLabel("\\(setting.key), \\(ServerSettings.locked)")', ".accessibilityLabel(setting.key)"):
         assert control in section, control

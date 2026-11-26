@@ -5,7 +5,9 @@ import SwiftUI
 /// pieces"): Needs a look (R12), Library care and In nobody's library, the event log (R13), People, a person, Server
 /// settings and a group of them (R14). Until each slice redraws its page, each is the phone's, at the readable width
 /// exactly as appRoutes draws it. (R13) Library care and the event log are the Mac's own pages; In nobody's library is
-/// drawn in Library care's boxes, so its route opens Library care.
+/// drawn in Library care's boxes, so its route opens Library care. (R14) People and a person are MacPeoplePage - the
+/// list and the person chosen side by side; Server settings and a group of them MacServerSettingsPage, opened at the
+/// group's tab.
 @MainActor
 enum MacManage {
     enum Page: Hashable {
@@ -25,10 +27,10 @@ enum MacManage {
         case .libraryCare: MacLibraryCarePage()
         case .heldByNobody: MacLibraryCarePage()
         case .eventLog: MacEventLogPage()
-        case .people: PeopleScreen().readableOnMac()
-        case .person(let id): PersonScreen(id: id).readableOnMac()
-        case .serverSettings: ServerSettingsScreen().readableOnMac()
-        case .serverSettingsGroup(let id): ServerSettingsGroupScreen(id: id).readableOnMac()
+        case .people: MacPeoplePage()
+        case .person(let id): MacPeoplePage(chosen: id)
+        case .serverSettings: MacServerSettingsPage()
+        case .serverSettingsGroup(let id): MacServerSettingsPage(tab: ServerSettings.tab(forGroup: id))
         }
     }
 }

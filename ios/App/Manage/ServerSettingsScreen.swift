@@ -4,7 +4,7 @@ import SwiftUI
 /// Settings > Manage > Server settings (Phase 8, slice 8 - notes/ios-specs/phase8-managing.md 7; the web's
 /// app/ServerSettings.tsx and components/SettingsView.tsx): what the page is for, then Connections (whoever runs deadwax:
 /// MusicBrainz, slskd and Navidrome, each Connected or what is wrong, and Check again - You.tsx's), the organizing
-/// verdict, and the web's three tabs as sections - Library, Downloads, Connections - each group a row pushing its own page
+/// verdict, and the web's three tabs - Library, Downloads, Connections - each group a row pushing its own page
 /// (ServerSettingsGroupScreen), marked "Needs attention" or "Unsaved" by the web's tab marks taken per group.
 ///
 /// Everything is the app's (ServerSettingsModel, every decision Core's): the drafts outlive the page, as the web keeps
@@ -13,10 +13,17 @@ import SwiftUI
 /// reach before anything was read, it says it needs deadwax; a first read that failed says so with Try again. Gone out of
 /// reach, what is drawn is how it was under the amber line Edit album has, and Save is off until deadwax is back and the
 /// settings read again. With Reduce Motion nothing slides; VoiceOver reads each row once, its mark with it.
+///
+/// (The redesign, slice R14 - notes/ios.md "The redesign, slice R14: People and Server settings") Flat, as
+/// iServerSettings draws it: no List - the page's black, the three tabs a strip (PhoneStrip, each tab's mark in its words)
+/// and the chosen tab's groups rows on their hairlines under it, each pushing its page of cards. The phone's alone: the
+/// Mac's Server settings is MacServerSettingsPage, every tab's boxes on one page.
 struct ServerSettingsScreen: View {
     @Environment(ServerSettingsModel.self) private var settings
     @Environment(Reachability.self) private var reachability
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The tab the strip shows - Library's first, as the web's.
+    @State private var tab: ServerSettings.Tab = .library
 
     var body: some View {
         let parts = settings.parts
@@ -48,135 +55,164 @@ struct ServerSettingsScreen: View {
 
     @ViewBuilder private func list(_ answer: ServerSettingsAnswer, _ parts: ServerSettings.Parts) -> some View {
         let marks = settings.flow.groupMarks
+        let tabMarks = settings.flow.tabMarks
         let sections = ServerSettings.sections(answer)
-        List {
-            Section {
-                Text(ServerSettings.pageLine)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if parts.connections {
-                ConnectionsSection()
-            }
-            ServerSettingsRereadFailure()
-            Section {
-                OrganizingVerdictView(organizing: answer.organizing)
-            }
-            ForEach(ServerSettings.tabs, id: \.self) { (tab: ServerSettings.Tab) in
-                if let groups = sections.first(where: { $0.tab == tab })?.groups {
-                    Section {
-                        ForEach(groups) { (group: ServerSettingGroup) in
-                            NavigationLink(value: AppRoute.serverSettingsGroup(group.id)) {
-                                GroupRow(label: group.label, mark: marks[group.id])
-                            }
-                        }
-                    } header: {
-                        Text(ServerSettings.label(tab))
-                            .font(Typeface.footnote)
-                    } footer: {
-                        Text(ServerSettings.hint(tab))
-                            .font(Typeface.footnote)
+        let tabs = sections.map(\.tab)
+        // a tab the answer no longer has: its first
+        let shown = tabs.contains(tab) ? tab : tabs.first ?? tab
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
+                    ManageNote(words: ServerSettings.pageLine)
+                    if parts.connections {
+                        ConnectionsSection()
                     }
+                    ServerSettingsRereadFailure()
+                    OrganizingVerdictView(organizing: answer.organizing)
+                        .padding(.top, ManageLook.cardAbove)
                 }
+                .padding(.horizontal, ManageLook.side)
+                if !tabs.isEmpty {
+                    PhoneStrip(options: tabs,
+                               words: { (each: ServerSettings.Tab) -> String in Self.words(each, tabMarks[each]) },
+                               shown: Binding(get: { shown },
+                                              set: { (chosen: ServerSettings.Tab) -> Void in tab = chosen }),
+                               spoken: ServerSettings.title)
+                        .padding(.top, ManageLook.cardAbove)
+                }
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(sections.first { $0.tab == shown }?.groups ?? []) { (group: ServerSettingGroup) in
+                        NavigationLink(value: AppRoute.serverSettingsGroup(group.id)) {
+                            GroupRow(label: group.label, mark: marks[group.id])
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    ManageNote(words: ServerSettings.hint(shown))
+                }
+                .padding(.horizontal, ManageLook.side)
             }
+            .padding(.bottom, ManageLook.cardAbove)
         }
         .transaction { (transaction: inout Transaction) -> Void in
             if reduceMotion { transaction.animation = nil }
         }
     }
+
+    /// A tab's words in the strip: its name, and its mark - "Library · Needs attention" - so a tab not shown says it too.
+    static func words(_ tab: ServerSettings.Tab, _ mark: ServerSettings.Mark?) -> String {
+        guard let mark else { return ServerSettings.label(tab) }
+        return "\(ServerSettings.label(tab)) \u{00B7} \(ServerSettings.markWords(mark))"
+    }
 }
 
-/// A group's row on the root: its name, and its mark - "Needs attention" amber, "Unsaved" in the accent - read with it.
+/// A group's row on the root (iSettings' `.go`): its name, its mark - "Needs attention" amber, "Unsaved" purple, a chip -
+/// and the chevron, on its hairline; one element for VoiceOver, its mark read with it.
 private struct GroupRow: View {
     let label: String
     let mark: ServerSettings.Mark?
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
+        PhoneGo {
             Text(label)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if let mark {
-                Text(ServerSettings.markWords(mark))
-                    .font(Typeface.footnote.weight(.semibold))
-                    .foregroundStyle(mark == .attention ? Palette.amber : Palette.accent)
-                    .multilineTextAlignment(.trailing)
+                DWChip(words: ServerSettings.markWords(mark), tone: mark == .attention ? .caution : .marked)
             }
+            PhoneChevron()
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
-/// `OrganizingVerdict`: whether finished downloads are filed now, and what stops it.
-private struct OrganizingVerdictView: View {
+/// `OrganizingVerdict`: whether finished downloads are filed now, and what stops it - (R14) flat, green or amber words
+/// with the blockers under them, on both devices' pages.
+struct OrganizingVerdictView: View {
     let organizing: Organizing
+    var font: Font = ManageLook.small
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: ManageLook.wordsGap) {
             Text(ServerSettings.verdict(organizing))
-                .font(Typeface.subheadline.weight(.semibold))
-                .foregroundStyle(organizing.enabled ? Palette.held : Palette.amber)
-                .fixedSize(horizontal: false, vertical: true)
+                .font(font.weight(.semibold))
+                .foregroundStyle(organizing.enabled ? DWPalette.greenText : DWPalette.amberText)
             ForEach(organizing.blockers, id: \.self) { (blocker: String) in
-                Text("• \(blocker)")
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text("\u{2022} \(blocker)")
+                    .font(font)
+                    .foregroundStyle(DWPalette.t2)
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 }
 
 /// Connections (You.tsx's three rows): each service, Connected or what is wrong in a word with the sentence under it -
-/// read by VoiceOver as one - and Check again. On the root, and on the Connections group's own page (the one Set up
-/// Navidrome opens), so a save there shows whether Navidrome answers now.
+/// read by VoiceOver as one - and Check again. On the phone's root, and on the Connections group's own page (the one Set
+/// up Navidrome opens, on the Mac too), so a save there shows whether Navidrome answers now. (R14) Flat: a heading, each
+/// row on its hairline with its dot, Check again the look's button - nothing of the phone's rows, so the Mac's sheet
+/// draws it at its own size; the Mac's Server settings draws its own box of them (MacServerSettingsPage).
 struct ConnectionsSection: View {
     @Environment(ServerSettingsModel.self) private var settings
     @Environment(Reachability.self) private var reachability
 
     var body: some View {
-        Section {
+        VStack(alignment: .leading, spacing: 0) {
+            ManageHeading(words: Connections.title)
+                .padding(.bottom, ManageLook.wordsGap)
             ForEach(Connections.Service.allCases, id: \.self) { (service: Connections.Service) in
-                let check = settings.checks.check(service)
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(service.label)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Circle()
-                            .fill(Self.dot(check.state))
-                            .frame(width: 8, height: 8)
-                            .accessibilityHidden(true)
-                        Text(check.text)
-                            .foregroundStyle(Palette.quiet)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    if let detail = check.detail {
-                        Text(detail)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .textSelection(.enabled)
-                    }
-                }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(check.spoken(service))
+                ConnectionRow(service: service, check: settings.checks.check(service))
+                    .padding(.vertical, ManageLook.cardGap)
+                    .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
             }
             Button(Connections.checkAgain) {
                 settings.checkConnections()
             }
+            .buttonStyle(DWButtonStyle())
             .disabled(!settings.checks.againOpen(online: reachability.online))
-        } header: {
-            Text(Connections.title)
-                .font(Typeface.footnote)
+            .padding(.top, ManageLook.wordsGap)
         }
+        .padding(.top, ManageLook.cardAbove)
+    }
+}
+
+/// One service's row: its name, the dot and the word, the sentence under them - read as one, the check's own words.
+struct ConnectionRow: View {
+    let service: Connections.Service
+    let check: Connections.Check
+    var font: Font = ManageLook.small
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(service.label)
+                    .foregroundStyle(DWPalette.text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Circle()
+                    .fill(Self.dot(check.state))
+                    .frame(width: CGFloat(DWFlat.dot), height: CGFloat(DWFlat.dot))
+                    .accessibilityHidden(true)
+                Text(check.text)
+                    .foregroundStyle(DWPalette.t2)
+                    .multilineTextAlignment(.trailing)
+            }
+            if let detail = check.detail {
+                Text(detail)
+                    .font(font)
+                    .foregroundStyle(DWPalette.t2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+        }
+        .font(Typeface.Look.text(.field))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(check.spoken(service))
     }
 
     /// `.app-dot`: green once it answered, the danger text's red when it didn't, nothing while it is asked.
-    private static func dot(_ state: Connections.Check.State) -> Color {
+    static func dot(_ state: Connections.Check.State) -> Color {
         switch state {
-        case .ok: return Palette.greenIcon
-        case .failed: return Palette.danger
+        case .ok: return DWPalette.greenText
+        case .failed: return DWPalette.redChipText
         case .pending: return Color.clear
         }
     }
@@ -195,13 +231,13 @@ struct ServerSettingsFirstRead: View {
                 Button(ServerSettings.tryAgain) {
                     settings.retry()
                 }
-                .buttonStyle(PrimaryFace())
+                .buttonStyle(DWButtonStyle(kind: .pri))
                 .disabled(settings.flow.reading || !reachability.online)
             } else {
                 HStack(spacing: 10) {
                     ProgressView()
                     Text(ServerSettings.reading)
-                        .foregroundStyle(Palette.quiet)
+                        .foregroundStyle(DWPalette.t2)
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -214,88 +250,107 @@ struct ServerSettingsFirstRead: View {
 /// A read again that failed over the settings shown: "Couldn't read the settings again just now.", with Try again -
 /// unless it was the look at a save that never answered, which the save bar says, with its own Try again.
 struct ServerSettingsRereadFailure: View {
+    var font: Font = ManageLook.small
+
     @Environment(ServerSettingsModel.self) private var settings
     @Environment(Reachability.self) private var reachability
 
     var body: some View {
         if let failure = settings.flow.readError, !settings.flow.checkStalled {
-            Section {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(failure)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.danger)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Button(ServerSettings.tryAgain) {
-                        settings.retry()
-                    }
-                    .buttonStyle(.borderless)
-                    .font(Typeface.footnote.weight(.semibold))
-                    .disabled(settings.flow.reading || settings.flow.saving || !reachability.online)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(failure)
+                    .font(font)
+                    .foregroundStyle(DWPalette.redChipText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button(ServerSettings.tryAgain) {
+                    settings.retry()
                 }
+                .buttonStyle(DWButtonStyle(size: .small))
+                .disabled(settings.flow.reading || settings.flow.saving || !reachability.online)
             }
+            .padding(.top, ManageLook.cardAbove)
         }
     }
 }
 
 /// The save bar (the web's `.app-settings-savebar`), at the foot of every Server settings page while there is
 /// something to say or to save: the refusal, "Saved." or how many are unsaved - and with drafts, Discard and Save
-/// changes. Its words are said by VoiceOver as a save ends (ServerSettingsModel), never with each change typed.
+/// changes. Its words are said by VoiceOver as a save ends (ServerSettingsModel), never with each change typed. (R14)
+/// The look's: on the phone the page's black over a hairline (`.foot2`) with Discard flat and Save changes the purple
+/// one; on the Mac the panel's ground over the line's edge (People.dc.html's foot) with the Mac's buttons. (R14's
+/// review) Beside the words while all of it fits one line; else the words over the buttons, side by side while they fit
+/// the width (418 points at AX3 don't fit a phone's 343), else one over the other, each across the bar, its words
+/// wrapping on the phone.
 private struct SaveBar: View {
     @Environment(ServerSettingsModel.self) private var settings
     @Environment(Reachability.self) private var reachability
 
     var body: some View {
         let flow = settings.flow
-        VStack(spacing: 0) {
-            Divider()
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    words(flow)
-                    Spacer(minLength: 8)
-                    buttons(flow)
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    words(flow)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                words(flow)
+                Spacer(minLength: 8)
+                buttons(flow, across: false)
+            }
+            // the last way: laid out in the bar's width, the buttons choosing their row or their stack in it
+            VStack(alignment: .leading, spacing: 10) {
+                words(flow)
+                ViewThatFits(in: .horizontal) {
                     HStack(spacing: 12) {
-                        buttons(flow)
+                        buttons(flow, across: false)
+                    }
+                    VStack(spacing: 8) {
+                        buttons(flow, across: true)
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
         }
-        .background(.bar)
+        .padding(.horizontal, ManageLook.side)
+        .padding(.vertical, 10)
+        .background {
+            (Platform.mac ? DWPalette.panel : DWPalette.footFace)
+                .ignoresSafeArea(.container, edges: .bottom)
+        }
+        .overlay(alignment: .top) { DWRule(colour: Platform.mac ? DWPalette.line : DWPalette.footEdge) }
     }
 
     private func words(_ flow: SettingsFlow) -> some View {
         Text(flow.barText)
-            .font(Typeface.footnote)
+            .font(ManageLook.small)
             .foregroundStyle(flow.checkStalled || flow.saveError != nil && flow.checking == nil
-                             ? Palette.danger : Palette.quiet)
+                             ? DWPalette.redChipText : DWPalette.t2)
             .fixedSize(horizontal: false, vertical: true)
     }
 
-    @ViewBuilder private func buttons(_ flow: SettingsFlow) -> some View {
+    /// The bar's buttons; `across`, one over the other, each the bar's width, its words wrapping on the phone.
+    @ViewBuilder private func buttons(_ flow: SettingsFlow, across: Bool) -> some View {
         // a save that never answered, and the read to see how it came out failed: Try again here, on every page - the
         // way out of "looking again" (Discard ends the look too)
         if flow.checkStalled {
-            Button(ServerSettings.tryAgain) {
+            Button {
                 settings.retry()
+            } label: {
+                ManageButtonWords(words: ServerSettings.tryAgain, across: across)
             }
-            .buttonStyle(SecondaryPill())
+            .buttonStyle(DWButtonStyle(fills: across))
             .disabled(!reachability.online)
         }
         if flow.dirty > 0 {
-            Button(ServerSettings.discard) {
+            Button {
                 settings.discard()
+            } label: {
+                ManageButtonWords(words: ServerSettings.discard, across: across)
             }
-            .buttonStyle(SecondaryPill())
+            .buttonStyle(DWButtonStyle(fills: across))
             .disabled(flow.saving)
-            Button(flow.saving ? ServerSettings.saving : ServerSettings.save) {
+            Button {
                 settings.save()
+            } label: {
+                ManageButtonWords(words: flow.saving ? ServerSettings.saving : ServerSettings.save, across: across)
             }
-            .buttonStyle(PrimaryFace())
+            .buttonStyle(DWButtonStyle(kind: .pri, fills: across))
             .disabled(!settings.saveOpen(online: reachability.online))
         }
     }
@@ -304,7 +359,8 @@ private struct SaveBar: View {
 extension View {
     /// Every Server settings page's frame: told to the model as it shows and goes, its permissions watched, the save bar
     /// at its foot, and the amber line while deadwax is out of reach - and (the Mac app, slice 7) on the Mac known to the
-    /// menus, so File > Save changes (⌘S) is the bar's Save changes while the page is the one in front.
+    /// menus, so File > Save changes (⌘S) is the bar's Save changes while the page is the one in front. (R14) The Mac's
+    /// Server settings (MacServerSettingsPage) is framed by it too, as its root.
     func serverSettingsPage(_ page: ServerSettingsModel.Page) -> some View {
         modifier(ServerSettingsPageFrame(page: page))
     }

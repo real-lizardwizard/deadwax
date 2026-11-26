@@ -1390,8 +1390,10 @@ TEXT_INPUTS = {
     "Library/AlbumsScreen.swift": [SYSTEM], "Library/ArtistsScreen.swift": [SYSTEM], "Library/LibraryView.swift": [WELL],
     "Library/SongsScreen.swift": [SYSTEM], "Look/DWField.swift": [WELL],
     # (R13) Library care's Narrow to is DWField now, the look's well - its file holds no field of its own
-    "Manage/PeopleScreen.swift": [SYSTEM],
-    "Manage/PeopleSheets.swift": [SYSTEM] * 7, "Manage/ServerSettingsGroupScreen.swift": [SYSTEM, SYSTEM],
+    # (R14) out of the List and the Forms: Unlock People's password and the sheets' seven on FieldLook, a setting's
+    # field (its secret's and its words') on the look's well
+    "Manage/PeopleScreen.swift": [OWN], "Manage/PeopleSheets.swift": [OWN] * 7,
+    "Manage/ServerSettingsGroupScreen.swift": [WELL, WELL],
     "Playlists/PlaylistPicker.swift": [SYSTEM],
     # (R1c's review) Edit's name and description: a plain List's rows draw no box, so the look's wells
     "Playlists/PlaylistView.swift": [WELL, WELL],
@@ -1458,15 +1460,20 @@ def blocks_around(code: str, at: int) -> list[tuple[int, str]]:
     return found
 
 
-def modifiers_named(files: dict[str, str], text: str) -> str:
-    """The bodies of the ViewModifiers `text` names (`.modifier(FieldLook())`, `.modifier(DWWellField(`...)."""
+def modifiers_named(files: dict[str, str], text: str, depth: int = 0) -> str:
+    """The bodies of the ViewModifiers `text` names (`.modifier(FieldLook())`, `.modifier(DWWellField(`...). (R14's
+    review) Each as the phone runs it, and the modifiers that names in turn: People's field (PeopleField) is the Mac's
+    own on the Mac and FieldLook on the phone."""
     bodies = []
     for modifier in re.findall(r"\.modifier\((\w+)\(", text):
         found = [re.search(rf"\bstruct {modifier}\b[^{{]*: ViewModifier \{{", other) for other in files.values()]
         found = [(other, match) for other, match in zip(files.values(), found) if match]
         assert len(found) == 1, f"the modifier {modifier}"
         other, match = found[0]
-        bodies.append(other[match.start():reader.closing(other, match.end() - 1) + 1])
+        body = phone_path(other[match.start():reader.closing(other, match.end() - 1) + 1])
+        bodies.append(body)
+        if depth < 2:
+            bodies.append(modifiers_named(files, body, depth + 1))
     return " ".join(bodies)
 
 
@@ -1693,7 +1700,13 @@ R10_PAGES = {"Edit/EditAlbumSheet.swift", "Edit/ReleasePage.swift"}
 #? their hairlines, the runs' rows with their meters, Narrow to on the look's well, the level strip, the mono lines;
 #? tests/test_ios_care_look.py holds what each draws)
 R13_PAGES = {"Manage/LibraryCareScreen.swift", "Manage/HeldByNobodyScreen.swift", "Manage/EventLogScreen.swift"}
-SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES | R13_PAGES
+#? R14: People and Server settings on the phone, flat (iPerson, iServerSettings - People's list on iArtists' rows, a
+#? person's switches and foot, the settings' strip, group rows and cards) and People's sheets on their boxes - the group
+#? page and the sheets drawn on the Mac too, in the look's own pieces (tests/test_ios_manage_look.py)
+R14_PAGES = {"Manage/PeopleScreen.swift", "Manage/PeopleSheets.swift", "Manage/ServerSettingsScreen.swift",
+             "Manage/ServerSettingsGroupScreen.swift"}
+SLICES = (R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES
+          | R13_PAGES | R14_PAGES)
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

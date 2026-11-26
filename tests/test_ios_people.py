@@ -268,7 +268,8 @@ def test_the_server_words_naming_the_web_apps_place_are_said_as_the_phones():
     outcome = swift_function("PeopleFlow.swift", "outcome")
     assert outcome.count("onPhone(") == 4
     screen = app_code("Manage", "PeopleScreen.swift")
-    assert "Text(People.onPhone(reason))" in screen and screen.count("People.onPhone(") == 2
+    # (R14) said as a flat page's note
+    assert "ManageNote(words: People.onPhone(reason))" in screen and screen.count("People.onPhone(") == 2
     # and the phone's place is where Change password is: Settings > Account
     account = app_code("You", "AccountSection.swift")
     assert "NavigationLink(value: AppRoute.changePassword)" in account
@@ -437,7 +438,7 @@ def test_the_pages_draw_as_the_spec_says():
     assert "Button(People.lock) {" in screen and "Image(systemName: People.addSymbol)" in screen
     assert ".accessibilityLabel(People.addTitle)" in screen
     assert "People.forgetQuestion(" in screen and "Button(People.forget, role: .destructive)" in screen
-    assert "Text(People.unlockedLine" in screen or "PeopleLine(text: People.unlockedLine" in screen
+    assert "ManageNote(words: People.unlockedLine)" in screen
     assert "People.versionNote(people.navidrome)" in screen
     # Unlock People: the password manager's current password, its words and the plain-http note
     assert re.search(r"SecureField\(People\.unlockLabel, text: [^\n]+\)\s*\.textContentType\(\.password\)", screen)

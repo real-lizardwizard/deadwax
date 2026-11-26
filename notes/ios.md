@@ -21600,3 +21600,245 @@ Franklin.
   xLarge is really the last size the chip fits beside Back, Copy and Clear, and the chip under the bar at xxLarge up,
   are the phone's to say; whether Catalyst's tooltips show the helps on the cut cells; Show all scrolling a few hundred
   albums.
+
+## The redesign, slice R14: People and Server settings (2026-11-25)
+
+The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R14, checks 598-602. The
+drawings are People.dc.html and ServerSettings.dc.html (the Mac's), iPerson.dc.html and iServerSettings.dc.html (the
+phone's, flat), with iArtists.dc.html's rows for People's list. Built on ed819e69 (wave D merged). The app is still
+0.13 (13); `__version__` untouched; no server data new (no diff to Core at all, nor to App/Shared/Routes.swift); no
+engine file touched. Nothing that is sent changed: the ticks as the boxes show them (all five, the flow's draft), a
+revert as an explicit `null` (Core's SettingUpdate), People unlocked with the admin's own Navidrome password, a secret's
+field a SecureField showing its placeholder and never its value.
+
+### The phone (iPerson, iServerSettings)
+
+- **People** (PeopleScreen) is a ScrollView, no List: PeopleStatus (the first read's spinner, why People can't work
+  here, Unlock People), then the unlocked line, the version note, what the list's last write said, **Everyone in
+  Navidrome** as a PhoneGroup of iArtists' rows (PersonRow: LibraryListRow with the person's initial on a round 44,
+  their name, PeopleFacts.line - the user name and chips - under it, LibraryChevron; one VoiceOver element of the name,
+  that line, their sign-ins, their library and the no-library warning), and Known only to deadwax (each name on the row
+  hairline with Forget…). Lock and + stay in the bar.
+- **A person** (PersonScreen): the head (the initial at 60, the name, the line, sign-ins · library, the warning; Make
+  admin or No longer admin beside it, under it from xxxLarge), what was said, **Permissions** as the purple switches
+  (`Toggle(isOn: people.ticked(...))` and `settingsSwitch()`) with **no lines under them** - each line is the switch's
+  VoiceOver hint; a tick's warning stays in amber - then the locked reason and the admins' line, **Account** as PhoneGo
+  rows (Reset password…, Remove… in red) and the refusals. **Revert** and **Save permissions** are PhoneFoot's
+  (PersonFoot), only for an ordinary person People saves permissions for. Revert (PeopleRevert) puts each switch back as
+  saved through the same `people.ticked` binding - nothing sent - and Save is the flow's, as before.
+- **The sheets** (Add a person, Reset password, Remove): out of their Forms, each a PeopleSheetPage (a ScrollView on
+  the page's black), its fields on FieldLook (the sign-in's box), Tab's order as before, the button purple (Remove's
+  red) across, its words three lines at the accessibility sizes.
+- **Server settings' root**: the page's line, Connections, the organizing verdict, then the three tabs as a **PhoneStrip**
+  (each tab's mark in its words: "Library · Needs attention") over the chosen tab's **group rows** (PhoneGo, a chip for a
+  group's mark, the chevron) - each pushing its group page, as before - and the hint.
+- **A group's page**: a **SettingCard** per setting on the page's black - its name in the readout face (hidden from
+  VoiceOver: the control says it), its control (SettingControl: Locked, a menu Picker, or a field), its chips
+  (SettingChips: the source - Set here in purple, From the container environment plain - Unsaved, Needs attention; a dot
+  and words on the phone) with **Revert to …** at their end, its words - and the group's hairline under it. A field is on
+  the look's well (SettingWell: the plain field in the readout face, DWWell under it, `selbd` as its edge while set
+  here). Re-time saved lyrics and the saved answers are flat parts at the foot of their groups.
+- The save bar: the page's black (footFace) over the foot's hairline, Discard flat and Save changes purple.
+
+### Why the phone's cards stay on the group pages
+
+iServerSettings draws the cards on the root under the strip. They stay on each group's own page instead: the model
+counts its pages (`shows(.group(id))`) to read the saved answers while their page is shown and to keep the screen awake
+for Re-time, and Set up Navidrome is the Connections group page itself. Drawing every card on the root would need the
+model's accounting changed - a ServerSettingsModel diff, not in this slice. The Mac's page tells the model the same way
+for the groups it draws (below).
+
+### The Mac (People.dc.html, ServerSettings.dc.html)
+
+- **People** (MacPeoplePage, for `.people` and `.person(id)`): the toolbar's **Add a person…** (purple) and **Lock**, only
+  unlocked. Locked or before the first answer, the phone's PeopleStatus and PeopleReadAgain at a readable width (Unlock
+  People with the admin's own password - PeopleField, the Mac's own field there). Unlocked, a MacColumnList at the left (398 at most,
+  42% of the page below that, 260 at least): **Person** (the initial at View > Row Size's cover, the name, the user name),
+  **Role** (Admin or Person) and **Last signed in** (now, People.ago's "2 hours ago", never - People.signInWords whole in
+  its help) - Last signed in, then Role, left out where Person would fall under its least (after the review, below);
+  under it the unlocked line, the version note, the list's said, and Known only to deadwax in a group box.
+  The person chosen (the route's, else the first; kept while listed, and through a lock) in the panel: the head (the initial at 72, the name
+  at h2, the user name, sign-ins · library in the readout face, the warning; the chips one over the other and Make admin
+  behind the phone's question - beside the words in a two-column panel, under them in a one-column one), what was said,
+  **Permissions** (MacCheckbox on `people.ticked`, dimmed and off while locked or a write is out, each line its help
+  and VoiceOver's hint, the warning, the locked reason, the admins' line) and **Account** (the
+  user name, Reset password… and Remove… in red, the refusals) - 1.15 : 1 side by side from a panel of 620 (the window's
+  opening: 661), else one over the other (the smallest window and beside the side panel: about 382) - and the foot
+  (Revert, Save permissions) for an ordinary person. The flow's one sheet (add, reset, remove), each its own root. The
+  status bar: "4 people", "1 admin", "Navidrome 0.65.0".
+- **Server settings** (MacServerSettingsPage, for `.serverSettings` and `.serverSettingsGroup(id)` - opened at the
+  group's tab): framed as the phone's root (`serverSettingsPage(.root)`: the save bar, ⌘S, the model told), the page's
+  line in the toolbar, MacFolderTabs over the tabs (the marks in their words), then the chosen tab - Library with the
+  verdict, Connections with its box of rows and Check again - each group a heading with its mark, its note, and a
+  **box per setting** (the name as the box's legend in the readout face, hidden from VoiceOver; the phone's SettingControl,
+  SettingChips with SettingRevert, SettingWords at the Mac's small size), two columns from a page of 990 (the window's
+  opening: 1060), one below it (660 and 659). Lyrics ends with Re-time's box, the saved answers with theirs; both groups
+  `shows`/`hides` the model as they're drawn. The status bar: "19 settings", "1 set here", "deadwax 2.1.x".
+- **What the Mac reaches of the phone's files** - Set up Navidrome's group page, People's sheets, and the parts the two
+  pages draw - uses only the look's pieces (DWButtonStyle, DWChip, DWWell, PeopleField's Mac half, ManageHeading,
+  ManageNote), never PhoneGo, PhoneCard, PhoneGroup, FieldLook, a phone switch or DWLook's target. ManageLook's small size is the Mac's .s there
+  (`Typeface.Look.text(.smallButton)`, App/Manage naming no Mac type) and the phone's scaled one here; the sheets' ground
+  is the window's on the Mac (`ManageLook.sheetGround`). A setting's chips that don't fit one line stack one per line.
+
+### Left out, and why
+
+- The drawing's per-setting **Save** and a **Revert every override**: one Save sends every draft (the model's one way),
+  and nothing reverts them all today.
+- People's **Unlocked** chip and "Unlocked for 9 more minutes": nothing tells how long the unlock has left.
+- **Their library**'s box past the albums the head says, "First seen" and Display name: not in People's answer.
+- The foot's "3 of 5 ticked" count.
+- The phone's cards on the root (above).
+
+### Tests
+
+tests/test_ios_manage_look.py (new): the four phone files flat (no Form, List or Section; what each draws on the phone's
+path, R1c's DRAWS, pinned; a face given back to a card is seen), People's list on iArtists' rows, the switches with no
+lines and the foot, what is sent (the tick on both devices, the flow's guard and body, Revert through the tick), the
+unlock, a revert's null, a secret's field and the well, the Mac's path (none of the phone's own pieces in the files and
+parts it draws; ManageLook's halves), the Mac pages' rules (the frame, the tabs, the groups told, the selection, the
+sheets, Make admin's question), both pages' two-column thresholds from the bundled faces and MacLook, VoiceOver and the
+largest sizes, and tokens. Updated: test_ios_phone_look (R14_PAGES among SLICES; People's eight fields OWN, a setting's
+two WELL), test_ios_mac_reach (the four routes off PHONES_PAGES, each pinned to its Mac page), test_ios_mac (the Mac
+page's pull and its three sheet roots), test_ios_people and test_ios_server_settings (the flat pages' anchors),
+test_ios_palette (PeopleSheetPage's ground, a fill as the manual search's, among what reaches the top) and
+test_ios_readout_rows (People's list among the Mac's tables; three readouts said alone - a setting's field in its well,
+Remove's typed name, a Mac box's legend on its edge; a setting's key set where it is drawn, so the walk follows it to
+its card's VStack).
+
+### Mutations
+
+Each applied alone to a copy of the worktree, the named tests run, the file put back (tests/test_ios_manage_look.py
+unless named). All 13 caught:
+- An unticked permission sent: PeopleModel's binding ticking `true` whatever is clicked, and Core's
+  PeoplePermissionsBody sending Edit albums as on: `test_only_the_ticks_shown_are_sent_and_none_the_role_cant_hold`.
+- Revert sent as a missing key (SettingUpdate's `encodeIfPresent`), and Revert drafting an empty value
+  (`settings.edit(key, "")` for `settings.revert(key)`): `test_a_revert_is_drafted_and_sent_as_an_explicit_null`.
+- A permission left on that the role can't hold: the Mac's box clickable while locked (`off` without `box.locked`),
+  and Core's tick without `People.savesPermissions`:
+  `test_only_the_ticks_shown_are_sent_and_none_the_role_cant_hold`; the phone's switch enabled while locked:
+  `test_a_persons_permissions_are_the_purple_switches_and_the_foot_saves`.
+- The flat rule: a setting's card given its face back (a `DWPalette.card` background), People's list back in a List:
+  `test_people_and_server_settings_on_the_phone_are_flat`.
+- The typing rule: Unlock People's password without FieldLook, a setting's field without its DWWell: test_ios_phone_look's
+  `test_every_place_you_type_on_the_phone_is_still_a_box`.
+- The Mac's path: a PhoneGo row in SettingRow (Set up Navidrome's page draws it on the Mac):
+  `test_the_macs_path_draws_none_of_the_phones_own_pieces`.
+- The Mac's Server settings in two columns from 640 (one column 299 wide at the smallest window):
+  `test_each_mac_page_takes_two_columns_only_where_they_fit`.
+
+### After the review (2026-11-26)
+
+The review found nothing wrong in what is sent (the ticks, Revert's null, secrets, the unlock, Remove's guard, Add and
+Reset), but two layout bugs, a broken rule and tests that let most of the slice's own choices change unseen. Each fix,
+then what was left as it was:
+
+- **The Mac's People list had no room for a name** (the list 277 at a page of 660 or 659, Role 96 and Last signed in 118
+  leaving Person 63; 46 at 589). Person now keeps a least beside the others - 160 at Small, Playlist's
+  (MacAlbumFacts.playlistLeast), its cover's growth on top at Medium and Large (168, 180) - so a name and user name keep
+  112 at every Row Size; where it wouldn't, Last signed in is left out, then Role (`MacPeoplePage.shown`, as the
+  Playlists page leaves Whose and Changed out). At 1060 all three at every size; at 660 and 659 Person and Role; at 589
+  Person and Role at Small, Person alone at Medium and Large. The Person cell's help says it all - display name, user
+  name, role, sign-ins - and the name holds its line before the user name (`layoutPriority`), which is cut in its middle.
+- **Buttons that don't fill never wrap.** DWButtonStyle (App/Look's, untouched) holds a button that doesn't fill to one
+  line, so a line limit on its words does nothing. ManageWrapButton (ServerSettingsGroupScreen) draws a button as it was
+  while it fits, else across its row (`fills`), its words (ManageButtonWords) as many lines as they take on the phone -
+  the innermost line limit holds - and on the Mac one line cut at its end, the whole in its help (a Mac button is 26
+  tall). Re-time's running button (some 354 at the default size), Re-time saved lyrics (351 at AX3), Clear MusicBrainz's
+  saved answers (373 at xxxLarge) and Revert to the environment with what it brings back (337 at the default size, 487 at
+  xxxLarge) are drawn so. SaveBar's last way is the words over the buttons, side by side while they fit (418 at AX3
+  don't) and else one over the other, each across the bar - its doc comment says so now, and SettingRevert's no longer
+  claims a wrap it couldn't do. SettingChips' last way is laid out in the width it's given, so a long Revert under the
+  chips wraps or is cut there.
+- **Phone-sized fields on the Mac.** Unlock People and the sheets' seven fields are PeopleField now: the sign-in's
+  FieldLook on the phone (SignInView.swift untouched), the Mac's own field on the Mac - the plain field at the field's
+  13 on the look's well, 24 tall, 8 in, the focus ring off, as SettingWell and DWField draw it. FieldLook is on
+  test_ios_manage_look's PHONE_ONLY, so the Mac's path can't reach it. PeopleSheetPage sets the Mac's 13 (ManageMacText)
+  over what sets no size of its own - what a write said, the sheets' lines; PeopleSaidView's warning and fix are
+  ManageLook.small, the Mac's .s there.
+- **An unlock that ran out mid-edit moved the admin off the person**, and a route's person was dropped by the empty list
+  before the first read (`initial: true`). The selection follows `flow.view == .list ? ids : nil` through
+  `MacPeoplePage.chosen`: kept while the list isn't loaded, kept while listed, let go of (for the first) only when a
+  loaded list hasn't them.
+- **Last signed in went stale.** The list and the panel are read against the minute, `TimelineView(.everyMinute)`'s
+  date - no `@State now` from the page's opening. The phone reads `Date()` per render, as before.
+- **Set up Navidrome's sheet kept the system's grey** round the flat group page: `.presentationBackground
+  (ManageLook.sheetGround)`, the page's black on the phone (the Mac's window ground there), as People's sheets.
+- **The menu Picker took a tap on its words alone** out of a Form's row. On the phone the choice is a Menu whose label
+  is the whole row - the choice in the accent, the look's caret, a Spacer - at least DWLook's target (44) tall, its
+  `contentShape` the row; the Picker's choices inline in the menu, the one chosen ticked; VoiceOver hears the setting's
+  name and the choice (`accessibilityValue`). The Mac keeps its menu Picker.
+- **Nits.** Server settings' two columns from 990, not 760: the widest chips that really show together with Revert -
+  "From the container environment", Unsaved and "Revert to the environment", a setting set here then typed in - are
+  some 437 points on one line, so 2 × (437 + 24) + 18 + 44 = 984 (Set here never shows with Unsaved; with Needs
+  attention and Revert, 347); two columns at the opening (1060, columns of 499), one at 660 and 659. docs/ios.md's 600
+  says Make account and Reset password purple and Remove red. The phone's Account legend only over rows (refusals alone
+  are notes). The Mac head gives the name its room: the chips and Make admin beside the words only in a two-column panel
+  (620 and up), under them across a one-column one (382 at the smallest window - the chip "Can't sign in to deadwax"
+  beside the name left it some 100). PersonFoot is one view either way - a `safeAreaInset` that is there or isn't -
+  so the page keeps its scroll when the foot goes (someone made an admin); the one way it differs from `phoneFoot`'s
+  layer is riding up on a keyboard, and a person's page with a foot has no field (Unlock People shows only while
+  locked, with no one shown).
+- **The hints.** The plan's section 4 lists People's hints among what has no data, and People.dc.html draws a line
+  under each box. They are left out on the Mac as on the phone: each permission's line is the box's help and
+  VoiceOver's hint there, never drawn - so the plan and both devices agree.
+
+The shared test helper changed: test_ios_phone_look's `modifiers_named` reads a named modifier's body down the phone's
+path and two levels deep, so PeopleField - whose Mac half is a DWWell under a plain field - counts as the box it is on
+the phone (OWN, FieldLook's), not as a WELL. Rebased onto b017851a (R10 and its allowlist): R10's wider `drawn()` sees
+nothing new in R14's files - the save bar's ground is `footFace` (the page's black) under `footEdge`, as PhoneFoot's, no
+longer the `.background(.bar)` material it had - and test_people_and_server_settings_on_the_phone_are_flat now pins it.
+
+#### Tests added for the review
+
+In tests/test_ios_manage_look.py: the columns at 589, 659, 660 and 1060 for each Row Size (`shown` pinned and run, the
+name's room, the headers and every cell's words in their columns, the help); the head beside or under at each panel;
+each button the review measured, at the default size, xxxLarge and AX3-AX5 in a 343 column from the bundled faces,
+where it first outgrows it, and that each is a ManageWrapButton (or the save bar's stack) - and every other R14 phone
+button fits at AX5; the widest real chips set read from Core's rule and the server's sources, against 990; the chips,
+their tones and the group marks' tones whole; each Account button's sheet whole on both devices; the Mac's admin count;
+the selection (pinned, and run through a lock, a first read, a list without them, an empty list); the minute's
+TimelineView; PeopleField's halves, FieldLook only in PeopleField, ManageMacText; Set up Navidrome's ground; the
+phone's menu row; the Mac's hints as help; Account's legend; PersonFoot's one identity; the save bar's ground.
+
+#### The review's mutations, and one for each fix
+
+Each applied alone to a copy of the worktree, test_ios_manage_look run (and the 13 above again, all still caught):
+
+All 41 caught - the 13 above, the review's 7 and 21 for the fixes:
+- The review's: the Mac's Role column 96 -> 196 (`test_the_macs_people_list_leaves_columns_out_before_a_name_loses_its_room`);
+  the Mac's Reset password… and Remove… opening each other's sheets and the Mac status bar counting everyone as an
+  admin (`test_the_macs_pages_are_the_phones_rules`); the phone Account's Remove… opening Reset's sheet
+  (`test_a_persons_permissions_are_the_purple_switches_and_the_foot_saves`); a purple set-here edge on every sourced
+  setting (`test_a_secret_is_shown_and_saved_as_today_and_every_field_is_a_box`); the Needs attention chip dropped and
+  GroupRow's tones swapped (`test_the_chips_and_the_marks_say_what_they_mean_in_their_tones`).
+- The list's room: Person's least 160 -> 60, no column ever left out, the help without the name
+  (`test_the_macs_people_list_leaves_columns_out_before_a_name_loses_its_room`).
+- The wrapping buttons: Re-time's running button a plain one-line button again, a wrapping button's words held to one
+  line, its second way not across its row, the save bar's stack not across it, Clear's words a plain Text
+  (`test_a_button_whose_words_outgrow_a_phones_column_goes_across_it_and_wraps`).
+- The Mac's fields: PeopleField's Mac half on FieldLook (`test_people_stays_unlocked_with_the_admins_own_password`,
+  `test_the_macs_path_draws_none_of_the_phones_own_pieces`); ManageMacText dropped from the sheets
+  (`test_a_secret_is_shown_and_saved_as_today_and_every_field_is_a_box`).
+- The selection: a lock letting go of the person (`guard let ids else { return nil }`), the key an empty list before the
+  first read; the time: `TimelineView(.explicit([Date()]))`; the hints drawn on the Mac
+  (`test_the_macs_pages_are_the_phones_rules`).
+- Set up Navidrome's sheet on the system's grey (`test_people_and_server_settings_on_the_phone_are_flat`).
+- The phone's menu row: its `contentShape` dropped, its 44 dropped (`test_a_choice_is_a_whole_row_to_tap_on_the_phone`).
+- Two columns at the old 760 (`test_each_mac_page_takes_two_columns_only_where_they_fit`); Account's legend over
+  refusals alone and PersonFoot's if/else back (`test_a_persons_permissions_are_the_purple_switches_and_the_foot_saves`);
+  the Mac head's chips beside the name in a one-column panel (`test_the_macs_person_head_gives_the_name_its_room`).
+
+### Not verified (only the devices can tell)
+
+- The menu Picker's look in a Mac box, and the phone's choice row (its menu from the whole row, the caret, the
+  choice ticked); the strip's words with a mark ("Library · Needs attention") at the largest sizes; the sheets'
+  black, Set up Navidrome's included, and PhoneFoot on a person's page.
+- PeopleField's Mac half beside the Mac's other fields (Unlock People and the sheets), and the sheets' words at 13.
+- A wrapping button at the largest sizes on a phone - Re-time's running words, Revert with its value, Clear, the
+  save bar's stack - and on the Mac a Revert cut short with its help.
+- The Mac's People at each Row Size (the initial at 20, 28 and 40; Role and Last signed in left out in a small
+  window), the Person cell's help, the head's chips under the name in a one-column panel, the panel's two columns by
+  eye, MacCheckbox dimmed while locked, a person kept chosen through a lock; Last signed in turning with the minute;
+  the folder tabs' marks; a box's legend cut in its middle for a long name.
+- Whether ViewThatFits picks the one-line button exactly where it fits, at each size (the measures here are the
+  bundled faces' advances, kerning aside).

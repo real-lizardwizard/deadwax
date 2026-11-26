@@ -649,9 +649,11 @@ def test_the_librarys_top_sits_under_the_status_bar():
     # alone (the iPhone draws MainTabs, never the frame), and its content below the strip.
     # (The redesign, slice R1c's review) The manual search's black, a fill behind its scroll view - under its bar too,
     # so no sheet's grey shows there; its fields keep to the safe area.
+    # (R14) People's sheets' ground (PeopleSheetPage), as the manual search's: a fill behind its scroll view.
     assert reaching == {"Library/LibraryTop.swift": 1, "Root/RootView.swift": 1, "Player/NowPlayingView.swift": 2,
                         "Root/MainTabs.swift": 1, "Player/CoverViewer.swift": 2, "Edit/ReleasePage.swift": 1,
-                        "Root/DesktopFrame.swift": 1, "Get/ManualSearchSheet.swift": 1}
+                        "Root/DesktopFrame.swift": 1, "Get/ManualSearchSheet.swift": 1,
+                        "Manage/PeopleSheets.swift": 1}
     manual = sources["Get/ManualSearchSheet.swift"]
     assert [line.strip() for line in manual.splitlines() if "ignoresSafeArea" in line] == [
         ".background(DWPalette.page.ignoresSafeArea())"]
