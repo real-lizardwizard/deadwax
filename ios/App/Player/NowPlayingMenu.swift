@@ -23,6 +23,10 @@ import SwiftUI
 /// The speed (app 0.7, notes/ios-specs/turntable.md 5.1): off 1x on the cover at the accessibility sizes, where the
 /// chip isn't drawn, a first section of one item - "Speed 1.25x - back to normal speed", `speedometer` - the chip's
 /// action.
+///
+/// Start Radio (Last.fm, slice A3 - deadwax-plans/lastfm.md 3.5): after Go to album, for the song playing - a new queue
+/// of it, played from its start in the tap (PlayerModel.startRadio), similar songs of your library after it. Left out
+/// while Last.fm isn't on and while deadwax can't be reached; the button's name says so when it is in (", start radio").
 struct NowPlayingMenu: View {
     /// The song playing names its album: Go to album is in the menu.
     let hasAlbum: Bool
@@ -38,11 +42,15 @@ struct NowPlayingMenu: View {
     @Environment(PlayerModel.self) private var player
     @Environment(DownloadModel.self) private var downloads
     @Environment(EQModel.self) private var eq
+    @Environment(ServerModel.self) private var server
+    @Environment(Reachability.self) private var reachability
 
     var body: some View {
         let song = player.current.map { player.song(for: $0) ?? Song(queued: $0.track) }
         let upNext = player.songsFromCurrent
         let upNextCount = downloads.isOpen ? downloads.upNextCount(upNext, paged: player.paged != nil) : nil
+        //? (Last.fm, slice A3) Start Radio for the song playing: while Last.fm is on and deadwax can be reached
+        let radio = song != nil && reachability.online && server.access.lastfm == .on
         Menu {
             if saysSpeed {
                 Section {
@@ -58,6 +66,11 @@ struct NowPlayingMenu: View {
             }
             if hasAlbum {
                 Button(NowPlayingWords.goToAlbum, systemImage: DownloadWords.goToAlbumSymbol, action: onAlbum)
+            }
+            if radio, let song {
+                Button(LastfmWords.startRadio, systemImage: LastfmWords.startRadioSymbol) {
+                    player.startRadio(song)
+                }
             }
             if let song {
                 DownloadMenuSection(songs: [song], name: song.title ?? "",
@@ -94,7 +107,7 @@ struct NowPlayingMenu: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .accessibilityLabel(NowPlayingWords.more(hasAlbum: hasAlbum, download: downloads.isOpen, eq: onEQ != nil,
-                                                 playlist: onPlaylist != nil))
+                                                 playlist: onPlaylist != nil, radio: radio))
     }
 
     /// Download the Queue: each song from the one playing on that isn't here or didn't download, asked for as a song.

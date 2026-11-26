@@ -374,8 +374,8 @@ menus and keys, and these differences.
   it has no room for it and the second its readout, each on its own; hold the pointer over a cut-short title or name
   and it shows whole. Then the tools: **Queue**, **Lyrics** and **Info** as one joined strip, the **EQ**, where the
   music plays - AirPlay's button and the output's name, the name left out in a window under 1000 points wide (hold the
-  pointer over the button for it) - and **•••**, Now Playing's: Info, Add to a playlist…, Go to album, the song's
-  download items, the EQ. With nothing queued the keys are dimmed and the display says **Nothing playing**.
+  pointer over the button for it) - and **•••**, Now Playing's: Info, Add to a playlist…, Go to album, Start Radio
+  (with a Last.fm key), the song's download items, the EQ. With nothing queued the keys are dimmed and the display says **Nothing playing**.
 - **The side panel**: a strip of tabs along its top - **Queue**, **Lyrics**, **Info** and **EQ**, and **Sources** first
   while an album you don't have's Get is open (see [Getting an album](#getting-an-album)) - and the tab's page under
   them, one at a time, 400 points wide. Open it from the bar's Queue, Lyrics, Info and EQ buttons (each lit
@@ -405,12 +405,13 @@ and adds deadwax's:
 | **File** | **Import EQ File…** ⌘O: the Mac's Open panel, for an EQ setting's `.txt` (see EQ files below); **Save changes** ⌘S: Server settings' Save changes, while one of its pages is in front (see Managing below); Close Window ⌘W - and no New Window: there is only ever one window |
 | **Edit** | **Find** ⌘F: the cursor in the sidebar's search field, the sidebar shown if it was hidden. The Mac's own **Copy** ⌘C and **Select All** ⌘A also copy and select the event log's lines (see Managing below) |
 | **View** | **Show Sidebar** or **Hide Sidebar** ⌃⌘S; **Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I, **EQ** ⌥⌘E - each shows its tab of the side panel, or closes the panel when its tab is showing, ticked while it shows; **Refresh** ⌘R: the page you're on, asked again (see below); **Row Size** - **Small**, **Medium** or **Large**, the one in use ticked, then **Make Bigger** ⌘+ and **Make Smaller** ⌘−: how tall every list's rows are (see below) |
-| **Controls** | **Play** or **Pause** (Space), **Next** ⌘→, **Previous** ⌘←, **Forward 10 Seconds** ⌥⌘→, **Back 10 Seconds** ⌥⌘←, **Shuffle**, **Repeat** (Repeat off, Repeat all, Repeat one - the one that's on is ticked), **Go to Current Song** ⌘L (the album of the song playing) |
+| **Controls** | **Play** or **Pause** (Space), **Next** ⌘→, **Previous** ⌘←, **Forward 10 Seconds** ⌥⌘→, **Back 10 Seconds** ⌥⌘←, **Shuffle**, **Repeat** (Repeat off, Repeat all, Repeat one - the one that's on is ticked), **Autoplay** (with a Last.fm key on deadwax: ticked while it's on, the Queue's chip - see [Radio and Autoplay](#radio-and-autoplay)), **Go to Current Song** ⌘L (the album of the song playing) |
 
 Format has nothing of deadwax's in it (there's nothing to format), and there's no deadwax Help (no Mac help book:
 this guide is the help). Every Controls item is dimmed while nothing is queued. Shuffle is named as Now Playing's
 Shuffle button is: during the Library's Shuffle it reads **Shuffle - shuffling your whole library** (**Shuffle -
-shuffling all music** for all of deadwax's), ticked and dimmed, as Now Playing's is - that order is the shuffle. The
+shuffling all music** for all of deadwax's), ticked and dimmed, as Now Playing's is - that order is the shuffle - and
+while the queue has a radio or songs Autoplay added it's dimmed unless it's on (it can still be turned off). The
 Repeat submenu's three items are the words the Queue says to VoiceOver as Repeat changes: Repeat off, Repeat all, Repeat
 one. Queue is dimmed with nothing queued (unless its tab is showing: then it closes the panel), and Info too unless a
 row is selected, and Lyrics with nothing queued or for a song known to have none. **While a sheet is up** (Edit album's Tags, Artwork, Lyrics or Delete, Add to a playlist, the EQ, a cover full size - any of them)
@@ -2112,7 +2113,8 @@ FLAC, 16-bit, 44.1 kHz". At the accessibility text sizes they go under the title
   place. VoiceOver reads the EQ button with the output's setting ("EQ, Bass Boost"), and the Queue with what's on
   ("Queue - Shuffle on").
 - **•••**, at the top right beside **Turntable**, has **Info**, **Add to a playlist…** for the song playing (while
-  deadwax can be reached), **Go to album**, **Download** (or Remove Download) for the song playing and **Download the
+  deadwax can be reached), **Go to album**, **Start Radio** (with a Last.fm key on deadwax, while it can be reached -
+  see [Radio and Autoplay](#radio-and-autoplay)), **Download** (or Remove Download) for the song playing and **Download the
   Queue** - every song still to play that isn't on the phone, when that's two or more. Go to album closes Now Playing
   and opens the album's page on the tab you're on. What a download item did is said for a moment at the top of Now
   Playing ("Downloading: Roads", "Downloading 23 songs from the Queue"), between **Close** and the buttons opposite
@@ -2375,6 +2377,48 @@ Playing** puts it away). The web app calls it Up Next:
 or list you haven't heard this time round. Turned off, the album's own order carries on from the song
 playing. Either way the song playing goes on, untouched, and songs you added keep their order, ahead of
 the rest.
+
+### Radio and Autoplay
+
+With a Last.fm key on deadwax (`LASTFM_API_KEY`) and **deadwax 2.1.44 or later**, songs of your library that Last.fm
+calls similar can carry on from a song, or from the end of whatever you're playing. Without the key neither is
+there.
+
+- **Start Radio**, in a song's **•••** - on an album's page, a playlist's, the Library's Songs, Search's songs and an
+  artist's Top Songs (on the Mac, the song's right-click) - and in Now Playing's **•••** for the song playing: the song
+  plays at once, from its start, as a new queue, and deadwax is asked for songs like it. **From Now Playing that means
+  the song playing starts again from the beginning**, and what was queued after it is replaced by the radio. Ten of
+  the songs it finds in your library follow it in the Queue, as the list's own, in deadwax's order (another artist
+  next wherever one is left); as the radio nears its end - when two songs are left after the one playing, so on its
+  third-to-last song - ten more come, up to a hundred in all. None is a song already in the queue (the same song, or one of the same title and artist - a "2011 Remaster"
+  of it too), what you've played in it included, nor the song you started from. If Last.fm knows nothing like it
+  in your library, "No similar songs in your library." shows and the song plays alone; if deadwax couldn't get them
+  just then, "Couldn't start the radio just now." - and it's asked again 30 seconds later (at once when the next song
+  starts), three times in all. Start Radio isn't in the menus while deadwax can't be reached, nor for a song of an
+  album deadwax no longer has; an album's or a playlist's own ••• (all of its songs) has none.
+- **Autoplay**, along the Queue's foot after **Repeat** (on the Mac, the Queue panel's chip after Repeat's, and
+  **Controls > Autoplay**, ticked while it's on - the same setting): **off** until you turn it on, and kept on this
+  phone or Mac alone. While it's on, a queue nearing its end - two songs left after the one playing, so on the
+  album's third-to-last song - gets ten songs like its last one, under a heading of their own, **Autoplay**, after
+  the album's or list's ("From Currents"); the album ends and they play on, and ten more come as they near their
+  end. It never starts the music by itself. Turned off, the Autoplay songs still to come go out of the Queue and the
+  album stops at its end, its heading and Repeat All's "Then … again" line naming the album again, and Repeat All
+  then repeats the album alone - one that has already played stays where it is in the queue. Turned off in a song's
+  last moments, it's done as the next song begins. A radio's songs stay. On the Mac, where the Queue panel's three
+  chips don't fit on one line, Autoplay's goes on a line of its own under Shuffle and Repeat. VoiceOver reads it as
+  selected while it's on, with the hint "Keeps playing similar songs from your library when the queue ends."
+- Neither adds anything while **Repeat** All or One is on, nor during the Library's **Shuffle** (which goes on by
+  itself). Turning Repeat on doesn't take Autoplay's songs out: they're queued songs by then. While the queue has a
+  radio, or songs Autoplay added, **Shuffle** can't be turned on - it's dimmed in the Queue, on Now Playing, on the
+  Mac's player bar and in Controls, as during the Library's Shuffle: shuffling would mix them into the album. If
+  Shuffle was already on, you can still turn it off.
+- While deadwax can't be reached, a radio or Autoplay adds only songs on this phone, and asks for nothing new; the
+  ones it passed over for not being on the phone come once deadwax is back.
+- Their songs are the queue's like any other: tap one, or in **Edit** move one (among the songs under its heading) or
+  take one out - one taken out isn't added back. They're queued at the level **Normalization** gives a playlist's
+  songs, and played, counted and kept in what you've played as any song is. The radio itself isn't kept: a new queue
+  ends it, and after the app is opened again its songs are plain songs of the list - Autoplay, if it's on, carries on
+  from the end as for any queue. The web app picks the queue up as one longer list.
 
 ### Lyrics
 
@@ -6541,7 +6585,8 @@ Ethan's phone as a listener (the one that sees no foot line). Say "pass", or wha
   - check LASTFM_API_KEY in Server settings. It's the API key, not the shared secret." The row says refused with the
   time; the event log says so once. Put the real key back, leave the app and come back: it works at once.
 - **486 [key] The Mac.** The same page at the readable width. Right-click a top song you have: the same menu as its
-  ••• (no Start Radio yet - that's a later slice). See All opens the list; From Last.fm opens last.fm in the browser.
+  ••• (Start Radio in it since Last.fm's third slice - 494-502). See All opens the list; From Last.fm opens last.fm in
+  the browser.
 - **487 [key] VoiceOver.** A top song reads its title and line ("Let It Happen, Currents · 2015"); a missing one
   "…, Not in your library"; "From Last.fm" reads as a link; the listeners line is read under the name.
 
@@ -6568,6 +6613,36 @@ deadwax's plain `http://` address, logins on. Say "pass", or what you saw.
   reorder under your finger after? Does it help you pick what to get next?
 - **493 [key] Offline, similar.** **Not done yet.** With Tame Impala open, turn on Airplane Mode (and WireGuard off):
   pictures of artists you don't have are dimmed and do nothing; one of yours still opens their page.
+
+### Last.fm's third slice's checks (494-502)
+
+**Not done yet.** These come with Last.fm's third slice on the app - [Start Radio and Autoplay](#radio-and-autoplay)
+(still app 0.13 (13)). They need **deadwax 2.1.44 or later** on the server; before it, Start Radio plays the song alone
+("Couldn't start the radio just now.") and Autoplay adds nothing. All nine are **[key]**. As for 476-493: both phones and the Mac, deadwax's plain `http://`
+address, logins on. Autoplay starts off on every device. Say "pass", or what you saw.
+
+- **494 [key] Start Radio.** **Not done yet.** From a song's •••, Start Radio. The song plays at once; within a few
+  seconds the Queue has 10 more, from your library. Any repeated? Two in a row by one artist? Do they sound similar?
+  Then from Now Playing's •••: the song playing starts again from its beginning - that's expected - with a new
+  radio after it.
+- **495 [key] It keeps going.** **Not done yet.** Let it run past 10 (skip to the 9th): 10 more arrive. None already
+  played in this queue.
+- **496 [key] Autoplay.** **Not done yet.** Along the Queue's foot: Autoplay is off, and a short album stops at its end.
+  Turn Autoplay on and play it again: when two songs are left after the one playing (on its third-to-last song), rows
+  appear under "Autoplay"; the album ends and they play on. Turn it off: the rows go, the heading is "From <the
+  album>" again, and the album stops at its end.
+- **497 [key] Repeat and Shuffle.** **Not done yet.** With Repeat All, no Autoplay rows appear. During a radio, Shuffle
+  is greyed out - unless it was on already, when it can still be turned off.
+- **498 [key] Locked.** **Not done yet.** Start an album near its end, lock the phone, wait: Autoplay's songs play on
+  with the phone locked.
+- **499 [key] Offline radio.** **Not done yet.** Airplane Mode: Start Radio isn't in the menus. A radio started before
+  still adds only downloaded songs - and once you're back online, it carries on with the rest.
+- **500 [key] The web after the phone.** **Not done yet.** Stop a radio on the phone; open the web app. Its queue picks
+  up the radio's songs as a list. Nothing breaks.
+- **501 [key] The Mac.** **Not done yet.** Controls has an Autoplay tick; the Queue panel has the chip (on a line of its
+  own under Shuffle and Repeat, where the three don't fit); they stay in step.
+- **502 [key] No similar songs.** **Not done yet.** Start Radio on a song Last.fm doesn't know: "No similar songs in
+  your library.", and the song plays alone.
 
 ### The Mac redesign's checks (518-614)
 

@@ -320,3 +320,115 @@ import Testing
         #expect(deadwax.request(Routes.lastfmArtist).timeout == nil)
     }
 }
+
+/// (Last.fm, slice A3) The radio's answers as the app reads them (`GET /deadwax/lastfm/radio`, server 2.1.44):
+/// Fixtures/lastfm/answers/radio.json, exported by tests/fixtures/lastfm/answers.py from the route over Last.fm's and
+/// Navidrome's recorded answers - and tests/test_lastfm_radio.py holds that copy to the route. Never edited by hand.
+@Suite struct LastfmRadioDecodeTests {
+    struct Exported: Decodable {
+        struct Case: Decodable {
+            let name: String
+            let query: [String: String]
+            let answer: LastfmRadio
+        }
+        let fixtures: String
+        let cases: [Case]
+    }
+
+    static func exported() throws -> (order: [Exported.Case], raw: [String: Data]) {
+        let data = try Fixtures.data("lastfm/answers/radio.json")
+        let file = try JSONDecoder().decode(Exported.self, from: data)
+        #expect(file.fixtures == "recorded")
+        let whole = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var raw: [String: Data] = [:]
+        for row in try #require(whole["cases"] as? [[String: Any]]) {
+            raw[try #require(row["name"] as? String)] = try JSONSerialization.data(withJSONObject: try #require(row["answer"]))
+        }
+        return (file.cases, raw)
+    }
+
+    static func read(_ json: String) throws -> LastfmRadio {
+        try JSONDecoder().decode(LastfmRadio.self, from: Data(json.utf8))
+    }
+
+    @Test func theRoutesOwnAnswersRead() throws {
+        let (order, _) = try Self.exported()
+        #expect(order.count == 10)
+        #expect(order.map { $0.answer.songs?.count } == [25, 16, 0, 20, nil, nil, nil, nil, nil, nil])
+        #expect(order.map(\.answer.enabled) == [true, true, true, true, true, true, true, true, false, false])
+        #expect(order.map(\.answer.unavailable) == [false, false, false, true, true, true, true, true, true, false])
+        // Let It Happen's: songs of the library, none twice, never the seed - read whole, each a song the queue takes
+        let tame = try #require(order[0].answer.songs)
+        #expect(Set(tame.map(\.id)).count == tame.count && !tame.contains { $0.id == "so-seed" })
+        #expect(tame[0].id == "so-np" && tame[0].title == "New Person, Same Old Mistakes" && tame[0].albumId == "al-Currents")
+        #expect(tame.allSatisfy { $0.title?.isEmpty == false && $0.artist?.isEmpty == false })
+        // what a station makes of each: songs, a definite nothing, or asked again
+        let made = order.map { (one: Exported.Case) -> Station.Outcome in
+            var station = Station(kind: .radio, seed: simTrack("so-seed"), queueId: "q")
+            station.began()
+            return station.answered(one.answer, playing: 0, now: 0)
+        }
+        #expect(made == [.songs, .songs, .nothing, .songs, .failed, .failed, .failed, .failed, .failed, .failed])
+        // the why, for whoever runs deadwax: a library too big, the key refused, no key
+        #expect(order[7].answer.why?.contains("too big") == true)
+        #expect(order[8].answer.why?.contains("LASTFM_API_KEY") == true)
+        #expect(order[9].answer.why?.contains("LASTFM_API_KEY") == true)
+    }
+
+    @Test func eachOfTheRoutesAnswersIsAskedAsTheAppAsksIt() async throws {
+        let (order, raw) = try Self.exported()
+        let (deadwax, transport) = client()
+        for one in order {
+            transport.answer("/deadwax/lastfm/radio", 200, String(decoding: try #require(raw[one.name]), as: UTF8.self))
+            let scope = try #require(PagedScope(rawValue: one.query["scope"] ?? ""))
+            let answer = try await deadwax.lastfmRadio(songId: one.query["song_id"] ?? "", title: one.query["title"] ?? "",
+                                                       artist: one.query["artist"] ?? "", scope: scope)
+            #expect(answer == one.answer, "\(one.name)")
+            let sent = try #require(transport.last)
+            #expect(sent.method == "GET")
+            let wanted = ["song_id", "title", "artist", "scope"].map { URLQueryItem(name: $0, value: one.query[$0]) }
+            #expect(URLComponents(url: sent.url, resolvingAgainstBaseURL: false)?.queryItems == wanted, "\(one.name)")
+        }
+        #expect(Routes.all.contains(Routes.lastfmRadio))
+        #expect(deadwax.request(Routes.lastfmRadio).timeout == 30)
+    }
+
+    @Test func aSongWithoutAnAskIsNeverAsked() async throws {
+        let (deadwax, transport) = client()
+        transport.answer("/deadwax/lastfm/radio", 200, #"{"enabled": true, "unavailable": false, "songs": []}"#)
+        // trimmed as the route trims them
+        _ = try await deadwax.lastfmRadio(songId: "so-1", title: "  Roads ", artist: " Portishead\n", scope: .yours)
+        #expect(URLComponents(url: try #require(transport.last).url, resolvingAgainstBaseURL: false)?.queryItems
+            == [URLQueryItem(name: "song_id", value: "so-1"), URLQueryItem(name: "title", value: "Roads"),
+                URLQueryItem(name: "artist", value: "Portishead"), URLQueryItem(name: "scope", value: "yours")])
+        let before = transport.sent.count
+        let refused: [(String, String, String)] = [
+            ("", "Roads", "Portishead"), ("so-1", "   ", "Portishead"), ("so-1", "Roads", ""),
+            (String(repeating: "a", count: Station.Ask.idMost + 1), "Roads", "Portishead"),
+            ("so-1", String(repeating: "a", count: Station.Ask.wordsMost + 1), "Portishead"),
+        ]
+        for (id, title, artist) in refused {
+            await #expect(throws: APIFailure.self) {
+                try await deadwax.lastfmRadio(songId: id, title: title, artist: artist, scope: .store)
+            }
+        }
+        #expect(transport.sent.count == before)
+    }
+
+    @Test func readLeniently() throws {
+        // an answer that says nothing of itself: nothing could be had, asked again by the top-up's rule
+        let bare = try Self.read("{}")
+        #expect(!bare.enabled && bare.unavailable && bare.why == nil && bare.songs == nil)
+        // songs not a list: none could be had; [] none in the library
+        #expect(try Self.read(#"{"enabled": true, "unavailable": false, "songs": {}}"#).songs == nil)
+        #expect(try Self.read(#"{"enabled": true, "unavailable": false, "songs": []}"#).songs == [])
+        // a song without an id is left out; a why that isn't words is none
+        let odd = try Self.read("""
+            {"enabled": true, "unavailable": "no", "why": 3,
+             "songs": [{"id": "so-1", "title": "Roads", "artist": "Portishead"}, {"title": "Glory Box"}, "so-2",
+                       {"id": 4}]}
+            """)
+        #expect(odd.enabled && odd.unavailable && odd.why == nil)
+        #expect(odd.songs?.map(\.id) == ["so-1"])
+    }
+}

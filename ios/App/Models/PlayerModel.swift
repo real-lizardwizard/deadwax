@@ -140,6 +140,9 @@ final class PlayerModel {
     /// and its changes reach the unit. Debug's Muffle and the unit's rows are EQModel's since slice 3.
     @ObservationIgnored var eq: EQModel?
 
+    /// (Last.fm, slice A3) Radio and Autoplay: the queue's station and Autoplay's setting (PlayerModel+Station.swift).
+    let stations: StationKeeper
+
     // MARK: Info's readings (D8)
 
     /// The song an entry was queued from - every field Navidrome gave (Info's Format, Sample rate, Bit depth): the
@@ -262,6 +265,7 @@ final class PlayerModel {
     init(server: ServerModel, files: SongFiles) {
         self.server = server
         self.files = files
+        stations = StationKeeper(server: server)
         book = LoudnessBook(server: server)
         reporter = PlayReporter(server: server)
         reporter.speedChanged(speedControl.speed)
@@ -288,6 +292,7 @@ final class PlayerModel {
         // when the output in use goes - nothing on the iPhone (Platform)
         Platform.watchSleep(willSleep: { [weak self] in self?.willSleep() }, woke: { EngineTrace.note(MacPower.wakeNote) })
         Platform.watchOutputs { [weak self] in self?.outputGone(.coreAudio) }
+        stations.attach(self)
     }
 
     // MARK: playing
@@ -392,6 +397,27 @@ final class PlayerModel {
         if started { cancelRetry() }
         if let words = pick.notice(choice, started: started) { say(words) }
         return true
+    }
+
+    /// (Last.fm, slice A3) A station's songs at the end of the list (QueueController.appendStation - withStation), each
+    /// at the songs level as a playlist's play queues them (PlaylistPlay.plan), their albums remembered beside the
+    /// queue's and the songs shelved for Info and the stream cache, as Add to Queue's are. Sent straight to the
+    /// controller, as the library's shuffle's pages are (ShuffleFeedLoop): an append, never a listener's action, so a
+    /// join the engine made meanwhile is a join. It never starts the music (PlayerModel+Station.swift's StationKeeper).
+    func appendStation(_ songs: [Song]) {
+        guard let controller, !songs.isEmpty else { return }
+        let plan = PlaylistPlay.plan(songs, setting: normalization) { [played] (id: String) -> Album? in played.get(id) }
+        let keeping = QueueAlbums.named(entries.map(\.track) + plan.tracks)
+        for each in plan.albums { played.also(each, keeping: keeping) }
+        shelve(songs)
+        controller.appendStation(plan.tracks)
+    }
+
+    /// (Last.fm, A3's review) Autoplay turned off: its songs - the list's source from `start` on - out of the queue
+    /// (QueueController.removeStation, withoutStation), as a removal is made.
+    func removeStation(from start: Int) {
+        guard let controller else { return }
+        act { controller.removeStation(from: start) }
     }
 
     /// The notice capsule says `words` for `Notice.seconds` (D11), and VoiceOver reads them - announced here, once per
@@ -667,6 +693,7 @@ final class PlayerModel {
         reporter.keep = { [weak downloads] songID, timeMs in downloads?.keepPlay(songID: songID, timeMs: timeMs) }
         book.reachable = { [weak reachability] in reachability?.online ?? true }
         book.kept = { [weak downloads] album in downloads?.keptLoudness(album) }
+        stations.connect(downloads: downloads, reachability: reachability)
         //? resume made for whoever the launch already has: one opened from the kept /me is .ready before this model
         //? watches, and /me answering the same (or not at all, offline) changes nothing it watches. Here, not in init,
         //? so the controller reads the person's kept queue through `downloads` (7.5)

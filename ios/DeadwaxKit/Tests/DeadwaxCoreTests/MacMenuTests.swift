@@ -77,6 +77,41 @@ import Testing
         // the words check 416 names
         #expect(shuffleLabel(.yours) == "Shuffle - shuffling your whole library")
         #expect(shuffleLabel(.store) == "Shuffle - shuffling all music")
+        // (Last.fm, A3) a station's queue isn't shuffled: its songs come in the order Last.fm gave them - (A3's review)
+        // but Shuffle already on can still be turned off
+        state.paged = nil
+        state.station = true
+        #expect(MacMenu.item(.shuffle, state).ticked && MacMenu.item(.shuffle, state).enabled)
+        state.shuffle = false
+        #expect(!MacMenu.item(.shuffle, state).ticked && !MacMenu.item(.shuffle, state).enabled)
+        state.station = false
+        #expect(MacMenu.item(.shuffle, state).enabled)
+    }
+
+    /// (Last.fm, slice A3) Autoplay: a tick after Repeat's submenu, the Queue chip's word, ticked while it is on - and
+    /// only while Last.fm is on; with nothing queued, dimmed and unticked as the rest.
+    @Test func autoplayIsATickAfterRepeatWhileLastfmIsOn() {
+        var state = Self.playing
+        #expect(!Self.items(state).contains { $0.command == .autoplay })
+        state.lastfm = true
+        let sections = MacMenu.controls(state).map { $0.map(\.command) }
+        #expect(sections[2] == [.shuffle, .repeatOff, .repeatAll, .repeatOne, .autoplay])
+        #expect(MacMenu.item(.autoplay, state) == MacMenu.Item(command: .autoplay, words: LastfmWords.autoplay,
+                                                               shortcut: nil, enabled: true, ticked: false))
+        #expect(MacMenu.item(.autoplay, state).words == "Autoplay")
+        state.autoplay = true
+        #expect(MacMenu.item(.autoplay, state).ticked && MacMenu.item(.autoplay, state).enabled)
+        // a library's shuffle doesn't dim it: it is the device's setting, used once the shuffle is over
+        state.paged = .yours
+        #expect(MacMenu.item(.autoplay, state).enabled)
+        // nothing queued: dimmed, unticked, though it is on
+        let idle = MacMenu.State(lastfm: true, autoplay: true)
+        #expect(!MacMenu.item(.autoplay, idle).enabled && !MacMenu.item(.autoplay, idle).ticked)
+        // Last.fm off: never ticked, even kept on
+        var off = Self.playing
+        off.autoplay = true
+        #expect(!MacMenu.item(.autoplay, off).ticked && !MacMenu.item(.autoplay, off).enabled)
+        #expect(MacMenu.key(.autoplay) == nil)
     }
 
     @Test func aTextFieldKeepsItsOwnKeys() {

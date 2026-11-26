@@ -121,7 +121,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 111
+ROUTE_COUNT = 112
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -2294,6 +2294,76 @@ def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
     # and LastfmLink reads the host as written, as urlparse does (a percent in it refused)
     assert "URLComponents(string: text)?.percentEncodedHost, !written.contains(\"%\")" in _code(
         (CORE / "Lastfm.swift").read_text(encoding="utf-8"))
+
+
+def test_the_radios_answer_is_what_the_app_decodes():
+    # (Last.fm, slice A3) GET /deadwax/lastfm/radio (server 2.1.44): asked with the song's id, title and artist and the
+    # asker's scope - all four, each within the route's limits - and every answer it builds holding what LastfmRadio
+    # reads: the songs Song decodes, null when none could be had, [] for a definite nothing
+    from src import lastfm as lastfm_rules
+    from src.routes import lastfm as lastfm_route
+    from src.routes import navidrome as navidrome_route
+
+    route = app_routes()[("GET", "/deadwax/lastfm/radio")]
+    params = {field.alias: field for field in route.dependant.query_params}
+    assert set(params) == {"song_id", "title", "artist", "scope"} and all(f.required for f in params.values())
+    assert declared_query("lastfmRadio") == ["song_id", "title", "artist", "scope"]
+    # the app's limits are the route's: an id of ID_MAX, a title and an artist of WORDS_MAX, trimmed as it trims them
+    station = (CORE / "Station.swift").read_text(encoding="utf-8")
+    assert f"public static let idMost = {navidrome_route.ID_MAX}\n" in station
+    assert f"public static let wordsMost = {lastfm_route.WORDS_MAX}\n" in station
+    assert "let title = PyText.strip(title)" in station and "let artist = PyText.strip(artist)" in station
+    assert "title, artist = whole(title).strip(), whole(artist).strip()" in inspect.getsource(lastfm_route.lastfm_radio)
+    # the scope: the route's two words, PagedScope's
+    assert 'scope: Literal["yours", "store"] = Query(...)' in inspect.getsource(lastfm_route.lastfm_radio)
+    assert re.search(r"public enum PagedScope: String, Sendable \{\s*case yours, store\s*\}",
+                     (CORE / "UpNextTypes.swift").read_text(encoding="utf-8"))
+    body = re.sub(r"\s+", " ", swift_function("DeadwaxClient.swift", "lastfmRadio"))
+    assert ('query: [("song_id", ask.songId), ("title", ask.title), ("artist", ask.artist), '
+            '("scope", scope.rawValue)])') in body
+    assert "guard let ask = Station.Ask(songId: songId, title: title, artist: artist) else {" in body
+    # what the app reads
+    read = fields("LastfmRadio")
+    assert read == {"enabled": False, "unavailable": False, "why": True, "songs": True}
+    song_fields = fields("Song")
+    song = {"id": "so-np", "title": "New Person, Same Old Mistakes", "artist": "Tame Impala", "album": "Currents",
+            "albumId": "al-Currents", "duration": 240}
+    refusal = lastfm_rules.Refused(10, "Invalid API key", 0.0)
+    answer = lastfm_rules.Answer
+    answers = [lastfm_rules.no_key_radio(),
+               lastfm_rules.radio_answer(answer({}), answer({}), [song], None),
+               lastfm_rules.radio_answer(answer({}), lastfm_rules.NotKnown(), [], None),
+               lastfm_rules.radio_answer(answer({}), None, [], None),
+               lastfm_rules.radio_answer(None, None, None, refusal),
+               lastfm_rules.radio_answer(answer({}), answer({}), None, None, "too big")]
+    for one in answers:
+        assert set(one) == set(read), one
+        assert_decodes("LastfmRadio", one, read)
+    # songs, a definite nothing, none could be had: songs nil is the app's failure, asked again by the top-up's rule
+    assert [one["songs"] for one in answers] == [None, [song], [], None, None, None]
+    assert not answers[0]["enabled"] and not answers[0]["unavailable"]
+    assert not answers[4]["enabled"] and answers[4]["unavailable"]
+    # the route answers within its 4 s for Last.fm, a cold scope's list read a page at a time besides: 30 s, past the
+    # transport's 8
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    assert "lastfmRadio: 30," in literal.group(1) and lastfm_route.RADIO_DEADLINE_S < 30
+    # the route's own answers as exported for the app's tests (tests/fixtures/lastfm/answers.py; tests/test_lastfm_radio.py
+    # holds the copy to the route): each read whole, its songs each a Song, each asked as the app asks
+    exported = json.loads((CORE.parent.parent / "Tests" / "DeadwaxCoreTests" / "Fixtures" / "lastfm" / "answers"
+                           / "radio.json").read_text(encoding="utf-8"))
+    assert exported["fixtures"] == "recorded" and len(exported["cases"]) == 10
+    for case in exported["cases"]:
+        assert set(case["answer"]) == set(read), case["name"]
+        assert_decodes("LastfmRadio", case["answer"], read)
+        for each in case["answer"]["songs"] or []:
+            assert set(each) <= set(song_fields), sorted(set(each) - set(song_fields))
+            assert required_fields("Song") <= {name for name, value in each.items() if value is not None}
+        query = case["query"]
+        assert set(query) == {"song_id", "title", "artist", "scope"}, case["name"]
+        assert 1 <= len(query["song_id"]) <= navidrome_route.ID_MAX and query["scope"] in {"yours", "store"}
+        for words in (query["title"], query["artist"]):
+            assert 1 <= len(words) <= lastfm_route.WORDS_MAX and words == words.strip()
 
 
 def declared_query(name: str) -> list[str]:

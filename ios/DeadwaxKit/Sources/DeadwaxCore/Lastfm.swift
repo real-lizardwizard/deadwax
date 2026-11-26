@@ -1,9 +1,9 @@
 import Foundation
 
 // Last.fm on the artist page (deadwax-plans/lastfm.md 2.5, 2.7, 3.7; notes/ios.md "Last.fm, slice A1"): what deadwax
-// says of Last.fm in /me, its answer for an artist (`GET /deadwax/lastfm/artist`), the key a top song meets a library
-// song by, and the one host its links may go to. deadwax asks Last.fm itself and keeps its answers; the app only reads
-// deadwax's.
+// says of Last.fm in /me, its answer for an artist (`GET /deadwax/lastfm/artist`) and (slice A3) for a radio
+// (`GET /deadwax/lastfm/radio`), the key a top song meets a library song by, and the one host its links may go to.
+// deadwax asks Last.fm itself and keeps its answers; the app only reads deadwax's.
 
 /// What deadwax says of Last.fm (`/me`'s `lastfm`, server 2.1.36): `on` with a key Last.fm takes, `off` with no
 /// LASTFM_API_KEY, `refused` while Last.fm refuses the key. `absent` is an older deadwax, with no `lastfm` in /me at
@@ -124,6 +124,39 @@ public struct LastfmArtist: Decodable, Sendable, Equatable {
     static func count(_ value: Int?) -> Int? {
         guard let value, value >= 0 else { return nil }
         return value
+    }
+}
+
+/// (Last.fm, slice A3 - lastfm.md 2.6, server 2.1.44) deadwax's answer for a radio (`GET /deadwax/lastfm/radio`): songs
+/// of the asker's library (their scope's) Last.fm calls similar to a song, in the order deadwax made - each one
+/// Navidrome's, read as Song reads a song (only its id is needed; one that doesn't read is left out). `songs` nil is
+/// "couldn't be made just now" - Last.fm or Navidrome away, the library too big, the key refused, no key - and is asked
+/// again (Station); `[]` is a definite nothing: nothing in the library is similar. `enabled` false with no key or a key
+/// refused, `why` its words for whoever runs deadwax. Read leniently, as LastfmArtist is: an answer that doesn't say it
+/// is enabled is off, one that doesn't say it is whole isn't.
+public struct LastfmRadio: Decodable, Sendable, Equatable {
+    public let enabled: Bool
+    public let unavailable: Bool
+    public let why: String?
+    public let songs: [Song]?
+
+    enum CodingKeys: String, CodingKey {
+        case enabled, unavailable, why, songs
+    }
+
+    public init(enabled: Bool = true, unavailable: Bool = false, why: String? = nil, songs: [Song]?) {
+        self.enabled = enabled
+        self.unavailable = unavailable
+        self.why = why
+        self.songs = songs
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = fields.looseField(Bool.self, .enabled) ?? false
+        unavailable = fields.looseField(Bool.self, .unavailable) ?? true
+        why = fields.looseField(String.self, .why)
+        songs = fields.looseList(Song.self, .songs)
     }
 }
 

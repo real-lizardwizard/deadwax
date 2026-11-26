@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 111)
+        #expect(Routes.all.count == 112)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -440,7 +440,9 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // name's sign-in throttle and Navidrome's login; Make account, Reset, the admin flip and Remove, 300 s, and
         // Forget and the permissions, 240 s - each after the one write lock, which another write may hold for a reset's
         // 130 s (PeopleWaits); Lock the transport's own 8 s, the unlock forgotten in memory
-        let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.autoEqSearch: 20, Routes.autoEqProfile: 20,
+        // (Last.fm, A3) the radio, 30 s: a cold scope's list read a page at a time, and Last.fm's 4 s besides
+        let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.lastfmRadio: 30, Routes.autoEqSearch: 20,
+                                          Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 120,
                                           Routes.discography: 60, Routes.jobs: 20, Routes.cancelJob: 30,

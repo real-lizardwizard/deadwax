@@ -929,3 +929,64 @@ public func withMore(_ queue: UpNextQueue, token: String, tracks: [QueueTrack], 
         }
     }
 }
+
+/// (Last.fm, slice A3 - lastfm.md 3.5; the phone's own, not the web's) A station's songs - Start Radio's, Autoplay's -
+/// at the end of this time round's list, as the list's own songs: `source` grows by them, each mark the list's
+/// (`{key: nextKey + i, from: .source, at: the old source count + i, pass: the round's}`), `nextKey` moved on - so a
+/// resumed queue on the web is a longer list. The same queue unless Repeat is Off (`mode`), the queue has Up Next's
+/// account and a song playing, isn't a library's shuffle (its feed appends there), and there are songs. Nothing that
+/// was there moves: no existing function changes, so the web-traced vectors hold as they are.
+public func withStation(_ queue: UpNextQueue, _ tracks: [QueueTrack], _ mode: Repeat) -> UpNextQueue {
+    guard mode == .off, let state = queue.upNext, state.paged == nil, queue.current != nil, !tracks.isEmpty else {
+        return queue
+    }
+    //? the round of the list's last song (pass never goes down along the queue); 0 for a queue with none of the list's
+    let last = lastSourceAt(state.marks, state.marks.count - 1)
+    let pass = last < 0 ? 0 : state.marks[last].pass
+    let marks = tracks.indices.map { Mark(key: state.nextKey + $0, from: .source, at: state.source.count + $0, pass: pass) }
+    return rebuilt(queue, state, queue.tracks + tracks, state.marks + marks) { more in
+        more.source += tracks
+        more.nextKey = state.nextKey + tracks.count
+    }
+}
+
+/// (Last.fm, slice A3's review) Autoplay turned off: the station's songs - the list's source from `start` on, what
+/// withStation appended - out. Every entry after the song playing of one of them goes, with its copies (in any time
+/// round: Repeat All turned on since keeps them, as queued songs, until now); then the source's tail from `start` on
+/// that no entry left plays, and the songs taken out of the round (`left`) among it. An Autoplay song that has played,
+/// or is playing, keeps its place in the source - the queue keeps it, and every song before it there - so nothing
+/// before the song playing changes (`tracks[0...index]` and `marks[0...index]` as they were). `reached`, a unit taken
+/// out, moves to the unit before it after the song playing, or none. `nextKey` stays: keys are never used twice. The
+/// same queue when nothing of the station's is left to take, or for a library's shuffle (no station is made of one).
+/// No existing function changes, so the web-traced vectors hold as they are.
+public func withoutStation(_ queue: UpNextQueue, from start: Int) -> UpNextQueue {
+    guard let state = queue.upNext, state.paged == nil, start >= 0, start < state.source.count,
+          state.marks.indices.contains(queue.index) else { return queue }
+    //? after the song playing's unit: its own copies stay with it
+    let after = unitEnd(state, queue.index)
+    var gone = Set<Int>()
+    var place = after
+    while place < state.marks.count {
+        let end = unitEnd(state, place)
+        let mark = state.marks[place]
+        if mark.from == .source && mark.at >= start { gone.formUnion(place..<end) }
+        place = end
+    }
+    //? the source's tail kept down to the last item an entry left still plays (a played song's, or its copies')
+    var count = state.source.count
+    let played = Set(state.marks.enumerated().filter { !gone.contains($0.offset) && $0.element.from != .added }
+        .map(\.element.at))
+    while count > start && !played.contains(count - 1) { count -= 1 }
+    if gone.isEmpty && count == state.source.count { return queue }
+    let (tracks, marks) = kept(queue, state) { !gone.contains($1) }
+    //? the furthest unit played (a roll-back's), taken out: the unit before it after the song playing, else none
+    let reachedAt = state.reached.flatMap { key in state.marks.firstIndex { $0.key == key } }
+    let before = reachedAt.flatMap { at in
+        unitsIn(state, after, at).last { !gone.contains($0) }
+    }
+    return rebuilt(queue, state, tracks, marks) { next in
+        next.source = Array(state.source.prefix(count))
+        next.left = state.left.filter { $0.at < count }
+        if let reachedAt, gone.contains(reachedAt) { next.reached = before.map { state.marks[$0].key } }
+    }
+}

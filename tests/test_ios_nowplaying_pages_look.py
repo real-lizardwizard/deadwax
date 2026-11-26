@@ -197,8 +197,9 @@ def test_the_queues_rows_and_foot_on_the_phone():
     assert "playingRow(playing)\n                                        .id(Self.card)" in body
     assert "heading(QueuePageWords.nowPlaying)" not in queue and "heading(UpNextWords.playingNext)" not in queue
     assert "nowPlaying" not in bare(TIME_LEFT)
-    assert len(re.findall(r"(?<![\w.])heading\(", body)) == 1, "the list's alone"
-    assert "heading(QueuePageWords.heading(list.title))" in body
+    #? (Last.fm, A3) and Autoplay's, over the rows Autoplay gave the queue - the list's tail (Station.split)
+    assert len(re.findall(r"(?<![\w.])heading\(", body)) == 2, "the list's, and Autoplay's"
+    assert "heading(QueuePageWords.heading(list.title))" in body and "heading(LastfmWords.autoplay)" in body
     assert "QueuePageWords.showsLines(list.rows, title: list.title)" in body
     playing = member(queue, "private func playingRow")
     for part in (".foregroundStyle(DWPalette.selt)", ".lookHeight(DWLook.here.tallRowHeight)", ".background(DWPalette.selbg)",

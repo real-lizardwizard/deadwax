@@ -301,6 +301,21 @@ public final class QueueController {
         edit { withMore($0, token: token, tracks: tracks, next: next) }
     }
 
+    /// (Last.fm, slice A3) A station's songs at the end of the list (withStation) - an edit like Add to Queue's, held
+    /// for the join in a song's last moments as any is, so the engine prepares the new next entry as it does after Add
+    /// to Queue on a last song. It never starts the music: a queue played out keeps them for Play. Under Repeat All or
+    /// One (as it is when asked, as setShuffle's edit reads it) it appends nothing.
+    public func appendStation(_ tracks: [QueueTrack]) {
+        let mode = repeatMode
+        edit { withStation($0, tracks, mode) }
+    }
+
+    /// (Last.fm, slice A3's review) Autoplay turned off: its songs - the list's source from `start` on - out of the
+    /// queue (withoutStation), an edit as a removal is: held for the join in a song's last moments, never a play.
+    public func removeStation(from start: Int) {
+        edit { withoutStation($0, from: start) }
+    }
+
     // MARK: moving
 
     /// Next: past Repeat One's copies to the next song. On Repeat All's last song, begun too lately for its top-up,

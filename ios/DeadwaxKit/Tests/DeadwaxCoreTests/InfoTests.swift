@@ -222,6 +222,10 @@ import Testing
     @Test func theMoreButtonSaysWhatTheMenuHolds() {
         #expect(NowPlayingWords.more(hasAlbum: true) == "More: info, go to album")
         #expect(NowPlayingWords.more(hasAlbum: false) == "More: info")
+        // (Last.fm, A3) Start Radio after Go to album, before the downloads and the EQ
+        #expect(NowPlayingWords.more(hasAlbum: true, download: true, eq: true, playlist: true, radio: true)
+            == "More: info, add to a playlist, go to album, start radio, download, EQ")
+        #expect(NowPlayingWords.more(hasAlbum: false, radio: true) == "More: info, start radio")
     }
 }
 

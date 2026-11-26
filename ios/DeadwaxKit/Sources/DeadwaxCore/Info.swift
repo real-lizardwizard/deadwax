@@ -428,9 +428,12 @@ public enum NowPlayingWords {
     /// The ••• button's name: what the menu holds - "add to a playlist" while it is offered (Phase 4, slice 2: deadwax
     /// in reach), "Go to album" only for a song that names its album, and "download" while this phone's downloads can
     /// be used (Phase 2) - NowPlaying.tsx's `More: info, add to a playlist, go to album, pin`, without what the app
-    /// hasn't got. And ", EQ" last, always, once the EQ is in (eq.md 3.1, 3.13).
-    public static func more(hasAlbum: Bool, download: Bool = false, eq: Bool = false, playlist: Bool = false) -> String {
-        let base = "More: info\(playlist ? ", add to a playlist" : "")\(hasAlbum ? ", go to album" : "")\(download ? ", download" : "")"
+    /// hasn't got. And ", EQ" last, always, once the EQ is in (eq.md 3.1, 3.13). (Last.fm, slice A3) ", start radio"
+    /// after Go to album while Start Radio is offered (Last.fm on, deadwax in reach).
+    public static func more(hasAlbum: Bool, download: Bool = false, eq: Bool = false, playlist: Bool = false,
+                            radio: Bool = false) -> String {
+        let base = "More: info\(playlist ? ", add to a playlist" : "")\(hasAlbum ? ", go to album" : "")"
+            + "\(radio ? ", start radio" : "")\(download ? ", download" : "")"
         return eq ? EQWords.moreName(base) : base
     }
 }

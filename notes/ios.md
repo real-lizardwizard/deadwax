@@ -22749,3 +22749,287 @@ All 32 were caught, and every file was restored and `cmp`'d against its copy.
   - a tile held to the page's width at AX5, which depends on the width `onGeometryChange` reports;
   - the two Toggle items drawn as the menu's checkmarks, in the phone's menu and in the Mac's pop-up;
   - VoiceOver saying "Opens once deadwax is back" on a dimmed tile.
+
+## Last.fm, slice A3 (2026-11-26)
+
+Last.fm's third app slice, **A3** of ~/Desktop/Code/deadwax-plans/lastfm.md (2.6, 3.5-3.8, section 4's A3, checks
+494-502, section 7, and section 8's binding answer: **Autoplay is off by default**): **Start Radio** and **Autoplay**,
+on the iPhone and the Mac alike. The server's half is S5, main's **2.1.44** (notes/lastfm.md "S5"), already on this
+branch: `GET /deadwax/lastfm/radio`, the songs of the asker's scope Last.fm calls similar to a song, the whole list at
+once. Not in it: About (A4). What it leaves alone:
+- src/ and ui/ are untouched; the app is still 0.13 (13); **ios/Deadwax.xcodeproj is untouched** (the new App file in
+  the synchronized folder, the Core file and the tests found by folder).
+- **No diff to DeadwaxAudio, App/AudioSessionController.swift or the engine**: a station's songs reach the engine as
+  Add to Queue's do, through QueueController's edit path (`replaceUpcoming`, held for a join).
+- **UpNext.swift and QueueController.swift gain one function each, additively** (`withStation`, `appendStation`); no
+  existing function changed, so UpNextTests, UpNextTraceTests and UpNextPropertyTests - the web-traced vectors - run
+  as they were.
+- `DeadwaxClient` grows by one route, `lastfmRadio(songId:title:artist:scope:)` (the count 111 to 112), its answer
+  `LastfmRadio`, read loosely.
+- Nothing of R12's (NeedsLookScreen, EditAlbumSheet's queue bar, MacNeedsALook, App/Shared/Routes.swift).
+
+### What was built
+
+**Core (pure, tested on Linux and macOS):**
+- `Station.swift` (new): `Station` - `kind` (`radio`, Start Radio's, its songs the list itself; `autoplay`, begun at a
+  queue's end from its LAST entry), `seed`, `queueId` (UpNextState.id: a station belongs to its queue), `songs` (the
+  answer's, at most `most` 100), `next` (where `take` stopped), `asks`, `asking`, `failure` (the entry playing as it
+  failed, and when), and Autoplay's `added` (the ids it gave) and `floor` (the queue's next key as it first gave any).
+  `lowWater` 2, `batch` 10, `tries` 3, `againSeconds` 30. `radio(_:)` and `autoplay(_:)` make one of a queue; `Ask` -
+  the id, title and artist, trimmed as the route trims them (`PyText.strip`), nil for one missing or past the route's
+  limits (ID_MAX 256, WORDS_MAX 500), so a 422 is never asked for; `mayAsk(playing:now:)` (no answer yet, none out,
+  under three asks, and after a failure another entry playing or 30 s gone); `againAt`; `began()`; `answered(_:playing:
+  now:)` - `.songs`, `.nothing` (`[]`, a definite nothing) or `.failed` (no answer, or `songs` null); `exhausted`;
+  `take(_:here:)` - the next ten from the pointer, never a song the queue holds (by id, History's included, or by
+  `SongTitle.key(title)` and `Fold.key(artist)`), never the seed (even once the queue lacks it), and with `here` given
+  (offline) only songs on the device; every song looked at passed for good, so one taken out of the Queue isn't added
+  back - but (after review) one passed only for not being on the device kept in `later`, looked at first by the next
+  take, and counted by `exhausted`. `wantsMore(_:mode:lastfm:station:autoplay:)` - Last.fm on, Repeat Off, not a
+  library's shuffle, a song playing, a station of this queue's or Autoplay on, and `following` (after review: every
+  entry after the one playing but Repeat One's copies) at `lowWater` or under. `inList` (after review) - a radio's,
+  or Autoplay's once it has given songs: what dims Shuffle. Autoplay's `start` (after review) - the source's count as
+  it first gave, what turning it off takes out from. `split(_:_:_:)` - the Queue's list
+  as the list's own rows under their own title (the source less Autoplay's songs: "From Mezzanine", not "Still to
+  play") and Autoplay's, the list's tail: the longest run at its end of `.source` marks from `floor` on whose songs
+  Autoplay gave; nothing split for a radio, another queue's station, a list with more than is drawn, or none; a list
+  all Autoplay's is nil. (`autoplayKeys` went at review: withoutStation, from `start`, replaced it.)
+  `Autoplay` - UserDefaults `deadwax-player-autoplay`, `on` alone on (`read`), `stored`.
+- `UpNext.swift`: `withStation(_:_:_:)` - the songs at the end of this time round's list as the list's own (`source`
+  grows; each mark `{key: nextKey + i, from: .source, at: the old source count + i, pass: the list's last song's}`;
+  `nextKey` on), through `rebuilt` as withMore is; the same queue unless Repeat is Off, the queue has Up Next's account,
+  a song playing and no `paged`, and there are songs. (After review) `withoutStation(_:from:)` - see "After review".
+- `QueueController.swift`: `appendStation(_:)` - `edit { withStation($0, tracks, repeatMode) }`, an edit like Add to
+  Queue's: held for a join in a song's last moments (D4) and made at the next tick, never a play. (After review)
+  `removeStation(from:)` - `edit { withoutStation($0, from: start) }`, the same kind of edit.
+- `Lastfm.swift`: `LastfmRadio` (`enabled` absent false, `unavailable` absent true, `why`, `songs` - `looseList`, a
+  song without an id left out; null or not a list nil). `Routes.swift`: `lastfmRadio` (query `song_id`, `title`,
+  `artist`, `scope`) with 30 s (`timeouts`: a cold scope's list is read a 2,000-song page at a time, and Last.fm's 4 s
+  besides). `DeadwaxClient.swift`: `lastfmRadio(songId:title:artist:scope:)` - nothing asked without an `Ask`.
+- `MacMenu.swift`: `State.lastfm`, `.autoplay`, `.station` (before `rowSize`, so MacCommands' state still ends with
+  the Row Size store's); `Command.autoplay`, Controls' tick after Repeat's three while Last.fm is on (no key), enabled
+  with something queued, ticked while on; Shuffle dimmed with a station while it is off.
+- `LastfmWords.swift`: `startRadio` "Start Radio" (`dot.radiowaves.left.and.right`), `autoplay` "Autoplay"
+  (`infinity`), `autoplayHint`, `autoplaySaid(_:)` ("Autoplay on" / "Autoplay off"), `noSimilarSongs`, `radioFailed`.
+  `Info.swift`: `NowPlayingWords.more(... radio:)` - ", start radio" after Go to album.
+
+**App:**
+- `Models/PlayerModel+Station.swift` (new): `StationKeeper` (the player's `stations`, made with it): the station, the
+  setting (read from UserDefaults once, written on each change), the ask (`client.lastfmRadio` with the scope the
+  Shuffle uses, `ShuffleOf.library.scope(library: AlbumScope.albums(for: server.me))`; never offline; a seed without
+  an ask answered `[]` at once), the retry (a DispatchWorkItem at `againAt`), the notices (a radio's: "No similar songs
+  in your library." for `.nothing`, "Couldn't start the radio just now." for its first `.failed`; Autoplay says
+  nothing) and the top-up's watch - `withObservationTracking` over the queue, Repeat, the setting, `access.lastfm` and
+  `online`, nothing else, outside every view. `check()`: a station of another queue dropped, nothing while an edit is
+  held (the queue it would be made against isn't the one in hand), then `wantsMore` - Autoplay's station begun from the
+  last entry, its next songs taken (offline, `downloads.isHere` only) and appended, or its answer asked for.
+  `setAutoplay` off (after review): `letAutoplayGo()` - Autoplay's station dropped and `player.removeStation(from:
+  start)` - a radio's never; while an edit is held, nothing yet, and `check()` makes it once the held edit has landed,
+  before `wantsMore`. PlayerModel's `startRadio(_:)`: `play(playlist: [song], at: 0)` - the existing call, in the tap,
+  nothing awaited - then `stations.radioStarted(song)` (the station of the queue that play made, its seed checked to
+  be the song, asked at once). `autoplay`, `setAutoplay`, `hasStation` (`has`: this queue's station, `inList`),
+  `stationHoldsShuffle` (after review: `hasStation && !shuffle` - what dims every Shuffle), `stationSplit`.
+- `Models/PlayerModel.swift`: `stations`, attached in init and connected with the downloads and the reach;
+  `appendStation(_:)` - PlaylistPlay.plan at the Normalization setting's songs level, the albums remembered as Add to
+  Queue's are, the songs shelved, then `controller.appendStation` straight (as ShuffleFeedLoop's pages are: not a
+  listener's action, so a join meanwhile stays a join). (After review) `removeStation(from:)` - `act {
+  controller.removeStation(from:) }`, as a removal is made.
+- `Player/QueueMenu.swift`: `QueueMenuRequest.radioSong` - one song, not queued as an album, not a playlist's whole
+  (`wholeList`); Start Radio after Add to a playlist… while Last.fm is on, deadwax is reached and the album isn't gone -
+  so every one-song ••• and a song's right-click on the Mac (which draw QueueMenuItems).
+- `Player/NowPlayingMenu.swift`: Start Radio after Go to album for the song playing, on the same terms; the button's
+  name says ", start radio" then.
+- `UpNext/UpNextScreen.swift`: the phone's foot - Autoplay after Repeat, the flat DWButtonStyle button Shuffle's and
+  Repeat's are, lit and `isSelected` while on, its hint; the Mac's panel - the chip (`infinity`) after Repeat's, the
+  hint on `Chip`; Autoplay's rows under their own heading (the phone's `heading`, the Mac's section header), drawn as
+  a part of the list's one group (`rows(_:lines:part:next:)`, `mover(_:from:)` counting from the part's start, so a
+  move or a removal is the list's); Shuffle dimmed with a station while off (`stationHoldsShuffle`, and
+  `toggleShuffle` refusing), as for `paged`; `toggleAutoplay` announcing "Autoplay on" / "Autoplay off". (After review)
+  the Mac's chips in a `ViewThatFits`: the three on one line, else Autoplay on a line of its own under Shuffle and
+  Repeat (`shuffleChip`, `repeatChip`, `autoplayChip`, `chipGap` 8), capped at xxxLarge.
+- `Shared/MacCommands.swift`: the state's `lastfm`, `autoplay`, `station`; the tick after Repeat's submenu; its click
+  the chip's own call.
+- `Player/NowPlayingView.swift`, `Player/PlayerBar.swift`: Shuffle dimmed with a station while off
+  (`stationHoldsShuffle`), as for `paged` - one line each.
+  Now Playing's is inside the transport R4b pinned, so test_ios_now_playing_look.py's `TRANSPORT_DIGEST` moves with
+  it (noted beside it) - the one pinned thing this slice changes, for 3.5's "as it is for paged" and check 497.
+
+### Decisions, and where this departs from the plan
+
+- **Autoplay is off by default** (section 8, answer 1): `Autoplay.read` is on only for a stored `on`.
+- **`lowWater` 2 counts entries after the one playing**, as 3.5 says; so Autoplay's rows appear on the album's
+  THIRD-to-last song (two follow it). Check 496 said "on its second-to-last song" - the spec's off-by-one, decided at
+  review: lowWater stays 2, and docs/ios.md's 496 now says "when two songs are left after the one playing".
+- **Autoplay's rows are told by the songs it gave and a floor key**, not by recorded keys: an append held for a join
+  is made later against the queue as it is then, so its keys can't be known as the songs are taken. A row of the
+  list's own, or one added with Add to Queue (`.added`), is never Autoplay's.
+- **Start Radio from Now Playing restarts the song**: 3.5's tap is `play(playlist: [song], at: 0)`, a new queue; the
+  song plays from its start. Kept at review, and said plainly in docs/ios.md and check 494.
+- **Shuffle is dimmed with a station on Now Playing, the Mac's player bar and Controls too**, not only the Queue's
+  chip (3.5 names the chip, "as it is for paged" - and paged dims all four). Kept at review, with the digest redone -
+  and (after review) only while Shuffle is off, and only once the station's songs are in the list.
+- **The top-up waits while an edit is held**, and runs again as the held edit lands (the queue changes).
+- ~~A song skipped offline is passed for good~~ (changed at review: kept for later - see "After review").
+- **Start Radio is left out for an album gone from the collection** (`request.gone`), as Add to a playlist… is.
+- **The notices**: "Couldn't start the radio just now." only on a radio's FIRST failed ask - the retries are quiet.
+- **The radio's notice on a song with no ask** (a title or artist blank or too long) is "No similar songs in your
+  library.": nothing can be asked, so nothing will come.
+- **`withStation` takes the pass of the list's last song**, so after Repeat All was turned off mid-round the songs
+  follow that round; it doesn't move History's start or anything before the end.
+
+### Words added (iphone.json and mac.json, by hand, the same seven in each)
+
+`LastfmWords.startRadio` "Start Radio", `LastfmWords.autoplay` "Autoplay", `LastfmWords.autoplayHint` "Keeps playing
+similar songs from your library when the queue ends.", `LastfmWords.autoplaySaid(on)` "Autoplay on",
+`LastfmWords.autoplaySaid(off)` "Autoplay off", `LastfmWords.noSimilarSongs` "No similar songs in your library.",
+`LastfmWords.radioFailed` "Couldn't start the radio just now.". None says "Up Next": the word is Queue.
+
+### Tests, and the faults they were seen failing on
+
+New: `StationTests.swift` (18 - StationAskTests, StationTakeTests, StationTopUpTests), `WithStationTests.swift` (8 -
+WithStationTests, and AppendStationTests on QueueController with the fake engine: an edit like Add to Queue's, held for
+a song's last moments then made, never starting the music, nothing under Repeat), `LastfmRadioDecodeTests` in
+LastfmDecodeTests.swift (the route's own answers over Fixtures/lastfm/answers/radio.json, the ask as the app makes it
+with its 30 s, a song without an ask never asked, read leniently), MacMenuTests' `autoplayIsATickAfterRepeatWhileLastfmIsOn`,
+DeviceWordsTests' seven keys, InfoTests' `more(radio:)`; ClientTests' count 112 and its 30 s; and
+`tests/test_ios_lastfm_a3.py` (14: Start Radio in the tap, nothing awaited or begun before the play; in every one-song
+menu and Now Playing's, only with Last.fm on and deadwax reached; the chip after Repeat on both, the Controls tick; the
+phone's button flat; the foot fitting at xxxLarge; Autoplay's heading; Autoplay off; the watch outside every view; the
+word is Queue; Autoplay never playing), test_ios_contract.py's `test_the_radios_answer_is_what_the_app_decodes`,
+test_ios_mac.py's state, perform and Command list, test_ios_nowplaying_pages_look.py's heading count,
+test_ios_now_playing_look.py's transport digest. (MacMenu.State's three new arguments come before `rowSize`, so the
+state MacCommands builds still ends with the Row Size store's, as test_ios_mac_rows.py reads it.)
+
+Each fault was made alone in the source, the suites run, the test named seen failing, and the bytes restored:
+
+| fault | caught by |
+| --- | --- |
+| `take` re-queues a song the queue has, by id | historysSongsCountAsTheQueues, neverASongTheQueueHasNorTheSeed, theSeedIsPassedEvenWhenTheQueueNoLongerHasIt |
+| ... by title and artist | neverASongTheQueueHasNorTheSeed, theSeedIsPassedEvenWhenTheQueueNoLongerHasIt |
+| the seed taken twice | theSeedIsPassedEvenWhenTheQueueNoLongerHasIt |
+| a top-up under Repeat All or One | eachGuardHoldsItBack |
+| a top-up of a paged queue | eachGuardHoldsItBack |
+| a top-up with Autoplay off and no station | eachGuardHoldsItBack |
+| offline, a song not on the device taken | offlineOnlySongsOnTheDeviceAndEachLookedAtOnce |
+| a removed row coming back (the pointer reset) | aSongTakenOutOfTheQueueIsntAddedBack, offlineOnlySongsOnTheDeviceAndEachLookedAtOnce, tenAtATimeFromWhereTheLastTakeStopped |
+| a fourth ask | itIsAskedThreeTimesAtMostAndAgainOnlyLater |
+| Autoplay's append starting the music | anEditLikeAddToQueues, heldForASongsLastMomentsThenMade, neverStartsTheMusic |
+| Autoplay's rows never split off (Core) | autoplaysRowsAreTheListsTailUnderItsOwnHeading |
+| Shuffle enabled with a station (the Mac's Controls) | shuffleIsUpNextsAndALibrarysCantBeTurnedOff |
+| `withStation` appending under Repeat | nothingUnderRepeat, theSameQueueForEachGuard |
+| `withStation`'s source places wrong | afterSongsAddedAndTheListsOwn, theSongsJoinTheEndOfTheListAsItsOwn |
+| `withStation`'s keys not unique | aSongTakenOutOfTheQueueIsntAddedBack, afterSongsAddedAndTheListsOwn, autoplaysRowsAreTheListsTailUnderItsOwnHeading, theSongsJoinTheEndOfTheListAsItsOwn |
+| Autoplay off leaving its rows | test_autoplay_off_takes_its_rows_out_and_never_touches_a_radio |
+| Autoplay off removing a radio's rows | test_autoplay_off_takes_its_rows_out_and_never_touches_a_radio |
+| Shuffle enabled with a station (the Queue's foot) | test_shuffle_is_dimmed_while_the_queue_has_a_station |
+| Autoplay's rows not under the heading (the phone) | test_autoplays_rows_are_drawn_under_their_own_heading, test_ios_nowplaying_pages_look's test_the_queues_rows_and_foot_on_the_phone |
+| a station surviving a new queue | test_the_top_up_is_watched_outside_every_view_reading_only_what_it_needs |
+| a station asked offline | test_the_top_up_is_watched_outside_every_view_reading_only_what_it_needs |
+| Start Radio awaiting before the play | test_start_radio_plays_in_the_tap_and_asks_after |
+| the chip saying "Up Next" | test_the_chip_is_after_repeat_on_both_and_only_while_lastfm_is_on, test_the_word_is_queue |
+| the flat rule: the phone's Autoplay given a card's face | test_the_phones_new_button_is_flat, test_the_chip_is_after_repeat_on_both_and_only_while_lastfm_is_on |
+| Start Radio offered offline | test_start_radio_is_in_every_one_song_menu_while_lastfm_is_on_and_deadwax_reached |
+
+### After review (2026-11-26)
+
+The review found no binding rule broken, and seven things to fix; rebased onto ios's eb119050 (R12 and Search's field,
+no conflicts) first. Each fix, then each new fault made alone and seen failing, then restored:
+
+1. **Medium - Autoplay off left its songs in `source`.** Its rows went (withoutKey, a row at a time) but withStation's
+   `source += tracks` stayed: the heading turned "Still to play", Repeat All's line said "the list", and Repeat All
+   turned on at the last song queued 1, 2, 3, 1, 2, 3, r1, r2, r3. **Fixed with one more additive Core function,
+   `withoutStation(_:from:)`** (UpNext.swift; no existing function changed, every existing vector as it was): every
+   entry after the song playing's unit whose mark is the list's with `at >= start` goes with its copies (any round:
+   turning Repeat on keeps Autoplay's rows, decided - they're queued songs - so turning Autoplay off afterwards takes
+   the later rounds' too); then the source's tail from `start` down to the last item an entry left still plays (a
+   played or playing Autoplay song keeps its place, and so does everything before it - nothing at or before the index
+   changes); `left` loses what's past the new end; `reached`, if taken out, moves to the unit before it after the song
+   playing; `nextKey` stays. `Station.start` (the source count as Autoplay first gave - only withStation grows a
+   non-paged queue's source, and the take never runs while an edit is held, so the held append lands at that count),
+   `QueueController.removeStation(from:)` and `PlayerModel.removeStation(from:)` carry it; `autoplayKeys` went.
+   WithoutStationTests: the queue as it was before Autoplay (marks, source, `left`, the whole Queue view, Repeat All's
+   "Then Mezzanine again from the top.", the next round 1, 2, 3, 1, 2, 3 - and the review's bug shown, rows alone
+   taken out leaving "Still to play" and r1-r3 in the next round), the song playing and its Repeat One copies kept,
+   Repeat All's later rounds, rows swiped out before, a roll-back's furthest unit, and the same queue for each guard.
+2. **Low-medium - one offline top-up used the whole answer up.** `take` now keeps a song passed only for not being on
+   the device in `later`, looks at `later` first, and `exhausted` counts it; a song kept for later that the queue has
+   since got is passed for good. `offlineOnlySongsOnTheDeviceAndTheRestKeptForLater` (back online r2 and r5 come
+   first) and `oneOfflineTopUpNeverUsesTheAnswerUp` (100 songs, 2 on the device: not exhausted, the next take ten).
+3. **Low - Autoplay off while its append was held** landed the held withStation as ten plain rows. `setAutoplay(false)`
+   now only records the setting while `player.holdsAnEdit`; `check()` makes the removal (`letAutoplayGo`) once the held
+   edit has landed - the watch sees the queue change - before `wantsMore`. Pinned (test_ios_lastfm_a3.py); the Core
+   half (a removal is itself a held edit, made at the join, never a play) is AppendStationTests'
+   `autoplayOffIsAnEditHeldForTheJoinAndNeverAPlay`.
+4. **Low - `following` undercounted after a roll-back across Repeat All's rounds.** It now counts every mark after the
+   index but Repeat One's copies (`wantsMore` asks only under Repeat Off). `aRollBackAcrossRoundsCountsWhatItMovedBackDown`:
+   the second round playing, rolled back to the first round's song 2, Repeat off - four to come (it was one).
+5. **Fit - the Mac Queue panel's chips.** Worked out with tests/ios_fonts.py: a chip is 12 a side, its symbol (1.3 em,
+   taken wide), the Label's gap (8, taken wide) and its words in the medium face at the subheadline's size; the row is
+   400 less the panel's 1-point edge, the inset list's 20 a side and the row's 20 a side: 319. At the Mac's size (15)
+   the three need 367 with "Repeat one" (the review's ~365) and 337 even with "Repeat" - more than 319, and more than
+   the 335 of 16-a-side margins too - so `modes` is now a `ViewThatFits`: the three on one line, else Shuffle and
+   Repeat (243 at 15, 312 at xxxLarge with "Repeat one") with Autoplay on a line of its own, capped at xxxLarge as the
+   phone's foot is. The chips read no Row Size (it sizes rows, not words). `test_the_macs_chips_take_two_lines_where_
+   the_three_dont_fit` holds it at every size from xSmall to xxxLarge and every Repeat word. Not measured on the Mac.
+6. **UX - Shuffle dimmed from the moment an Autoplay station was made**, and with Shuffle on it couldn't be turned off.
+   Decided: `has` is true for a radio, or for Autoplay's station once it has added songs (`Station.inList`); and every
+   Shuffle - the Queue's foot, its chip and `toggleShuffle`, Now Playing's, the Mac's player bar, Controls
+   (`(!state.station || state.shuffle)`) - dims only while Shuffle is off (`stationHoldsShuffle`). The transport's
+   digest redone for Now Playing's one line. MacMenuTests (on with a station: enabled; off: dimmed),
+   StationTests' `autoplayNotesWhatItGaveForTheHeading` (`inList` false until it gives), test_ios_lastfm_a3.py.
+7. **Wiring - seven StationKeeper mutations passed the whole suite.** `check`, `ask`, `answered`, `scheduleAgain`,
+   `drop`, `radioStarted`, `connect`, `has`, `letAutoplayGo` and the PlayerModel extension are pinned exactly
+   (`test_the_keepers_every_definition_is_as_written`); `ids.insert(song.id)` in `take` has its own test
+   (`twoSongsOfOneIdAreOneSong`).
+
+Decided at review and done: lowWater stays 2 (check 496's words fixed); Start Radio from Now Playing restarting the
+song kept, said plainly in docs/ios.md and 494; Shuffle dimmed on every surface and the digest move kept; drags not
+crossing between the list and Autoplay's part, and Shuffle's scope for the radio, kept.
+
+**The review's faults, and what caught each** (each made alone, the suites run, restored byte for byte):
+
+| fault | caught by |
+| --- | --- |
+| withoutStation leaves the source as it was (the review's bug) | theQueueAsItWasBeforeAutoplayAddedAnything, autoplaysSongPlayingStaysAndSoDoItsCopies, repeatAllsLaterRoundsLoseThemToo, rowsTakenOutBeforeGoFromTheSourceToo, autoplayOffIsAnEditHeldForTheJoinAndNeverAPlay |
+| withoutStation trims a played Autoplay song from the source | autoplaysSongPlayingStaysAndSoDoItsCopies, repeatAllsLaterRoundsLoseThemToo |
+| withoutStation keeps `left` past the source's new end | rowsTakenOutBeforeGoFromTheSourceToo |
+| withoutStation takes the playing Autoplay song's Repeat One copies too | autoplaysSongPlayingStaysAndSoDoItsCopies |
+| withoutStation leaves `reached` on a unit it took out | aRollBacksFurthestSongTakenOutMovesBack |
+| an offline skip passed for good, nothing kept for later (the review's bug) | offlineOnlySongsOnTheDeviceAndTheRestKeptForLater, oneOfflineTopUpNeverUsesTheAnswerUp |
+| `exhausted` ignores the songs kept for later | oneOfflineTopUpNeverUsesTheAnswerUp |
+| `following` back to this round's songs only (the review's bug) | aRollBackAcrossRoundsCountsWhatItMovedBackDown, repeatOnesCopiesDontCountAndEveryOtherEntryDoes |
+| `inList` always true (Shuffle dimmed from the moment Autoplay's station is made) | autoplayNotesWhatItGaveForTheHeading |
+| Controls' Shuffle can't be turned off with a station | MacMenuTests.shuffleIsUpNextsAndALibrarysCantBeTurnedOff |
+| `take`'s `ids.insert(song.id)` gone | twoSongsOfOneIdAreOneSong |
+| `QueueController.removeStation` makes no edit | autoplayOffIsAnEditHeldForTheJoinAndNeverAPlay |
+| Autoplay's `start` never noted | autoplayNotesWhatItGaveForTheHeading, autoplaysRowsAreTheListsTailUnderItsOwnHeading, nothingIsSplitButAutoplaysOwnDrawnWhole |
+| Autoplay off removes at once while an edit is held | test_autoplay_off_takes_its_rows_out_and_never_touches_a_radio |
+| the check never makes a held-back removal | test_autoplay_off_takes_its_rows_out_and_never_touches_a_radio, test_the_keepers_every_definition_is_as_written, test_the_top_up_is_watched_outside_every_view_reading_only_what_it_needs |
+| late: both late-answer guards gone | test_the_keepers_every_definition_is_as_written |
+| `has` returning false | test_shuffle_is_dimmed_while_the_queue_has_a_station |
+| keep: the take's station not kept | test_the_keepers_every_definition_is_as_written |
+| scope: the radio asked of the store | test_the_keepers_every_definition_is_as_written |
+| count: the ask not counted | test_the_keepers_every_definition_is_as_written |
+| setter: PlayerModel.setAutoplay a no-op | test_the_keepers_every_definition_is_as_written |
+| timer: the retry at once | test_the_keepers_every_definition_is_as_written |
+| `has` true for Autoplay's station before it gave anything | test_shuffle_is_dimmed_while_the_queue_has_a_station |
+| Autoplay off takes a radio's songs too | test_autoplay_off_takes_its_rows_out_and_never_touches_a_radio |
+| Autoplay off makes no removal | test_autoplay_off_takes_its_rows_out_and_never_touches_a_radio |
+| Now Playing's Shuffle can't be turned off with a station | test_shuffle_is_dimmed_while_the_queue_has_a_station, test_ios_now_playing_look's test_the_transport_is_as_it_was |
+| the Mac bar's Shuffle can't be turned off with a station | test_shuffle_is_dimmed_while_the_queue_has_a_station |
+| the Queue's Shuffle can't be turned off with a station | test_shuffle_is_dimmed_while_the_queue_has_a_station |
+| the Mac's chips on one line only (Autoplay left out of the second form) | test_the_chip_is_after_repeat_on_both_and_only_while_lastfm_is_on |
+| the chips' gap widened to 16 | test_the_macs_chips_take_two_lines_where_the_three_dont_fit |
+| the chips' text uncapped | test_the_chip_is_after_repeat_on_both_and_only_while_lastfm_is_on |
+
+### Not verified here - what James's phone, Ethan's and the Mac can say (494-502)
+
+- **Against a real deadwax with a real key**: the answers here are the route's own over the recordings
+  (Fixtures/lastfm/answers/radio.json); whether the songs sound similar (494) is James's to hear.
+- **The engine preparing the next entry after an append while a last song plays** (section 7): the same path as Add
+  to Queue on a last song, held for the join by the fake engine in AppendStationTests - not seen with a station. And
+  Autoplay's songs playing on locked (498).
+- The drawing: the foot's three buttons (measured with the bundled faces to fit 375 points at xxxLarge, not seen),
+  the Mac's chip and the Controls tick in step (501), the Autoplay heading on both, VoiceOver's "selected" and hint.
+- The retry's timing (30 s, 3 tries) and the top-up's watch on a device; offline adds (499); the web after the phone
+  (500) - the web reads the longer list as its own, by design, but nothing here ran the web.
+- Nothing ran in a simulator (none is used here).

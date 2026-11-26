@@ -45,6 +45,15 @@ import SwiftUI
 /// is dimmed - not a button out of Edit, its minus and handle still whole in it; the song playing's card is marked,
 /// never dimmed. VoiceOver hears the state as the row's value. No download control here. The mark and the dim are
 /// small views of their own, so a download's progress redraws them, never this list.
+///
+/// RADIO AND AUTOPLAY (Last.fm, slice A3 - deadwax-plans/lastfm.md 3.5; notes/ios.md "Last.fm, slice A3"): while Last.fm
+/// is on, "Autoplay" after Repeat - on the phone the foot's flat button as Shuffle's and Repeat's, on the Mac the panel's
+/// chip with `infinity` - lit and "selected" while on, its hint "Keeps playing similar songs from your library when the
+/// queue ends." Off by default. The rows Autoplay gave the queue, the list's tail, are drawn under a heading of their
+/// own, "Autoplay" (Core's Station.split), after the list's own under its title; a radio's songs are the list itself.
+/// They come out in Edit as any of the list's rows, and move among themselves (a drag stays under its heading, as it
+/// stays in its group; the move is made in the whole list's places). Shuffle is dimmed while the queue has a station,
+/// as during a library's shuffle.
 struct UpNextScreen: View {
     /// (R3b) In the sheet over Now Playing (iQueue): `‹ Now Playing` and the strip at its top, History, Clear and Edit at
     /// the top's right, the song playing as the selected row first - (R3b's review) no heading over it, nor over
@@ -57,6 +66,7 @@ struct UpNextScreen: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(HistoryModel.self) private var history
     @Environment(Reachability.self) private var reachability
+    @Environment(ServerModel.self) private var server
     @Environment(\.dismiss) private var dismiss
     /// (The Mac app, slice 3) Drawn in the desktop frame's side panel: Done puts the panel away (MacPanel).
     @Environment(\.inSidePanel) private var inSidePanel
@@ -226,35 +236,67 @@ struct UpNextScreen: View {
                                 }
                             }
 
-                            if let list = view.list {
+                            if let whole = view.list {
+                                //? (Last.fm, A3) the list's own rows under its title, then Autoplay's under theirs -
+                                //? one group of rows, drawn in two parts (`part`), so a move or a removal is the list's
+                                let split = player.stationSplit(whole)
+                                let own = split.list?.rows.count ?? 0
                                 if phone {
-                                    Section {
-                                        heading(QueuePageWords.heading(list.title))
-                                        //? (2.1.3) Playing Next is carried after a list row tapped: what plays next is
-                                        //? its head. (R3b) Under an album's heading its rows are their titles.
-                                        rows(list.rows, lines: QueuePageWords.showsLines(list.rows, title: list.title)) { index in
-                                            view.added.first ?? (list.rows.indices.contains(index + 1) ? list.rows[index + 1] : nil)
+                                    if let list = split.list {
+                                        Section {
+                                            heading(QueuePageWords.heading(list.title))
+                                            //? (2.1.3) Playing Next is carried after a list row tapped: what plays next
+                                            //? is its head. (R3b) Under an album's heading its rows are their titles.
+                                            rows(whole.rows, lines: QueuePageWords.showsLines(list.rows, title: list.title),
+                                                 part: 0..<own) { index in
+                                                view.added.first ?? (whole.rows.indices.contains(index + 1) ? whole.rows[index + 1] : nil)
+                                            }
+                                            if list.more > 0 {
+                                                note(UpNextWords.more(list.more))
+                                            }
                                         }
-                                        if list.more > 0 {
-                                            note(UpNextWords.more(list.more))
+                                    }
+                                    if !split.autoplay.isEmpty {
+                                        Section {
+                                            heading(LastfmWords.autoplay)
+                                            rows(whole.rows, lines: true, part: own..<whole.rows.count) { index in
+                                                view.added.first ?? (whole.rows.indices.contains(index + 1) ? whole.rows[index + 1] : nil)
+                                            }
                                         }
                                     }
                                 } else {
-                                    Section {
-                                        //? (2.1.3) Playing Next is carried after a list row tapped: what plays next is its head
-                                        rows(list.rows, lines: true) { index in
-                                            view.added.first ?? (list.rows.indices.contains(index + 1) ? list.rows[index + 1] : nil)
+                                    if let list = split.list {
+                                        Section {
+                                            //? (2.1.3) Playing Next is carried after a list row tapped: what plays next
+                                            //? is its head
+                                            rows(whole.rows, lines: true, part: 0..<own) { index in
+                                                view.added.first ?? (whole.rows.indices.contains(index + 1) ? whole.rows[index + 1] : nil)
+                                            }
+                                            if list.more > 0 {
+                                                note(UpNextWords.more(list.more))
+                                            }
+                                        } header: {
+                                            Group {
+                                                Text(list.title)
+                                                    .textCase(nil)
+                                                    .accessibilityAddTraits(.isHeader)
+                                            }
+                                            .font(Typeface.footnote)
                                         }
-                                        if list.more > 0 {
-                                            note(UpNextWords.more(list.more))
+                                    }
+                                    if !split.autoplay.isEmpty {
+                                        Section {
+                                            rows(whole.rows, lines: true, part: own..<whole.rows.count) { index in
+                                                view.added.first ?? (whole.rows.indices.contains(index + 1) ? whole.rows[index + 1] : nil)
+                                            }
+                                        } header: {
+                                            Group {
+                                                Text(LastfmWords.autoplay)
+                                                    .textCase(nil)
+                                                    .accessibilityAddTraits(.isHeader)
+                                            }
+                                            .font(Typeface.footnote)
                                         }
-                                    } header: {
-                                        Group {
-                                            Text(list.title)
-                                                .textCase(nil)
-                                                .accessibilityAddTraits(.isHeader)
-                                        }
-                                        .font(Typeface.footnote)
                                     }
                                 }
                             }
@@ -448,14 +490,17 @@ struct UpNextScreen: View {
     }
 
     /// (R3b) The foot's Shuffle and Repeat: each lit while on, and "selected" to VoiceOver; Shuffle dimmed during a
-    /// library's shuffle, as its chip was.
+    /// library's shuffle, as its chip was - and (Last.fm, A3) while the queue has a station, unless it is on (it can be
+    /// turned off). Then Autoplay, while
+    /// Last.fm is on: lit and "selected" while on, with its hint. The three fit a 375-point phone on one line at
+    /// xxxLarge, where the foot stops growing (test_ios_lastfm_a3.py works it out); the time left goes under them.
     @ViewBuilder private var modeButtons: some View {
         let mode = player.repeatMode
         Button(action: toggleShuffle) {
             Text(UpNextWords.shuffle)
         }
         .buttonStyle(DWButtonStyle(kind: player.shuffle ? .on : .normal))
-        .disabled(player.paged != nil)
+        .disabled(player.paged != nil || player.stationHoldsShuffle)
         .accessibilityAddTraits(player.shuffle ? .isSelected : [])
         .accessibilityFocused($focus, equals: .shuffle)
         Button(action: cycleRepeat) {
@@ -463,6 +508,14 @@ struct UpNextScreen: View {
         }
         .buttonStyle(DWButtonStyle(kind: mode != .off ? .on : .normal))
         .accessibilityAddTraits(mode != .off ? .isSelected : [])
+        if server.access.lastfm == .on {
+            Button(action: toggleAutoplay) {
+                Text(LastfmWords.autoplay)
+            }
+            .buttonStyle(DWButtonStyle(kind: player.autoplay ? .on : .normal))
+            .accessibilityAddTraits(player.autoplay ? .isSelected : [])
+            .accessibilityHint(LastfmWords.autoplayHint)
+        }
     }
 
     /// (R3b) The Mac's foot: the time left, in the dock's look - a row's height, under the line's edge, (R3b's review)
@@ -653,17 +706,53 @@ struct UpNextScreen: View {
         }
     }
 
+    /// The Mac's chips: Shuffle, Repeat and (Last.fm, A3) Autoplay after it, while Last.fm is on. (A3's review) The three
+    /// don't fit on one line of the 400-point panel's inset row with "Repeat one" (test_ios_lastfm_a3.py works it out),
+    /// so where they don't, Autoplay goes on a line of its own under the two - the text capped at xxxLarge, as the
+    /// phone's foot is. The chips don't read the Row Size: it sizes rows, not words.
     private var modes: some View {
-        let mode = player.repeatMode
-        let paged = player.paged != nil
-        return HStack(spacing: 8) {
-            Chip(glyph: "shuffle", label: UpNextWords.shuffle, on: player.shuffle, enabled: !paged, action: toggleShuffle)
-                .accessibilityFocused($focus, equals: .shuffle)
-            Chip(glyph: mode == .one ? "repeat.1" : "repeat", label: repeatLabel(mode), on: mode != .off, enabled: true, action: cycleRepeat)
-            Spacer(minLength: 0)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Self.chipGap) {
+                shuffleChip
+                repeatChip
+                autoplayChip
+                Spacer(minLength: 0)
+            }
+            VStack(alignment: .leading, spacing: Self.chipGap) {
+                HStack(spacing: Self.chipGap) {
+                    shuffleChip
+                    repeatChip
+                    Spacer(minLength: 0)
+                }
+                autoplayChip
+            }
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(UpNextWords.modesGroup)
+    }
+
+    /// The gap between the Mac's chips, and between their lines.
+    private static let chipGap: CGFloat = 8
+
+    private var shuffleChip: some View {
+        Chip(glyph: "shuffle", label: UpNextWords.shuffle, on: player.shuffle,
+             enabled: player.paged == nil && !player.stationHoldsShuffle, action: toggleShuffle)
+            .accessibilityFocused($focus, equals: .shuffle)
+    }
+
+    private var repeatChip: some View {
+        let mode = player.repeatMode
+        return Chip(glyph: mode == .one ? "repeat.1" : "repeat", label: repeatLabel(mode), on: mode != .off, enabled: true,
+                    action: cycleRepeat)
+    }
+
+    //? (Last.fm, A3) Autoplay after Repeat, while Last.fm is on
+    @ViewBuilder private var autoplayChip: some View {
+        if server.access.lastfm == .on {
+            Chip(glyph: LastfmWords.autoplaySymbol, label: LastfmWords.autoplay, on: player.autoplay, enabled: true,
+                 hint: LastfmWords.autoplayHint, action: toggleAutoplay)
+        }
     }
 
     // MARK: a group's rows
@@ -671,9 +760,13 @@ struct UpNextScreen: View {
     /// One group's rows - `next(index)` is the row a tap on the row at `index` moves focus to, what plays next (Playing
     /// Next's last: the list's first; a list row's: Playing Next's head, carried after it). In Edit the List's own drag
     /// handle moves them, a drag staying in its group, and each row's (-) takes it out. No onDelete, in Edit or out:
-    /// out of it, it would be a swipe that loses a song; in it, the system's two-step (-).
-    private func rows(_ rows: [UpNextRow], lines: Bool, next: @escaping (Int) -> UpNextRow?) -> some View {
-        ForEach(Array(rows.enumerated()), id: \.element.key) { index, row in
+    /// out of it, it would be a swipe that loses a song; in it, the system's two-step (-). (Last.fm, A3) `part`: the rows
+    /// of the group drawn here - the list's own, or Autoplay's under their heading - every index the group's, so a move
+    /// or a removal is made in the whole group.
+    private func rows(_ rows: [UpNextRow], lines: Bool, part: Range<Int>? = nil,
+                      next: @escaping (Int) -> UpNextRow?) -> some View {
+        let drawn = part.map { $0.clamped(to: rows.indices) } ?? rows.indices
+        return ForEach(Array(Array(rows.enumerated())[drawn]), id: \.element.key) { index, row in
             Group {
                 if editing {
                     editRow(row, index: index, rows: rows, lines: lines)
@@ -686,15 +779,17 @@ struct UpNextScreen: View {
             .onAppear { seen.ids.insert(row.key) }
             .onDisappear { seen.ids.remove(row.key) }
         }
-        .onMove(perform: mover(rows))
+        .onMove(perform: mover(rows, from: drawn.lowerBound))
     }
 
-    /// The List's drag in Edit, as a move to the row's new place (none out of Edit: no handles).
-    private func mover(_ rows: [UpNextRow]) -> ((IndexSet, Int) -> Void)? {
+    /// The List's drag in Edit, as a move to the row's new place (none out of Edit: no handles) - (A3) the drag's
+    /// places counted from `offset`, where the part drawn begins in its group.
+    private func mover(_ rows: [UpNextRow], from offset: Int = 0) -> ((IndexSet, Int) -> Void)? {
         guard editing else { return nil }
         return { source, destination in
-            guard let from = source.first, rows.indices.contains(from) else { return }
-            move(rows[from], in: rows, to: UpNextWords.movedTo(from: from, destination: destination))
+            guard let first = source.first, rows.indices.contains(first + offset) else { return }
+            let from = first + offset
+            move(rows[from], in: rows, to: UpNextWords.movedTo(from: from, destination: destination + offset))
         }
     }
 
@@ -885,7 +980,7 @@ struct UpNextScreen: View {
     // MARK: what each change does
 
     private func toggleShuffle() {
-        guard player.paged == nil else { return }
+        guard player.paged == nil, !player.stationHoldsShuffle else { return }
         let on = !player.shuffle
         player.toggleShuffle()
         Notice.announce(UpNextWords.shuffleSaid(on))
@@ -895,6 +990,13 @@ struct UpNextScreen: View {
         let mode = nextRepeat(player.repeatMode)
         player.setRepeat(mode)
         Notice.announce(UpNextWords.repeatSaid(mode))
+    }
+
+    /// (Last.fm, A3) Autoplay on or off - off takes its rows still to come out (PlayerModel.setAutoplay).
+    private func toggleAutoplay() {
+        let on = !player.autoplay
+        player.setAutoplay(on)
+        Notice.announce(LastfmWords.autoplaySaid(on))
     }
 
     private func clear() {
@@ -988,12 +1090,14 @@ private struct UpNextDownload: ViewModifier {
     }
 }
 
-/// Shuffle or Repeat as Up Next's chip: its glyph and its words, pressed (VoiceOver's "selected") and tinted while on.
+/// Shuffle or Repeat as Up Next's chip: its glyph and its words, pressed (VoiceOver's "selected") and tinted while on -
+/// and (Last.fm, A3) Autoplay, with its hint.
 private struct Chip: View {
     let glyph: String
     let label: String
     let on: Bool
     let enabled: Bool
+    var hint: String = ""
     let action: () -> Void
 
     var body: some View {
@@ -1010,6 +1114,7 @@ private struct Chip: View {
         .buttonStyle(.borderless)
         .disabled(!enabled)
         .accessibilityAddTraits(on ? .isSelected : [])
+        .accessibilityHint(hint)
     }
 }
 

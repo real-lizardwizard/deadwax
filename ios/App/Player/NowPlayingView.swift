@@ -541,7 +541,8 @@ struct NowPlayingView: View {
     }
 
     private var transport: some View {
-        let paged = player.paged != nil
+        //? Shuffle can't be used during a library's shuffle - (Last.fm, A3) nor turned on with a station, as the Queue's
+        let paged = player.paged != nil || player.stationHoldsShuffle
         let mode = player.repeatMode
         return HStack {
             ModeButton(glyph: "shuffle", on: player.shuffle, label: shuffleLabel(player.paged?.scope), enabled: !paged) {

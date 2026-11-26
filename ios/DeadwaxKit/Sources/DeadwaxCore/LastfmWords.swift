@@ -3,7 +3,8 @@ import Foundation
 /// Last.fm's words on the artist page (lastfm.md 3.6) - the same on the iPhone and the Mac (DeviceWordsTests holds them
 /// in words/iphone.json and words/mac.json). Slice A1's: Top Songs, its rows' lines, the credit, the two troubles of a
 /// song you don't have, the listeners line and the foot line for whoever runs deadwax. Slice A2's: Similar Artists,
-/// and the albums' order and plays.
+/// and the albums' order and plays. Slice A3's: Start Radio, Autoplay (the Queue's chip, its hint, the Mac's tick and
+/// the heading over its rows) and the radio's two notices.
 public enum LastfmWords {
     // MARK: Top Songs
 
@@ -68,6 +69,26 @@ public enum LastfmWords {
         case .listeners: return count == 1 ? "1 listener" : "\(short(count)) listeners"
         }
     }
+
+    // MARK: (A3) Start Radio and Autoplay
+
+    /// Every one-song •••'s item, Now Playing's ••• and a song's right-click on the Mac: a new queue of the song, and
+    /// songs Last.fm calls similar after it.
+    public static let startRadio = "Start Radio"
+    public static let startRadioSymbol = "dot.radiowaves.left.and.right"
+    /// The Queue's chip after Repeat, the Mac's Controls tick, and the heading over Autoplay's rows.
+    public static let autoplay = "Autoplay"
+    public static let autoplaySymbol = "infinity"
+    /// VoiceOver's hint on the chip.
+    public static let autoplayHint = "Keeps playing similar songs from your library when the queue ends."
+    /// What VoiceOver says as the chip is pressed - "Autoplay on", "Autoplay off" - as Repeat's says its setting.
+    public static func autoplaySaid(_ on: Bool) -> String {
+        on ? "Autoplay on" : "Autoplay off"
+    }
+    /// The notices: a radio Last.fm found nothing in your library for (the song plays alone), and one deadwax couldn't
+    /// make just now (it is asked again as the song plays).
+    public static let noSimilarSongs = "No similar songs in your library."
+    public static let radioFailed = "Couldn't start the radio just now."
 
     // MARK: the foot line (whoever runs deadwax only)
 

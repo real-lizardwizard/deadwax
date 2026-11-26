@@ -33,6 +33,12 @@ import Foundation
 // its end (MacRowSize's sizes, kept on this Mac). ⌘+ is drawn as Finder draws Make Bigger - the + itself, which a US
 // keyboard types as ⇧⌘= - and ⌘= is the same item's hidden second key (`alternateKey`), so either way it's typed works.
 // Never dimmed for a sheet or the sign-in: it only changes how tall the rows are, kept for when they show.
+//
+// (Last.fm, slice A3 - deadwax-plans/lastfm.md 3.5; notes/ios.md "Last.fm, slice A3") And Controls' Autoplay: a tick
+// after Repeat's submenu, the Queue's chip's word (LastfmWords.autoplay), ticked while it is on - only while Last.fm
+// is on (the chip is absent otherwise, and so is it), and dimmed with nothing queued as Repeat's are. And Shuffle dimmed
+// while the queue has a station and Shuffle is off, as the Queue's chip is: shuffling would mix the station into the
+// album - (A3's review) one already on can still be turned off.
 
 public enum MacMenu {
     /// What the menus are drawn from - read by the App each time it draws them.
@@ -82,12 +88,20 @@ public enum MacMenu {
         public var saveOpen: Bool
         /// (The Mac's Row Size) How tall the lists' rows are, as this Mac keeps it: its item ticked, the steps from it.
         public var rowSize: MacRowSize
+        /// (Last.fm, slice A3) deadwax's Last.fm is on: Autoplay is in Controls.
+        public var lastfm: Bool
+        /// (A3) Autoplay is on, this Mac's setting.
+        public var autoplay: Bool
+        /// (A3) The queue has a station whose songs are in its list (a radio's, Autoplay's once it gave some): Shuffle is
+        /// dimmed while off.
+        public var station: Bool
 
         public init(queued: Bool = false, playing: Bool = false, shuffle: Bool = false, paged: PagedScope? = nil,
                     repeatMode: Repeat = .off, length: Double = 0, hasAlbum: Bool = false, typing: Bool = false,
                     tabs: Bool = true, refresh: Refresh = .none, nowPlaying: Bool = false, sheet: Bool = false,
                     sidebarShown: Bool = true, panel: MacDock.Tab? = nil, selected: Bool = false,
                     lyrics: LyricsHave = .unknown, serverSettings: Bool = false, saveOpen: Bool = false,
+                    lastfm: Bool = false, autoplay: Bool = false, station: Bool = false,
                     rowSize: MacRowSize = .standard) {
             self.queued = queued
             self.playing = playing
@@ -108,6 +122,9 @@ public enum MacMenu {
             self.serverSettings = serverSettings
             self.saveOpen = saveOpen
             self.rowSize = rowSize
+            self.lastfm = lastfm
+            self.autoplay = autoplay
+            self.station = station
         }
     }
 
@@ -121,6 +138,8 @@ public enum MacMenu {
         case settings, find, refresh
         case playPause, next, previous, forward, back
         case shuffle, repeatOff, repeatAll, repeatOne
+        // (Last.fm, slice A3) the tick after Repeat's submenu
+        case autoplay
         case goToCurrentSong
         case sidebar, upNext, lyrics, info, eq
         // (slice 6) File's - and (slice 7) Server settings' Save changes
@@ -288,7 +307,7 @@ public enum MacMenu {
         //? (the Mac's Row Size) drawn ⌘+ and ⌘−, as Finder's Make Bigger and Make Smaller are
         case .biggerRows: return Shortcut(.character("+"), .command)
         case .smallerRows: return Shortcut(.character("-"), .command)
-        case .shuffle, .repeatOff, .repeatAll, .repeatOne: return nil
+        case .shuffle, .repeatOff, .repeatAll, .repeatOne, .autoplay: return nil
         case .smallRows, .mediumRows, .largeRows: return nil
         }
     }
@@ -322,9 +341,10 @@ public enum MacMenu {
     }
 
     /// The Controls menu, its sections in order: Play/Pause, Next, Previous; the skips; Shuffle and Repeat's three
-    /// (drawn in Repeat's submenu); Go to Current Song.
+    /// (drawn in Repeat's submenu) - and (A3) Autoplay after them, while Last.fm is on; Go to Current Song.
     public static func controls(_ state: State) -> [[Item]] {
-        [[.playPause, .next, .previous], [.forward, .back], [.shuffle] + Command.repeats, [.goToCurrentSong]]
+        [[.playPause, .next, .previous], [.forward, .back], [.shuffle] + Command.repeats + (state.lastfm ? [.autoplay] : []),
+         [.goToCurrentSong]]
             .map { $0.map { item($0, state) } }
     }
 
@@ -382,6 +402,7 @@ public enum MacMenu {
         case .back: return Words.back
         case .shuffle: return shuffleLabel(state.paged)
         case .repeatOff, .repeatAll, .repeatOne: return UpNextWords.repeatSaid(command.repeatMode ?? .off)
+        case .autoplay: return LastfmWords.autoplay
         case .goToCurrentSong: return Words.goToCurrentSong
         case .sidebar: return state.sidebarShown ? Words.hideSidebar : Words.showSidebar
         case .upNext: return UpNextWords.title
@@ -404,9 +425,12 @@ public enum MacMenu {
         case .refresh: return state.tabs && !state.nowPlaying && !state.sheet && state.refresh == .ready
         case .playPause, .next, .previous: return state.queued
         case .forward, .back: return state.queued && state.length > 0
-        //? as Now Playing's Shuffle: a library's shuffle can't be turned off
-        case .shuffle: return state.queued && state.paged == nil
+        //? as Now Playing's Shuffle: a library's shuffle can't be turned off - (A3) nor a station's queue shuffled, though
+        //? Shuffle already on can be turned off
+        case .shuffle: return state.queued && state.paged == nil && (!state.station || state.shuffle)
         case .repeatOff, .repeatAll, .repeatOne: return state.queued
+        //? (A3) as Repeat's - and never drawn while Last.fm isn't on (`controls`)
+        case .autoplay: return state.queued && state.lastfm
         case .goToCurrentSong: return state.tabs && !state.sheet && state.queued && state.hasAlbum
         //? (slice 3) the frame's: with the tabs drawn and no sheet over them - a panel open can always be put away, and
         //? one closed opens with something queued (Lyrics not while it is known the song has none) - (R3) Info with a
@@ -435,6 +459,7 @@ public enum MacMenu {
         switch command {
         case .shuffle: return state.queued && state.shuffle
         case .repeatOff, .repeatAll, .repeatOne: return state.queued && command.repeatMode == state.repeatMode
+        case .autoplay: return state.queued && state.lastfm && state.autoplay
         case .upNext, .lyrics, .info, .eq: return state.panel == command.panel
         case .smallRows, .mediumRows, .largeRows: return state.rowSize == command.rowSize
         default: return false

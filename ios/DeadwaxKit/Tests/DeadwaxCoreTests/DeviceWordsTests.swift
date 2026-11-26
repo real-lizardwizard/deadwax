@@ -395,6 +395,16 @@ enum DeviceWords {
         add("LastfmWords.plays(4123456, listeners)", LastfmWords.plays(4_123_456, counted: .listeners))
         add("ArtistPageFacts.yourMostPlayed", ArtistPageFacts.Words.yourMostPlayed)
 
+        // MARK: (Last.fm, slice A3) Start Radio and Autoplay - the same words on both: none names the device
+
+        add("LastfmWords.startRadio", LastfmWords.startRadio)
+        add("LastfmWords.autoplay", LastfmWords.autoplay)
+        add("LastfmWords.autoplayHint", LastfmWords.autoplayHint)
+        add("LastfmWords.autoplaySaid(on)", LastfmWords.autoplaySaid(true))
+        add("LastfmWords.autoplaySaid(off)", LastfmWords.autoplaySaid(false))
+        add("LastfmWords.noSimilarSongs", LastfmWords.noSimilarSongs)
+        add("LastfmWords.radioFailed", LastfmWords.radioFailed)
+
         // MARK: (the redesign, slice R9) Getting albums' cancel note - the phone's ✕, the Mac's Cancel and Leave - and
         // where Sign in keeps the sign-in: each written for its device, so both are named in theMacsWordsDiffer's own
 

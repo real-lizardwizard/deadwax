@@ -458,6 +458,20 @@ public struct DeadwaxClient: Sendable {
         return try await call(Routes.lastfmArtist, as: LastfmArtist.self, query: query)
     }
 
+    /// (Last.fm, slice A3) A radio from a song (`Routes.lastfmRadio`, server 2.1.44): the songs of `scope` - yours, or
+    /// the store's - Last.fm calls similar to the song `songId`, by its title and artist. Every song of the list at once
+    /// - always answered while deadwax is in reach: Last.fm off, refused or away is said in the answer (`songs` nil).
+    /// deadwax refuses a blank id, title or artist (422), so none is asked for: `APIFailure.other` (Station.Ask is what
+    /// the app asks with, and leaves such a song out before it gets here).
+    public func lastfmRadio(songId: String, title: String, artist: String, scope: PagedScope) async throws -> LastfmRadio {
+        guard let ask = Station.Ask(songId: songId, title: title, artist: artist) else {
+            throw APIFailure.other("a song with no id, title or artist")
+        }
+        return try await call(Routes.lastfmRadio, as: LastfmRadio.self,
+                              query: [("song_id", ask.songId), ("title", ask.title), ("artist", ask.artist),
+                                      ("scope", scope.rawValue)])
+    }
+
     /// A MusicBrainz artist's albums (`Routes.discography`), as the web's artist page asks them: their albums
     /// (`types=album`), the studio ones alone with `studioOnly` - `problem` when MusicBrainz broke the list off.
     public func discography(mbid: String, studioOnly: Bool) async throws -> DiscographyAnswer {

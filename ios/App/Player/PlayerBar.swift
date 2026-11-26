@@ -100,7 +100,8 @@ struct PlayerBar: View {
 
     private var keys: some View {
         let queued = player.hasQueue
-        let paged = player.paged != nil
+        //? Shuffle can't be used during a library's shuffle - (Last.fm, A3) nor turned on with a station, as the Queue's
+        let paged = player.paged != nil || player.stationHoldsShuffle
         let mode = player.repeatMode
         return HStack(spacing: Self.keysGap) {
             Button {

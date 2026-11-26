@@ -131,6 +131,10 @@ public enum Routes {
     // top songs, asked by their MusicBrainz id and/or their name - a user's route, answered by 4 s (inside the
     // transport's 8)
     public static let lastfmArtist = Endpoint(method: "GET", path: "/deadwax/lastfm/artist", query: ["mbid", "name"])
+    // (Last.fm, slice A3 - lastfm.md 2.6, server 2.1.44) Start Radio's and Autoplay's songs: those of the asker's scope
+    // Last.fm calls similar to a song, by its id, title and artist - asked with 30 s to answer (`timeouts`): a cold
+    // scope's list is read a 2,000-song page at a time, as the Shuffle's, and Last.fm waited for 4 s besides
+    public static let lastfmRadio = Endpoint(method: "GET", path: "/deadwax/lastfm/radio", query: ["song_id", "title", "artist", "scope"])
     // Phase 5, slice 4's (phase5-search.md 6.4): what MusicBrainz's answers saved on deadwax hold matching the words
     // (`SavedSearchAnswer`, server 2.0.0-player.56) - asked beside the library as the words settle, given up after
     // `SearchSaved.waitMs`; the three searches above take `offset` for More from MusicBrainz
@@ -271,7 +275,7 @@ public enum Routes {
         libraryOwned,
         fullySearch, releaseGroup, archiveCover,
         searchArtists, searchSongs, artistFacts, discography,
-        lastfmArtist,
+        lastfmArtist, lastfmRadio,
         savedSearch,
         jobs, cancelJob, retryJob, retryJobSame, clearJobs,
         storeState, findCandidates, enqueue, preferences,
@@ -388,7 +392,7 @@ public enum Routes {
     /// waits on the one write lock for another write's worst (a reset's 130) before its own, so Make account, Reset,
     /// the admin flip and Remove 300 and Forget and the permissions 240 (PeopleWaits); Lock forgets the unlock in memory,
     /// the transport's own 8 - tests/test_ios_people.py holds each to the handlers.
-    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30, logStream: 45, ownPassword: 240, people: 120, unlockPeople: 120, createPerson: 300, resetPassword: 300, setAdmin: 300, removePerson: 300, forgetPerson: 240, savePermissions: 240]
+    public static let timeouts: [Endpoint: Double] = [albumIndex: 30, lastfmRadio: 30, autoEqSearch: 20, autoEqProfile: 20, libraryOwned: 30, fullySearch: 20, releaseGroup: 60, searchArtists: 20, searchSongs: 20, artistFacts: 120, discography: 60, jobs: 20, cancelJob: 30, retryJob: 60, retryJobSame: 30, clearJobs: 30, storeState: 20, findCandidates: 300, enqueue: 300, joinJob: 60, libraryAdd: 60, libraryTracks: 30, libraryAlbums: 120, releases: 60, release: 60, retagPreview: 60, retagApply: 480, artFetch: 120, libraryArt: 30, queueIgnore: 20, queueUnignore: 20, tagsPreview: 60, tagsApply: 120, trackPicture: 30, lyricsFetch: 600, discArtFetch: 360, libraryDiscArt: 30, deletionSummary: 60, deleteAlbum: 120, libraryArtist: 120, artistArt: 30, artistImagesPreview: 660, artistImagesApply: 600, artistSearch: 120, refilePreview: 480, refileApply: 600, queueSummary: 30, queueReviewed: 20, rescan: 300, held: 30, heldAdd: 60, heldDismiss: 30, serverSettings: 30, saveServerSettings: 60, savedAnswers: 30, clearSavedAnswers: 120, pingMusicBrainz: 120, pingSlskd: 30, logStream: 45, ownPassword: 240, people: 120, unlockPeople: 120, createPerson: 300, resetPassword: 300, setAdmin: 300, removePerson: 300, forgetPerson: 240, savePermissions: 240]
 }
 
 /// The Cover Art Archive's thumbnail sizes the app asks deadwax's relay for (`Routes.archiveCover`'s `size`, which takes

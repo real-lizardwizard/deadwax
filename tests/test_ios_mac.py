@@ -346,7 +346,9 @@ def test_the_menus_are_mac_menus_and_nothing_else():
                  "sidebarShown: navigation.macSidebarShown", "panel: navigation.macPanel", "lyrics: lyrics.have",
                  # (slice 7) Server settings' page in front, and its button's own rule
                  "serverSettings: MacRefresh.shared.settingsInFront",
-                 "saveOpen: serverSettings.saveOpen(online: reachability.online)"):
+                 "saveOpen: serverSettings.saveOpen(online: reachability.online)",
+                 # (Last.fm, A3) Autoplay's tick while Last.fm is on, and Shuffle dimmed for a station's queue
+                 "lastfm: server.access.lastfm == .on", "autoplay: player.autoplay", "station: player.hasStation"):
         assert read in state, read
     # each click as the player's button makes it, read again as it lands
     perform = commands[commands.index("private func perform("):commands.index("static func shortcut(")]
@@ -356,7 +358,9 @@ def test_the_menus_are_mac_menus_and_nothing_else():
                  "MacMenu.skip(command, from: player.shownPosition, length: player.duration) { player.seek(to: to) }",
                  "player.toggleShuffle()", "player.setRepeat(mode)", "navigation.openAlbum(route)",
                  "navigation.macSidebarShown.toggle()", "if let panel = command.panel { navigation.togglePanel(panel) }",
-                 "case .saveChanges:\n            serverSettings.save()"):
+                 "case .saveChanges:\n            serverSettings.save()",
+                 # (Last.fm, A3) the Queue's chip's own call
+                 "case .autoplay:\n            player.setAutoplay(!player.autoplay)"):
         assert call in perform, call
     # no volume of deadwax's own (audio fidelity first), and nothing of the engine's
     assert not re.search(r"(?i)volume|gain", code)
@@ -365,7 +369,10 @@ def test_the_menus_are_mac_menus_and_nothing_else():
     cases = re.findall(r"^\s*case ([a-z][\w, ]*)$", bare(core[core.index("public enum Command"):core.index("public static let repeats")]), re.M)
     every = [name.strip() for line in cases for name in line.split(",")]
     assert every == ["settings", "find", "refresh", "playPause", "next", "previous", "forward", "back", "shuffle",
-                     "repeatOff", "repeatAll", "repeatOne", "goToCurrentSong", "sidebar", "upNext", "lyrics", "info",
+                     "repeatOff", "repeatAll", "repeatOne",
+                     #? (Last.fm, A3) Controls > Autoplay, a tick after Repeat's submenu
+                     "autoplay",
+                     "goToCurrentSong", "sidebar", "upNext", "lyrics", "info",
                      #? (R3) View > EQ (⌥⌘E), the side panel's EQ tab
                      "eq", "importEQFile", "saveChanges",
                      #? (the Mac's Row Size) View > Row Size's three and its two steps

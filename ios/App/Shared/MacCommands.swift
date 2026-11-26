@@ -11,7 +11,8 @@ import UIKit
 /// panel, at the top of File where New Window was - and (slice 7, managing on a big screen) File's Save changes (⌘S),
 /// Server settings' own, while one of its pages is the one in front - and (the Mac's Row Size) View's Row Size: Small,
 /// Medium and Large ticked, Make Bigger (⌘+, and ⌘= - RowSizeAlternateKey) and Make Smaller (⌘−), kept on this Mac
-/// (MacRowSizeStore) and read by every list (DesktopFrame hands it down).
+/// (MacRowSizeStore) and read by every list (DesktopFrame hands it down) - and (Last.fm, slice A3) Controls' Autoplay, a
+/// tick after Repeat's submenu while Last.fm is on, in step with the Queue's chip (the same setting, PlayerModel's).
 /// Drawn from Core's MacMenu and nothing else: each item's words, key, dimming and tick are MacMenu's, read
 /// from the player and the window each time the menus are drawn; this only carries the click out, through the very
 /// calls the player's own buttons make. The system's menus stay - About, Hide, Quit (⌘Q), Undo to Select All, Close
@@ -44,6 +45,9 @@ struct MacCommands: Commands {
                              panel: navigation.macPanel, selected: navigation.macSelected, lyrics: lyrics.have,
                              serverSettings: MacRefresh.shared.settingsInFront,
                              saveOpen: serverSettings.saveOpen(online: reachability.online),
+                             // (Last.fm, A3) Autoplay's tick, while Last.fm is on; Shuffle dimmed for a station's queue
+                             lastfm: server.access.lastfm == .on, autoplay: player.autoplay,
+                             station: player.hasStation,
                              // (the Mac's Row Size) the size kept now, from the store the lists' frame reads too
                              rowSize: MacRowSizeStore.shared.size)
     }
@@ -92,9 +96,11 @@ struct MacCommands: Commands {
         }
     }
 
-    /// One section of Controls: buttons, Shuffle a tick, Repeat's three ticks in Repeat's submenu.
+    /// One section of Controls: buttons, Shuffle a tick, Repeat's three ticks in Repeat's submenu - and (A3) Autoplay a
+    /// tick after it.
     @ViewBuilder private func controls(_ section: [MacMenu.Item]) -> some View {
-        ForEach(section.filter { $0.command.repeatMode == nil }, id: \.command) { (each: MacMenu.Item) in
+        ForEach(section.filter { $0.command.repeatMode == nil && $0.command != .autoplay },
+                id: \.command) { (each: MacMenu.Item) in
             if each.command == .shuffle {
                 tick(each)
             } else {
@@ -108,6 +114,7 @@ struct MacCommands: Commands {
             }
             .disabled(repeats.allSatisfy { !$0.enabled })
         }
+        ForEach(section.filter { $0.command == .autoplay }, id: \.command) { (each: MacMenu.Item) in tick(each) }
     }
 
     /// (Slice 3) One section of View's frame: Show/Hide Sidebar a button, each panel a tick.
@@ -176,6 +183,9 @@ struct MacCommands: Commands {
             player.toggleShuffle()
         case .repeatOff, .repeatAll, .repeatOne:
             if let mode = command.repeatMode { player.setRepeat(mode) }
+        // (Last.fm, A3) the Queue's chip's own call: off takes Autoplay's songs still to come out
+        case .autoplay:
+            player.setAutoplay(!player.autoplay)
         case .goToCurrentSong:
             if let track = player.current?.track, let route = PlayedAlbum.route(track, player: player) {
                 navigation.openAlbum(route)

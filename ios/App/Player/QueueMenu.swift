@@ -29,6 +29,14 @@ struct QueueMenuRequest {
     /// (R5) The album page's own •••: a Download asked for from it - the page announces its end, as it did for the
     /// download control the ••• took the place of.
     var downloadAsked: (@MainActor () -> Void)?
+    /// (Last.fm, slice A3) The whole of a playlist (its bar's •••, its right-click): never one song's, whatever it holds.
+    var wholeList = false
+
+    /// (A3) The song a one-song ••• is for - Start Radio's seed. Nil for an album's own •••, a playlist's, and any
+    /// other of more than one song.
+    var radioSong: Song? {
+        pick.queuedAs == nil && !wholeList && pick.tracks.count == 1 ? pick.tracks.first : nil
+    }
 }
 
 extension QueueMenuRequest {
@@ -56,7 +64,9 @@ extension QueueMenuRequest {
     /// and on the Mac a right-click on the playlist's row (PlaylistRightClick).
     static func playlist(_ answer: PlaylistWithSongs?, name: String, songs: [Song]) -> QueueMenuRequest? {
         guard let pick = PlaylistPlay.pick(name: name, songs: songs) else { return nil }
-        return QueueMenuRequest(pick: pick, album: nil, playlist: answer)
+        var request = QueueMenuRequest(pick: pick, album: nil, playlist: answer)
+        request.wholeList = true
+        return request
     }
 }
 
@@ -114,6 +124,13 @@ extension QueueMenuRequest {
 /// (AlbumDownloadMenu, PlaylistDownloadMenuSection's `titled`), its items the control's. Edit album is the top row's
 /// Edit on the phone (the page's bar clears `editAlbum`); the Mac's right-click keeps it here. Add to Queue stays the
 /// one queue item on both: no Play Next or Play Last.
+///
+/// START RADIO (Last.fm, slice A3 - deadwax-plans/lastfm.md 3.5; notes/ios.md "Last.fm, slice A3"): every one-song •••
+/// (`request.radioSong` - a song's row on an album, a playlist, Songs, Search, Top Songs) has "Start Radio" after Add to
+/// a playlist… - and so a song's right-click on the Mac, which draws these items. It plays the song at once as a new
+/// queue, in the tap (PlayerModel.startRadio: the play first, nothing awaited), and similar songs of your library come
+/// after it. Left out while Last.fm isn't on (`access.lastfm`), while deadwax can't be reached, and for an album gone
+/// from the collection. Playing needs no permission, so it asks none.
 struct QueueMenu<Label: View>: View {
     let request: QueueMenuRequest?
     @ViewBuilder let label: () -> Label
@@ -139,6 +156,7 @@ struct QueueMenuItems: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
+    @Environment(ServerModel.self) private var server
 
     var body: some View {
         if let request {
@@ -151,6 +169,11 @@ struct QueueMenuItems: View {
                     if reachability.online, !request.gone, !request.pick.tracks.isEmpty {
                         Button(PlaylistWords.addToAPlaylistRow, systemImage: PlaylistWords.addSymbol) {
                             navigation.playlistPick = PlaylistPickRequest(PlaylistPick(request.pick))
+                        }
+                    }
+                    if let seed = request.radioSong, reachability.online, !request.gone, server.access.lastfm == .on {
+                        Button(LastfmWords.startRadio, systemImage: LastfmWords.startRadioSymbol) {
+                            player.startRadio(seed)
                         }
                     }
                 }

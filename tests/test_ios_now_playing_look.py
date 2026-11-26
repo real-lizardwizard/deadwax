@@ -275,8 +275,11 @@ def test_now_playings_words_glyphs_and_buttons_have_no_face():
 
 
 #? the transport as it is (binding 6): Shuffle, Previous, Play/Pause, Next, Repeat - their glyphs, frames, actions and
-#? names exactly as R4b found them (31cab12d). A change to them is a change of its own, never this slice's
-TRANSPORT_DIGEST = "611f11f2e13940031ddd94caf8cf14e4d1295ad00d00c34b7ccd2bcd9547ef5e"
+#? names exactly as R4b found them (31cab12d). A change to them is a change of its own, never this slice's. One since:
+#? (Last.fm, A3) Shuffle dimmed with a station as for a library's shuffle, while it is off (A3's review) - `paged`
+#? reads `|| player.stationHoldsShuffle` - deadwax-plans/lastfm.md 3.5 and check 497 ("During a radio, Shuffle is
+#? greyed out")
+TRANSPORT_DIGEST = "c724df8126f7c5680dd5a93ae62758b4f06a3323584ce92aef74a73ce1eb38e7"
 
 
 def transport_digest() -> str:
