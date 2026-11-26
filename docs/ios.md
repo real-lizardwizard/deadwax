@@ -411,7 +411,7 @@ Shuffle button is: during the Library's Shuffle it reads **Shuffle - shuffling y
 shuffling all music** for all of deadwax's), ticked and dimmed, as Now Playing's is - that order is the shuffle. The
 Repeat submenu's three items are the words the Queue says to VoiceOver as Repeat changes: Repeat off, Repeat all, Repeat
 one. Queue is dimmed with nothing queued (unless its tab is showing: then it closes the panel), and Info too unless a
-row is selected, and Lyrics with nothing queued or for a song known to have none. **While a sheet is up** (Edit album, Add to a playlist, the EQ, a cover full size - any of them)
+row is selected, and Lyrics with nothing queued or for a song known to have none. **While a sheet is up** (Edit album's Tags, Artwork, Lyrics or Delete, Add to a playlist, the EQ, a cover full size - any of them)
 Settings…, Import EQ File…, Find, Refresh, Go to Current Song, the sidebar and the side panel's tabs are dimmed: they'd act on the
 window under the sheet - and Save changes is, unless the sheet is Server settings' own page (the Library's Set up
 Navidrome) - and all of them until you're signed in. **While a text field has the
@@ -452,7 +452,7 @@ The rest of the differences:
   on this Mac, as Grid or List is, and is as you left it after you quit; the phone has no Row Size, and its rows don't
   change. All songs is still the phone's page, so it doesn't follow it yet.
 - **Escape** closes the sheet in front - its Close, Cancel or Done, so where Close asks before throwing away what you
-  typed (Edit album, Artist images, a playlist's Edit), Escape asks too. Where Close doesn't ask, Escape does nothing
+  typed (Artist images, a playlist's Edit), Escape asks too. Where Close doesn't ask, Escape does nothing
   while you've typed something Close would throw away - Add a person's passwords, Reset password's, Which artist is
   this?'s and Artist images' searches, Choose a source's search words, a new playlist's name: click Close or Cancel
   then. It closes a cover shown full size. In the window itself Escape goes to one thing at a time, in this order: a
@@ -487,10 +487,13 @@ The rest of the differences:
   and **Share the Correction Alone** hand it to the Mac's Share menu - AirDrop, Mail. The correction alone needs a
   correction, as on the phone (dimmed otherwise). A file saved or shared imports again.
 - **Managing on a big screen.**
-  - **Edit album** is a sheet 760 points wide - the width an artist's page reads at - and as tall as the window less 40
-    points above and below, so it always fits inside the window, whatever its size (on macOS 15 or later; on macOS 14
-    it's the size macOS gives a sheet). Release, Tags, Artwork, Lyrics and Delete album… open inside it, as on the phone.
-  - **Manage's pages** - Edit an album's Choose the folder, Needs a look, Server settings and each of its groups,
+  - **Edit album** is a page, not a sheet: Settings' **Edit an album**, every album folder down its left (**Find**,
+    and **All | Needs a look**) and the folder you pick at its right - its header, **Release | Tags | Artwork | Lyrics
+    | Delete** as tabs, and Release's boxes, with **Revert** and **Apply** at its foot. An album page's **Edit** and a
+    Needs a look row open this page on that folder. Tags, Artwork, Lyrics and Delete album… are still today's pages:
+    their tab's **Open…** opens each in a sheet over the page. While it has changes, or an Apply runs, there's no Back,
+    and another folder or another album's Edit asks **Discard changes?** first.
+  - **Manage's pages** - Needs a look, Server settings and each of its groups,
     People and a person's page - sit in the middle of the page at the same readable width as an album's, scrolling
     with the pointer anywhere across the page. **Library care** (In nobody's library with it) and the **event log** are
     the Mac's own pages, across the whole page: their buttons in the toolbar, their counts in the status bar.
@@ -913,8 +916,8 @@ Library - see [Set up Navidrome](#set-up-navidrome).
   playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
   closes it.
 - **Edit**, at the top right before the •••, for someone who may edit albums (Edit albums or Look after the library -
-  an admin, or everyone with logins off): the album's editor, on a sheet over the tabs - see [Edit
-  album](#edit-album). It's dimmed while deadwax can't be reached, and for an album gone from the collection. (A
+  an admin, or everyone with logins off): the album's editor - Settings' Edit an album page, on this album's folder -
+  see [Edit album](#edit-album). It's dimmed while deadwax can't be reached, and for an album gone from the collection. (A
   right-click on the album elsewhere on the Mac still has **Edit album** in its menu.)
 - **Album info**, in the last part of the top •••'s menu, for everyone: everything known about the album, on a sheet
   of its own with **Done**. See [Album info](#album-info). **Refresh** ends that part: the album asked for again now.
@@ -1019,8 +1022,10 @@ page (turned off in Screen Time), the sheet says so under the link.
 and folder put right to match. It opens from an album page's top **•••** (**Edit album**, between Album info and
 Refresh), from Settings > Manage > **Edit an album**, or from a row of [Needs a look](#needs-a-look) - with ‹, Skip and
 Next album at its foot to work through the list - for someone who may edit albums - Edit albums or Look after the
-library: an admin, or everyone with logins off. It's a sheet over the tabs, titled Edit album, laid out as iOS
-Settings is: a header, then rows that each open a page. **Close** is at its top left.
+library: an admin, or everyone with logins off. It's a sheet over the tabs, titled Edit album, drawn flat on the
+page's black: a header, a strip of the editor's parts, then Release, with **Revert** and **Apply** at its foot.
+**Close** is at its top left, and at its top right **Matched** (green) when the folder is tagged with a MusicBrainz
+release, **Not matched** when it isn't. (On the Mac, Edit album is a page of its own - see [The Mac app](#the-mac-app).)
 
 **Finding the folder.** The editor works on the album's folder in deadwax's library, which the phone finds as the web
 app does: the folder deadwax knows the album by, else the folder tagged with the album's release, else an untagged one
@@ -1040,8 +1045,11 @@ doesn't list. Pull down to read the library again.
 **The editor's first page:**
 
 - **The header**: the folder's cover, the album, the artist (and its edition), the folder's formats and track count
-  ("FLAC · 12 tracks · 2 discs"), and the folder's path under them, which you can select.
+  ("FLAC · 12 tracks · 2 discs"), and the folder's path under them in the typewriter face, which you can select.
 - **Folder**, a menu, when the album is in more than one folder.
+- **The strip**: **Release**, **Tags**, **Artwork** and **Lyrics** with Edit albums, **Delete** with Look after the
+  library. Release is drawn on this page, under the strip (below); the others each open their page, as the rows did
+  (all below).
 - **Needs a look**, with Edit albums, when something's wrong with the album: each issue, with what it means ("Not
   matched to MusicBrainz", "No cover art"...), as Needs a look in the web app says them. With **Look after the
   library** too, **It's fine as it is** under them takes the album out of Needs a look for those issues; after it,
@@ -1049,24 +1057,21 @@ doesn't list. Pull down to read the library again.
   one it doesn't answer (or answers with a server error) may still have been kept, so the album is read again and shows
   what deadwax now holds - as an apply that got no answer is. Someone with Edit albums alone sees the
   issues, but not the two buttons - marking an album fine is the library's keeper's call - and someone with Look after
-  the library alone has only Delete album…, as in the web app.
-- **Edit**, with Edit albums: **Release** - the release the album is matched to, or "Not matched to a release" - opens
-  the Release page (below), **Tags** ("12 tracks") the album's files, **Artwork** ("Cover, CD art", "No cover") its
-  cover and CD art, and **Lyrics** ("8 of 12") how many tracks have lyrics (all below).
-- **Delete album…**, in red, with Look after the library, opens the Delete album page (below).
+  the library alone has only Delete in the strip, as in the web app.
 
-**Release** is the release, the fields, the cover and what Apply will do, top to bottom:
+**Release**, under the strip, is four groups - the release, the fields, the cover and what Apply will do, top to
+bottom - with **Revert** and **Apply** at the foot of the page, staying there under the keyboard while you type:
 
-- **Release**: the pressing chosen - its cover, title, artist, its year and what tells it apart ("2011 · CD · GB ·
-  SHVL 804"), its track count (in amber when it isn't the folder's), and **Current** when the folder is already tagged
-  with it. Tap it to **Choose a release**. With none chosen yet, "Choose a release".
+- **Release**: the pressing chosen - its title, **Current** when the folder is already tagged with it, its year and
+  what tells it apart ("2011 · CD · GB · SHVL 804") with its track count (in amber when it isn't the folder's).
+  **Change…** opens **Choose a release** - **Choose a release**, with none chosen yet.
 - **Fields**: **Artist**, **Album**, **Year**, **Original year** and **Edition**, as the web app's editor has them -
   the years with the number pad, **Done** above the keyboard. Choosing a release fills them in from it (Edition left
   blank, worked out from the release). "Blank fields are left alone rather than cleared. The folder is named after the
   original year and the edition, so a remaster files under the album's own year."
 - **Cover**: a switch, "Download cover art" - or "Replace cover.jpg" when the folder has one - on at first only when it
-  has none, with where it comes from and the size it's saved at under it. **Compare covers…** opens the folder's cover
-  beside the release's (below).
+  has none, with where it comes from and the size it's saved at under it, beside the folder's cover and the release's.
+  **Compare** opens them side by side, larger (Compare covers, below).
 - **What Apply does**, worked out by deadwax as you go: "Working out the changes…" (or "Fetching the tracklist…" while
   a release you chose loads), then anything worth reading first - a track count that differs, files the tracklist
   didn't reach - in amber; when the folder will be renamed, **Folder** with its path now and → its new path (**Merge**
@@ -1080,6 +1085,9 @@ doesn't list. Pull down to read the library again.
   and it says what it's waiting for: "Applying, waiting for Navidrome", or "Applying, renaming in 20s". Then what it
   did: "Updated the tags in 12 files, moved the folder to match its tags." The folder is read again, and the album page
   under the sheet shows the album as it is now.
+- **Revert**, beside Apply: Release put back as the folder has it - the fields, the cover's switch and the release
+  it's tagged with - writing nothing. It's on only once you've changed something, and not while anything is being
+  written or the folder is being read again after an Apply.
 
 **Choose a release** is MusicBrainz's pressings of the album, best first, as the web app's editor lists them: it
 searches for the fields' artist and album (or for words you type at the top), takes the three albums that match best
@@ -6180,8 +6188,9 @@ Say "pass", or what you saw.
   Show Tab Bar then its +, System Settings > Desktop & Dock > Prefer tabs when opening documents set to Always, the Dock
   icon's own menu? Say what each did. Typing in Search after the window came back, does Space type a space (not
   pause), and with the cursor out of the field, pause?
-- **422 Escape and Return.** Edit album with nothing typed: Escape closes it. Type in a field, Escape: it asks to
-  discard - and Return there keeps editing, it doesn't discard. Escape closes Up Next, Info, Album info, the Sources
+- **422 Escape and Return.** Edit album (Settings' **Edit an album** page since the redesign, no longer a sheet):
+  type in a field, then click another folder in its list - it asks to discard, and Return there keeps editing, it
+  doesn't discard. A part's page it opens over itself (Tags…, say): Escape closes it, as Done does. Escape closes Up Next, Info, Album info, the Sources
   sheet, Add to a playlist, a cover full size and Now Playing. A playlist's Edit: Escape leaves it, asking first after
   a change. Settings > Downloads > Remove All Downloads: Return cancels, nothing removed. A playlist's Delete: Return
   keeps it. Edit album's Delete permanently, and People's Forget: Return cancels, nothing deleted or forgotten. In a
@@ -6334,10 +6343,11 @@ deadwax quits as it opens, say so before anything else**: macOS throws out an ap
 only a Mac can say whether its File menu has a ⌘S of its own (none was found in macOS's own menus). Say "pass", or what
 you saw.
 
-- **452 Edit album.** An album's ••• > Edit album: the sheet fits the window; Release, Tags, Artwork, Lyrics, Delete
-  album… each open. Is the sheet 760 points wide and nearly as tall as the window - or the size it was before (say
-  which macOS the Mac has)? Narrow and shorten the window as far as it goes with Edit album shut, then open it: does
-  it still fit? Does it follow the window if you resize it with the sheet up?
+- **452 Edit album.** An album's ••• > Edit album: Settings' **Edit an album** page opens on that folder (a page since
+  the redesign, never a sheet - [580-582](#edit-album-the-folder-list-and-release-580-584) are its own checks);
+  Release, Tags, Artwork, Lyrics and Delete each open. Narrow and shorten the window as far as it goes with the page
+  up: does it still fit, the list narrowing and the editor stacking? Tags, Artwork, Lyrics and Delete open over it in
+  a sheet: does that sheet fit the window, and follow it if you resize it?
 - **453 The keyboard in the editor.** Tab moves between the fields; Return in a field doesn't apply; Apply is a click.
   In Release: Artist, Tab, Album, Tab, Year… in that order, and Shift-Tab back. In Edit tags the same, through all
   eleven fields, from Track's into Album's. Does Tab ever skip a field, or move two at once? Return in any of them:
@@ -6911,6 +6921,51 @@ first, and start one more so something is coming.
   sizes Check goes under the address. This phone > Change address is the old screen, in a box now.)
 - **579 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 577-578, or "not done yet".
 
+#### Edit album, the folder list and Release (580-584)
+
+**Not done yet.** Edit album in the new look: on the Mac one page, Settings' **Edit an album** - every album folder at
+the left, the one you pick at the right; on the phone the sheet's first page drawn flat, with a strip across it and
+**Revert** and **Apply** at its foot. Tags, Artwork, Lyrics and Delete are still the pages they are today. Have an
+album whose tags you don't mind changing and changing back, and one or two in Needs a look.
+
+- **580 Edit an album.** **Not done yet.** On the Mac pick a folder: the header and Release fit one screen, with Apply
+  in view. (Settings' **Edit an album** opens the page: the folders down its left in the Library's order - by artist,
+  "AC/DC" after "Abba", "dEUS" among the D's - **Find folders** to narrow them, **All | Needs a look** to show only
+  what Needs a look lists, an amber count on each with something to look at and **New** on one just added, and the
+  status bar saying how many folders show and how many need a look - the same number as the sidebar's **Needs a
+  look**. Click one and, a moment later, the right shows it: its
+  cover, the album, the artist, the formats and size, its path in the typewriter face, **Matched to MusicBrainz** or
+  **Not matched**, and **Open album**; then **Release | Tags | Artwork | Lyrics | Delete** as tabs, and Release's
+  boxes - Pressing (search and Find releases, the pressings to click), Fields, Cover and What Apply does - two columns
+  in a wide window, one in a narrow one. **Revert** and **Apply** are at the foot whatever the window's size. Tab goes
+  through the search and the five fields in order. Tags, Artwork, Lyrics and Delete each say what they hold, and
+  their **Open…** at the foot opens today's page over this one; Done closes it.)
+- **581 Apply.** **Not done yet.** What Apply does shows the change; after Apply, the album and Navidrome show it;
+  Revert undoes it. (Change the edition, say: What Apply does says what will change - **Show every change** lists
+  each file's. **Apply** says what it's waiting for while it runs; while it does, the window can't be closed, there's
+  no Back, and clicking another folder does nothing. Then the album's page and Navidrome show the change. Type
+  something else and **Revert** puts the fields back as the folder has them - nothing is written. With something
+  typed, clicking another folder, or another album page's **Edit**, asks **Discard changes?** first; **Keep editing**
+  is Return's.)
+- **582 From an album.** **Not done yet.** An album page's **Edit** opens this page on that folder. (The Edit album
+  page comes to the front with the album's folder picked in the list. **Open album** goes back to the album's page,
+  with the Edit page under it. A Needs a look row opens it too, with ‹ and Skip over the header for now. Open it from
+  an album and, while it's still finding the folder, click another tab and come back: it finds it - it never stays
+  finding it for good. An album you don't mind losing: its **Delete** tab, **Open Delete album…**, delete it - is its
+  album page gone from the Library too, not left behind?)
+- **583 Edit album on the phone.** **Not done yet.** As drawn; Release is the strip's one tab, the rest open their
+  pages; Apply at the foot works; Close with typed work asks first. (The top has **Close**, Edit album and a green
+  **Matched** - or **Not matched**. Under the header - its byline and its path, in the typewriter face, a line each,
+  cut short with … when long - is the strip: **Release** is this page; Tags, Artwork, Lyrics and Delete each open
+  their page as the rows did. Release is four groups with a heading each and no grey boxes: Release (**Choose a
+  release** or **Change…**), Fields (Artist, Album, Year and Original on one line - the years in the typewriter face -
+  Edition, each a box you type in), Cover (the two covers, the purple switch, **Compare**) and What Apply does, its
+  line to every change an easy tap. **Revert** and **Apply** sit at the foot and stay there under the keyboard -
+  none of the fields is hidden behind them. Type, then Close: it asks **Discard changes?**; a swipe down doesn't close
+  it. At the largest text sizes each field's label sits over its box, and the two buttons' words take more than one
+  line.)
+- **584 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 583, or "not done yet".
+
 #### Library care and the Event log (594-597)
 
 **Not done yet.** Library care, In nobody's library and the Event log in the new look - the Mac's toolbar and boxes,
@@ -7012,15 +7067,16 @@ track, a picture and anywhere you type keep a face. Nothing works any differentl
 download or two on Requests and something queued.
 
 **Not flat yet**, each until the slice that redraws it: Settings' Debug page;
-Edit album's pages (R10 and R11); Needs a look (R12); People and Server settings (R14); and the EQ's own pages - Correction's search and a filter's editor - and an artist's Artist images and Move
-albums sheets, which no slice has taken yet. Those keep iOS's grouped lists and their grey rows for now: don't count
+Edit album's Tags, Artwork, Lyrics and Delete pages (R11); Needs a look (R12); People and Server settings (R14);
+and the EQ's own pages - Correction's search and a filter's editor - an artist's Artist images and Move albums
+sheets, and the pages Edit album's Release opens (Choose a release, Changes, Compare covers), which no slice has
+taken yet. Those keep iOS's grouped lists and their grey rows for now: don't count
 them in 612.
 
 - **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
   Requests, an album, a playlist, an artist's page, Now Playing's sheet, Search Soulseek…'s sheet, Search, an album
   you don't have, Choose a source, Settings and its pages (Debug aside), Settings > Downloads, Library care, In
-  nobody's library, the Event log and the sign-in -
-  not the screens
+  nobody's library, the Event log, the sign-in and Edit album's first page - not the screens
   above that aren't flat yet: is anything still a grey box laid on top? Is every button still plainly a button, and
   does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while
   your finger is on it - an album's Shuffle, **Same source again**, a card's ✕, the EQ's output, Downloaded's **Not

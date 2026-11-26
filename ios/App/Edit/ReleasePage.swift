@@ -4,14 +4,43 @@ import UIKit
 
 /// Edit album's Release (notes/ios-specs/phase8-managing.md 3.3; the web's MetadataEditor, split over pages): the
 /// pressing chosen (pushing Choose a release), the fields, the cover, What Apply does - the preview, drawn in the web's
-/// words, its changes a row pushing Changes - and Apply under it. Apply is on only for a preview of what the page shows
-/// now that changes something, with nothing loading and deadwax in reach (RetagFlow.canApply); while it runs it says
-/// what it waits for (RetagWords.applying), and after, what it did - the folder read again and the album followed by
-/// EditAlbumModel. Every word is Core's.
+/// words, its changes a row pushing Changes - and Apply. Apply is on only for a preview of what the page shows now that
+/// changes something, with nothing loading and deadwax in reach (RetagFlow.canApply); while it runs it says what it waits
+/// for (RetagWords.applying), and after, what it did - the folder read again and the album followed by EditAlbumModel.
+/// Every word is Core's.
+///
+/// (R10 - notes/ios.md "The redesign, slice R10: Edit album, the folder list and Release") On the phone Release is the
+/// root's own now, under its strip (iEdit.dc.html): its four cards (ReleaseCards) and its foot (ReleaseFoot - Revert and
+/// Apply). This page is the same cards and foot pushed by themselves, where Artwork's pointer to the Release tab still
+/// pushes them (R11 makes that the strip's tab).
 struct ReleasePage: View {
     let model: EditAlbumModel
     let retag: RetagModel
 
+    var body: some View {
+        ScrollView {
+            ReleaseCards(model: model, retag: retag, pushed: true)
+                .padding(.horizontal, CGFloat(PhoneLook.bigSide))
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(DWPalette.page)
+        .navigationTitle(EditWords.release)
+        .navigationBarTitleDisplayMode(.inline)
+        .phoneFoot { ReleaseFoot(model: model, retag: retag) }
+    }
+}
+
+/// Release's cards on the phone (iEdit.dc.html, flat as R1c draws the phone): Release - the pressing chosen, Change…
+/// pushing Choose a release; Fields - Artist, Album, Year beside Original, Edition, each on the look's well; Cover - the
+/// folder's and the pressing's, Replace cover.jpg's switch, Compare pushing Compare covers; What Apply does - the
+/// preview, its summary pushing Changes. `pushed`, the page by itself: the waits are said here too, as the root says
+/// them over its strip.
+struct ReleaseCards: View {
+    let model: EditAlbumModel
+    let retag: RetagModel
+    var pushed = false
+
+    @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var focused: Field?
 
     private enum Field: Hashable {
@@ -23,16 +52,22 @@ struct ReleasePage: View {
 
     var body: some View {
         let plan = retag.currentPlan
-        Form {
-            if retag.flow.mayHaveFinished {
-                Section {
+        VStack(alignment: .leading, spacing: 0) {
+            if retag.flow.mayHaveFinished && pushed {
+                PhoneCard {
                     MayHaveFinished(reading: model.scan.reading)
                 }
             }
-            // the folder couldn't be read again after a write or a gap: the wait ends here, said, with Look again
+            // the folder couldn't be read again after a write or a gap: the wait ends here, said, with Look again - on
+            // the root its own line says it, where the library's read failed
             if retag.flow.readFailed {
-                Section {
-                    ReadAgainFailed(model: model)
+                if pushed || model.scan.failure == nil {
+                    PhoneCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ReadAgainFailed(model: model)
+                        }
+                        .buttonStyle(DWButtonStyle(size: .small))
+                    }
                 }
             }
             pressingSection
@@ -40,9 +75,8 @@ struct ReleasePage: View {
             coverSection
             applySection(plan)
         }
-        .navigationTitle(EditWords.release)
-        .navigationBarTitleDisplayMode(.inline)
-        .scrollDismissesKeyboard(.interactively)
+        .font(Typeface.Phone.text(.row))
+        .foregroundStyle(DWPalette.text)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -54,24 +88,60 @@ struct ReleasePage: View {
     // MARK: the pressing
 
     private var pressingSection: some View {
-        Section {
-            NavigationLink(value: EditPage.chooseRelease) {
-                if let shown = chosen {
-                    RetagPressingRow(candidate: shown, album: retag.album, loading: retag.loadingId == shown.id)
-                } else {
-                    Text(EditWords.chooseRelease)
+        PhoneGroup(legend: EditWords.release) {
+            PhoneCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    stacking(spacing: 10) {
+                        pressingWords
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        NavigationLink(value: EditPage.chooseRelease) {
+                            buttonWords(retag.selectedId == nil ? EditWords.chooseRelease : EditAlbumPage.Words.change)
+                        }
+                        .buttonStyle(DWButtonStyle(size: .small))
+                        .disabled(retag.flow.applying)
+                    }
+                    if let error = retag.searchError {
+                        Text(error)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(DWPalette.amberText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
-            .disabled(retag.flow.applying)
-            if let error = retag.searchError {
-                Text(error)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.amber)
-                    .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// The pressing chosen, in iEdit's words: its title and Current, its facts in the readout face - one element for
+    /// VoiceOver (EditWords.releaseRow), its tracklist loading said as its value.
+    @ViewBuilder private var pressingWords: some View {
+        if let shown = chosen {
+            let release = shown.release
+            let current = Retag.isCurrent(release, retag.album.releaseMbid)
+            let differs = Retag.countDiffers(release, album: retag.album)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(release.title ?? "")
+                        .fontWeight(.semibold)
+                    if current {
+                        DWChip(words: RetagWords.current, tone: .marked)
+                    }
+                    if retag.loadingId == shown.id {
+                        ProgressView()
+                    }
+                }
+                Text([Retag.detail(release), Retag.trackWords(release)].filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(Typeface.Phone.mono(.extraSmall))
+                    .foregroundStyle(differs ? DWPalette.amberText : DWPalette.t2)
             }
-        } header: {
-            Text(EditWords.release)
-                .font(Typeface.footnote)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(EditWords.releaseRow(release, current: current))
+            .accessibilityValue(retag.loadingId == shown.id ? EditWords.loadingTracklist
+                                : differs ? EditWords.countDiffers(retag.album) : "")
+        } else {
+            Text(EditWords.releaseValue(retag.album, pressing: nil))
+                .foregroundStyle(DWPalette.t2)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -85,151 +155,284 @@ struct ReleasePage: View {
     // MARK: the fields
 
     private var fieldsSection: some View {
-        Section {
-            field(EditWords.artist, \.artist, .artist)
-            field(EditWords.album, \.album, .album)
-            field(EditWords.year, \.year, .year, prompt: EditWords.year, digits: true)
-            field(EditWords.originalYear, \.originalYear, .originalYear,
-                  prompt: RetagWords.originalPlaceholder(retag.fields.year), digits: true)
-            field(EditWords.edition, \.editionLabel, .edition, prompt: RetagWords.editionPlaceholder(retag.plan))
-        } header: {
-            Text(EditWords.fields)
-                .font(Typeface.footnote)
-        } footer: {
+        VStack(alignment: .leading, spacing: 8) {
+            PhoneGroup(legend: EditWords.fields) {
+                fieldRow(EditWords.artist, field(EditWords.artist, \.artist, .artist))
+                fieldRow(EditWords.album, field(EditWords.album, \.album, .album))
+                yearRow(field(EditWords.year, \.year, .year, prompt: EditWords.year, digits: true),
+                        field(EditWords.originalYear, \.originalYear, .originalYear,
+                              prompt: RetagWords.originalPlaceholder(retag.fields.year), digits: true))
+                fieldRow(EditWords.edition, field(EditWords.edition, \.editionLabel, .edition,
+                                                  prompt: RetagWords.editionPlaceholder(retag.plan)))
+            }
             Text(RetagWords.fieldsHint)
-                .font(Typeface.footnote)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .disabled(retag.flow.applying)
     }
 
+    /// A field on the look's well (DWWellField): its own focus, then Tab's, as every field of the editor's. (R10's
+    /// review) The years in the readout face, as iEdit draws them (`.in.mono`) - ReleaseYearFace, set inside the well's
+    /// own face, so it wins; its size the field's 16, so iOS never zooms to it.
     private func field(_ label: String, _ key: WritableKeyPath<RetagFields, String>, _ name: Field,
                        prompt: String? = nil, digits: Bool = false) -> some View {
-        LabeledContent(label) {
-            TextField(label, text: Binding(get: { retag.fields[keyPath: key] }, set: { retag.set(key, $0) }),
-                      prompt: prompt.map { Text($0) })
-                .multilineTextAlignment(.trailing)
-                .keyboardType(digits ? .numberPad : .default)
-                .textInputAutocapitalization(digits ? .never : .words)
-                .autocorrectionDisabled()
-                .focused($focused, equals: name)
-                .tabs($focused, in: Self.order)
+        TextField(label, text: Binding(get: { retag.fields[keyPath: key] }, set: { retag.set(key, $0) }),
+                  prompt: prompt.map { Text($0).foregroundStyle(DWPalette.t3) })
+            .keyboardType(digits ? .numberPad : .default)
+            .textInputAutocapitalization(digits ? .never : .words)
+            .autocorrectionDisabled()
+            .focused($focused, equals: name)
+            .tabs($focused, in: Self.order)
+            .modifier(ReleaseYearFace(digits: digits))
+            .modifier(DWWellField(focus: $focused, field: name))
+    }
+
+    /// (R10's review) A field's row, as DWFieldRow's phone half draws it - its label at the left in white, 88 at least,
+    /// the field beside it, the row 44 tall at least on its hairline - but stacked, the label over the field, at the
+    /// accessibility sizes, as the Year row stacks: the look's DWFieldRow keeps one line at every size, so these rows
+    /// are Release's own.
+    private func fieldRow(_ label: String, _ field: some View) -> some View {
+        row {
+            fieldLabel(label)
+                .frame(minWidth: CGFloat(DWLook.here.labelWidth), alignment: .leading)
+            field
+                .accessibilityLabel(label)
         }
+    }
+
+    /// iEdit's Year row: Year and Original on one row, a field's row with two labels - each field said by its own name
+    /// (one label would name both) - stacked at the accessibility sizes.
+    private func yearRow(_ year: some View, _ original: some View) -> some View {
+        row {
+            fieldLabel(EditWords.year)
+                .frame(minWidth: CGFloat(DWLook.here.labelWidth), alignment: .leading)
+            year
+                .accessibilityLabel(EditWords.year)
+            fieldLabel(EditAlbumPage.Words.original)
+            original
+                .accessibilityLabel(EditWords.originalYear)
+        }
+    }
+
+    /// A row of the Fields card (`.field`): side by side, stacked at the accessibility sizes; 44 tall at least, on the
+    /// group's hairline (PhoneGroup clips the last one's, as `.field:last-child` draws none).
+    private func row<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                                                  : AnyLayout(HStackLayout(spacing: 8))
+        return layout { content() }
+            .padding(.vertical, typeSize.isAccessibilitySize ? 8 : 0)
+            .frame(minHeight: CGFloat(DWLook.here.fieldRowHeight))
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
+    }
+
+    private func fieldLabel(_ words: String) -> some View {
+        Text(words)
+            .font(Typeface.Look.text(.fieldLabel))
+            .foregroundStyle(DWPalette.rowText)
+            .accessibilityHidden(true)
     }
 
     // MARK: the cover
 
     private var coverSection: some View {
         let existing = retag.plan?.art.existing
-        return Section {
-            Toggle(isOn: Binding(get: { retag.fetchArt }, set: { retag.setFetchArt($0) })) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(RetagWords.coverToggle(existing: existing))
+        let album = retag.album
+        return PhoneGroup(legend: EditWords.cover) {
+            PhoneCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    stacking(spacing: 10) {
+                        HStack(spacing: 10) {
+                            FolderCover(path: album.path, mtime: album.artMtime, hasArt: !album.art.isEmpty, pixels: 160)
+                                .frame(width: 48, height: 48)
+                                .clipShape(Corners.artShape)
+                            if let release = retag.coverRelease {
+                                ArchiveCover(addresses: ArchiveCoverID.addresses(release: release,
+                                                                                 group: chosen?.groupMbid ?? ""),
+                                             size: ArchiveCoverSize.row)
+                                    .frame(width: 48, height: 48)
+                                    .clipShape(Corners.artShape)
+                            }
+                        }
+                        .accessibilityHidden(true)
+                        Toggle(isOn: Binding(get: { retag.fetchArt }, set: { retag.setFetchArt($0) })) {
+                            Text(RetagWords.coverToggle(existing: existing))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .toggleStyle(.phoneSwitch)
+                        .disabled(retag.flow.applying)
+                        if retag.coverRelease != nil {
+                            NavigationLink(value: EditPage.compareCovers) {
+                                buttonWords(EditAlbumPage.Words.compare)
+                            }
+                            .buttonStyle(DWButtonStyle(size: .small))
+                            .accessibilityLabel(EditWords.compareCovers)
+                        }
+                    }
                     Text(RetagWords.coverHint(existing: existing, size: retag.plan?.art.size))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .disabled(retag.flow.applying)
-            if retag.coverRelease != nil {
-                NavigationLink(value: EditPage.compareCovers) {
-                    Text(EditWords.compareCovers)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-        } header: {
-            Text(EditWords.cover)
-                .font(Typeface.footnote)
         }
     }
 
-    // MARK: what Apply does, and Apply
+    // MARK: what Apply does
 
     @ViewBuilder private func applySection(_ plan: RetagPlan?) -> some View {
-        Section {
-            if retag.flow.planning {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(RetagWords.planningLabel(loadingRelease: retag.flow.loadingRelease))
-                        .foregroundStyle(Palette.quiet)
+        PhoneGroup(legend: EditWords.whatApplyDoes) {
+            PhoneCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    if retag.flow.planning {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text(RetagWords.planningLabel(loadingRelease: retag.flow.loadingRelease))
+                                .foregroundStyle(DWPalette.t2)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    // what the last apply reported, kept on screen while the preview is redone under it
+                    ForEach(retag.appliedProblems, id: \.self) { (problem: String) in
+                        Text(RetagWords.problem(problem)).foregroundStyle(DWPalette.amberText)
+                    }
+                    if let plan, !retag.flow.planning {
+                        preview(plan)
+                    } else if let error = retag.previewError, !retag.flow.planning {
+                        ErrorNote(text: error)
+                    }
+                    if let applied = retag.applied {
+                        Text(applied)
+                            .foregroundStyle(DWPalette.greenText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let error = retag.applyError {
+                        ErrorNote(text: error)
+                    }
                 }
-                .accessibilityElement(children: .combine)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            // what the last apply reported, kept on screen while the preview is redone under it
-            ForEach(retag.appliedProblems, id: \.self) { (problem: String) in
-                Text(RetagWords.problem(problem)).foregroundStyle(Palette.amber)
-            }
-            if let plan, !retag.flow.planning {
-                preview(plan)
-            } else if let error = retag.previewError, !retag.flow.planning {
-                ErrorNote(text: error)
-            }
-            if let applied = retag.applied {
-                Text(applied)
-                    .foregroundStyle(Palette.held)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if let error = retag.applyError {
-                ErrorNote(text: error)
-            }
-        } header: {
-            Text(EditWords.whatApplyDoes)
-                .font(Typeface.footnote)
         }
-        Section {
-            Button {
-                Task { await model.apply() }
-            } label: {
-                HStack(spacing: 10) {
-                    if retag.flow.applying { ProgressView() }
-                    Text(retag.flow.applying ? RetagWords.applying(plan ?? retag.plan) : RetagWords.apply)
-                        .font(Typeface.headline)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .disabled(!retag.canApply || model.tagsApplying || model.getting || model.deleting)
-        }
+        .padding(.bottom, CGFloat(PhoneLook.cardPadding))
     }
 
     /// The preview in the web's words (MetadataEditor's): its problems, the folder's move or merge, the pause before the
     /// rename, nothing to change - or how many files would change, a row pushing each file's changes.
     @ViewBuilder private func preview(_ plan: RetagPlan) -> some View {
         ForEach(plan.problems, id: \.self) { (problem: String) in
-            Text(RetagWords.problem(problem)).foregroundStyle(Palette.amber)
+            Text(RetagWords.problem(problem)).foregroundStyle(DWPalette.amberText)
         }
         if plan.moves {
             VStack(alignment: .leading, spacing: 3) {
                 Text(RetagWords.moveLabel(plan))
-                    .font(Typeface.footnote.weight(.semibold))
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small).weight(.semibold))
+                    .foregroundStyle(DWPalette.t2)
                 Text(plan.albumPath)
-                    .font(Typeface.mono(.footnote))
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.mono(.extraSmall))
+                    .foregroundStyle(DWPalette.t2)
                 Text("→ \(plan.targetPath ?? "")")
-                    .font(Typeface.mono(.footnote))
+                    .font(Typeface.Phone.mono(.extraSmall))
             }
             .fixedSize(horizontal: false, vertical: true)
             .textSelection(.enabled)
             .accessibilityElement(children: .combine)
         }
         if let wait = RetagWords.renameWait(plan) {
-            Text(wait).font(Typeface.footnote).foregroundStyle(Palette.quiet)
+            Text(wait).font(Typeface.Phone.text(.small)).foregroundStyle(DWPalette.t2)
         }
         if let merging = RetagWords.merge(plan) {
-            Text(merging).font(Typeface.footnote)
+            Text(merging).font(Typeface.Phone.text(.small))
         }
         if plan.empty {
-            Text(RetagWords.nothingToChange).foregroundStyle(Palette.quiet)
+            Text(RetagWords.nothingToChange).foregroundStyle(DWPalette.t2)
         } else if retag.applyError == nil {
             if plan.changedFileCount > 0 {
                 NavigationLink(value: EditPage.changes) {
-                    Text(RetagWords.changeSummary(plan))
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: CGFloat(PhoneLook.goGap)) {
+                        Text(RetagWords.changeSummary(plan))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        PhoneChevron()
+                    }
+                    // (R10's review) every change, a finger's 44 tall at least however short its words
+                    .frame(minHeight: CGFloat(DWLook.here.target))
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             } else {
                 Text(RetagWords.changeSummary(plan))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    // MARK: the cards' parts
+
+    /// A card's row: side by side, the trailing parts stacked under at the accessibility sizes.
+    private func stacking<Content: View>(spacing: CGFloat, @ViewBuilder _ content: () -> Content) -> some View {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
+                                                  : AnyLayout(HStackLayout(alignment: .center, spacing: spacing))
+        return layout { content() }
+    }
+
+    /// A button's words: three lines at the accessibility sizes, one otherwise.
+    private func buttonWords(_ words: String) -> some View {
+        Text(words)
+            .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            .multilineTextAlignment(.center)
+    }
+}
+
+/// (R10's review) A year field's face on the phone: the readout's (`.in.mono`) at the field's 16, set inside
+/// DWWellField's own face so it wins there; a field of words keeps the well's.
+private struct ReleaseYearFace: ViewModifier {
+    let digits: Bool
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if digits {
+            content.font(Typeface.Look.mono(.field))
+        } else {
+            content
+        }
+    }
+}
+
+/// Release's foot on the phone (iEdit's .foot2): Revert - the typed work put back as the folder has it - and Apply,
+/// the purple one, growing. Apply sends the preview's very body (EditAlbumModel.apply): the server works the plan out
+/// again from it, never a plan sent back. While it runs it says what it waits for, the sheet's Close off and its swipe
+/// held (EditAlbumSheet).
+struct ReleaseFoot: View {
+    let model: EditAlbumModel
+    let retag: RetagModel
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let plan = retag.currentPlan
+        Button {
+            model.revertRelease()
+        } label: {
+            words(EditAlbumPage.Words.revert)
+        }
+        .buttonStyle(DWButtonStyle(size: .large))
+        .disabled(!model.canRevertRelease)
+        Button {
+            Task { await model.apply() }
+        } label: {
+            HStack(spacing: 10) {
+                if retag.flow.applying { ProgressView() }
+                words(retag.flow.applying ? RetagWords.applying(plan ?? retag.plan) : RetagWords.apply)
+            }
+        }
+        .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
+        .disabled(!retag.canApply || model.tagsApplying || model.getting || model.deleting)
+    }
+
+    private func words(_ said: String) -> some View {
+        Text(said)
+            .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            .multilineTextAlignment(.center)
     }
 }
 

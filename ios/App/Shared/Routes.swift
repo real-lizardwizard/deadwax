@@ -319,8 +319,19 @@ final class AppNavigation {
     /// Over the tabs, not the album page, so the page beneath can be moved to the album's new id while it is up.
     var albumEdit: AlbumEditRequest?
     /// (slice 6's review) Edit album as last presented: whatever ends it - its sheet dismissed, another opening, a
-    /// sign-out - tells its Needs a look session, which ends once however many say so (Core's NeedsLook.Run).
+    /// sign-out - tells its Needs a look session, which ends once however many say so (Core's NeedsLook.Run). (R10) On
+    /// the Mac, the opening its page shows: the page leaving every stack ends it (`editPageGone`).
     @ObservationIgnored private var presentedEdit: AlbumEditRequest?
+    /// (R10 - notes/ios.md "The redesign, slice R10: Edit album, the folder list and Release") Edit album on the Mac: the
+    /// opening its page shows - Settings' Edit an album (`.chooseFolder`), the folder list beside the editor
+    /// (MacEditWindow). The Mac never presents the sheet: `albumEdit` is never set there, nor this on the iPhone.
+    private(set) var macEdit: AlbumEditRequest?
+    /// (R10) An opening asked for while the Mac's editor holds work (typed work, a write or a mark): its page, brought to
+    /// the front, asks "Discard changes?" first, as the sheet's Close does (`macEditAnswered`).
+    private(set) var macEditAsked: AlbumEditRequest?
+    /// (R10) The Mac's editor holds work: its page is kept as a playlist's Edit is (`kept`) - a tab's button never pops
+    /// it, a sidebar row opens over it - and its page draws no Back meanwhile.
+    private(set) var macEditHolds = false
     /// (Phase 8, slice 1) One more each time Edit album wrote to an album's folder, by the album's id: its page asks
     /// again (now, and once Navidrome has scanned - EditAlbumModel).
     private(set) var albumWrites: [String: Int] = [:]
@@ -509,8 +520,10 @@ final class AppNavigation {
         endSources()
     }
 
-    /// (R7) The page in front moved: the dock's Get ends unless its own page is still the one in front.
+    /// (R7) The page in front moved: the dock's Get ends unless its own page is still the one in front. (R10) And the
+    /// Mac's Edit album ends once its page is on no stack.
     private func frontMoved() {
+        editPageGone()
         guard let get = macSources, !MacDock.getLasts(AppRoute.group(get.page), front: shownStack.last) else { return }
         endSources()
     }
@@ -560,6 +573,10 @@ final class AppNavigation {
         case .playlist(let id, let how):
             tab = .library
             MacSidebar.put(AppRoute.playlist(PlaylistRoute(id: id)), how, on: &library, kept: kept(library))
+        case .manage(.edit, _) where you.contains(.chooseFolder):
+            // (R10) one Edit album page: back to it - the pages over it popped, those that hold work kept
+            tab = .you
+            backToEditPage()
         case .manage(let tool, let how):
             tab = .you
             if let route = Self.route(.manage(tool)) { MacSidebar.put(route, how, on: &you, kept: kept(you)) }
@@ -673,9 +690,11 @@ final class AppNavigation {
         }
         let password = stack.map { (route: AppRoute) -> Bool in route == .changePassword }
         let people = stack.map(\.isPeople)
+        // (R10) the Mac's Edit album holding work, and the pages under it
+        let editing = macEditHolds ? (stack.lastIndex(of: .chooseFolder).map { (at: Int) -> Int in at + 1 } ?? 0) : 0
         return max(PlaylistEdit.pagesKept(ids, editing: editingPlaylist),
                    OwnPassword.pagesKept(password, changing: changingPassword),
-                   People.pagesKept(people, writing: writingPeople))
+                   People.pagesKept(people, writing: writingPeople), editing)
     }
 
     /// (Phase 8, slice 10) Change password's change went out, or answered.
@@ -763,12 +782,103 @@ final class AppNavigation {
 
     /// Edit album opened over the tabs (a page's ••• or Choose the folder; Now Playing is never over either). Put in
     /// place of another opening - still up, or going with its onDismiss yet to come - that one's Needs a look session
-    /// ends: unless this is the same page's new session, which its Run began only once the last had ended.
+    /// ends: unless this is the same page's new session, which its Run began only once the last had ended. (R10) On the
+    /// Mac, never the sheet: Settings' Edit an album page, on that folder (`macEditPage`).
     func editAlbum(_ request: AlbumEditRequest) {
+        if MacFrame.drawsDesktop(Platform.device) {
+            macEditPage(request)
+            return
+        }
         let was = presentedEdit
         presentedEdit = request
         albumEdit = request
         if let was, was.id != request.id, was.queue !== request.queue { was.queue?.editorClosed() }
+    }
+
+    /// (R10) Edit album on the Mac: Now Playing closed, Settings shown with its Edit an album page in front, opened for
+    /// `request` - an album page's Edit, a folder picked in the page's own list, Needs a look's row. One page of it, ever:
+    /// on top already it stays (its list and its place kept); one further down is let go and the page put on top - as
+    /// Manage's row puts it, or over Needs a look when opened from there (Back is the queue's page again). While the editor
+    /// holds work, nothing is let go: the page is brought to the front and asks "Discard changes?" for the new opening.
+    /// The opening put in place of another ends that one's Needs a look session, as the sheet's does.
+    private func macEditPage(_ request: AlbumEditRequest) {
+        nowPlayingShown = false
+        if macEditHolds, let shown = macEdit, shown.id != request.id {
+            if let asked = macEditAsked, asked.id != request.id, asked.queue !== request.queue {
+                asked.queue?.editorClosed()
+            }
+            macEditAsked = request
+            backToEditPage()
+            tab = .you
+            return
+        }
+        let was = presentedEdit
+        presentedEdit = request
+        // the stack changed in one write, so it never reads as the page gone (`editPageGone`) on the way
+        var stack = you
+        if stack.last != .chooseFolder {
+            stack.removeAll { (route: AppRoute) -> Bool in route == .chooseFolder }
+            let how = request.queue != nil ? MacSidebar.StackMove.open
+                : MacSidebar.managingMove(stack.map(Self.sidebarPage), .edit)
+            MacSidebar.put(AppRoute.chooseFolder, how, on: &stack, kept: kept(stack))
+        }
+        you = stack
+        tab = .you
+        // (R10's review) an opening asked for and never answered - Discard said to a folder picked meanwhile: let go,
+        // and the Needs a look session it began with it, as Keep editing lets it go
+        if let asked = macEditAsked, asked.id != request.id, asked.queue !== request.queue {
+            asked.queue?.editorClosed()
+        }
+        macEditAsked = nil
+        macEdit = request
+        if let was, was.id != request.id, was.queue !== request.queue { was.queue?.editorClosed() }
+    }
+
+    /// (R10) The Mac's editor answered "Discard changes?" for the opening asked (`macEditAsked`): Discard opens it, Keep
+    /// editing lets it go - and the Needs a look session it began with it.
+    func macEditAnswered(discard: Bool) {
+        guard let asked = macEditAsked else { return }
+        macEditAsked = nil
+        if discard {
+            macEditHolds = false
+            macEditPage(asked)
+        } else if asked.queue !== macEdit?.queue {
+            asked.queue?.editorClosed()
+        }
+    }
+
+    /// (R10) The Mac's editor holds work now, or no longer (MacEditWindow says so as it changes).
+    func macEditHolding(_ holds: Bool) {
+        macEditHolds = holds
+    }
+
+    /// (R10) The Mac's Edit album went with the album it showed - deleted, or the queue's session over (the sheet would
+    /// close): the page stays, its editor shows nothing until a folder is picked.
+    func macEditEnded() {
+        guard let shown = macEdit else { return }
+        macEdit = nil
+        macEditHolds = false
+        if presentedEdit?.id == shown.id { presentedEdit = nil }
+        shown.queue?.editorClosed()
+    }
+
+    /// (R10) Settings' stack back to the Edit album page: the pages over it popped, but none that hold work.
+    private func backToEditPage() {
+        guard let at = you.lastIndex(of: .chooseFolder) else { return }
+        let keep = max(at + 1, kept(you))
+        if you.count > keep { you.removeLast(you.count - keep) }
+    }
+
+    /// (R10) The Mac's Edit album page is on no stack any more - Back, a tab's button, a sidebar row in its place: its
+    /// opening over, and its Needs a look session with it, as the sheet's dismissal ends it.
+    private func editPageGone() {
+        guard macEdit != nil || macEditAsked != nil,
+              !(library + search + requests + you).contains(.chooseFolder) else { return }
+        if let asked = macEditAsked {
+            macEditAsked = nil
+            asked.queue?.editorClosed()
+        }
+        macEditEnded()
     }
 
     /// (slice 6's review) Edit album's sheet went (MainTabs' onDismiss) - Close, a swipe, Discard, a step to an album
@@ -839,9 +949,23 @@ final class AppNavigation {
 
     /// (Phase 8, slice 4) An album Edit album deleted, nothing of it left in Navidrome (AlbumEdit.deletesAll): its page
     /// gone from the top of the tab shown - only while it is what shows (App.tsx's `else if (showing) router.back()`).
+    /// (R10's review) On the Mac the editor is Settings' page, so the tab shown is Settings, with Edit an album on top:
+    /// every page of the album goes, on every stack, as `albumMoved` follows it on every stack - the album page it was
+    /// opened from left on its own tab's top, and any other, would show an album that is gone.
     func leaveAlbum(_ id: String) {
         func left(_ stack: inout [AppRoute]) {
             if case .album(let shown)? = stack.last, shown.id == id { stack.removeLast() }
+        }
+        if MacFrame.drawsDesktop(Platform.device) {
+            func gone(_ stack: inout [AppRoute]) {
+                guard stack.contains(where: { (route: AppRoute) -> Bool in Self.isAlbum(route, id) }) else { return }
+                stack.removeAll { (route: AppRoute) -> Bool in Self.isAlbum(route, id) }
+            }
+            gone(&library)
+            gone(&search)
+            gone(&requests)
+            gone(&you)
+            return
         }
         switch tab {
         case .library: left(&library)
@@ -849,6 +973,12 @@ final class AppNavigation {
         case .requests: left(&requests)
         case .you: left(&you)
         }
+    }
+
+    /// The album `id`'s page.
+    private static func isAlbum(_ route: AppRoute, _ id: String) -> Bool {
+        if case .album(let shown) = route { return shown.id == id }
+        return false
     }
 
     /// Back to the EQ page a page was pushed from ("Use for …", eq.md 3.7): every page over the topmost EQ page on the
@@ -871,6 +1001,12 @@ final class AppNavigation {
 
     /// The person changed: every page popped, Now Playing closed, Library shown.
     func reset() {
+        // (R10) the Mac's Edit album let go before its page goes, so its session ends below, once the session has moved
+        // on - as the sheet's does
+        let asked = macEditAsked
+        macEditAsked = nil
+        macEdit = nil
+        macEditHolds = false
         library.removeAll()
         search.removeAll()
         requests.removeAll()
@@ -899,6 +1035,7 @@ final class AppNavigation {
         // (slice 6's review) Needs a look's session over - once the session has moved on, so nothing is noted, read or
         // asked for the next person
         editor?.queue?.editorClosed()
+        asked?.queue?.editorClosed()
     }
 }
 

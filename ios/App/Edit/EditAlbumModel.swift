@@ -68,7 +68,7 @@ final class EditAlbumModel {
     private(set) var chosen: String?
     /// The album being edited - the scan's folder, once its folder is known.
     private(set) var album: ScanAlbum?
-    /// Its Release.
+    /// Its Release - made afresh only here: as a folder is held, and by Revert (`revertRelease()`).
     private(set) var retag: RetagModel?
     /// Its Tags (slice 2): the files, the selection, the tag editor.
     private(set) var tags: TagsModel?
@@ -110,6 +110,10 @@ final class EditAlbumModel {
     /// its preview meant to; the next read finds the album there if the scan lists it (RetagFlow.whereAfter).
     @ObservationIgnored private var after: (path: String, known: Bool)?
     @ObservationIgnored private var opened = false
+    /// (R10's review) The opening's first read came back - it landed or failed. One cut off (`.dropped`: the Mac's
+    /// page left while it read, a tab switched or a page pushed over it, its task cancelled) leaves this false, and the
+    /// page asks again as it comes back (`reopen()`).
+    @ObservationIgnored private var answered = false
 
     /// `target` the folder or album to open - in queue mode, the session's current folder; `scan` the page's, then.
     init(request: AlbumEditRequest, target: AlbumEditRequest.Target? = nil, scan: LibraryScanModel? = nil,
@@ -199,6 +203,25 @@ final class EditAlbumModel {
     /// An apply or the cover alone is under way: the album held and its Release stay, whatever a read brings.
     var writing: Bool { applying || retag?.flow.savingCover == true }
 
+    /// (R10) Revert's gate (EditAlbumPage.canRevert): typed work in Release to put back, deadwax in reach, no write or
+    /// mark under way, and the folder not waiting to be read again.
+    var canRevertRelease: Bool {
+        guard let retag else { return false }
+        return EditAlbumPage.canRevert(unsaved: retag.unsaved, online: online, writing: writing, marking: marking,
+                                       needsRead: retag.flow.needsRead)
+    }
+
+    /// (R10) Revert, the foot's on both devices: Release made afresh on the folder as the scan last read it - its fields
+    /// the folder's, the cover's switch as it opens, the pressing it is tagged with chosen again by the search it starts
+    /// - as the editor opens on it. Nothing is written and nothing asked of the folder; Tags' typed work is Tags' own.
+    /// (R10's review) The model's own, so `retag` is set nowhere else.
+    func revertRelease() {
+        guard canRevertRelease, let album = album ?? retag?.album else { return }
+        let fresh = RetagModel(album: album, online: online, admin: admin, client: client)
+        retag = fresh
+        fresh.start()
+    }
+
     /// (slice 6) Whether queue mode's ‹, Skip and Next album - and Discard's step - may go now (Core's StepGate): in
     /// reach (a step notes the album left, and opens the next from deadwax), and nothing done to this album still to
     /// settle - no write or mark under way or still following up (the folder read again, then Needs a look told), the
@@ -232,6 +255,19 @@ final class EditAlbumModel {
         await lookUp()
     }
 
+    /// (R10's review) The Mac's page come back (its task run again as it shows): opened as `open()` opens it - or, its
+    /// first read cut off before anything came back (the page left while it read), asked again, so it never says it is
+    /// finding the folder for good with nothing in its list and no Look again. The phone's sheet calls `open()` alone:
+    /// its task goes with the sheet, and the model with it.
+    func reopen() async {
+        guard opened else {
+            await open()
+            return
+        }
+        guard !answered, online else { return }
+        await lookUp()
+    }
+
     /// Look again (and back in reach): the bridge and the scan asked afresh; the album held followed to the fresh scan
     /// - or let go, its folder gone, to be found again from what the scan says.
     func lookUp() async {
@@ -249,6 +285,7 @@ final class EditAlbumModel {
         }
         switch read {
         case .landed:
+            answered = true
             unansweredGet = nil
             // a delete that never answered: the scan says whether it went
             if let pending = unansweredDelete, let answer = scan.answer,
@@ -265,6 +302,7 @@ final class EditAlbumModel {
             }
             settle()
         case .failed:
+            answered = true
             // the read a write or a gap waits for: the wait ends, said with Look again (the sheet draws scan.failure)
             retag?.couldNotRead()
             tags?.couldNotRead()

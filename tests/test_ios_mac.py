@@ -534,6 +534,9 @@ ESCAPES = {
     "Player/MacPanels.swift": 1, "Root/MacSidebarView.swift": 1,
     "Player/NowPlayingView.swift": 1, "Playlists/PlaylistPicker.swift": 2, "Playlists/PlaylistView.swift": 1,
     "Search/PressingPickerSheet.swift": 1, "UpNext/UpNextScreen.swift": 1,
+    #? (the redesign, R10) the Mac's Edit album: the Done of the sheet a part still today's page opens in - (its
+    #? review) the editor's own, MacAlbumEditor's, which the page and R12's MacNeedsALook host
+    "Mac/Edit/MacAlbumEditor.swift": 1,
 }
 
 
@@ -730,6 +733,9 @@ SHEET_ROOTS = {
     "Mac/Requests/MacRequestsPage.swift": 1,
     #? (the redesign, R5) New playlist…, from the Mac's Playlists' toolbar
     "Mac/Library/MacPlaylistsPage.swift": 1,
+    #? (the redesign, R10) the Mac's Edit album: a part still today's page (Tags, Artwork, Lyrics, Delete) or Compare
+    #? covers, over the page - (its review) the editor's own sheet, MacAlbumEditor's
+    "Mac/Edit/MacAlbumEditor.swift": 1,
 }
 
 
@@ -762,6 +768,9 @@ def test_the_window_is_kept_open_over_work_a_close_would_lose():
     uses = {name: re.findall(r"\.keepsWindowOpen\(([^\n]*)\)\n", bare(text)) for name, text in app.items() if name != PLATFORM}
     assert {name: found for name, found in uses.items() if found} == {
         "Edit/EditAlbumSheet.swift": ["model?.holdsWork == true"],
+        #? (the redesign, R10) the Mac's Edit album page, over the same work the sheet holds the window for - (its
+        #? review) in MacEditHolding, a modifier of its own: `holds` is `model?.holdsWork == true`
+        "Mac/Edit/MacEditWindow.swift": ["holds"],
         "Playlists/PlaylistView.swift": ["model.editing && model.changed"],
     }
     commands = bare(app["Shared/MacCommands.swift"])
@@ -1773,6 +1782,19 @@ def test_edit_albums_sheet_is_sized_by_the_window_and_managings_pages_are_readab
     assert re.search(r"EditAlbumSheet\(request: request\)\s*\.macSheet\(\)\s*\.sizedSheet\(MacFrame\.sheetSize\(width: width, "
                      r"height: height\)\)$", edit.strip())
     assert "@State private var height: Double = MacFrame.openingHeight" in frame
+    #? (the redesign, R10) and never presented on the Mac: every Edit album opens Settings' Edit an album page there
+    #? (MacEditWindow) - `albumEdit`, what presents the sheet, is set in one place, the phone's half of editAlbum
+    routes = bare(app["Shared/Routes.swift"])
+    opening = _body(routes, "func editAlbum(_ request: AlbumEditRequest) {")
+    assert re.match(r"func editAlbum\(_ request: AlbumEditRequest\) \{\s*if MacFrame\.drawsDesktop\(Platform\.device\) \{"
+                    r"\s*macEditPage\(request\)\s*return\s*\}", opening)
+    assert opening.index("return") < opening.index("albumEdit = request")
+    sets = [(name, found) for name, text in app.items() for found in re.findall(r"\balbumEdit = (?!nil\b)\w+", bare(text))]
+    assert sets == [("Shared/Routes.swift", "albumEdit = request")], sets
+    page = _body(routes, "private func macEditPage(_ request: AlbumEditRequest) {")
+    assert "albumEdit" not in page.replace("macEdit", "") and "macEdit = request" in page
+    edit = bare(app["Mac/Edit/MacEdit.swift"])
+    assert "case .chooseFolder: MacEditWindow()" in edit
     #? (the Mac redesign, R1) the frame is laid under the title bar: the height under it is the frame's less the strip's
     assert re.search(r"\.onGeometryChange\(for: Double\.self\) \{ \(frame: GeometryProxy\) -> Double in\s*"
                      r"Double\(frame\.size\.height - max\(CGFloat\(MacLook\.titleHeight\), frame\.safeAreaInsets\.top\)\)"
@@ -1802,7 +1824,9 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
             #? (manual search, slice A1) Search Soulseek's Artist and Album
             "Get/ManualSearchSheet.swift": 2,
             #? (R8's review) the Mac's Requests' toolbar: Artist, then Album
-            "Mac/Requests/MacRequestsPage.swift": 1}
+            "Mac/Requests/MacRequestsPage.swift": 1,
+            #? (the redesign, R10) the Mac's Release tab: the search, then the fields
+            "Mac/Edit/MacReleaseTab.swift": 1}
     found = {}
     for name, text in app.items():
         if name == PLATFORM:
@@ -1820,6 +1844,14 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
     assert "private static let order: [Field] = [.artist, .album, .year, .originalYear, .edition]" in release
     fields = _body(release, "private var fieldsSection: some View {")
     assert re.findall(r"field\(EditWords\.\w+, \\\.\w+, \.(\w+)", fields) == ["artist", "album", "year", "originalYear", "edition"]
+    # (the redesign, R10) the Mac's Release tab: the search first, then the fields in the order drawn
+    release_tab = bare(app["Mac/Edit/MacReleaseTab.swift"])
+    assert "private static let order: [Field] = [.search, .artist, .album, .year, .originalYear, .edition]" in release_tab
+    assert re.findall(r"field\(EditWords\.\w+, \\\.\w+, \.(\w+)",
+                      _body(release_tab, "private var fieldsBox: some View {")) == [
+        "artist", "album", "year", "originalYear", "edition"]
+    assert release_tab.index("well(TextField(EditAlbumPage.Words.musicBrainzSearch") < release_tab.index(
+        "private var fieldsBox")
     tags = bare(app["Edit/TagsPages.swift"])
     assert "private static let order = TagEdit.sections.flatMap" in tags
     assert "ForEach(TagEdit.sections, id: \\.title)" in tags, "drawn in the sections' order, Tab's order"
@@ -1838,9 +1870,11 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
     assert "static let backTab = KeyEquivalent(Character(Unicode.Scalar(UInt8(0x19))))" in mac
     # Return in a field never applies, deletes or saves: in the editor and Manage's pages a field's Return moves to the
     # next field, puts the keyboard away, searches or unlocks People (a password checked, nothing written) - nothing else
-    allowed = re.compile(r"\.onSubmit(?: \{ focused = (?:\.\w+|nil|false) \}| \{ people\.unlock\(\) \}|\(of: \.search\) \{)")
+    allowed = re.compile(r"\.onSubmit(?: \{ focused = (?:\.\w+|nil|false) \}| \{ people\.unlock\(\) \}|\(of: \.search\) \{"
+                         r"| \{ findReleases\(\) \})")
     for name, text in app.items():
-        if not (name.startswith("Edit/") or name.startswith("Manage/")):
+        # (the redesign, R10) and the Mac's Edit album: Return in its search finds releases, in a field nothing
+        if not (name.startswith("Edit/") or name.startswith("Manage/") or name.startswith("Mac/Edit/")):
             continue
         code = bare(text)
         for submit in re.finditer(r"\.onSubmit\b[^\n]*", code):
@@ -1848,6 +1882,9 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
         assert "defaultAction" not in code and "keyboardShortcut" not in code, name
     search = _body(bare(app["Edit/ReleasePage.swift"]), ".onSubmit(of: .search) {")
     assert "apply" not in search.lower() and "write" not in search.lower(), "Choose a release's Return searches"
+    find = _body(release_tab, "private func findReleases() {")
+    assert "await retag.search()" in find and "apply()" not in find and "save" not in find.lower(), "Return searches"
+    assert re.findall(r"\.onSubmit\b[^\n]*", release_tab) == [".onSubmit { findReleases() }"]
     # (manual search, slice A1) Search Soulseek: Return in Artist moves to Album, Return in Album searches - never a Get
     manual = bare(app["Get/ManualSearchSheet.swift"])
     assert re.findall(r"\.onSubmit\b[^\n]*", manual) == [".onSubmit { focused = .album }", ".onSubmit { search() }"]

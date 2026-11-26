@@ -84,6 +84,15 @@ ALONE = [
      "the address typed in its well, beside Check's button (SignIn's Where deadwax is)"),
     ("Mac/Settings/MacSignIn.swift", "Text(server.address?.description ?? \"\")\n                .font(Typeface.Mac.mono(.small))",
      "over the app, the address in use said alone in Where deadwax is: nothing beside it"),
+    # (R10) Edit album's Release on the Mac: the search and the years typed in their wells - each box centred on its
+    # label as DWFieldRow lays every field, and the search's on Find releases' faced button (Main.dc.html's .fr), the
+    # words inside each box centred in it, as R9's address beside Check
+    ("Mac/Edit/MacReleaseTab.swift", "input.font(Typeface.Mac.mono(.label))",
+     "the search and the years typed in their wells, beside their labels and Find releases' button"),
+    # (R10's review) Edit album's Release on the phone: the years typed in their wells (iEdit's `.in.mono`), each well
+    # centred on its label in the field's row and the words centred in the well, as the Mac's above
+    ("Edit/ReleasePage.swift", "content.font(Typeface.Look.mono(.field))",
+     "the years typed in their wells, beside their labels in Release's Fields"),
 ]
 
 
@@ -253,6 +262,8 @@ def test_the_macs_tables_and_status_bar_are_set_on_one_baseline():
     pages = sorted(str(path.relative_to(APP)) for path in APP.rglob("*.swift") if "MacColumnList(" in path.read_text(
         encoding="utf-8") and path.name != "MacColumnList.swift")
     assert pages == ["Mac/Album/MacAlbumPage.swift", "Mac/Album/MacPlaylistPage.swift", "Mac/Artist/MacArtistPage.swift",
+                     # (R10) Edit album's folder list
+                     "Mac/Edit/MacFolderList.swift",
                      "Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift",
                      "Mac/Library/MacPlaylistsPage.swift",
                      # (R7) Get's tracklist

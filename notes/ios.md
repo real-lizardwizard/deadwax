@@ -20979,6 +20979,393 @@ r9-core-mutate2.py); all 37 and the three in Core fail:
 - The Mac's Settings: one column at 1280 by eye (the sum says the two buttons need 478 of 475); the first ask on the
   Mac's Downloaded.
 
+## The redesign, slice R10: Edit album, the folder list and Release (2026-11-25)
+
+The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R10: Edit album on the Mac
+as one page - the library's folders at its left, the album's editor at its right - and the phone's sheet's root as
+iEdit draws it. The drawings are Main.dc.html (the Mac's) and iEdit.dc.html (the phone's), in
+~/Desktop/Code/deadwax-plans/mac-redesign/. Built on ed819e69 (R9). The app is still 0.13 (13); `__version__`
+untouched; no server data new (no diff to Core's DeadwaxClient or Routes); no engine file touched. Tags, Artwork,
+Lyrics and Delete are still today's pages: R11 draws each as a tab (below, "Where R11 plugs in").
+
+### The Mac: one page (ios/App/Mac/Edit/)
+
+- **Every Edit album on the Mac opens this page, never the sheet.** `AppNavigation.editAlbum` (App/Shared/Routes.swift)
+  sends the Mac to `macEditPage(_:)` first: Now Playing closed, the You stack shown with Settings' Edit an album
+  (`.chooseFolder`) on top, `macEdit` set to the opening. `albumEdit` - the sheet's - is never set on the Mac, so
+  DesktopFrame's sheet is unreachable there now (its owner may take it out; it isn't R10's file). One page of it,
+  ever: on top already it stays, with its list and its place; further down it is taken out and put on top, as
+  Manage's row puts it - or over Needs a look when opened from there, so Back is the queue's page again. The
+  sidebar's Edit an album (`macMove`'s `.manage(.edit, _)`) goes back to it while it is on the stack.
+  MacEdit.swift's `.chooseFolder` draws `MacEditWindow()` (its doc already named R10; the phone's Choose the folder is
+  as it was).
+- **MacEditWindow** is the page. The editor is the sheet's own model (EditAlbumModel), made afresh for each opening as
+  the sheet makes it - Needs a look's folder and scan in queue mode, otherwise the list's own scan - and opened
+  (`.task(id: Opening(id:step:online:))`). A folder picked in the list is an opening of its own, 200 ms after the pick
+  rests (R2's rest).
+- **MacFolderList** (its left, 398 wide from a page of 1000, 280 under it with no Artist column): MacToolbar's Find
+  field and the **All | Needs a look** switch (DWSegmented large), then MacColumnList's rows - Album, Artist (112),
+  Year (50) and the amber count of the issues still to look at (42) - each row read cell by cell, as every list but an
+  artist's and an album's (MacColumnList's `voice` is theirs alone, test_ios_artist_look), the album's words saying
+  the artist where there is no Artist column, and `EditAlbumPage.Words.folderRow` the row's help. Every folder
+  (AlbumEdit.folderChoices' match with no limit: the list is lazy) in the Library's order, and Needs a look counted
+  by the queue's own function - both since the review (below, "After review"). The status bar says how many folders
+  the list shows and how many need a look.
+- **MacEditHeader**: the cover (72), the album, its byline, the facts and the size in the readout face, the folder's
+  path (selectable, truncated in the middle, the whole path its help), **Matched to MusicBrainz** or **Not matched**
+  as a chip, and **Open album** (the album's page, pushed over this one, which is kept). Several folders for one
+  album: a pop-up of their paths. The chip and Open album sit beside the words from an editor of 560, under them
+  below that.
+- **The tabs** are MacFolderTabs over `EditAlbumPage.tabs` (the person's permissions: Release, Tags, Artwork and
+  Lyrics with Edit albums, Delete with Look after the library). The tab is the editor's own `@State` (MacAlbumEditor's
+  since the review), above the model, so changing it never touches typed work.
+- **MacReleaseTab** (Release): Needs a look's issues and marks, when there are any; **Pressing** - the MusicBrainz
+  search field (Return finds releases, never applies), **Find releases**, and the pressings as rows, the chosen one
+  lit; **Fields** - Artist, Album, Year and Original year side by side, Edition, the hint; **Cover** - the folder's
+  and the pressing's covers, the cover's switch and **Compare full size…** (Compare covers, in a sheet); **What Apply
+  does** - the preview, with **Show every change**. Two columns from an editor of 620, one under it. Tab goes
+  through the search field and the five fields in the order drawn (`.tabs`, test_ios_mac.py's TABS).
+- **MacEditFooter**: 48 tall under the tab, what the tab's action does at its left and, under Release, **Revert** and
+  **Apply** (the purple one, saying what it waits for while it runs). Under a part still today's page, its **Open
+  Tags…** (etc.) opens that page over this one in a sheet, as the phone pushes it - with Done (Escape) to close it.
+- **Apply is the sheet's own** on both devices: `EditAlbumModel.apply()`, which posts RetagModel's body - the folder,
+  the release chosen, the fields and the cover's switch - and the server works the plan out again from it. No plan is
+  sent; no file of this slice calls EditClient.
+- **Never left mid-apply, nor with typed work** (EditAlbumModel.holdsWork - typed work, a write including an apply,
+  a mark): the window can't be closed (`keepsWindowOpen`), Back isn't drawn, and AppNavigation's `kept()` keeps the
+  page under anything opened over it (`macEditHolds`, told by the page as it changes) - a tab's button doesn't pop
+  it, a sidebar row opens over it. Another folder picked, a step through the queue, or an opening from elsewhere
+  (`macEditAsked`: the page brought to the front, nothing let go) each ask **Discard changes?** first - Discard the
+  destructive one, Keep editing Return's - and none is asked while an apply runs: it waits for the apply to end.
+- **The page goes** when it is on no stack any more (`editPageGone`, from `frontMoved`): its opening over, and its
+  Needs a look session told, as the sheet's dismissal tells it. The album deleted: the page stays with nothing in its
+  editor until a folder is picked (`macEditEnded`); in queue mode it stays saying so, as the sheet does. A sign-out
+  lets it go first (`reset()`).
+- **Revert** (both devices): Release made afresh on the folder as the scan last read it - its fields the folder's, the
+  cover's switch as it opens, the pressing it is tagged with chosen again - as the editor opens on it
+  (`EditAlbumModel.revertRelease()`, the model's own since the review - its `retag` setter private again). Nothing
+  is written. Only with typed work to put back, deadwax in reach, no write or mark under way, and the folder not
+  waiting to be read again (`EditAlbumPage.canRevert`).
+
+### The phone: iEdit, flat (ios/App/Edit/)
+
+- **The top**: Close (as it was, with its question over typed work), "Edit album", and the **Matched** chip at the
+  right (green; the plain **Not matched** for a folder tagged with no release) - its glass off on iOS 26
+  (`sharedBackgroundVisibility(.hidden)`). Close keeps iOS 26's glass: `.cancellationAction` is pinned by
+  test_ios_edit.
+- **EditAlbumRoot** (EditAlbumSheet.swift) is the sheet's root, a ScrollView on the page's black: the header (the
+  cover 60, the album, its byline and facts, the path in the readout face, selectable), the Folder menu for several
+  folders, then **the strip of five** (PhoneStrip) in place of the root's rows: Release its one tab, drawn under it;
+  Tags, Artwork, Lyrics and Delete pushing their pages as the rows did (`EditAlbumPage.strip`, the same permissions).
+  Then the waits, Needs a look's card, and Release's cards.
+- **ReleaseCards** (ReleasePage.swift): **Release** (the pressing, its Current chip, its facts in the readout face,
+  Choose a release / Change…), **Fields** (Artist, Album, Year and Original on one row - stacked at the accessibility
+  sizes - Edition, the hint; each field on the look's well, DWWellField, Tab's order kept), **Cover** (the two covers,
+  the purple switch, Compare) and **What Apply does** (the preview; its › to every change). PhoneGroup's legends and
+  PhoneCard's lines only.
+- **The foot** (`.phoneFoot { ReleaseFoot }`): Revert and Apply, Apply the purple one that fills. PhoneFoot's layer
+  takes the keyboard's room, so the foot stays at the screen's foot under the keyboard and never rides up over a
+  field. The words take three lines at the accessibility sizes.
+- **ReleasePage** - Release pushed on its own (Artwork's pointer to it) - is the same cards and foot; its waits are
+  drawn only there (`pushed`), the root drawing its own over the strip.
+- Kept as they were: Discard's question, `.interactiveDismissDisabled` while the editor holds work, the window kept
+  open, the apply's wait (MayHaveFinished, ReadAgainFailed), the queue bar (R12's), the out-of-reach band, and the
+  pages pushed from the cards (Choose a release, the changes, Compare covers, the full cover).
+
+### Core (pure, tested on Linux)
+
+`EditAlbumPage` (DeadwaxCore/EditAlbumPage.swift, new): the folder list's rows and its switch, the issues counted,
+the header's chip, the strip and the tabs by permission, the tab kept across a change of permissions, Revert's gate,
+the Mac's page at its width (`Layout(page:)`) and the words. EditAlbumPageTests.
+
+### Where R11 plugs in
+
+- `EditAlbumPage.strip`: Tags, Artwork, Lyrics and Delete move from `pushes` to `tabs`, and EditAlbumRoot's `open(_:)`
+  drops its pushes - PhoneStrip's `shown` then binds a tab of the root's own state, as the Mac's does.
+- The Mac: MacAlbumEditor's `partCard` and `MacEditSheet.part` (MacAlbumEditor.swift since the review) give way to
+  the four tab files; MacEditFooter takes their actions (Tags' Revert and Apply, Delete's Delete permanently) where it
+  says Open….
+- MacReleaseTab's cover switch is the system's Toggle: App/Look/DWCheckbox.swift replaces it.
+- R12: the interim queue bar over the Mac's header (MacEditQueueBar, MacAlbumEditor's `bar`) and the sheet's,
+  MacNeedsALook (hosting MacAlbumEditor) and NeedsLookScreen.
+
+### Left out, and why
+
+- The drawing's pressing list on the phone's Release card: the phone keeps Choose a release as its own page (pushed
+  from the card); the Mac draws the pressings in its Pressing box.
+- MacEditFooter's ground: Main.dc.html's #17161d→#121118 is no token in MacPalette (not R10's file), so the foot sits
+  on `MacPalette.statusFace`, the status bar's.
+- Choose a release, the changes and Compare covers on the phone stay iOS's lists: neither R10 nor R11 takes them, so
+  docs/ios.md's **Not flat yet** names them now in place of "Edit album's pages (R10 and R11)", and check 612 counts
+  Edit album's first page among the flat ones.
+- The queue bar on both devices is today's (R12 draws MacNeedsALook and restyles it).
+- MacReleaseTab's cover switch is the system's Toggle until R11's DWCheckbox.
+
+### The gate's files outside the brief's list
+
+- **ios/App/Mac/Edit/MacEdit.swift** - one line: `.chooseFolder` draws `MacEditWindow()` (and its doc). The router
+  had to draw the new page, and this is where it does.
+- **ios/DeadwaxKit/Sources/DeadwaxCore/EditAlbumPage.swift** and **EditAlbumPageTests.swift** (new): what both
+  devices read that isn't a word already - pure, tested on Linux.
+- Tests whose pins broke with the structure (each changed only where the root's rows became the strip, or the Mac's
+  chooseFolder its own page): tests/test_ios_edit.py (the permission test pins the strip, ReleaseCards and
+  `open(_:)`'s pushes), test_ios_edit_parts.py (three tests pin the strip's pushes in place of the rows),
+  test_ios_edit_parts_contract.py (`strip_gates()`: Managing.albumEdit, EditAlbumPage.strip and AlbumEdit.parts, used by
+  three tests), test_ios_mac_reach.py (`.chooseFolder` off PHONES_PAGES - the phone's `ChooseFolderScreen()
+  .readableOnMac()`, the Mac's `MacEditWindow()`), test_ios_phone_look.py (R10_PAGES in SLICES; ReleasePage's fields
+  in TEXT_INPUTS as the look's well).
+- test_ios_mac.py, R10's entries: MacEditWindow in ESCAPES, SHEET_ROOTS and the keepsWindowOpen list; MacReleaseTab in
+  TABS (the search first, then the five fields in order); the onSubmit loop over Mac/Edit/ (Return only finds
+  releases); the sheet test - editAlbum's Mac branch first, `albumEdit` set only on the phone, macEditPage setting
+  `macEdit`, MacEdit.swift drawing MacEditWindow.
+- test_ios_readout_rows.py, R10's entries (after the first full run): MacFolderList among MacColumnList's pages, and
+  one ALONE entry - the search and the years typed in Release's wells on the Mac, each box centred on its label as
+  DWFieldRow lays every field and the search's on Find releases' faced button, as R9's address beside Check. A
+  pressing's track count sits on its title's first text baseline, the spinner centred on the words. (R10's review)
+  A second ALONE entry: the years typed in Release's wells on the phone (ReleaseYearFace), each well centred on its
+  label in the field's row and the words centred in the well, as the Mac's.
+
+### Tests
+
+- tests/test_ios_edit_look.py (new): Apply the sheet's own on both devices (`model.apply()` in the tap; no R10 file
+  calls EditClient or builds a write's body; RetagRequestBody's three fields, no plan); the Mac's page never left
+  mid-apply or with work (holdsWork through an apply, no Back, the window kept, `kept()`'s editing term, macEditPage's
+  hold branch, a pick and an opening waiting for the apply); a tab change never touching typed work (the tab `@State`,
+  the model made only in `open(_:)`, the task's key id/step/online, `revertRelease()` called only by Revert's two
+  buttons, and gated); the sheet's rules (Close, `.interactiveDismissDisabled`, `keepsWindowOpen`, the chip); the foot
+  (`.phoneFoot { ReleaseFoot }` on the root and ReleasePage, no safeAreaInset, PhoneFoot's keyboard rule); the phone
+  flat (`drawn()` per file, by test_ios_phone_look's own matcher; the four legends; the one TextField on the well);
+  tokens only in what the slice drew; "Up Next" nowhere.
+- Core: EditAlbumPageTests (6 tests: the list and its switch, the chip, the strip and the tabs, Revert's gate, the
+  Mac's layout, the words - their cases redone after the review, below).
+
+### Mutations
+
+Each applied alone, the slice's tests run (test_ios_edit_look, test_ios_edit, test_ios_phone_look, test_ios_edit_parts,
+test_ios_edit_parts_contract, test_ios_mac_reach, and test_ios_mac for the first two), the file put back
+byte for byte. Every one caught:
+- The sheet still presented on the Mac (editAlbum's Mac branch removed): test_ios_mac's
+  `test_edit_albums_sheet_is_sized_by_the_window_and_managings_pages_are_readable`.
+- A plan sent over the wire (the Mac's Apply posting `retagApply(retag.body, plan: plan)` itself):
+  `test_apply_is_the_sheets_own_and_sends_no_plan`.
+- The page left mid-apply (`kept()` without its editing term, so a tab's button pops the page holding work):
+  `test_the_macs_page_is_never_left_mid_apply_nor_with_typed_work`.
+- The phone's sheet swipeable with typed work (`.interactiveDismissDisabled` removed):
+  `test_the_phones_sheet_keeps_its_rules`, and test_ios_edit's `test_the_sheet_keeps_typed_work_and_a_running_apply`.
+- A tab change losing typed work (`.onChange(of: tab) { model?.revertRelease() }`):
+  `test_a_tab_changed_never_touches_typed_work`.
+- The foot over a field above the keyboard (ReleasePage's foot a `safeAreaInset(edge: .bottom)`, which rides up with
+  the keyboard): `test_the_phones_foot_never_rides_up_on_a_field`.
+- The flat rule (a grey face, `.background(DWPalette.panel)`, behind the Artist row): `test_the_phone_is_flat_in_edit_album`
+  alone - test_ios_phone_look's SLICES rule passed it.
+- The typing rule (ReleaseCards' field without DWWellField): test_ios_phone_look's
+  `test_every_place_you_type_on_the_phone_is_still_a_box`, and `test_the_phone_is_flat_in_edit_album`.
+
+### Not verified - only a phone and a Mac can say (checks 580-584)
+
+- Anything on a screen: no Simulator, no phone, no Mac run of this build (Mac smoke run: not done - James's app
+  running). The Mac's page at 1280 (the list 398, Release in two columns) and in a narrow window (280, one column):
+  whether the header and Release fit one screen with the foot in view; the folder list's rows, keys and selection;
+  the 200 ms rest before a pick opens; the pop-ups; the part sheets over the page and their Done.
+- The Mac's holding: Back hidden, ⌘W off, a tab's button and a sidebar row with work, "Discard changes?" from a pick,
+  a step and another album's Edit, Return's Keep editing; whether an opening asked during an apply is asked once it
+  ends.
+- The phone: iEdit's look at the standard and the accessibility sizes, the strip under the header running to the
+  screen's edges, the chip without its glass on iOS 26, the foot staying under the keyboard (PhoneFoot's rule is
+  still untried on a phone - R1b's note) and the fields scrolled clear of it, Revert's and Apply's three lines.
+- Apply end to end - What Apply does, the album and Navidrome after, Revert after typing - against a real deadwax.
+
+### After review (2026-11-26)
+
+The coordinator's review of 7ea076f8: two Mac bugs, a counting rule broken, holding rules with almost no tests, and the
+seam R11 and R12 build on. All of it amended into the one commit, still on ed819e69.
+
+#### The bugs
+
+- **The page left while it loads.** `open()` set `opened` before its read; a tab switched or a page pushed over the
+  page cancelled the `.task`, the read came back `.dropped`, nothing landed - and on return `open()` returned at once,
+  so the page said it was finding the folder for good, its list empty and no Look again. Now EditAlbumModel keeps
+  `answered` (set where the opening's read lands or fails, never where it drops), and the Mac's page calls
+  `reopen()`: `open()` the first time, then `lookUp()` again while nothing has come back. The phone's sheet still
+  calls `open()` alone (its task goes with the sheet, and the model with it) - nothing it does changed.
+- **A delete on the Mac left the album's page behind.** `leaveAlbum` popped the shown tab's top only - on the Mac
+  that is Settings, with Edit an album on top. On the Mac it now takes every page of the album off every stack, as
+  `albumMoved` follows one on every stack (`isAlbum(_:_:)`); the phone's rule is as it was. (Delete is R11's; R10's
+  routing broke it.)
+- **Two "need a look" counts on one window.** The switch, the status bar and the rows counted
+  `MetadataQueue.outstanding` alone; the queue and the sidebar's badge count `needsAttention || isNewImport`. Now
+  `EditAlbumPage.waiting` asks the queue's own function (`MetadataQueue.queueAlbums([album], nil)`), the status bar's
+  count is `NeedsLook.summaryTotal`, and a row's mark is `EditAlbumPage.mark`: its issues, amber, or **New** (the
+  queue's chip, `.marked` as the Library's New mark) for a clean new import, VoiceOver's "Newly added". Nothing for a
+  folder the queue doesn't list - an issue the server doesn't call needing attention included.
+- **Every keystroke ran the page's body.** `body` read `model?.holdsWork` (→ `retag.unsaved` → `retag.fields`), so a
+  letter typed in Album filtered, sorted and diffed ~1,400 folders again. The holding reads (`keepsWindowOpen`, Back,
+  `macEditHolding`) are MacEditHolding's, a modifier of their own; the list works out its rows and the status bar's
+  counts itself (MacFolderList's body, from the scan, Find and the switch); the queue's bar is a view of its own
+  (MacEditQueueBar), its step gate read there. The page's body reads no field.
+- **The seam for R12.** The editor - header, waits, tabs, scroll, foot, part sheet, and what it says in place of an
+  album - is **MacAlbumEditor** (App/Mac/Edit/MacAlbumEditor.swift), below.
+- **A spurious "Discard changes?" after an apply.** An opening asked for during an apply was asked about once
+  `applying` turned false - before the follow-up read landed, while `retag.unsaved` still compared against the album
+  as it was before the write. askAboutOpening and a pick now wait for `following == 0` too (an apply counts in
+  `following` until its read is done), and `following` changing asks again.
+- **The Mac's foot ignored permissions.** MacEditFooter is drawn under Release only with Edit albums, as the tab and
+  the phone's foot are; under a part still today's page it keeps its Open… (Delete's, for Look after the library).
+
+#### The seam: MacAlbumEditor (R11, R12)
+
+`MacAlbumEditor<Bar: View>(model: EditAlbumModel, layout: EditAlbumPage.Layout) { bar }` - and without the slot,
+`MacAlbumEditor(model:layout:)`.
+
+- **The host owns** the model (made for each opening, as the sheet makes it), its opening and its questions (Discard,
+  the steps), the folder list if it has one, the holding modifier, and the page's width (`EditAlbumPage.Layout`).
+- **The editor owns** the tab (`@State`, above the model, kept across a new model), the part sheet and its stack (put
+  away when the model changes or the folder is deleted), Release's Compare covers sheet, and the out-of-reach,
+  which-folder and status states with Look again.
+- **`bar`** is drawn over the header: MacEditWindow passes MacEditQueueBar in queue mode, nothing otherwise. R12's
+  MacNeedsALook hosts the same view beside its own list, passing its own bar.
+- **R11** adds Tags, Artwork, Lyrics and Delete as tabs inside it - in place of `partCard` and `MacEditSheet.part` -
+  and their actions to MacEditFooter; nothing in MacEditWindow changes for it.
+- Its reads of the model are none of them a field's (no `holdsWork`, `unsaved` or `.fields`): a keystroke re-draws
+  MacReleaseTab and MacEditFooter, never the editor or its host.
+
+#### The tests that held nothing
+
+Each of these mutations passed every test after the first pass; each is now pinned in test_ios_edit_look's
+`test_the_macs_holding_rules_are_each_pinned`: the 200 ms rest (test_ios_library_look pins it for the Library's three
+pages, not here); `editPageGone` acting with Edit an album still on a stack; `frontMoved` not calling it (and each
+stack's `didSet` calling `frontMoved`); `macMove`'s back-to-page case for the sidebar's Edit an album, before the
+Manage row's own; Discard on a folder pick letting the hold go before it opens the folder; Keep editing ending the
+asked opening's Needs a look session; a delete outside queue mode ending the opening; the `macEdit?.queue != nil`
+guard; `reset()` letting `macEdit` go first (the worst: the next person's Edit an album opening on the last one's
+folder), its sessions ended once the session has moved on; MacFolderList's `.disabled(writing)`.
+
+And one more found on the way: **Discard said to a folder pick** while another opening waited to be asked about let
+that opening go (`macEditAsked = nil` in macEditPage) without ending its Needs a look session. macEditPage now ends
+it, as Keep editing does.
+
+#### The phone's flat rule, widened (test_ios_phone_look.py's `drawn()`, the coordinator's one shared change)
+
+`DRAWS` matched `.background(` and `.fill(` with the bracket straight after, so a face laid any other way passed every
+flat test. It now also sees: `.background { … }` and `.background(alignment:) { … }` (trailing closures); `.overlay(…)`
+and `.overlay { … }`; `.listRowBackground(…)`; `.backgroundStyle(…)`; and a colour standing as a view of its own in a
+`ZStack { … }`. A closure reports the colours that stand in it as views (`bare_colours`: a statement of the block, or
+of an `if` in it, that is a colour - never a colour an argument names); a call's own colours are counted without the
+draw calls inside it (`own_text`), which are found on their own. Colours now include the old palette, SwiftUI's
+(`Color.x`, not `.clear`), a bar's and a material. PhoneFoot's own ground, `.background { DWPalette.footFace }` (the
+page's black under the foot, run into the home indicator's room), is in FLAT_DRAWS with its reason.
+
+Run over the whole tree, it catches in files that aren't R10's - left as they are, for the merge:
+
+| file | caught | its test |
+| --- | --- | --- |
+| Artist/TopSongsSection.swift | `ZStack: Palette.coverEmpty` (an empty cover's square) | test_ios_artist_look's `test_the_phones_artist_page_is_flat` fails |
+| You/YouView.swift | `background: Palette.avatar` (the avatar's circle) | test_ios_settings_look's `test_settings_on_the_phone_draws_no_grey_box` fails |
+| Get/SourcesSheet.swift | `background: Palette.well` (the search field's box) | test_ios_search_look's `test_the_phone_is_flat_in_search_get_and_sources` fails |
+| EQ/EQCurveView.swift, EQ/EQScreen.swift | `background: Palette.barTrack`; `background: DWPalette.card` | none (no flat test reads them) |
+| Edit/TagsPages.swift (R11's) | `ZStack: Palette.coverEmpty` | none yet |
+| Library/ArtistsScreen.swift, Library/LibraryTop.swift | `ZStack: Palette.coverEmpty`; `background: Palette.page` | none |
+| Manage/EventLogScreen.swift (R13's), Manage/ServerSettingsScreen.swift (R14's), Manage/NeedsLookScreen.swift (R12's) | `background: .bar`; `background: .bar`; `listRowBackground: Palette.accent` | none yet |
+| Player/CoverViewer.swift, Player/NowPlayingView.swift | `ZStack: Palette.page`, `background: Palette.card`; `ZStack: Color.black`, `overlay: Color.black` | none |
+| Playlists/PlaylistPicker.swift, Playlists/PlaylistsScreen.swift | `ZStack: Palette.coverEmpty` | none |
+| Root/MainTabs.swift | `background: DWPalette.tabBarFace` | none |
+| Shared/Notice.swift | `background: .thinMaterial` | none |
+| UpNext/UpNextScreen.swift | `background: .regularMaterial`, `background: Palette.accent, Color.primary`, `listRowBackground: DWPalette.panel` (twice) | none |
+
+R10's own: ReleasePage's pages still iOS's (docs/ios.md's "Not flat yet") - Choose a release's Current badge
+(`Palette.badgeFill`) and its chosen row (`listRowBackground: Palette.toggledFill`), and the full cover on black - are
+in test_ios_edit_look's FLAT with that reason.
+
+#### Order, counts and widths
+
+- **The folder list in the Library's order** (`EditAlbumPage.libraryOrder`): the Library's Artist sort, its own
+  comparisons (Shelf.byName - letters before `#` - Shelf.missingLast, Shelf.text over Fold.key): by artist folded as
+  the Library folds names ("Abba" before "AC/DC", "dEUS" among the D's, "Ólafur Arnalds" among the O's), then the year
+  (none last), the album, the path. Choose the folder's raw UTF-16 path order stays the phone's (AlbumEdit.swift isn't
+  R10's).
+- **Layout**: the list's width is `MacLook.folderListWidth`; EditAlbumPage's own copy is gone. EditAlbumPageTests' widths
+  are now the real ones: the opening (1280 - 220 = 1060), 1280 with the panel open (1280 - 220 - 400 - 1 = 659, the
+  smallest page there is - the old case's 860 was a sum gone wrong), the smallest window (660), and each boundary a
+  point either side - the list at 999/1000/1001, two columns at 900/901/902 (and 1018/1019/1020 with the wide list),
+  the header beside at 840/841/842 - so `>=` as `>`, or any constant moved, fails.
+
+#### The nits
+
+- The phone: the years in the readout face (`Typeface.Look.mono(.field)`, the field's 16, iEdit's `.in.mono`) -
+  ReleaseYearFace, a modifier of ReleasePage's own set inside DWWellField on the field's own chain (an inner `.font`
+  wins). A first try wrapped the field in a `Group` to choose the face, which put DWWellField on the Group: the full
+  run's test_every_place_you_type_on_the_phone_is_still_a_box read Release's fields as in no box, and
+  test_ios_readout_rows called the mono unexplained - so the face is a modifier, and the readout has its ALONE entry
+  (below); the line to every change 44 tall at least; each field's row stacks its label over its box at the accessibility sizes
+  - Release's own rows (`fieldRow`, `row`), as the Year row stacks, since the look's DWFieldRow keeps one line and
+  isn't R10's to change; the header's byline and path one line each (`.ell`), the path cut in its middle as the Mac's
+  header cuts it (its artist's folder and its own name kept), their whole words to VoiceOver.
+- The Mac: Find's words are **Find folders** - "Folder, artist or album" (132 at 13) didn't fit the field's room in
+  the narrow list (280 - 24 - 6 - the switch's 134, about 116); the old words are its name to VoiceOver and its help.
+  `.help` on the Artist and Year cells, and on the foot's applying words - which, by the sum, are cut at the narrower
+  editors ("Applying, waiting for Navidrome").
+- `EditAlbumModel.retag` is `private(set)` again; Revert (`revertRelease()`, `canRevertRelease`) is the model's own.
+- docs/ios.md: 583's heading says Release is the strip's one tab until R11; 422 and 452 no longer call the Mac's Edit
+  album a sheet that Escape closes; 580 and 582 say the order, the count, New, and the two bugs to watch for.
+
+#### R10's review: the mutations
+
+Each applied alone by a script (scratch `r10-mutate.py`, `r10-mutate-swift.py`), the file put back byte for byte
+and compared. Python ones run test_ios_edit_look (the flat ones test_ios_phone_look too); Core's run
+EditAlbumPageTests. Every one caught:
+
+| mutation | caught by |
+| --- | --- |
+| the page come back calls `open()`, not `reopen()` | `test_the_macs_page_asks_again_when_it_comes_back_with_nothing_read` |
+| a dropped read counted as answered | the same |
+| leaveAlbum's Mac branch removed | `test_a_delete_on_the_mac_leaves_no_page_of_the_album_on_any_stack` |
+| the status bar counting outstanding issues alone (MacFolderList) | `test_needs_a_look_is_counted_as_the_queue_counts_it` |
+| the switch counting outstanding issues alone (Core) | EditAlbumPageTests' `theListIsEveryFolderInTheLibrarysOrderOrThoseTheQueueLists` |
+| `needingALook` a count of the page's own (Core) | the same |
+| a clean new import with no New mark (Core) | the same, and `theWords` |
+| holdsWork read in the page's body again (`.navigationBarBackButtonHidden(model?.holdsWork == true)`) | `test_a_keystroke_never_runs_the_pages_body` |
+| the list's rows worked out in the page's body | the same |
+| a part's sheet kept across a new opening | `test_the_editor_is_one_view_its_hosts_share` |
+| an opening asked about before the apply's read is done | `test_the_macs_page_is_never_left_mid_apply_nor_with_typed_work` |
+| a pick decided before the apply's read is done | the same |
+| the Mac's foot drawn without Edit albums | `test_the_macs_foot_is_the_persons_permissions` |
+| flat: `.background { DWPalette.card }` (a trailing closure) | `test_the_phone_is_flat_in_edit_album`; phone_look's `test_every_place_you_type_on_the_phone_is_still_a_box` |
+| flat: `.overlay(DWPalette.panel)` | the same two |
+| flat: `.overlay { DWPalette.card.opacity(0.5) }` | the same two, and `test_edit_album_draws_no_value_of_its_own` |
+| flat: `ZStack { DWPalette.card …` | the same two |
+| flat: `.background(alignment: .top) { Palette.card }` on the root's header | the same three |
+| the 200 ms rest removed | `test_the_macs_holding_rules_are_each_pinned` |
+| `editPageGone` acting with Edit an album still on a stack | the same |
+| `frontMoved` not calling `editPageGone` | the same |
+| macMove's back-to-page case removed | the same |
+| Discard on a folder pick keeping the hold | the same |
+| Keep editing not ending the asked session | the same |
+| a delete outside queue mode not ending the page | the same |
+| the `macEdit?.queue != nil` guard removed | the same |
+| `reset()` leaving `macEdit` set | the same |
+| the list on while a write runs | the same |
+| an asked opening let go without its session ended (macEditPage) | the same |
+| the list's boundary `>=` as `>` | EditAlbumPageTests' `theMacsPageFitsEachWidth` |
+| two columns from 621; the header beside from 559; the list wide from 1001; the narrow list 281 | the same, each |
+| the list by path again (Choose the folder's order) | `theListIsEveryFolderInTheLibrarysOrderOrThoseTheQueueLists` |
+| the year sorted newest first | the same |
+| Find's old words | `test_the_macs_words_fit_and_say_themselves_whole` |
+| the foot's applying words, or the Artist cell, with no help | the same |
+| the years not mono; every change under 44; the path wrapping | `test_the_phones_header_and_fields_as_iedit_draws_them` |
+| ReleaseYearFace taken off the field's chain | the same |
+| `retag`'s setter internal again | `test_a_tab_changed_never_touches_typed_work` |
+
+The five flat mutations were also run against the first pass's `drawn()` (its text from 7ea076f8): it saw none of
+them; the widened one sees all five.
+
+#### R10: not verified, after the review
+
+- Whether the page come back mid-read really re-asks (a cancelled task's `.dropped` is read from LibraryScanModel's
+  code, not seen); whether Catalyst ever re-runs the page's `.task` on reappearing - it is what the fix leans on.
+- The keystroke fix's cost: no profile was taken; that the page's body no longer reads a field is what the test holds.
+- The list's order and its New chips, the foot's helps, Find folders in the narrow list, the delete leaving no album
+  page behind: by eye on the Mac only.
+
 ## The redesign, slice R13: Library care and the Event log (2026-11-25)
 
 The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R13: Library care and the

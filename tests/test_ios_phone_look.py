@@ -1164,8 +1164,47 @@ MAC_ONLY = {
     "Look/DWButtonStyle.swift": [(r"case \.normal:\s*DWRaised\(", "("), (r"case \.on:\s*DWRaised\(", "(")],
 }
 
-#? a fill, a face or an edge, or a hairline - each drawing call, with the colours it names
-DRAWS = re.compile(r"(\.fill|\.background|\.strokeBorder|\.stroke|\bDWRaised|\bDWWell|\bDWRule)\(")
+#? a fill, a face or an edge, or a hairline - each drawing call, with the colours it names. (R10's review) And every
+#? other way a face is laid: a background's or an overlay's trailing closure (`.background { DWPalette.x }`, after an
+#? alignment or not), an overlay's argument, a list row's background, a background style, and a colour standing as a
+#? view of its own in a ZStack - the matcher only saw `.background(` and `.fill(` before, so a grey laid any of these
+#? ways passed every flat test
+DRAWS = re.compile(r"(\.fill|\.background|\.overlay|\.listRowBackground|\.backgroundStyle|\.strokeBorder|\.stroke|"
+                   r"\bDWRaised|\bDWWell|\bDWRule|\bZStack)\s*(?:\([^(){}]*\)\s*)?([({])")
+#? the calls that lay a face under or over what they're on (or, a ZStack, behind its other views)
+FACES = ("background", "overlay", "listRowBackground", "backgroundStyle", "ZStack")
+#? a colour as it is named: the look's, the old palette's, SwiftUI's own (not .clear), a bar's or a material
+COLOUR = re.compile(r"\bDWPalette\.\w+|(?<![\w.])Palette\.\w+|\bColor\.(?!clear\b)\w+|(?<![\w.])\.(?:bar|"
+                    r"(?:ultraThin|thin|regular|thick|ultraThick)Material)\b")
+
+
+def own_text(code: str, start: int, end: int) -> str:
+    """code[start:end] with every draw call inside it blanked: what is laid by this call itself, the calls inside it
+    each found on their own."""
+    out = list(code[start:end])
+    for match in DRAWS.finditer(code, start, end):
+        close = reader.closing(code, match.end() - 1)
+        for k in range(match.start() - start, min(close + 1, end) - start):
+            out[k] = " "
+    return "".join(out)
+
+
+def bare_colours(code: str, opened: int, close: int) -> list[str]:
+    """The colours standing as views of their own in the block at `opened`: a statement of it (or of an `if` in it)
+    that is a colour, never one an argument names."""
+    found = []
+    inner = own_text(code, opened + 1, close)
+    for match in re.finditer(r"(?m)(?:^|[{;])\s*(" + COLOUR.pattern + r")", inner):
+        at = opened + 1 + match.start(1)
+        stack = []
+        for c in code[opened + 1:at]:
+            if c in "([{":
+                stack.append(c)
+            elif c in ")]}" and stack:
+                stack.pop()
+        if not stack or stack[-1] == "{":
+            found.append(match.group(1))
+    return found
 
 
 def drawn(code: str) -> list[str]:
@@ -1173,11 +1212,32 @@ def drawn(code: str) -> list[str]:
     found = []
     for match in DRAWS.finditer(code):
         opened = match.end() - 1
-        arguments = re.sub(r"\s+", " ", code[opened + 1:reader.closing(code, opened)]).strip()
-        colours = re.findall(r"\bDWPalette\.\w+", arguments)
+        close = reader.closing(code, opened)
         call = match.group(1).lstrip(".")
-        if call == "background" and not colours and not re.match(r"\w+(,|$)", arguments):
-            continue  # a background's alignment, its content drawn by the calls inside it
+        if code[opened] == "{":
+            # a trailing closure (a background's, an overlay's) or a ZStack: the colours standing in it as views
+            if call in FACES:
+                colours = bare_colours(code, opened, close)
+                if colours:
+                    found.append(f"{call}: {', '.join(colours)}")
+            continue
+        if call == "ZStack":
+            continue  # its alignment: its views are what follow
+        arguments = re.sub(r"\s+", " ", code[opened + 1:close]).strip()
+        if call in FACES and call != "background":
+            colours = COLOUR.findall(own_text(code, opened + 1, close))
+            if colours or re.match(r"\w+(,|$)", arguments):
+                found.append(f"{call}: {', '.join(colours) or arguments}")
+            continue
+        colours = re.findall(r"\bDWPalette\.\w+", arguments)
+        if call == "background" and not colours:
+            # (R10's review) a face in the old palette's colours, or SwiftUI's, or a material
+            olds = COLOUR.findall(own_text(code, opened + 1, close))
+            if olds:
+                found.append(f"{call}: {', '.join(olds)}")
+                continue
+            if not re.match(r"\w+(,|$)", arguments):
+                continue  # a background's alignment, its content drawn by the calls inside it
         found.append(f"{call}: {', '.join(colours) or arguments}")
     return found
 
@@ -1215,7 +1275,10 @@ FLAT_DRAWS = {
     "Look/DWWellField.swift": ["DWWell: focused: focus.wrappedValue == field"],
     # a card's hairline under it, a group's rows' under each
     "Phone/PhoneCard.swift": ["DWRule: DWPalette.cardRule", "DWRule: DWPalette.groupRule", "DWRule: DWPalette.groupRule"],
-    "Phone/PhoneFoot.swift": ["DWRule: DWPalette.footEdge"],
+    # (R10's review) the foot's ground, run on down into the home indicator's room: the page's own black (footFace is
+    # made from `.dw.ph`'s ground, held below), so it reads as the page while what scrolls under it doesn't show
+    # through - and its hairline over it
+    "Phone/PhoneFoot.swift": ["background: DWPalette.footFace", "DWRule: DWPalette.footEdge"],
     # the hairline over the mini player, and its seek line's played part (the scrubber, unchanged)
     "Phone/PhoneMini.swift": ["DWRule: DWPalette.miniEdge", "fill: DWPalette.seekFill"],
     "Phone/PhoneStrip.swift": ["DWRule: DWPalette.stripRule", "fill: DWPalette.acc"],
@@ -1318,7 +1381,10 @@ WELL, OWN, SYSTEM = "the look's well", "the app's own box", "iOS's own box"
 TEXT_INPUTS = {
     "Artist/ArtistImagesSheet.swift": [SYSTEM], "Artist/ArtistMoveSheet.swift": [SYSTEM],
     "EQ/EQCorrectionScreen.swift": [SYSTEM], "EQ/EQFilterEditor.swift": [SYSTEM], "EQ/EQNameAlert.swift": [SYSTEM],
-    "Edit/ChooseFolderView.swift": [SYSTEM], "Edit/ReleasePage.swift": [SYSTEM, SYSTEM], "Edit/TagsPages.swift": [SYSTEM],
+    "Edit/ChooseFolderView.swift": [SYSTEM],
+    # (R10) Release's fields on the look's wells (Artist, Album, Year, Original, Edition: one helper), Choose a release's
+    # search iOS's own still
+    "Edit/ReleasePage.swift": [WELL, SYSTEM], "Edit/TagsPages.swift": [SYSTEM],
     # (R1c's review) Artist and Album on the look's wells, in a flat sheet
     "Get/ManualSearchSheet.swift": [WELL, WELL], "Get/SourcesSheet.swift": [OWN],
     "Library/AlbumsScreen.swift": [SYSTEM], "Library/ArtistsScreen.swift": [SYSTEM], "Library/LibraryView.swift": [WELL],
@@ -1621,11 +1687,13 @@ R9_PAGES = {"You/YouView.swift", "You/AccountSection.swift", "You/PlaybackSectio
             "You/GettingAlbumsSection.swift", "You/ManageSection.swift", "You/DownloadsRow.swift",
             "You/ChangePasswordScreen.swift", "Root/SignInView.swift", "Root/ServerAddressView.swift",
             "Downloads/DownloadsScreen.swift"}
+#? R10: Edit album on the phone (iEdit - the top's chip, the header, the strip and its pushes, Release's cards and foot)
+R10_PAGES = {"Edit/EditAlbumSheet.swift", "Edit/ReleasePage.swift"}
 #? R13: Library care, In nobody's library and the event log on the phone, flat (iLibraryCare, iEventLog - the groups and
 #? their hairlines, the runs' rows with their meters, Narrow to on the look's well, the level strip, the mono lines;
 #? tests/test_ios_care_look.py holds what each draws)
 R13_PAGES = {"Manage/LibraryCareScreen.swift", "Manage/HeldByNobodyScreen.swift", "Manage/EventLogScreen.swift"}
-SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R13_PAGES
+SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES | R13_PAGES
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

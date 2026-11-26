@@ -372,9 +372,10 @@ def test_mac_routes_says_every_route_once_each_to_its_area():
 #? R9 took .downloaded and .downloadedPlaylists: the Mac's Downloaded (MacDownloadedPage), on its two tabs.
 #? R13 took .libraryCare, .heldByNobody and .eventLog: the Mac's Library care (MacLibraryCarePage, In nobody's library
 #? in its boxes - so both routes open it) and its event log (MacEventLogPage) - asserted below.
+#? R10 took .chooseFolder: the Mac's Edit album (MacEditWindow), the folders beside the editor - asserted below.
 PHONES_PAGES = {"downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
                 "account", "thisPhone", "about", "allSongs",
-                "mbArtist", "topSongs", "chooseFolder", "needsALook",
+                "mbArtist", "topSongs", "needsALook",
                 "serverSettings", "serverSettingsGroup", "changePassword", "people", "person"}
 #? (R13) the routes each slice gave a Mac page of its own in place of the phone's, and the page
 MACS_OWN = {"libraryCare": "MacLibraryCarePage()", "heldByNobody": "MacLibraryCarePage()", "eventLog": "MacEventLogPage()"}
@@ -425,3 +426,5 @@ def test_every_area_page_is_still_the_phones_own():
     assert phone["libraryCare"] == "LibraryCareScreen().readableOnMac()"
     assert phone["heldByNobody"] == "HeldByNobodyScreen().readableOnMac()"
     assert phone["eventLog"] == "EventLogScreen().readableOnMac()"
+    # (R10) Edit an album: the phone's Choose the folder, the Mac's one page of folders and editor
+    assert phone["chooseFolder"] == "ChooseFolderScreen().readableOnMac()" and drawn["chooseFolder"] == "MacEditWindow()"

@@ -39,10 +39,10 @@ def test_tags_is_a_page_of_the_phones_own():
     assert "TagsListView(model: model, tags: tags, path: $path)" in view
     assert "TrackPageView(model: model, tags: tags, filename: filename, path: $path)" in view
     assert "EditTagsView(model: model, tags: tags)" in view
+    # (R10) the root's strip pushes it, as its row did - R11 draws it as the strip's tab
     root = declared(sheet, "struct", "EditAlbumRoot")
-    sections = body(root, "private func albumSections(")
-    row = body(sections, "NavigationLink(value: EditPage.tags)")
-    assert "LabeledContent(AlbumEdit.Part.tags.label)" in row and "EditWords.tracks(album.trackCount)" in row
+    assert "case .tags: path.append(.tags)" in body(root, "private func open(_ part: AlbumEdit.Part)")
+    assert "PhoneStrip(options: strip.tabs," in body(root, "private func albumSections(")
 
 
 def test_select_is_the_lists_own_and_edits_the_tracks_chosen_or_all():
@@ -190,14 +190,11 @@ def test_artwork_and_lyrics_are_pages_of_the_phones_own():
     assert "case artwork" in sheet and "case lyrics" in sheet
     view = declared(sheet, "struct", "EditPageView")
     assert "ArtworkPage(model: model, album: album)" in view and "LyricsPage(model: model, album: album)" in view
-    sections = body(declared(sheet, "struct", "EditAlbumRoot"), "private func albumSections(")
-    artwork = body(sections, "NavigationLink(value: EditPage.artwork)")
-    assert "LabeledContent(AlbumEdit.Part.artwork.label)" in artwork and "EditWords.artworkValue(album)" in artwork
-    lyrics = body(sections, "NavigationLink(value: EditPage.lyrics)")
-    assert "LabeledContent(AlbumEdit.Part.lyrics.label)" in lyrics and "EditWords.lyricsValue(album)" in lyrics
+    # (R10) the root's strip pushes each, as their rows did - R11 draws each as the strip's tab
+    pushed = body(declared(sheet, "struct", "EditAlbumRoot"), "private func open(_ part: AlbumEdit.Part)")
+    assert "case .artwork: path.append(.artwork)" in pushed and "case .lyrics: path.append(.lyrics)" in pushed
     # Delete album…, the last row that was the web app's, is a page of the phone's own since slice 4
-    delete = body(sections, "if edit.delete {")
-    assert "NavigationLink(value: EditPage.delete)" in delete and "WebAppRow" not in sheet
+    assert "case .delete: path.append(.delete)" in pushed and "WebAppRow" not in sheet
 
 
 def test_artwork_draws_the_cover_and_cd_art_and_offers_each_get_as_the_web_does():
@@ -303,13 +300,13 @@ def test_delete_album_is_a_page_of_the_phones_own():
     assert "case delete" in sheet
     view = declared(sheet, "struct", "EditPageView")
     assert "DeletePage(model: model, album: album)" in view
-    sections = body(declared(sheet, "struct", "EditAlbumRoot"), "private func albumSections(")
-    row = body(sections, "if edit.delete {")
-    assert "NavigationLink(value: EditPage.delete)" in row and "Text(EditWords.deleteAlbum)" in row
-    assert ".foregroundStyle(Palette.danger)" in row
-    # under Look after the library's gate alone: Edit albums alone has no Delete album… (check 338), Look after the
-    # library alone only it (342)
-    assert sections.index("if edit.editors, let retag = model.retag {") < sections.index("if edit.delete {")
+    # (R10) the strip's last push, Delete, under Look after the library's gate alone: Edit albums alone has no Delete
+    # album… (check 338), Look after the library alone only it (342) - EditAlbumPage.strip's (Swift's
+    # EditAlbumPageTests; tests/test_ios_edit_parts_contract.py's strip_gates)
+    root = declared(sheet, "struct", "EditAlbumRoot")
+    assert "let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)" in body(
+        root, "private func albumSections(")
+    assert "case .delete: path.append(.delete)" in body(root, "private func open(_ part: AlbumEdit.Part)")
     assert "webURL" not in sheet and "inWebAppLine" not in sheet
 
 

@@ -50,6 +50,11 @@ enum EditPage: Hashable {
 /// it. The sheet going ends the session - Close here, and its every dismissal where it is presented (MainTabs'
 /// onDismiss, AppNavigation.editorDismissed) - never this content disappearing, which a full-screen cover over it
 /// (Compare covers, a picture full size) brings about too (slice 6's review).
+///
+/// (R10 - notes/ios.md "The redesign, slice R10: Edit album, the folder list and Release") The phone's alone: on the Mac
+/// every Edit album opens its page beside the library's folders (MacEditWindow, AppNavigation.editAlbum), never this
+/// sheet. Its top is iEdit's - Close, "Edit album", the Matched chip - and its root the header, the strip and Release
+/// (EditAlbumRoot); Discard, the swipe held over typed work and Close off while an apply runs are as they were.
 struct EditAlbumSheet: View {
     let request: AlbumEditRequest
 
@@ -71,7 +76,7 @@ struct EditAlbumSheet: View {
         NavigationStack(path: $path) {
             Group {
                 if let model {
-                    EditAlbumRoot(model: model)
+                    EditAlbumRoot(model: model, path: $path)
                         .toolbar {
                             if let queue = request.queue, let nav = queue.nav {
                                 ToolbarItemGroup(placement: .bottomBar) {
@@ -85,6 +90,8 @@ struct EditAlbumSheet: View {
             }
             .navigationTitle(EditWords.title)
             .navigationBarTitleDisplayMode(.inline)
+            // (R10) the top's chip: the folder held matched to a release, or not
+            .matchedChip(model?.album)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(EditWords.close, action: close)
@@ -242,14 +249,24 @@ struct EditPageView: View {
     }
 }
 
-/// Edit album's root: the album's header, then its sections - the Folder menu with several folders, Needs a look, Edit
+/// Edit album's root: the album's header, then its parts - the Folder menu with several folders, Needs a look, Edit
 /// (Release, Tags, Artwork, Lyrics), Delete album… (slice 4: its page) - each by the person's permissions (Core's
 /// Managing.albumEdit and AlbumEdit.marksFine). Without an album, what AlbumEdit.status says, with Look again and
 /// Choose the folder; several folders by name alone, the Folder menu alone, "Which folder is this album?" over it.
+///
+/// (R10 - notes/ios.md "The redesign, slice R10: Edit album, the folder list and Release") Drawn as iEdit.dc.html draws
+/// it, flat: the header (the cover, the album, its byline and facts, its path in the readout face), the strip of five
+/// in place of the root's rows - Release its one tab, drawn under it; Tags, Artwork, Lyrics and Delete pushing their
+/// pages as the rows did (EditAlbumPage.strip, by the same permissions), until R11 draws each as a tab - Release's cards,
+/// and its foot: Revert and Apply, laid over the page's foot and never riding up on the keyboard (`.phoneFoot`).
 struct EditAlbumRoot: View {
     let model: EditAlbumModel
+    @Binding var path: [EditPage]
 
     @Environment(ServerModel.self) private var server
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    private let side = CGFloat(PhoneLook.bigSide)
 
     var body: some View {
         Group {
@@ -260,21 +277,22 @@ struct EditAlbumRoot: View {
                 } description: {
                     Text(EditWords.needsDeadwax)
                 }
+            } else if let album = model.album {
+                albumPage(album)
             } else {
-                List {
-                    if let album = model.album {
-                        albumSections(album)
-                    } else if model.choosing, let folders = model.folders {
-                        Section {
-                            folderMenu(folders.paths, chosen: nil)
-                        } header: {
-                            Text(EditWords.whichFolder)
-                                .font(Typeface.footnote)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if model.choosing, let folders = model.folders {
+                            PhoneGroup(legend: EditWords.whichFolder) {
+                                folderMenu(folders.paths, chosen: nil)
+                            }
+                        } else if let status = model.status {
+                            statusSection(status)
                         }
-                    } else if let status = model.status {
-                        statusSection(status)
                     }
+                    .padding(.horizontal, side)
                 }
+                .background(DWPalette.page)
             }
         }
         .editOutOfReach(!model.online && model.scan.loaded)
@@ -283,145 +301,174 @@ struct EditAlbumRoot: View {
     // MARK: no album
 
     @ViewBuilder private func statusSection(_ status: AlbumEdit.Status) -> some View {
-        Section {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                if status.busy {
-                    ProgressView()
+        PhoneCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    if status.busy {
+                        ProgressView()
+                    }
+                    Text(status.text)
+                        .font(Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.text)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Text(status.text)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityElement(children: .combine)
-            if status.retry {
-                Button(EditWords.lookAgain) {
-                    Task { await model.lookUp() }
+                .accessibilityElement(children: .combine)
+                if status.retry {
+                    Button(EditWords.lookAgain) {
+                        Task { await model.lookUp() }
+                    }
+                    .buttonStyle(DWButtonStyle(size: .small))
+                    .disabled(!model.online || model.scan.reading)
                 }
-                .disabled(!model.online || model.scan.reading)
-            }
-            if status.choose {
-                NavigationLink(value: EditPage.chooseFolder) {
-                    Text(EditWords.chooseFolder)
+                if status.choose {
+                    NavigationLink(value: EditPage.chooseFolder) {
+                        Text(EditWords.chooseFolder)
+                    }
+                    .buttonStyle(DWButtonStyle(size: .small))
+                    .disabled(!model.online)
                 }
-                .disabled(!model.online)
             }
         }
     }
 
     // MARK: the album
 
+    /// The album's page: what scrolls, and Release's foot over it - Release's wherever its cards are drawn.
+    @ViewBuilder private func albumPage(_ album: ScanAlbum) -> some View {
+        let edit = Managing.albumEdit(server.access.permissions)
+        let page = ScrollView {
+            albumSections(album)
+                .padding(.horizontal, side)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(DWPalette.page)
+        if edit.editors, let retag = model.retag {
+            page.phoneFoot { ReleaseFoot(model: model, retag: retag) }
+        } else {
+            page
+        }
+    }
+
     @ViewBuilder private func albumSections(_ album: ScanAlbum) -> some View {
         let edit = Managing.albumEdit(server.access.permissions)
-        Section {
+        let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)
+        VStack(alignment: .leading, spacing: 0) {
             header(album)
-        }
-        if model.retag?.flow.mayHaveFinished == true {
-            Section {
-                MayHaveFinished(reading: model.scan.reading)
-            }
-        }
-        // the library couldn't be read again: what is drawn is the last read's, said, with Look again
-        if model.scan.failure != nil {
-            Section {
-                ReadAgainFailed(model: model)
-            }
-        }
-        if let folders = model.folders, folders.paths.count > 1 {
-            Section {
+            if let folders = model.folders, folders.paths.count > 1 {
                 folderMenu(folders.paths, chosen: album.path)
             }
-        }
-        // the web's issues and marks are on its Release tab, Edit albums': Look after the library alone has Delete only
-        if edit.editors {
-            needsALook(album)
-        }
-        if edit.editors, let retag = model.retag {
-            Section {
-                NavigationLink(value: EditPage.release) {
-                    LabeledContent(EditWords.release) {
-                        Text(EditWords.releaseValue(album, pressing: retag.selected?.release))
-                            .multilineTextAlignment(.trailing)
-                    }
-                }
-                NavigationLink(value: EditPage.tags) {
-                    LabeledContent(AlbumEdit.Part.tags.label) {
-                        Text(EditWords.tracks(album.trackCount))
-                    }
-                }
-                NavigationLink(value: EditPage.artwork) {
-                    LabeledContent(AlbumEdit.Part.artwork.label) {
-                        Text(EditWords.artworkValue(album))
-                    }
-                }
-                NavigationLink(value: EditPage.lyrics) {
-                    LabeledContent(AlbumEdit.Part.lyrics.label) {
-                        Text(EditWords.lyricsValue(album))
-                    }
-                }
-            } header: {
-                Text(EditWords.edit)
-                    .font(Typeface.footnote)
+            if !strip.tabs.isEmpty || !strip.pushes.isEmpty {
+                PhoneStrip(options: strip.tabs, words: { (part: AlbumEdit.Part) -> String in part.label },
+                           shown: Binding(get: { AlbumEdit.Part.release },
+                                          set: { (part: AlbumEdit.Part) -> Void in open(part) }),
+                           spoken: EditAlbumPage.Words.parts, pushes: strip.pushes)
+                    // the strip's own sides and hairline run to the screen's edges
+                    .padding(.horizontal, -side)
             }
-        }
-        // Look after the library's: its page says what goes and asks before anything does
-        if edit.delete {
-            Section {
-                NavigationLink(value: EditPage.delete) {
-                    Text(EditWords.deleteAlbum)
-                        .foregroundStyle(Palette.danger)
+            if model.retag?.flow.mayHaveFinished == true {
+                PhoneCard {
+                    MayHaveFinished(reading: model.scan.reading)
                 }
+            }
+            // the library couldn't be read again: what is drawn is the last read's, said, with Look again
+            if model.scan.failure != nil {
+                PhoneCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ReadAgainFailed(model: model)
+                    }
+                    .buttonStyle(DWButtonStyle(size: .small))
+                }
+            }
+            // the web's issues and marks are on its Release tab, Edit albums': Look after the library alone has Delete
+            // only - the strip's one push
+            if edit.editors {
+                needsALook(album)
+            }
+            if edit.editors, let retag = model.retag {
+                ReleaseCards(model: model, retag: retag)
             }
         }
     }
 
-    private func header(_ album: ScanAlbum) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 14) {
-                FolderCover(path: album.path, mtime: album.artMtime, hasArt: !album.art.isEmpty, pixels: 240)
-                    .frame(width: 72, height: 72)
-                    .clipShape(Corners.artShape)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(album.album.isEmpty ? album.path : album.album)
-                        .font(Typeface.headline)
-                    let byline = EditWords.byline(album)
-                    if !byline.isEmpty {
-                        Text(byline)
-                            .font(Typeface.subheadline)
-                            .foregroundStyle(Palette.quiet)
-                    }
-                    Text(EditWords.facts(album))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
-            Text(album.path)
-                .font(Typeface.mono(.caption))
-                .foregroundStyle(Palette.quiet)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+    /// A push of the strip's (R10: Tags, Artwork, Lyrics, Delete - each its page, as the root's rows pushed them; R11
+    /// draws each as a tab instead): Release is the root's own, never pushed.
+    private func open(_ part: AlbumEdit.Part) {
+        switch part {
+        case .release: break
+        case .tags: path.append(.tags)
+        case .artwork: path.append(.artwork)
+        case .lyrics: path.append(.lyrics)
+        case .delete: path.append(.delete)
         }
-        .padding(.vertical, 4)
+    }
+
+    /// iEdit's header: the cover at 60, the album semibold, its byline and facts in the second colour, its path in the
+    /// readout face - which can be selected, so it stays apart from the rest, read as one.
+    private func header(_ album: ScanAlbum) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            FolderCover(path: album.path, mtime: album.artMtime, hasArt: !album.art.isEmpty, pixels: 180)
+                .frame(width: 60, height: 60)
+                .clipShape(Corners.artShape)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(album.album.isEmpty ? album.path : album.album)
+                        .font(Typeface.Phone.text(.row).weight(.semibold))
+                        .foregroundStyle(DWPalette.text)
+                    // (R10's review) one line each, as iEdit draws them (`.ell`) - their whole words to VoiceOver
+                    let byline = [EditWords.byline(album), EditWords.facts(album)].filter { !$0.isEmpty }
+                        .joined(separator: " · ")
+                    Text(byline)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
+                        .lineLimit(1)
+                        .accessibilityLabel(byline)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+                // the path cut in its middle, as the Mac's header cuts it: its artist's folder and its own name stay
+                Text(album.path)
+                    .font(Typeface.Phone.mono(.extraSmall))
+                    .foregroundStyle(DWPalette.t3)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .accessibilityLabel(album.path)
+                    .textSelection(.enabled)
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.top, 10)
+        .padding(.bottom, 12)
     }
 
     /// The Folder menu (a menu Picker of the paths): another of the album's folders - or, several by name, the one
     /// this album is.
     private func folderMenu(_ paths: [String], chosen: String?) -> some View {
-        Picker(EditWords.folder, selection: Binding<String?>(
-            get: { chosen },
-            set: { (picked: String?) in
-                if let picked { model.choose(picked, fromScan: false) }
-            })) {
-            if chosen == nil {
-                Text(EditWords.pickOne).tag(String?.none)
+        HStack(spacing: 8) {
+            Text(EditWords.folder)
+                .font(Typeface.Look.text(.fieldLabel))
+                .foregroundStyle(DWPalette.rowText)
+                .accessibilityHidden(true)
+            Spacer(minLength: 0)
+            Picker(EditWords.folder, selection: Binding<String?>(
+                get: { chosen },
+                set: { (picked: String?) in
+                    if let picked { model.choose(picked, fromScan: false) }
+                })) {
+                if chosen == nil {
+                    Text(EditWords.pickOne).tag(String?.none)
+                }
+                ForEach(paths, id: \.self) { (path: String) in
+                    Text(path).tag(Optional(path))
+                }
             }
-            ForEach(paths, id: \.self) { (path: String) in
-                Text(path).tag(Optional(path))
-            }
+            .pickerStyle(.menu)
+            .tint(DWPalette.acc)
+            .disabled(model.writing)
         }
-        .pickerStyle(.menu)
-        .disabled(model.writing)
+        .frame(minHeight: CGFloat(DWLook.here.fieldRowHeight))
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
     }
 
     /// Needs a look (metadataQueue.ts): each issue the album still has, its label and hint, and what was marked fine -
@@ -433,50 +480,55 @@ struct EditAlbumRoot: View {
         let types = model.scan.answer?.issueTypes ?? [:]
         let marks = AlbumEdit.marksFine(server.access.permissions)
         if !outstanding.isEmpty || !fine.isEmpty {
-            Section {
-                ForEach(outstanding, id: \.self) { (code: String) in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(MetadataQueue.label(code, types))
-                            .font(Typeface.body.weight(.semibold))
-                        let hint = MetadataQueue.hint(code, types)
-                        if !hint.isEmpty {
-                            Text(hint)
-                                .font(Typeface.footnote)
-                                .foregroundStyle(Palette.quiet)
+            PhoneGroup(legend: EditWords.needsALook) {
+                PhoneCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(outstanding, id: \.self) { (code: String) in
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(MetadataQueue.label(code, types))
+                                    .font(Typeface.Phone.text(.row).weight(.semibold))
+                                    .foregroundStyle(DWPalette.amberText)
+                                let hint = MetadataQueue.hint(code, types)
+                                if !hint.isEmpty {
+                                    Text(hint)
+                                        .font(Typeface.Phone.text(.small))
+                                        .foregroundStyle(DWPalette.t2)
+                                }
+                            }
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityElement(children: .combine)
+                        }
+                        if marks, !outstanding.isEmpty {
+                            Button {
+                                Task { await model.markFine() }
+                            } label: {
+                                if model.marking {
+                                    Label(RetagWords.markingFine, systemImage: "hourglass")
+                                } else {
+                                    Text(RetagWords.fine)
+                                }
+                            }
+                            .buttonStyle(DWButtonStyle(size: .small))
+                            .disabled(!model.online || model.marking || model.writing)
+                        }
+                        if !fine.isEmpty {
+                            Text(RetagWords.markedFine(fine.map { MetadataQueue.label($0, types) }))
+                                .font(Typeface.Phone.text(.small))
+                                .foregroundStyle(DWPalette.t2)
+                                .fixedSize(horizontal: false, vertical: true)
+                            if marks {
+                                Button(RetagWords.askAgain) {
+                                    Task { await model.askAgain() }
+                                }
+                                .buttonStyle(DWButtonStyle(size: .small))
+                                .disabled(!model.online || model.marking || model.writing)
+                            }
+                        }
+                        if let failure = model.markFailure {
+                            ErrorNote(text: failure)
                         }
                     }
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityElement(children: .combine)
                 }
-                if marks, !outstanding.isEmpty {
-                    Button {
-                        Task { await model.markFine() }
-                    } label: {
-                        if model.marking {
-                            Label(RetagWords.markingFine, systemImage: "hourglass")
-                        } else {
-                            Text(RetagWords.fine)
-                        }
-                    }
-                    .disabled(!model.online || model.marking || model.writing)
-                }
-                if !fine.isEmpty {
-                    Text(RetagWords.markedFine(fine.map { MetadataQueue.label($0, types) }))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
-                    if marks {
-                        Button(RetagWords.askAgain) {
-                            Task { await model.askAgain() }
-                        }
-                        .disabled(!model.online || model.marking || model.writing)
-                    }
-                }
-                if let failure = model.markFailure {
-                    ErrorNote(text: failure)
-                }
-            } header: {
-                Text(EditWords.needsALook)
-                    .font(Typeface.footnote)
             }
         }
     }
@@ -531,7 +583,36 @@ struct MayHaveFinished: View {
     }
 }
 
+/// (R10) The top's trailing chip (iEdit's `.chip.green`): the folder held tagged with a MusicBrainz release, Matched -
+/// else Not matched, plain; nothing until a folder is held.
+private struct MatchedChip: ToolbarContent {
+    let album: ScanAlbum?
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            if let album {
+                let matched = EditAlbumPage.matched(album)
+                DWChip(words: matched ? EditAlbumPage.Words.matched : EditAlbumPage.Words.notMatched,
+                       tone: matched ? .good : .plain)
+                    .accessibilityLabel(matched ? EditAlbumPage.Words.matchedMusicBrainz : EditWords.notMatched)
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+            }
+        }
+    }
+}
+
 extension View {
+    /// The chip in the sheet's top - on iOS 26 and later with no glass behind it, as the drawings' top has none (Now
+    /// Playing's sheetTopItems).
+    @ViewBuilder
+    fileprivate func matchedChip(_ album: ScanAlbum?) -> some View {
+        if #available(iOS 26.0, *) {
+            toolbar { MatchedChip(album: album).sharedBackgroundVisibility(.hidden) }
+        } else {
+            toolbar { MatchedChip(album: album) }
+        }
+    }
+
     /// Edit album's line while deadwax can't be reached (phase8-managing.md 2): at the top of each of its pages, under
     /// the bar, amber as the offline banner - what is drawn is how it was, and nothing can change until it's back.
     func editOutOfReach(_ shown: Bool) -> some View {

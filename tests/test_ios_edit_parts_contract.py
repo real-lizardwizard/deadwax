@@ -234,6 +234,20 @@ def test_the_tag_routes_are_waited_for_past_a_folders_read():
     assert wait["trackPicture"] >= wait["libraryTracks"]
 
 
+def strip_gates() -> str:
+    """(R10) The root's parts are its strip's, by permission: EditAlbumPage.strip(editors:delete:) of Managing.albumEdit,
+    its parts AlbumEdit.parts' - Delete by `remove` (Look after the library), Release, Tags, Artwork and Lyrics by
+    `editors` (Edit albums) - each push opening its page. The sheet's code, for the push looked for."""
+    sheet = (CORE.parent.parent.parent / "App" / "Edit" / "EditAlbumSheet.swift").read_text(encoding="utf-8")
+    assert "let edit = Managing.albumEdit(server.access.permissions)" in sheet
+    assert "let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)" in sheet
+    assert "let parts = AlbumEdit.parts(editors: editors, remove: delete)" in (CORE / "EditAlbumPage.swift").read_text(
+        encoding="utf-8")
+    assert "Part.allCases.filter { $0 == .delete ? remove : editors }" in (CORE / "AlbumEdit.swift").read_text(
+        encoding="utf-8")
+    return sheet
+
+
 def test_each_part_is_asked_with_the_permission_the_root_shows_it_for():
     # Tags is on the root under Edit albums (Managing.albumEdit's `editors`), as its routes are; the track listing and
     # its pictures are any signed-in person's (tests/test_logins.py ROUTES holds the server's side)
@@ -241,9 +255,7 @@ def test_each_part_is_asked_with_the_permission_the_root_shows_it_for():
     assert ROUTES[("POST", "/deadwax/library/tags/preview")] == "edit"
     assert ROUTES[("POST", "/deadwax/library/tags/apply")] == "edit"
     assert ROUTES[("GET", "/deadwax/library/tracks/picture")] == "user"
-    sheet = (CORE.parent.parent.parent / "App" / "Edit" / "EditAlbumSheet.swift").read_text(encoding="utf-8")
-    editors = sheet.index("if edit.editors, let retag = model.retag {")
-    assert editors < sheet.index("NavigationLink(value: EditPage.tags)")
+    assert "case .tags: path.append(.tags)" in strip_gates()
 
 
 # ---------------------------------------------------------------------------- Artwork and Lyrics: what the phone sends
@@ -474,10 +486,8 @@ def test_artwork_and_lyrics_are_asked_with_the_permission_the_root_shows_them_fo
     assert ROUTES[("POST", "/deadwax/library/lyrics/fetch")] == "edit"
     assert ROUTES[("POST", "/deadwax/library/disc_art/fetch")] == "edit"
     assert ROUTES[("GET", "/deadwax/library/disc_art")] == "user"
-    sheet = (CORE.parent.parent.parent / "App" / "Edit" / "EditAlbumSheet.swift").read_text(encoding="utf-8")
-    editors = sheet.index("if edit.editors, let retag = model.retag {")
-    assert editors < sheet.index("NavigationLink(value: EditPage.artwork)") < sheet.index("if edit.delete")
-    assert editors < sheet.index("NavigationLink(value: EditPage.lyrics)") < sheet.index("if edit.delete")
+    sheet = strip_gates()
+    assert "case .artwork: path.append(.artwork)" in sheet and "case .lyrics: path.append(.lyrics)" in sheet
 
 
 # ---------------------------------------------------------------------------- Delete album (slice 4)
@@ -553,7 +563,4 @@ def test_delete_is_asked_with_the_permission_the_root_shows_it_for():
     from tests.test_logins import ROUTES
     assert ROUTES[("POST", "/deadwax/library/delete")] == "library"
     assert ROUTES[("GET", "/deadwax/library/deletion_summary")] == "library"
-    sheet = (CORE.parent.parent.parent / "App" / "Edit" / "EditAlbumSheet.swift").read_text(encoding="utf-8")
-    gate = sheet.index("if edit.delete {")
-    assert gate < sheet.index("NavigationLink(value: EditPage.delete)")
-    assert sheet.index("NavigationLink(value: EditPage.lyrics)") < gate
+    assert "case .delete: path.append(.delete)" in strip_gates()
