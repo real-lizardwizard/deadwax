@@ -1,4 +1,11 @@
 {
+  "AboutWords.heading" : "About",
+  "AboutWords.less" : "Less",
+  "AboutWords.more" : "More",
+  "AboutWords.moreWords" : "More…",
+  "AboutWords.source(lastfm)" : "More on Last.fm",
+  "AboutWords.source(wikipedia)" : "From Wikipedia",
+  "AboutWords.spoken" : "1994 studio album by Portishead, Dummy is the debut album by Portishead.",
   "AlbumInfo.local" : "On this Mac",
   "AlbumInfo.onPhone(checking)" : "Downloaded | 3 of 12 songs · 92 MB | ",
   "AlbumInfo.onPhone(downloaded)" : "Downloaded | 3 of 12 songs · 92 MB | ",

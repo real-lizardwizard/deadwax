@@ -44,6 +44,14 @@ import SwiftUI
 /// - On the Mac (`desk`, from MacAlbum.page(for:)), MacAlbumPage draws the album in the List's place, handed this page's
 ///   own model and actions (AlbumDesk): every load, wait, levels warmed and let go, New mark seen and announcement stays
 ///   this page's - the Mac draws, nothing more. On the iPhone there is no desk (`init(route:)`).
+///
+/// ABOUT (Last.fm, slice A4 - lastfm.md 3.9; notes/ios.md "Last.fm, slice A4"): at the page's foot, under the songs'
+/// line, "About" - deadwax's description of the album (Last.fm's words first, else Wikipedia's, else Navidrome's), with
+/// Wikidata's subtitle, four lines and More (AboutSection; on the Mac, the desk's `about`). Asked by its release group -
+/// the id bridge's (the web's own source) once it has answered, else what the library's folders of its pressing say
+/// (`/library/owned`, asked if it isn't in hand - and again as deadwax comes back - and waited for until it answers or
+/// fails) - and Navidrome's id, once the album is in hand (`aboutQuestion`); absent with no words. (A4's review) One
+/// answer drawn, never Navidrome's words and then another's in their place.
 struct AlbumView<Desk: View>: View {
     let route: AlbumRoute
     /// (R5) The Mac's album page, drawn in the List's place - none on the iPhone.
@@ -55,6 +63,7 @@ struct AlbumView<Desk: View>: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
+    @Environment(SearchModel.self) private var search
     @State private var model: AlbumModel
     /// On screen - the page on top of its tab.
     @State private var shown = false
@@ -66,6 +75,9 @@ struct AlbumView<Desk: View>: View {
     @State private var albumInfo: Album?
     /// The page's pull to shuffle.
     @State private var pull = ShufflePull()
+    /// (A4's review) `/library/owned`'s count of ends (SearchModel.ownedAnswers) as this page asked it - nil until it
+    /// has: About's release group, without the bridge's, is the library's folders' word, waited for until it is in.
+    @State private var ownedSince: Int?
     @AccessibilityFocusState private var noteFocused: Bool
 
     /// (R5) The Mac's: the album drawn by `desk` (MacAlbumPage).
@@ -87,6 +99,29 @@ struct AlbumView<Desk: View>: View {
     /// Who and which album: a new person, or a library of their own come or gone, asks everything again.
     private var taskKey: String { "\(server.person)|\(server.access.hasLibrary)|\(route.id)" }
 
+    /// (Last.fm, slice A4) About's question for the page now (AboutBlock.album): once the album is in hand - and the
+    /// bridge's word, when it is asked (A4's review) - by its release group: the bridge's, else what the library's
+    /// folders of its pressing say, once they have answered or failed since the page asked; and Navidrome's id. Nothing
+    /// for an album deadwax no longer has.
+    private var aboutQuestion: AboutBlock.Question {
+        AboutBlock.album(answered: model.album != nil && model.bridgeSettled, gone: model.gone || model.goneButHere,
+                         navidromeId: route.id, release: model.album?.musicBrainzId,
+                         storeGroup: model.store?.releaseGroupMbid, index: search.ownedIndex,
+                         ownedSettled: ownedSettled)
+    }
+
+    /// (A4's review) `/library/owned` has answered, or failed, since this page asked it.
+    private var ownedSettled: Bool {
+        ownedSince.map { (since: Int) -> Bool in search.ownedAnswers > since } ?? false
+    }
+
+    /// (A4's review) When `/library/owned` is asked for About: as the page opens for someone, and again as deadwax comes
+    /// back (or the app's client does).
+    private var ownedKey: String { "\(taskKey)|\(reachability.online)|\(server.client != nil)" }
+
+    /// (A4) About asked for the page and the question, and whether deadwax can be reached - so only the newest draws.
+    private var aboutKey: String { "\(taskKey)|\(aboutQuestion.token)|\(reachability.online)" }
+
     var body: some View {
         let download = downloads.album(model.songs)
         let offline = !reachability.online
@@ -104,7 +139,8 @@ struct AlbumView<Desk: View>: View {
                                change: { (action: AlbumMine.Action) -> Void in
                                    Task { await model.change(action, client: server.client, library: library, downloads: downloads) }
                                },
-                               refresh: { refresh() }, asked: { askedHere = true }))
+                               refresh: { refresh() }, asked: { askedHere = true },
+                               about: model.about.drawn(for: taskKey)))
             } else {
                 page(download: download, offline: offline, note: note, can: can, playable: playable)
             }
@@ -120,6 +156,18 @@ struct AlbumView<Desk: View>: View {
                              downloads: downloads)
         }
         .task { await downloads.followProgress() }
+        // (Last.fm, slice A4) About, asked for the page and the album's ids now - the session's answer drawn at once
+        .task(id: aboutKey) {
+            model.about.ask(page: taskKey, person: server.person, question: aboutQuestion, client: server.client,
+                            online: reachability.online)
+        }
+        .task(id: ownedKey) {
+            // (A4's review) About's release group, without the bridge's, is the library's folders' word: asked if it
+            // isn't in hand, and About holds until it has answered or failed - never a fixed wait
+            guard reachability.online, server.client != nil, search.ownedIndex == nil else { return }
+            ownedSince = search.ownedAnswers
+            search.refreshOwned()
+        }
         .onChange(of: reachability.online) { _, online in
             model.online = online
             // back: what the page drew from the phone, or couldn't draw, is asked of deadwax now
@@ -236,6 +284,12 @@ struct AlbumView<Desk: View>: View {
                 .foregroundStyle(DWPalette.t3)
                 .listRowSeparator(.hidden, edges: .bottom)
                 .listRowBackground(Color.clear)
+                // (A4) About, under the songs' line, at the page's foot
+                if let about = model.about.drawn(for: taskKey) {
+                    AboutSection(drawn: about)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
             }
         }
         .listStyle(.plain)
@@ -494,6 +548,8 @@ struct AlbumDesk {
     let refresh: () -> Void
     /// A download asked for from the page: its end is announced while the page is on top.
     let asked: () -> Void
+    /// (A4) About's words for the page - nil for none.
+    let about: AboutBlock.Drawn?
 }
 
 /// A page's own quiet line (3.7): a state in words, not a failure - "This album isn't on this phone - it plays once

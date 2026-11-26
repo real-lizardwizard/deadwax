@@ -28,6 +28,14 @@ import SwiftUI
 /// - Properties (.group): Released, Added, Format, Size (every disc's, or none), and Album info's Folder or Folders -
 ///   whenever Album info would show it (AlbumInfo.server, for whoever may see folders): the id bridge's answer, asked
 ///   here when the page's model hasn't it (with logins off, or break-glass, the model asks it for nobody's library).
+/// - (Last.fm, slice A4 - lastfm.md 3.9) About (.group, as Properties): under Properties, at the page's foot - deadwax's
+///   description of the album, Wikidata's subtitle, four lines and More, the link; the words one VoiceOver element, the
+///   legend a header of its own. (A4's review) The page doesn't scroll, and the songs' box's least always wins: About
+///   is laid out before the box (its priority) in what the box's least leaves it - its four lines, never grown in place,
+///   when they fit (at the opening window's height they always do), else one row, its heading and More… (a short
+///   window). More, in the block or the row, opens the whole words beside the page (AboutWhole, a popover: scrolling
+///   inside past 360, the link in it). The row's height (`aboutLeast`) is counted in what the box has left, as
+///   Properties is, so the row is never pushed off the page nor drawn a sliver.
 /// - The status bar: the songs, their length and their size.
 /// - "Yesterday" is the calendar's, read against a `now` taken again at a day's change.
 struct MacAlbumPage: View {
@@ -99,9 +107,17 @@ struct MacAlbumPage: View {
 
     /// (The Mac's Row Size, after review) What the songs' box has left on the page: the page's height less its edges,
     /// the gap above the box, the hero and Properties, as they are drawn now (MacRowSize.boxRoom) - nil until measured.
+    /// (A4's review) Less About's least - its one row - while there is an About: the box's least never takes the room
+    /// that row needs, and what is left over the least is About's four lines' when they fit.
     private var boxRoom: Double? {
         MacRowSize.boxRoom(page: pageTall,
-                           around: Double(Drawn.top + Drawn.bottom + Drawn.boxAbove) + heroTall + propertiesTall)
+                           around: Double(Drawn.top + Drawn.bottom + Drawn.boxAbove) + heroTall + propertiesTall
+                               + aboutLeast)
+    }
+
+    /// (A4's review) The least About takes on the page - its one row (MacAlbumAboutDrawn.rowTall) - none without one.
+    private var aboutLeast: Double {
+        desk.about == nil ? 0 : MacAlbumAboutDrawn.rowTall
     }
 
     var body: some View {
@@ -129,6 +145,12 @@ struct MacAlbumPage: View {
                         } action: { (now: Double) -> Void in
                             propertiesTall = now
                         }
+                    // (A4) About, at the page's foot - (A4's review) laid out before the songs' box, in what the
+                    // box's least leaves it
+                    if let about = desk.about {
+                        About(drawn: about)
+                            .layoutPriority(2)
+                    }
                 } else {
                     waiting
                         .padding(.top, Drawn.boxAbove)
@@ -574,6 +596,53 @@ struct MacAlbumPage: View {
         }
     }
 
+    // MARK: (Last.fm, slice A4) About
+
+    /// (A4's review) About on the page that doesn't scroll: its four lines in the page's own section style - a group
+    /// box on the page's ground, as Properties is, 22 under it - their height their own (never grown in place), when the
+    /// page has room for them; else (ViewThatFits) one row, its heading and More…. More, in either, opens the whole words
+    /// beside the page (AboutWhole, in a popover). The words ONE VoiceOver element (AboutSpoken), the legend and the
+    /// row's heading headers of their own.
+    private struct About: View {
+        let drawn: AboutBlock.Drawn
+
+        /// The whole words open beside the page.
+        @State private var whole = false
+
+        var body: some View {
+            ViewThatFits(in: .vertical) {
+                AboutBlockView(drawn: drawn, faces: MacAlbumAboutDrawn.faces,
+                               opens: { () -> Void in whole = true }) { (words: AboutWordsElement) in
+                    MacGroupBox(legend: AboutWords.heading, ground: DWPalette.bg) {
+                        words
+                    }
+                    .padding(.top, Drawn.propertiesAbove)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                row
+            }
+            .appPopover(isPresented: $whole) {
+                AboutWhole(drawn: drawn, faces: MacAlbumAboutDrawn.faces)
+            }
+            .onChange(of: drawn) { (_: AboutBlock.Drawn, _: AboutBlock.Drawn) -> Void in whole = false }
+        }
+
+        /// The page too short for the four lines: About's heading, as the legend draws it, and More… beside it.
+        private var row: some View {
+            HStack(alignment: .center, spacing: AboutDrawn.macRowGap) {
+                Text(AboutWords.heading)
+                    .font(Typeface.Mac.text(.label).weight(.semibold))
+                    .foregroundStyle(DWPalette.label)
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                Button(AboutWords.moreWords) { whole = true }
+                    .buttonStyle(DWButtonStyle(size: .small))
+                Spacer(minLength: 0)
+            }
+            .padding(.top, AboutDrawn.macRowAbove)
+        }
+    }
+
     private func factColumn(_ facts: [MacAlbumFacts.Fact], label: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             ForEach(facts) { (fact: MacAlbumFacts.Fact) in
@@ -593,6 +662,17 @@ struct MacAlbumPage: View {
             }
         }
     }
+}
+
+/// (A4) About's faces on the Mac's album page: the subtitle and the link small (12), the paragraph the base (13), in
+/// the drawings' measure (640). (A4's review) Its foot always drawn under words, a small button's 22 tall - so the four
+/// lines' height never waits on whether they run past (More), and the page's choice of them or the row never turns on
+/// a measure. The row: 12 under Properties, a small button tall (MacLook's 22 - the heading's 11.5 shorter).
+private enum MacAlbumAboutDrawn {
+    static let faces = AboutFaces(subtitle: Typeface.Mac.text(.small), words: Typeface.Mac.text(.base),
+                                  credit: Typeface.Mac.text(.small), gap: AboutDrawn.gap, target: 0,
+                                  measure: AboutDrawn.macMeasure, footLeast: CGFloat(MacLook.smallButtonHeight))
+    static let rowTall = Double(AboutDrawn.macRowAbove) + MacLook.smallButtonHeight
 }
 
 /// A song row's right-click (MacColumnList's `menu`): the song's own ••• items, as its ••• offers them.

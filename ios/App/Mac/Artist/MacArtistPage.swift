@@ -13,7 +13,7 @@ import SwiftUI
 ///   Pin is left out (no pin for an artist yet).
 /// - The band (559): their round picture (88), their name (.h1), who they are on MusicBrainz ("Group · Sydney · since
 ///   1973"), their listeners on Last.fm, who they are chosen here - and at its end the chips: "6 in your library", "10
-///   more to get" (ArtistPageFacts.chips). The drawing's description is slice A4's, left for it under the facts.
+///   more to get" (ArtistPageFacts.chips). The drawing's description is slice A4's About, drawn at the page's foot instead (below).
 /// - The page is one lazy stack in one scroll view (R6's review): each list a section of it (MacColumnList's `flow`),
 ///   its rows made only as they come into view - and only then their covers asked, so Everything's hundreds ask a
 ///   screenful, never past the relay's 64 under way. The page hears ↑ ↓ Home End and Return for the list a click last
@@ -407,6 +407,8 @@ struct MacArtistPage: View {
                 // (A2) Similar Artists, at the foot
                 if desk.similar.shows { similarArtists }
             }
+            // (A4) About, after them - once what lies above it is drawn
+            if !desk.arrival.holding, let about = desk.about { aboutSection(about) }
             if let foot = desk.lastfm.foot { lastfmFoot(foot) }
             Color.clear
                 .frame(height: Drawn.side)
@@ -679,6 +681,23 @@ struct MacArtistPage: View {
             .padding(.bottom, Drawn.below)
     }
 
+    // MARK: (Last.fm, slice A4) About
+
+    /// About at the page's foot (lastfm.md 3.9): the heading as the page's other sections have theirs, then the words -
+    /// the subtitle (small), the paragraph at the page's base size in the drawings' measure, its four lines and More,
+    /// the link - the words one VoiceOver element (AboutSpoken), the heading a header of its own (A4's review) - and
+    /// the room under a section.
+    private func aboutSection(_ about: AboutBlock.Drawn) -> some View {
+        AboutBlockView(drawn: about, faces: MacAboutDrawn.faces) { (words: AboutWordsElement) in
+            VStack(alignment: .leading, spacing: 0) {
+                sectionHead(AboutWords.heading)
+                words
+                    .padding(.horizontal, Drawn.side)
+                    .padding(.bottom, Drawn.below)
+            }
+        }
+    }
+
     /// (R6's review) A row as VoiceOver reads it: one element, its cells' words in order (ArtistPageFacts.spoken), its
     /// buttons its actions in their own words - Play and Open an album of yours, Get (or Open) one of theirs - each only
     /// as its button is drawn and does something; none while its album is asked for, or dimmed.
@@ -867,6 +886,14 @@ private enum MacSimilarDrawn {
     static let gap: CGFloat = 16
     static let name = Typeface.Mac.text(.base).weight(.semibold)
     static let line = Typeface.Mac.text(.small)
+}
+
+/// (A4) About's faces on the Mac's artist page: the subtitle and the link small (12), the paragraph the base (13), in
+/// the drawings' measure (640); the page scrolls, so the opened words grow in place and have no bound of their own.
+private enum MacAboutDrawn {
+    static let faces = AboutFaces(subtitle: Typeface.Mac.text(.small), words: Typeface.Mac.text(.base),
+                                  credit: Typeface.Mac.text(.small), gap: AboutDrawn.gap, target: 0,
+                                  measure: AboutDrawn.macMeasure)
 }
 
 /// (R6) A discography row's right-click (MacColumnList's `menu`): an album of yours its page's ••• (AlbumRightClick, as

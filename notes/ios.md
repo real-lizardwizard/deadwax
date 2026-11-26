@@ -23033,3 +23033,318 @@ crossing between the list and Autoplay's part, and Shuffle's scope for the radio
 - The retry's timing (30 s, 3 tries) and the top-up's watch on a device; offline adds (499); the web after the phone
   (500) - the web reads the longer list as its own, by design, but nothing here ran the web.
 - Nothing ran in a simulator (none is used here).
+
+## Last.fm, slice A4 (2026-11-26)
+
+Last.fm's fourth app slice, **A4** of ~/Desktop/Code/deadwax-plans/lastfm.md (3.9, section 4's A4, checks 503-504):
+**About** at the foot of an artist's page and an album's, on the iPhone and the Mac alike - "About", Wikidata's one
+line, the paragraph at four lines with More / Less, and the link ("More on Last.fm", "From Wikipedia"). The server's
+half was there already: `GET /deadwax/describe/artist` and `/album` (server 2.0.13, the web's descriptions), Last.fm's
+words first since S3 (main's **2.1.42**, notes/lastfm.md "S3"). No server change was needed. What it leaves alone:
+- src/ and ui/ are untouched; the app is still 0.13 (13); **ios/Deadwax.xcodeproj is untouched** (the two new App files
+  in the synchronized folder, the Core files and tests found by folder).
+- **The engine files have no diff**, nor does anything of DeadwaxAudio's or the player's (A3's files): About plays
+  nothing.
+- Of the files A3 shares, only A4's own entries: Routes.swift's two endpoints, their line in `all` and their two
+  timeouts; DeadwaxClient's `describe(_:)`; ClientTests' count (A3's 112 to 114) and its timeouts
+  table; the words fixtures' six keys; test_ios_contract.py's ROUTE_COUNT and one test.
+
+### What was built
+
+**Core (pure, tested on Linux and macOS):**
+- `AboutBlock.swift` (new - Core's `About.swift` is Info's About already, so the plan's "Core `About`" is `AboutBlock`
+  and `AboutWords`), the web's lib/describe.ts and app/useDescription.ts:
+  - `DescribeAnswer`: the route's five fields, read loosely (a field of the wrong kind is none); `unavailable` missing
+    is read as true - unsure, kept a minute - as A1's answers are (the web reads it `=== true`; the route always sends
+    it, so only a broken answer differs).
+  - `of(_:)` (descriptionOf): the paragraph only with words and a source the app knows (`wikipedia`, `lastfm` - the
+    route names Navidrome's words `lastfm` too, their link Last.fm's page), the subtitle trimmed as the web trims; nil -
+    no block - with neither. `link(_:_:)` (linkFits): Last.fm's by A1's `LastfmLink.checked`; Wikipedia's https on
+    `en.wikipedia.org` exactly (`percentEncodedHost`, so no escaped host passes), printable ASCII, no `\` or `@`, at
+    most `LastfmLink.most` letters - a link that doesn't fit is dropped, the words kept (after review: no name or
+    password before the host, rather than no `@`, and Wikipedia's credit kept as words - `credited(_:)`). `url(_:)` is
+    the one URL the App opens.
+  - `Ask`: only what the route takes - `mbid` by `MBID.of`, Navidrome's id 1 to `idMost` (256, the route's ID_MAX)
+    letters - each sent only when there is one (an empty `mbid=` is the route's 422), none at all with neither (its
+    NEEDS_AN_ID); `key` the kind and both ids.
+  - `Question` (`unsettled`, `nothing`, `ask`) and the two pages' rules: `artist(...)` - nothing for an artist gone;
+    unsettled until Navidrome's answer, then while who they are on MusicBrainz may still come from the library's
+    folders (`indexKnown`, or the albums' own wait, `SearchPacing.ownedWaitMs`), then, with an mbid, until MusicBrainz's
+    facts have settled (answered or not: the web's ArtistPage asks after its facts, and the server's Wikipedia side
+    makes that same lookup); `album(...)` - nothing for an album gone (`gone || goneButHere`), unsettled until the album
+    is in hand and, with a pressing to look up, while the library's folders haven't answered nor been waited for; the
+    release group the first of `OwnedIndex.forRelease`'s folders that names one.
+  - `Kept` (keptDescription / keepDescription): the session's answers by `Ask.key`, the 200 most recently used
+    (`kept`), one unsure only `unsureKeptMs` (60 s); and each page's last question (rememberPageKey). `Showing`
+    (useDescription): what a page draws, for which page - the session's answer at once, else its own ask's; while the
+    question changes what it drew stays until a new answer replaces it; a page come back to while its ids settle draws
+    the answer of its last question. `asks(_:kept:now:)`: the Ask to send, or nil when there is none or one is kept.
+- `AboutWords.swift` (new): `heading` "About", `more`, `less`, `source(_:)` ("From Wikipedia", "More on Last.fm"),
+  `spoken(_:)` - the heading, the subtitle and every word, VoiceOver's one label (after review: no heading - it is a
+  header of its own - and Wikipedia's credit when it is words; `moreWords` "More…" added).
+- `Routes.describeArtist` and `.describeAlbum` (114 routes now), each given 120 s (`artistFacts`'s: a
+  description is a MusicBrainz lookup with its ten attempts, then Wikidata and Wikipedia at 8 s each, and the server
+  bounds none of it but Last.fm's 4 s; nothing waits for the block). `DeadwaxClient.describe(_:)` picks the route by
+  the kind.
+
+**App:**
+- `Models/AboutModel.swift` (new): one per page, ArtistPageModel's `about` and AlbumModel's. `ask(page:person:question:
+  client:online:)` draws what the session has at once and - online, with a question settled and nothing kept - asks.
+  The session is static and one person's (another's begins it again); one ask out per key, shared by every page
+  asking it and never called off, its answer kept when it comes (a failure as none, unsure) for the person who asked;
+  each ask takes the next number and only the newest lands. Offline nothing is asked: a kept answer draws, else nothing.
+- `Shared/AboutSection.swift` (new): `AboutSection`, the phone's (the heading, the words, 20 above); `AboutBlockView`,
+  the one VoiceOver element every page draws through (`.accessibilityElement(children: .ignore)`, the label
+  `AboutWords.spoken`, More or Less and the link as actions; opened only for the words it was opened for - after
+  review, the words alone are the element, `AboutSpoken`, the heading outside it);
+  `AboutWordsView` (the subtitle, the paragraph at `AboutBlock.lines` with the whole measured unseen behind it so More
+  shows only when the words run past four lines, and the foot of More / Less and the link - side by side, stacked at
+  the accessibility sizes, the link up to three lines there); `AboutFaces` - the phone's (`.phone`) the only place the
+  phone's sizes are named, each Mac page passing its own (the link's face named `credit`: test_ios_no_web_app.py
+  refuses an argument labelled `link:` anywhere but Core's AlbumInfo); `AboutDrawn`, the spaces.
+- The phone's artist page (ArtistView): `aboutQuestion` from the page's answer, its mbid (said, or chosen with Which
+  artist is this?) and `model.factsSettled(for:)` (ArtistPageModel's new `factsFor`: the mbid whose facts settled, set
+  only when the facts' task wasn't let go); `aboutKey` = `taskKey|` the question's token `|online`, its `.task(id:)`;
+  About after Similar Artists, drawn once nothing above is held (`!arrival.holding`), before A1's foot line.
+- The phone's album page (AlbumView): `aboutQuestion` from the album, its `musicBrainzId` and `search.ownedIndex` (the
+  page reads SearchModel now and asks `refreshOwned()` when no index is in hand - after review, the id bridge's group
+  first and the folders' waited for until their ask ends, never a fixed wait: "After review"); the same key and task;
+  About the List's last row, under the songs' line, with no separator and a clear ground.
+- The Mac's artist page (MacArtistPage): after Similar Artists, `aboutSection` - the page's own `sectionHead` and the
+  words at the drawing's measure (`MacAboutDrawn`, 640), under the same `!arrival.holding`. The drawing's description
+  under the name is not built: About at the foot is it.
+- The Mac's album page (MacAlbumPage): under Properties, a `MacGroupBox` titled About, as Properties is. (Corrected
+  after review - see "After review" below: the first version counted About's drawn height in what the songs' box had
+  left and let its opened words scroll inside past 220, which squeezed About to a line, and to nothing opened; it is
+  laid out before the box now, four lines or one row, More opening a popover.)
+- Each Mac page is handed `about` on its desk (ArtistDesk, AlbumDesk): the words its phone page draws, for the same
+  page.
+
+### Which existing piece each part is
+
+- **The heading**: on the phone `ArtistSectionHead` (Top Songs' and Similar Artists' heading, with no trailing part);
+  on the Mac's artist page its `sectionHead(_:)` (Albums', Top Songs', Similar Artists'); on the Mac's album page
+  `MacGroupBox`'s legend (Properties').
+- **The subtitle**: words in `DWPalette.t3`, the quiet colour, at the small face - the phone's
+  `Typeface.Phone.text(.small)` (LastfmCredit's), the Mac's `Typeface.Mac.text(.small)`.
+- **The paragraph**: `DWPalette.t2` at `Typeface.subheadline` on the phone, the Mac's `Typeface.Mac.text(.base)`,
+  `.lineLimit(AboutBlock.lines)`.
+- **More / Less**: `DWButtonStyle(size: .small)` - on the phone the flat one (DWFlatButtonBody: purple words, no face,
+  44 wide at least), on the Mac the Mac's small button.
+- **The link**: a SwiftUI `Link` in `DWPalette.acc` at the small face - A1's `LastfmCredit` way (TopSongsSection.swift),
+  opened by the system beside the app, never a web view - its row 44 tall at least on the phone (`DWLook.here.target`).
+- **Flat on the phone**: no face, card, divider or corner anywhere in it; test_ios_phone_look.py's SLICES has
+  `A4_PAGES` (AboutSection.swift).
+
+### Decisions, and where this departs from the plan
+
+- **The album's release group** is the first of `OwnedIndex.forRelease`'s folders that names one (the plan's
+  `.first?.releaseGroupMbid`): a first folder without one doesn't hide a later one's.
+- **The album page waits for the library's folders** before asking - the plan didn't say. (After review: the bridge's
+  group first, and the folders' waited for until their ask ends; the first version waited 1.5 s and could draw
+  Navidrome's words, then another's in their place - "After review".) An album no folder names a group for is asked by
+  Navidrome's id alone, for good.
+- **The artist page asks once MusicBrainz's facts have settled** (the web's way): the server's Wikipedia side makes the
+  same lookup, so it is served from the server's cache rather than racing it.
+- **Drawn only once nothing above it is held** on the artist page (A2's `arrival.holding`): the foot never stands under
+  Play while the albums wait.
+- **A failure is none, unsure**: no block, no words for it, kept a minute so Back draws at once and it is asked again
+  soon - the plan's "absent with no words".
+- **No header trait** on the element: the rule is one element per row, the heading inside its label, so VoiceOver's
+  headings rotor won't stop on About. (Reversed after review: the heading is its own element, a header, outside the
+  words' one - "After review".)
+- **Not on the pages of what you don't have** (a MusicBrainz artist's page, an album you don't have): 3.9 names the
+  artist page and the album page. docs/ios.md's line on Search's artist page "without their description" still holds.
+
+### Words changed (iphone.json and mac.json, by hand, the same six in each)
+
+Added: `AboutWords.heading` "About", `AboutWords.more` "More", `AboutWords.less` "Less", `AboutWords.source(wikipedia)`
+"From Wikipedia", `AboutWords.source(lastfm)` "More on Last.fm", `AboutWords.spoken` "About, 1994 studio album by
+Portishead, Dummy is the debut album by Portishead." (the test's own drawn block, not a recorded answer). None changed
+or removed. DeviceWordsTests adds the six. (After review, by hand in both: `AboutWords.spoken` is "1994 studio album by
+Portishead, Dummy is the debut album by Portishead." - no heading - and `AboutWords.moreWords` "More…" is added, seven
+keys in each.)
+
+### Tests, and the faults they were seen failing on
+
+- Swift: **AboutBlockTests** (new, 12) - describe.ts's words (the paragraph, the subtitle, both sources), an answer
+  with no words drawing no block, the link only to its own host (Wikipedia's lookalikes, escapes, `@`, http, long ones;
+  Last.fm's by LastfmLink), the answer read loosely, the Ask taking only what the route takes, the route asked with
+  only what there is (a fake transport: the path, the query, 120 s), the artist page asking once who they are is
+  settled, the album page asking by its release group and Navidrome's id, an unsure answer kept a minute and a sure
+  one the session, the session keeping the 200 most recently used, only the answer to the page's question drawing, and
+  a page come back to drawing its kept answer while its ids settle. **ClientTests** (114 routes, the two
+  timeouts), **DeviceWordsTests** (the six keys).
+- Python: **tests/test_ios_lastfm_a4.py** (new, 9) - About the foot of both pages on both devices; each page asking by
+  its ids, keyed on the page; only the newest answer drawing and the session sharing each ask; one VoiceOver element
+  with its actions; four lines, More or Less, the link a Link; the phone's flat (with a planted face found); each
+  device's own faces; tokens and Core's words only; the foot fitting a 375-point phone at every text size (by
+  tests/ios_fonts.py: at xxxLarge the button 61.2 + 16 + the link 144.8 = 222.1 of 343; at AX5, stacked, the button
+  126 and "More on Last.fm" 335.4, its widest word 155.9, so it wraps between words within its three lines; the heading
+  145.3 at AX5; the Mac's link 91.5 of 640). **test_ios_contract.py**: ROUTE_COUNT 114 and
+  `test_abouts_routes_are_the_servers_and_their_answers_what_the_app_decodes` (the routes' parameters and their
+  patterns, ID_MAX, the client's call, DescribeAnswer's fields the route's, every answer the route builds decoded, the
+  two sources, Wikipedia's link ASCII, the timeouts). **test_ios_no_web_app.py**: AboutSection's one way out
+  (`AboutBlock.url(drawn.paragraph)`) allowed, and its rule held to Wikipedia's and Last.fm's hosts.
+  **test_ios_phone_look.py**: A4_PAGES in SLICES. **test_ios_mac_rows.py**: the songs' box's room now less About's
+  height too (`+ propertiesTall + aboutTall`), measured and let go on the page (after review: less About's row,
+  `+ aboutLeast`, never its drawn height).
+- Faults, each applied alone on the tree rebased onto A3 (e036c3a9), its tests run (AboutBlockTests, DeviceWordsTests
+  and ClientTests; test_ios_lastfm_a4, no_web_app, contract and phone_look), then restored and compared byte for byte -
+  every one caught:
+  - A sure answer kept only a minute: `anUnsureAnswerIsKeptAMinuteAndASureOneTheSession`.
+  - An unsure (`unavailable`) answer kept past its minute: the same, and
+    `aPageComeBackToDrawsItsKeptAnswerWhileItsIdsSettle`.
+  - An answer of a page left drawing on another (Showing's page check gone): `onlyTheAnswerToThePagesQuestionNowDraws`,
+    `test_only_the_newest_answer_draws_and_the_session_shares_each_ask`.
+  - An older ask's answer landing (AboutModel's `asked == self.asks` gone): the same Python test.
+  - The words ("More on Last.fm" said as A1's "From Last.fm"): `theWordsAreDescribesOwn`, both words snapshots'
+    tests, `test_the_foot_fits_a_375_point_phone_at_every_text_size`.
+  - A link to another host - in Core (any `wikipedia.org` host): `theLinkGoesOnlyToItsOwnHost`, the contract's About
+    test, `test_each_way_out_goes_to_a_site_that_isnt_deadwax`; in the App (the answer's url opened unchecked):
+    `test_nothing_in_the_app_opens_the_web_app`.
+  - The block drawn with no words: `anAnswerWithNoWordsDrawsNoBlock`, `theAnswerIsReadLoosely`.
+  - The album page asking with neither id (Ask's guard gone): `theAlbumPageAsksByItsReleaseGroupAndNavidromesId`,
+    `theArtistPageAsksOnceWhoTheyAreIsSettled`, `theAskTakesOnlyWhatTheRouteTakes`, the contract's About test.
+  - A face on the phone (`.background(DWPalette.card)` on AboutSection): `test_the_phones_section_is_flat`.
+- The whole ios suite run once before the mutations found `AboutFaces(link:)` refused by test_ios_no_web_app.py's
+  rule on `link:` labels; the face is `credit` since.
+
+### After review
+
+The coordinator's review of the first version (e3d8dc88) found seven things. Each is fixed in this one commit; where a
+line above said otherwise it is corrected where it stands.
+
+1. **The Mac album page squeezed About to a line, and More made its words vanish** (high). The page doesn't scroll and
+   its songs' box has `.layoutPriority(1)`; About's four lines had no height of their own (their least one line), and
+   opened, the ViewThatFits fell back to a ScrollView whose least is 0. The reviewer's probe at a 662-point page: with
+   8, 12 or 20 songs the closed paragraph 16 points, More showing even for short words; opened, 0; at a 442-point page
+   the songs' box 18. What was decided, for the Mac album page alone (the phone and the Mac's artist page are as they
+   were):
+   - **The four lines are fixed at their height** (`.fixedSize(horizontal: false, vertical: true)` on the block) and
+     never grow in place. `AboutBlockView` takes `opens`: given, More does that instead of opening the words where they
+     stand (and no Less). Its foot is always drawn under the words on that page (`AboutFaces.footLeast`, MacLook's
+     small button, 22), so the block's height never waits on whether More shows - the measure - and the page's choice
+     can't turn on it.
+   - **More opens the whole words in a popover** (`AboutWhole` in AboutSection.swift, in the page's faces: the
+     subtitle, every word - selectable - and the credit, 440 wide and 16 in, scrolling inside past 360). It is
+     presented through Presenting.swift's new `appPopover` (`CarriedPopover`: the app's models carried on the Mac as a
+     sheet's page is, its going said on `appPresentationGone` as it disappears - SwiftUI's popover has no onDismiss);
+     test_ios_mac.py's list of SwiftUI presentations in Presenting.swift now ends in `popover`, five carried.
+   - **The songs' box's least always wins.** About is `.layoutPriority(2)`, laid out before the box in what the box's
+     least leaves: `ViewThatFits(in: .vertical)` of the block and one row - "About" as MacGroupBox's legend draws it,
+     and **More…** (`AboutWords.moreWords`) opening the same popover. The box's least is taken less the row's height
+     (`aboutLeast`: `MacAlbumAboutDrawn.rowTall`, 12 + 22 = 34, while there is an About), never About's drawn height
+     (`aboutTall` is gone) - so the row is never pushed off the page nor drawn a sliver, and never 0.
+   - **The arithmetic** (tests/test_ios_lastfm_a4.py's `test_the_mac_album_page_keeps_the_songs_least_and_about_on_it`,
+     with tests/ios_fonts.py's faces): the block 22 + 14 + the subtitle's line at 12 (14.54) + 6 + four lines at 13
+     (63.02) + 6 + 22 + 12 = 159.6; the row 34; around the box 54 (20 + 16 + 18), the hero 132, Properties 100 or 112.
+     At the opening window's 662 (room 364-376) the box's least is untouched (114, 144, 180) and the block is offered
+     184 to 262: the four lines at every Row Size, with 3 songs or 20. At the smallest window's 442 (room 144-156) the
+     block never fits: the row, and the box's least 110 to 122. **A judgement**: the row is counted as Properties is, so
+     at Small with four-line Properties the least stays 114, but at Medium and Large - whose least was 144-156 there
+     before About - the songs give up to 34 for it (110-122).
+   - **Probed**: the same stack (the hero, the box at its least and its whole with priority 1, Properties, About with
+     priority 2 as ViewThatFits of the fixed block and the row, in the bundled faces) laid out by SwiftUI on this Mac
+     (swiftc, ImageRenderer at 1x; scratch only, never committed - as "The letter bar beats momentum" did), every
+     frame read: at 662 the block (161 tall - each line rounded to a whole point at 1x; 159.5 at 2x) at every size,
+     3 or 20 songs, the box at or over its least (116 to 215); at 442 the row (34) and the box at its least (110-122,
+     or the 3 songs' whole 116), About's foot at 420 to 426 of the page's 426; at 600 the block or the row as the
+     arithmetic says. The popover: 440 x 360 for long words (scrolling), 440 x 90 for a line - it hugs short ones.
+   - docs/ios.md's check 504 ("opened, long words scroll inside it, and the songs still show") and the line on a short
+     window ("Properties (and About under it) stays on the page") said what the first version did; both say this one's.
+2. **The phone's Link in a List row** (medium): an automatic-style Link in the album page's List row takes the whole
+   row as its target. AboutCredit's Link is `.buttonStyle(.borderless)` (after its font and colour, OfflineBanner's
+   order), as RequestCards', UpNextScreen's and OfflineBanner's buttons in rows are; More's DWButtonStyle, a style of
+   its own, keeps its target already.
+3. **The album page could draw one answer, then replace it** (medium-low). Now:
+   - The release group is the id bridge's first (`storeGroup`: `AlbumModel.store?.releaseGroupMbid`, the web's own
+     source - AlbumPage.tsx asks once `storeFor` says the bridge has answered). **My addition**: with the bridge asked
+     (a library of your own), the album counts as answered only once the bridge's word is in - `AlbumModel.bridgeSettled`
+     (answered, failed, or not asked) - else the folders' group could draw and the bridge's replace it.
+   - Without the bridge's group, the library's folders': the page holds unsettled while `/library/owned` is out -
+     `ownedSettled`, SearchModel's new `ownedAnswers` (one more at each end of its ask: answered, the same as before, or
+     failed - counted after the index it brings, in the same turn) against the count when the page asked
+     (`ownedSince`). Asked by Navidrome's id alone only once it has answered without one, or failed. No fixed wait
+     (`ownedWaited` and its sleep are gone from the album page; the artist page keeps its own, as decided).
+   - `refreshOwned()` again as deadwax comes back (`ownedKey`: the page, online, and whether there is a client).
+   - Core's `album(answered:gone:navidromeId:release:storeGroup:index:ownedSettled:)`, and the sequence tested:
+     `theAlbumPageDrawsOneAnswerNeverTwo` - opened cold with `/library/owned` out longer than the old 1.5 s, the
+     bridge's group in hand, and the folders' ask failing - each draws one answer and asks once.
+4. **Tests that let mutations pass**: `eachQuestionHasATokenOfItsOwn` (each question's token its own, an ask's its key);
+   `clamped = height measure()` and `whole = height measure()` pinned exactly, once each; both Mac About views
+   compared whole (the artist page's `.padding(.horizontal, Drawn.side)` and `.padding(.bottom, Drawn.below)`, the album
+   page's `.padding(.top, Drawn.propertiesAbove)` and its row).
+5. **VoiceOver's headings rotor skipped About** (`.ignore` swallowed the heading's `.isHeader`). `AboutSpoken`, a
+   ViewModifier, makes the words alone the one element - their label, More / Less and the link as actions - before the
+   page's frame lays its heading beside them (`AboutWordsElement`), so ArtistSectionHead's, the Mac artist page's
+   sectionHead's, MacGroupBox's legend and the row's heading keep their header trait. `AboutWords.spoken` no longer
+   says "About" (it is read as the heading). Both devices.
+6. **The `@` refusal on Wikipedia links**: a name or password before the host is refused (`parts.user == nil,
+   parts.password == nil`), not every `@` - "https://en.wikipedia.org/wiki/@Home" passes; "https://en.wikipedia.org@
+   evil.com/..." is still refused by the exact host and "https://someone@en.wikipedia.org/..." by the userinfo. With no
+   usable link, Wikipedia's credit is drawn as plain words in the second colour (`AboutBlock.credited`, AboutCredit's
+   Text - LastfmCredit's way), and read in the words' label, so its attribution never goes; Last.fm's credit only with
+   its link (Navidrome's words come as `lastfm` and may be Deezer's, so "More on Last.fm" with nowhere to go would say
+   the wrong thing).
+7. **docs/ios.md** said Navidrome's words "are Last.fm's too"; they may be Deezer's (lastfm.md 2.8, describe.ts). It
+   says so now, and that the link names only where it goes.
+
+Words changed after review (iphone.json and mac.json, by hand, the same in each): `AboutWords.spoken` - "1994 studio
+album by Portishead, Dummy is the debut album by Portishead." (no heading); `AboutWords.moreWords` "More…" added.
+DeviceWordsTests adds it.
+
+Faults applied after review, each alone, its tests run (the Core ones with AboutBlockTests and DeviceWordsTests built
+and run), then restored byte for byte - all 29 caught (a4 is tests/test_ios_lastfm_a4.py):
+
+| # | the fault | caught by |
+| --- | --- | --- |
+| 1 | the Mac album block not fixed at its height | a4 `..._heading_a_header_outside_it` (the album About whole) |
+| 2 | About without `.layoutPriority(2)` | a4 `test_about_is_the_foot_of_both_pages_on_both_devices`; mac_rows `test_a_short_window_keeps_properties_on_the_page` |
+| 3 | the box's least not less About's row (`aboutLeast` dropped) | a4 `test_each_device_draws_the_words_in_its_own_faces`; mac_rows `test_a_short_window_keeps_properties_on_the_page` |
+| 4 | `rowTall` the button alone (22, not 34) | a4 `test_each_device_draws_the_words_in_its_own_faces` |
+| 5 | the foot drawn only with More (no `footLeast`) | a4 `test_each_device_draws_the_words_in_its_own_faces` |
+| 6 | More opening the words in place on the Mac album page (no `opens`) | a4 `..._more_opens_the_whole_words_beside_it`, `..._heading_a_header_outside_it` |
+| 7 | the popover's words unbounded (no 360) | a4 `..._more_opens_the_whole_words_beside_it` |
+| 8 | SwiftUI's own `.popover` in place of `appPopover` | a4 (both of 6's); test_ios_mac.py `test_every_sheet_and_cover_goes_through_the_carrying_wrappers` |
+| 9 | the popover's page not carrying the app's models | a4 `..._more_opens_the_whole_words_beside_it`; test_ios_mac.py (as 8) |
+| 10 | the Mac album block's 22 under Properties changed | a4 `..._heading_a_header_outside_it` |
+| 11 | the Mac artist About's side padding dropped | a4 `..._heading_a_header_outside_it` |
+| 12 | the Link back to the automatic style (no `.borderless`) | a4 `test_four_lines_more_or_less_and_the_link_beside_the_app`, `test_the_link_keeps_its_own_target_in_the_phones_list_row` |
+| 13 | Core: the bridge's group ignored | Swift `theAlbumPageAsksByItsReleaseGroupAndNavidromesId` |
+| 14 | Core: the folders never waited for (`ownedSettled` taken as true) | Swift `theAlbumPageAsksByItsReleaseGroupAndNavidromesId`, `theAlbumPageDrawsOneAnswerNeverTwo` |
+| 15 | App: the bridge's group not passed (`storeGroup: nil`) | a4 `test_each_page_asks_by_its_ids_keyed_on_the_page` |
+| 16 | App: the bridge's word not waited for (no `bridgeSettled`) | a4 (as 15) |
+| 17 | App: the folders' ask taken as ended at once (`>=`) | a4 (as 15) |
+| 18 | App: a failed ask never counted (`ownedAnswers` only after an answer) | a4 (as 15) |
+| 19 | App: not asked again as deadwax comes back (`ownedKey` the page alone) | a4 (as 15) |
+| 20 | Core: every ask's token the same | Swift `eachQuestionHasATokenOfItsOwn` |
+| 21 | App: `clamped = height` without its `measure()` | a4 `test_four_lines_more_or_less_and_the_link_beside_the_app` |
+| 22 | App: `whole = height` without its `measure()` | a4 (as 21) |
+| 23 | the heading swallowed into one element (the phone's section `.combine`d) | a4 `..._heading_a_header_outside_it` |
+| 24 | Core: the heading said in the words' label again | Swift `theIPhonesWordsAreAsTheyWere`, `theMacsWordsAreTheOnesWritten`, `theWordsAreDescribesOwn`; a4 `..._heading_a_header_outside_it` |
+| 25 | Core: a name before Wikipedia's host let through (userinfo unchecked) | Swift `theLinkGoesOnlyToItsOwnHost`; no_web_app `test_each_way_out_goes_to_a_site_that_isnt_deadwax` |
+| 26 | Core: every `@` refused again | Swift `theLinkGoesOnlyToItsOwnHost`; no_web_app (as 25) |
+| 27 | Core: Wikipedia's credit left out without its link | Swift `theWordsAreDescribesOwn`, `wikipediasCreditIsNeverLeftOut`; a4 `test_wikipedias_credit_is_drawn_as_words_without_a_link` |
+| 28 | Core: Last.fm credited with nowhere to go | Swift (both words tests), `theWordsAreDescribesOwn`, `wikipediasCreditIsNeverLeftOut`; a4 (as 27) |
+| 29 | App: the plain credit not drawn | a4 `test_wikipedias_credit_is_drawn_as_words_without_a_link` |
+
+(`..._heading_a_header_outside_it` is `test_the_words_are_one_voiceover_element_and_the_heading_a_header_outside_it`,
+which compares both Mac About views whole; `..._more_opens_the_whole_words_beside_it` is
+`test_the_mac_album_pages_more_opens_the_whole_words_beside_it`.)
+
+### Not verified - only James's phone, Ethan's and the Mac can say (503-504)
+
+- **Against a real deadwax**: the route's answers here are its own code's (descriptions.py's builders), not a real
+  Last.fm, Wikipedia or Navidrome's; whether Portishead's and Dummy's words read well at four lines is James's to see.
+- The drawing: the four lines measured against the whole words drawn unseen (`onGeometryChange` on a hidden copy), so
+  whether More shows exactly when the words run past four lines; the foot side by side and stacked at the
+  accessibility sizes (measured with tests/ios_fonts.py's bundled faces, not seen); on the Mac album page the four
+  lines or the row as the window's height changes, the popover's size and its scrolling, and the songs' box keeping its
+  least (worked out, and probed with the same stack outside the app - not the app); nothing moving above About as it
+  lands. Nothing ran in a simulator (none is used here), and the Mac smoke run was not done (James's installed app was
+  running).
+- A Link opening Safari beside the app on the phone, and the browser on the Mac; a tap beside the link in the phone
+  album page's row doing nothing (borderless); VoiceOver reading the words as one element with its More / Less and link
+  actions, and the headings rotor stopping on About (its heading a header now).
+- Offline: a page opened before drawing its kept About, one not opened since the app started drawing none (504).

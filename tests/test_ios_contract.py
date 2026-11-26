@@ -121,7 +121,7 @@ from src.store import JobStore  # noqa: E402
 
 CORE = Path(__file__).resolve().parent.parent / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore"
 ENDPOINT = re.compile(r'Endpoint\(method: "(\w+)", path: "([^"]+)", query: \[([^\]]*)\]\)')
-ROUTE_COUNT = 112
+ROUTE_COUNT = 114
 RAW_OPENING = re.compile(r'#+"')
 HASHES = re.compile(r"#*")
 
@@ -2364,6 +2364,73 @@ def test_the_radios_answer_is_what_the_app_decodes():
         assert 1 <= len(query["song_id"]) <= navidrome_route.ID_MAX and query["scope"] in {"yours", "store"}
         for words in (query["title"], query["artist"]):
             assert 1 <= len(words) <= lastfm_route.WORDS_MAX and words == words.strip()
+
+
+def test_abouts_routes_are_the_servers_and_their_answers_what_the_app_decodes(monkeypatch):
+    # (Last.fm, slice A4) About at the foot of the artist and album pages: GET /deadwax/describe/artist and /album
+    # (src/routes/describe.py, server 2.0.13; Last.fm's words first since 2.1.42), asked by `mbid` and/or
+    # `navidrome_id` - only what there is - and every answer the route builds read as DescribeAnswer reads it
+    from src import descriptions
+    from src.routes import describe as describe_route
+    from src.routes.navidrome import ID_MAX
+
+    monkeypatch.setattr(Config, "AUTH_MODE", None)
+    for kind, name in (("artist", "describeArtist"), ("album", "describeAlbum")):
+        route = app_routes()[("GET", f"/deadwax/describe/{kind}")]
+        params = {field.alias: field for field in route.dependant.query_params}
+        assert set(params) == {"mbid", "navidrome_id"} and not any(field.required for field in params.values())
+        assert declared_query(name) == ["mbid", "navidrome_id"]
+    taken = inspect.getsource(describe_route.describe_artist) + inspect.getsource(describe_route.describe_album)
+    assert taken.count("mbid: str | None = Query(None, pattern=MBID_PATTERN)") == 2
+    assert taken.count("navidrome_id: str | None = Query(None, min_length=1, max_length=ID_MAX)") == 2
+    assert describe_route.MBID_PATTERN == search_musicbrainz.MBID_PATTERN
+    # an id as the route takes one: MBID.of's lowercase, Navidrome's 1 to ID_MAX letters (AboutBlock.Ask)
+    about = (CORE / "AboutBlock.swift").read_text(encoding="utf-8")
+    assert ID_MAX == int(re.search(r"public static let idMost = (\d+)\n", about).group(1))
+    assert "let mbid = MBID.of(mbid)" in about
+    assert ("let id = trimmed.isEmpty || trimmed.unicodeScalars.count > AboutBlock.idMost ? nil : trimmed"
+            in about)
+    # each part sent only when there is one, never empty (the route answers `mbid=` or `navidrome_id=` with a 422);
+    # with neither, nothing is asked (the route's NEEDS_AN_ID) - and the route by the kind
+    assert 'if let mbid { query.append(("mbid", mbid)) }' in about
+    assert 'if let navidromeId { query.append(("navidrome_id", navidromeId)) }' in about
+    assert "guard mbid != nil || id != nil else { return nil }" in about
+    assert describe_route.NEEDS_AN_ID
+    body = swift_function("DeadwaxClient.swift", "describe")
+    assert "let route = ask.kind == .artist ? Routes.describeArtist : Routes.describeAlbum" in body
+    assert "return try await call(route, as: DescribeAnswer.self, query: ask.query)" in body
+    # what the app reads: every field, none needed but `unavailable` (always sent), read loosely
+    read = fields("DescribeAnswer")
+    assert read == {"text": True, "source": True, "url": True, "subtitle": True, "unavailable": False}
+    row = {"text": "Dummy is the debut album.", "url": "https://en.wikipedia.org/wiki/Dummy_(album)",
+           "subtitle": "1994 studio album by Portishead"}
+    heard = {"text": "Dummy is Portishead's debut.", "source": "lastfm",
+             "url": "https://www.last.fm/music/Portishead/Dummy"}
+    answers = [descriptions.NONE, descriptions.answer_of(None), descriptions.answer_of(row),
+               descriptions.answer_of(row, heard, True), descriptions.answer_lastfm_first(heard, row, None),
+               descriptions.answer_lastfm_first(None, row, heard), descriptions.answer_lastfm_first(None, None, heard, True),
+               descriptions.answer_lastfm_first(None, None, None, True)]
+    for answer in answers:
+        assert set(answer) == set(read), answer
+        assert_decodes("DescribeAnswer", answer, read)
+        assert isinstance(answer["unavailable"], bool)
+        # whose words: AboutBlock.Source's two, and nothing else
+        assert answer["source"] in (None, "wikipedia", "lastfm"), answer
+    assert re.search(r"public enum Source: String, Sendable, Equatable \{\s*case wikipedia, lastfm\s*\}", about)
+    assert descriptions.NONE == {"text": None, "source": None, "url": None, "subtitle": None, "unavailable": False}
+    # Wikipedia's link: the page's own on en.wikipedia.org, else made from its title - ASCII, as AboutBlock.link reads
+    # one; Last.fm's as LastfmLink takes it (test_lastfms_answer_is_what_the_app_decodes holds lastfm_url to it)
+    assert descriptions.ENGLISH_WIKIPEDIA == "en.wikipedia.org"
+    for title in ("Dummy (album)", "Sigur Rós", "Ágætis byrjun", "AC/DC"):
+        made = descriptions.page_url(title)
+        assert made.startswith("https://en.wikipedia.org/wiki/") and made.isascii() and "@" not in made, made
+    assert 'return written.lowercased() == "en.wikipedia.org" ? text : nil' in about
+    # nothing waits for the block at the page's foot: both are given the facts' time, the lookup they share
+    text = (CORE / "Routes.swift").read_text(encoding="utf-8")
+    literal = re.search(r"public static let timeouts: \[Endpoint: Double\] = \[([^\]]*)\]", text)
+    timeouts = {name: float(seconds) for name, seconds in re.findall(r"(\w+): ([\d.]+)", literal.group(1))}
+    assert timeouts["describeArtist"] == timeouts["describeAlbum"] == timeouts["artistFacts"]
+    assert timeouts["artistFacts"] > musicbrainz_endpoint.MusicBrainzClient.RETRIES * 3.0
 
 
 def declared_query(name: str) -> list[str]:

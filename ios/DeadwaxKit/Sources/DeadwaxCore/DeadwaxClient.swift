@@ -472,6 +472,15 @@ public struct DeadwaxClient: Sendable {
                                       ("scope", scope.rawValue)])
     }
 
+    /// (Last.fm, slice A4) About's words (`Routes.describeArtist`, `Routes.describeAlbum`): an artist's or an album's
+    /// description, asked with only what there is to ask by (AboutBlock.Ask: an id the route takes, Navidrome's
+    /// trimmed) - always answered while deadwax is in reach: none, or a source that couldn't be asked, is said in
+    /// the answer, never as a failure.
+    public func describe(_ ask: AboutBlock.Ask) async throws -> DescribeAnswer {
+        let route = ask.kind == .artist ? Routes.describeArtist : Routes.describeAlbum
+        return try await call(route, as: DescribeAnswer.self, query: ask.query)
+    }
+
     /// A MusicBrainz artist's albums (`Routes.discography`), as the web's artist page asks them: their albums
     /// (`types=album`), the studio ones alone with `studioOnly` - `problem` when MusicBrainz broke the list off.
     public func discography(mbid: String, studioOnly: Bool) async throws -> DiscographyAnswer {

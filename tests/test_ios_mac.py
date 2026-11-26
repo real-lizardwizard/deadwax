@@ -837,8 +837,10 @@ def test_every_sheet_and_cover_goes_through_the_carrying_wrappers():
     for name, text in app_sources().items():
         code = bare(text)
         if name == PRESENTING:
-            assert [m.group(1) for m in PRESENTS.finditer(code)] == ["sheet", "fullScreenCover", "sheet", "fullScreenCover"]
-            assert code.count(".carryingApp(carried)") == 4
+            # (Last.fm, slice A4's review) and the Mac album page's About's popover, carried as a sheet is
+            assert [m.group(1) for m in PRESENTS.finditer(code)] == ["sheet", "fullScreenCover", "sheet", "fullScreenCover",
+                                                                     "popover"]
+            assert code.count(".carryingApp(carried)") == 5
             continue
         found = [m.group(0) for m in PRESENTS.finditer(code)]
         assert not found, f"{name}: {found} - present through appSheet / appCover (Shared/Presenting.swift)"
@@ -871,7 +873,9 @@ def test_the_carried_models_are_every_model_the_root_shares():
     assert re.findall(r"^\s*let (\w+): ", carried, re.M) == ["models", "tabBarRoom", "playerClearance", "sheetLevel"]
     assert re.findall(r"\.environment\(\\\.(\w+), carried\.(\w+)\)", carries) == [
         ("tabBarRoom", "tabBarRoom"), ("playerClearance", "playerClearance"), ("macSheetLevel", "sheetLevel")]
-    for kind in ("private struct CarriedPresentation", "private struct CarriedItemPresentation"):
+    # (Last.fm, slice A4's review) and the popover's, the Mac album page's About
+    for kind in ("private struct CarriedPresentation", "private struct CarriedItemPresentation",
+                 "private struct CarriedPopover"):
         presenter = presenting[presenting.index(kind):]
         presenter = presenter[:presenter.index("\n}\n")]
         reads = re.findall(r"@Environment\(\\\.(\w+)\) private var (\w+)", presenter)

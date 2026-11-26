@@ -374,7 +374,7 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
     }
 
     @Test func everyRouteIsDeadwaxsOwn() {
-        #expect(Routes.all.count == 112)
+        #expect(Routes.all.count == 114)
         #expect(Set(Routes.all).count == Routes.all.count)
         for endpoint in Routes.all {
             #expect(endpoint.path.hasPrefix("/deadwax/"))
@@ -441,11 +441,14 @@ func sentJSON(_ request: HTTPRequest?) throws -> [String: SentValue] {
         // Forget and the permissions, 240 s - each after the one write lock, which another write may hold for a reset's
         // 130 s (PeopleWaits); Lock the transport's own 8 s, the unlock forgotten in memory
         // (Last.fm, A3) the radio, 30 s: a cold scope's list read a page at a time, and Last.fm's 4 s besides
+        // (Last.fm, slice A4: About) an artist's or an album's description, 120 s each, the facts' own: one MusicBrainz
+        // lookup with its ten attempts, then Wikidata and Wikipedia - nothing waits for it at the page's foot
         let longer: [Endpoint: Double] = [Routes.albumIndex: 30, Routes.lastfmRadio: 30, Routes.autoEqSearch: 20,
                                           Routes.autoEqProfile: 20,
                                           Routes.libraryOwned: 30, Routes.fullySearch: 20, Routes.releaseGroup: 60,
                                           Routes.searchArtists: 20, Routes.searchSongs: 20, Routes.artistFacts: 120,
-                                          Routes.discography: 60, Routes.jobs: 20, Routes.cancelJob: 30,
+                                          Routes.discography: 60, Routes.describeArtist: 120,
+                                          Routes.describeAlbum: 120, Routes.jobs: 20, Routes.cancelJob: 30,
                                           Routes.retryJob: 60, Routes.retryJobSame: 30, Routes.clearJobs: 30,
                                           Routes.storeState: 20, Routes.findCandidates: 300, Routes.enqueue: 300,
                                           Routes.joinJob: 60, Routes.libraryAdd: 60, Routes.libraryTracks: 30,

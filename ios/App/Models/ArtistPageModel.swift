@@ -30,6 +30,9 @@ import Observation
 /// of them (`albumsShown`), with whether the menu offers Most played read the same way (`albumsOffered`). (A2's
 /// review) Each answer is kept part by part over the one before (LastfmArtist.keeping): a later ask's part that
 /// couldn't be had never takes away one drawn.
+///
+/// And (Last.fm, slice A4 - lastfm.md 3.9) About at the page's foot (`about`, AboutModel): asked once their answer is
+/// in hand and who they are settled - MusicBrainz's facts in for an id (`factsFor`), as the web's page waits for them.
 @MainActor
 @Observable
 final class ArtistPageModel {
@@ -82,6 +85,12 @@ final class ArtistPageModel {
     @ObservationIgnored private var lineKeptFor: String?
     /// (A2) The Albums list as last made (the page is drawn again as each album's songs land).
     @ObservationIgnored private var playsMade = AlbumPlays.Made()
+
+    /// (Last.fm, slice A4 - notes/ios.md "Last.fm, slice A4") About at the page's foot: its answers for the page.
+    let about = AboutModel()
+    /// Who MusicBrainz has said they are (their facts answered, or failed) - by the id asked: About waits for it, as
+    /// deadwax's Wikipedia side makes the same lookup (AboutBlock.artist's `factsSettled`).
+    private(set) var factsFor: String?
 
     init(route: ArtistRoute) {
         self.route = route
@@ -214,8 +223,14 @@ final class ArtistPageModel {
     var facts: MBArtistFacts? { discography?.facts }
 
     func theirFacts(client: DeadwaxClient?, online: Bool) async {
+        let mbid = discography?.route.mbid
         await discography?.loadFacts(client: client, online: online)
+        // (A4) settled for who they are now - a task let go for another id settles nothing
+        if !Task.isCancelled { factsFor = mbid }
     }
+
+    /// (A4) Whether MusicBrainz has said who `mbid` is - answered or failed - on this page.
+    func factsSettled(for mbid: String?) -> Bool { mbid != nil && factsFor == mbid }
 
     /// Try again under the buttons: the albums that didn't come asked for again.
     func again(client: DeadwaxClient?) {

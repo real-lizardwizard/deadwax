@@ -38,6 +38,10 @@ final class AlbumModel {
     /// A library of the person's own (`Access.hasLibrary`) as the page was loaded: Whose's `personal`, and whether the
     /// bridge is asked at all (D12).
     private(set) var personal = false
+    /// (Last.fm, slice A4's review) The bridge's word is in - answered, or failed - or it isn't asked (no library of
+    /// your own): About's release group is the bridge's first (the web's own source, AlbumPage.tsx's `storeFor`), so
+    /// About waits for it.
+    var bridgeSettled: Bool { !personal || store != nil || storeFailed }
     /// What this page's last Add or Remove did, once deadwax took it (whose.ts's `changed`): said at once, over the
     /// album's own `starred` from before it.
     private(set) var changed: AlbumMine.Change?
@@ -61,6 +65,9 @@ final class AlbumModel {
     @ObservationIgnored private var storeAsks = 0
     /// The album its levels were warmed for (once per album, as the web's effect on `album?.id`).
     @ObservationIgnored private var warmed: String?
+
+    /// (Last.fm, slice A4 - notes/ios.md "Last.fm, slice A4") About at the page's foot: its answers for the page.
+    let about = AboutModel()
 
     init(route: AlbumRoute) {
         self.route = route

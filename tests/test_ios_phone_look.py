@@ -1730,8 +1730,11 @@ R12_PAGES = {"Manage/NeedsLookScreen.swift"}
 #? (Last.fm, slice A2) the albums' order menu, Similar Artists' section and tiles, and its See All page: the look's
 #? buttons and colours, flat on the phone (tests/test_ios_lastfm_a2.py holds what each draws)
 A2_PAGES = {"Artist/AlbumOrderMenu.swift", "Artist/SimilarArtistsSection.swift", "Artist/SimilarArtistsScreen.swift"}
+#? (Last.fm, slice A4) About at the foot of the artist and album pages: the phone's section (the small words, the
+#? link's 44-point target) flat, and the words both devices draw in their own faces (tests/test_ios_lastfm_a4.py)
+A4_PAGES = {"Shared/AboutSection.swift"}
 SLICES = (R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES
-          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES)
+          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES | A4_PAGES)
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

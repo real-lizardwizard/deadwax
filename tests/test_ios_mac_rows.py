@@ -359,10 +359,15 @@ def test_a_short_window_keeps_properties_on_the_page():
     # An album's page: the songs' box never asks for more than the page has left - its edges, the gap above it, the
     # hero and Properties as drawn - so a short window at Large keeps Properties on the page (Core's arithmetic:
     # MacRowSizeTests' aShortWindowNeverPushesPropertiesOffThePage). At heights with room, the least is as drawn.
+    # (Last.fm, slice A4's review) About under Properties is counted by its least - its one row - none while there is
+    # none: what is left over the box's least is About's four lines' when they fit (test_ios_lastfm_a4's arithmetic)
     album = bare(source(ALBUM))
     room = flat(body(album, "private var boxRoom: Double? {"))
     assert ("MacRowSize.boxRoom(page: pageTall, around: Double(Drawn.top + Drawn.bottom + Drawn.boxAbove) + heroTall "
-            "+ propertiesTall)") in room
+            "+ propertiesTall + aboutLeast)") in room
+    assert ("private var aboutLeast: Double { desk.about == nil ? 0 : MacAlbumAboutDrawn.rowTall }"
+            in flat(album))
+    assert "aboutTall" not in album
     for name in ("pageTall", "heroTall", "propertiesTall"):
         assert f"@State private var {name}: Double = 0" in album, name
         assert flat(album).count(f"{name} = now") == 1, name
@@ -371,6 +376,7 @@ def test_a_short_window_keeps_properties_on_the_page():
                 "action: { (now: Double) -> Void in ")
     assert f"hero .{measured}heroTall = now }}" in page
     assert f"properties(album) .{measured}propertiesTall = now }}" in page
+    assert "About(drawn: about) .layoutPriority(2)" in page
     assert (".padding(EdgeInsets(top: Drawn.top, leading: Drawn.side, bottom: Drawn.bottom, trailing: Drawn.side)) "
             f".frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading) .{measured}pageTall = now }}") in page
     # MacPage frames its content the same way, so the page's own frame moves nothing

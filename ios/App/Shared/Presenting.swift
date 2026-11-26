@@ -36,6 +36,13 @@ extension View {
                                                    @ViewBuilder content: @escaping (Item) -> Cover) -> some View {
         modifier(CarriedItemPresentation(kind: .cover, item: item, onDismiss: onDismiss, page: content))
     }
+
+    /// (Last.fm, slice A4's review) SwiftUI's `.popover(isPresented:content:)`, what is in it given the app's models on
+    /// the Mac - as a sheet's page is - and its going said as it goes (no `onDismiss` of SwiftUI's: its disappearing).
+    /// The Mac album page's About (its whole words) alone.
+    func appPopover<Shown: View>(isPresented: Binding<Bool>, @ViewBuilder content: @escaping () -> Shown) -> some View {
+        modifier(CarriedPopover(isPresented: isPresented, shown: content))
+    }
 }
 
 /// Every model DeadwaxApp shares through the environment - one field for each `.environment(model)` on its root
@@ -193,6 +200,27 @@ private struct CarriedItemPresentation<Item: Identifiable, Page: View>: ViewModi
             content.fullScreenCover(item: item, onDismiss: gone(onDismiss)) { (shown: Item) in
                 page(shown).carryingApp(carried)
             }
+        }
+    }
+}
+
+/// (A4's review) A popover shown while a Bool says so, what is in it handed what this presenter has.
+private struct CarriedPopover<Shown: View>: ViewModifier {
+    let isPresented: Binding<Bool>
+    let shown: () -> Shown
+
+    @Environment(\.appModels) private var models
+    @Environment(\.tabBarRoom) private var tabBarRoom
+    @Environment(\.playerClearance) private var playerClearance
+    @Environment(\.macSheetLevel) private var sheetLevel
+
+    func body(content: Content) -> some View {
+        let carried = AppCarried(models: models, tabBarRoom: tabBarRoom, playerClearance: playerClearance,
+                                 sheetLevel: sheetLevel)
+        content.popover(isPresented: isPresented) {
+            shown()
+                .carryingApp(carried)
+                .onDisappear(perform: gone(nil))
         }
     }
 }

@@ -315,8 +315,12 @@ menus and keys, and these differences.
   **Plays** (blank for a song never played, never 0), **Length** and a **•••** - with a heading row above each disc's
   first song where the phone has one ("Disc 2", or "Disc 2 · Live" for a disc with a title); double-click or Return
   plays from the lit song; then **Properties**: Released, Added, Format, Size (only when every song says its own) and,
-  for an admin, **Folder** (or **Folders**, for an album in more than one), as Album info shows it. The status bar
-  has the songs, their length and the size.
+  for an admin, **Folder** (or **Folders**, for an album in more than one), as Album info shows it - and under it,
+  in a box of its own, **About** ([as on an artist's page](#artists)): its four lines stay four on this page, and
+  **More** (there when the words run past them) opens all the words in a popover beside it - long ones scroll inside
+  it - with the link. In a window too
+  short for the four lines above the songs, About is one row instead, its heading and **More…** (the same popover), so
+  the songs keep their room. The status bar has the songs, their length and the size.
   **A playlist's page** is drawn the same way: the toolbar (Play, Shuffle, Add to Queue, Add to a playlist…, Download,
   Edit - dimmed for one you can't change), the mosaic, the name, whose it is and when it changed, its songs and length,
   then the songs in columns - **#**, **Title**, **Album** and **Length**. Its **Edit** is the phone's form, as before.
@@ -336,7 +340,8 @@ menus and keys, and these differences.
   theirs the library holds - then **Your most played**: the songs of theirs you've played most, each once however many
   pressings it's on, with its plays (no section at all until you've played one of them) - and at the page's foot
   **Similar Artists** ([from Last.fm](#artists)), a row of round pictures that two fingers on a trackpad scroll
-  sideways, with **See All** for a grid of them all. Double-click or Return plays from a song or opens an album - a
+  sideways, with **See All** for a grid of them all - and under them **About** ([as on the phone](#artists)).
+  Double-click or Return plays from a song or opens an album - a
   double-click on a row's buttons is the buttons', not the row's; right-click one of yours for its menu. The tables are part of the page, which scrolls as one; ↑ and ↓ move through the table you last
   clicked, bringing its row into view. VoiceOver reads an album's row as one - "Low, 1977, in your library, FLAC" - its
   Play, Open and Get as its actions. The status bar: "16 albums", "6 in your library", "59 songs".
@@ -451,7 +456,8 @@ The rest of the differences:
   disc's heading row keep theirs. The row you've selected stays in view as the rows grow or shrink. A bigger cover
   leaves a playlist's or a request's name the room it had, so at Large Playlists still shows every column in the
   smallest window and beside the side panel, and Requests still fits a window as it first opens. In a short window an
-  album's songs box gives way first, scrolling inside, so Properties stays on the page at Large too. Row Size is kept
+  album's songs box gives way first, scrolling inside, so Properties stays on the page at Large too - and About under
+  it gives way before the songs do: one row, "About" and **More…**, which stays on the page. Row Size is kept
   on this Mac, as Grid or List is, and is as you left it after you quit; the phone has no Row Size, and its rows don't
   change. All songs is still the phone's page, so it doesn't follow it yet.
 - **Escape** closes the sheet in front - its Close, Cancel or Done, so where Close asks before throwing away what you
@@ -918,7 +924,10 @@ Library - see [Set up Navidrome](#set-up-navidrome).
 - **The songs**, under a heading for each disc when there's more than one, or a disc has a title
   ("Disc 2", or "Disc 2 · Live" with its title). The song playing has moving bars instead of its
   number. **Tap a song** to play the album from it. **Swipe a song right** to add it to the queue (see [Adding
-  to the queue](#adding-to-the-queue)). Under the songs: how many and how long ("10 songs, 42 min").
+  to the queue](#adding-to-the-queue)). Under the songs: how many and how long ("10 songs, 42 min"). Under that,
+  **About**: what deadwax says of the album, drawn as on [an artist's page](#artists) - asked by the album's release
+  group (as deadwax's record of your library's folder of it says) and Navidrome's id, once the page knows which it
+  is: it draws one answer, never one and then another in its place.
 - **•••** at the end of a song's row has **Add to Queue** and **Add to a playlist…** for that song; the
   **•••** at the top has them for the whole album (see [the Queue](#queue) and [Add to a
   playlist](#add-to-a-playlist)). Each menu opens from the ••• you tapped, and a tap anywhere else
@@ -1549,6 +1558,29 @@ for all ten. Under them, **From Last.fm** opens their page on last.fm in the bro
   that (later than its 0.8 s wait, the first time an artist is opened), the albums stay newest first for that visit,
   and the menu says so; choose Most played, or pull the page down, and they're ordered then (on a pull, the albums
   stay as they are until the new answer comes).
+
+**About**, at the page's foot (under Similar Artists, on the phone and the Mac alike; an album's page has one too,
+under its songs' line): what deadwax says of them - with a Last.fm key (and **deadwax 2.1.42 or later**) Last.fm's
+words first, else Wikipedia's (by their MusicBrainz id), else Navidrome's - under Wikidata's one line saying what
+they are, in a quieter grey. No key is needed: without one it's Wikipedia's words or Navidrome's.
+
+- The words show **four lines**; **More** under them shows them all and **Less** four again. More is there only when
+  the words run past four lines.
+- Beside it, the link: **More on Last.fm** (Last.fm's words, or Navidrome's - which Navidrome may have from Last.fm
+  or from Deezer - so it says only where it goes) or **From Wikipedia**, opening that page in Safari - on the Mac,
+  your browser - beside the app. Only a page on last.fm, or on en.wikipedia.org, is linked to; any other address
+  deadwax gives is left out, and the words stay - Wikipedia's still with **From Wikipedia** under them, as plain
+  words (Wikipedia asks to be credited), Last.fm's or Navidrome's with nothing.
+- With no words and no one line, there's **no About at all** - nothing empty, and no words for a failure.
+- It's asked once the page knows who they are: an artist by their MusicBrainz id (their page's, or the one you chose
+  with [Which artist is this?](#managing-an-artist)), once MusicBrainz has been asked about them, and Navidrome's id; an
+  album by its release group and Navidrome's id. A page opened again draws what it was answered at once - the answers
+  are kept while the app runs (one deadwax could only partly get, or not at all, a minute) - and only the answer to
+  the page you're on is ever drawn.
+- **Offline**, an About the app already has for the page is drawn; any other page has none.
+- VoiceOver reads **About** as a heading (the rotor's Headings stop there, as at Top Songs and Similar Artists),
+  then the words as one - Wikidata's line, then every word, and "From Wikipedia" when it's plain words - with
+  **More** (or **Less**) and the link among its actions.
 
 **Offline**, the Artists page lists what it last listed, an artist with nothing on this phone dimmed (it
 opens nothing). With no list in hand it lists the artists of the albums on the phone, under "Only the
@@ -6644,6 +6676,29 @@ address, logins on. Autoplay starts off on every device. Say "pass", or what you
 - **502 [key] No similar songs.** **Not done yet.** Start Radio on a song Last.fm doesn't know: "No similar songs in
   your library.", and the song plays alone.
 
+### Last.fm's fourth slice's checks (503-504)
+
+**Not done yet.** These come with Last.fm's fourth slice on the app - [About](#artists) at the foot of an artist's
+page and an album's (still app 0.13 (13)). Last.fm's words need **deadwax 2.1.42 or later** on the server and the
+key; without them About still shows Wikipedia's or Navidrome's words. Both are **[key]**. As for 476-502: both phones
+and the Mac, deadwax's plain `http://` address, logins on. Say "pass", or what you saw.
+
+- **503 [key] About on an artist.** **Not done yet.** Open Portishead and scroll to the page's foot, under Similar
+  Artists: "About", Wikidata's quiet line saying what they are, then Last.fm's words in four lines. **More** opens them
+  all and **Less** closes them; **More on Last.fm** opens their page in Safari, beside the app (on the Mac, in your
+  browser). Does anything above it move as it comes in? At the largest text sizes, is any of it cut off? With
+  VoiceOver, "About" is a heading - the rotor's Headings stop on it - then the words read as one, that line and every
+  word, with More and More on Last.fm as its actions.
+- **504 [key] About on an album.** **Not done yet.** The same on Dummy's album page, under its songs' line, the words
+  coming in once and never swapped for others; on the phone, tap beside **More on Last.fm** in its row - nothing
+  happens; only the words open the page. On the Mac, in a box of its own under Properties: the four lines stay four,
+  **More** opens every word in a popover beside the page (long words scroll inside it) with the link; make the window
+  as short as it goes, at each Row Size - About is one row, "About" and **More…** (the same popover), and the songs
+  still show in their box, scrolling inside it. An album
+  whose folder has no MusicBrainz tags shows Navidrome's words, or no About at all - nothing empty. Turn on Airplane
+  Mode (and WireGuard off): an album opened before still shows its About; one not opened since the app started has
+  none.
+
 ### The Mac redesign's checks (518-614)
 
 The new look, drawn on the design canvas and built a slice at a time (still app 0.13 (13)): the Mac's first, and the
@@ -7436,8 +7491,7 @@ These are the web app's for now - open deadwax's address in a browser for them, 
 there. Looking after deadwax isn't among them any more: every managing tool is the app's own (see [Manage](#manage)).
 
 - **The visualizer**: it stays the web app's, on a desktop.
-- On an artist's page their **description**, and the page following an artist whose albums
-  [Move albums](#managing-an-artist) moved to their name now.
+- **The page following an artist** whose albums [Move albums](#managing-an-artist) moved to their name now.
 - In **Search**, an artist you don't have's page lists their albums, without their description or links. A search
   of what's downloaded while deadwax can't be reached isn't built: offline, Search keeps a list already drawn, and
   new words wait for deadwax.

@@ -405,6 +405,18 @@ enum DeviceWords {
         add("LastfmWords.noSimilarSongs", LastfmWords.noSimilarSongs)
         add("LastfmWords.radioFailed", LastfmWords.radioFailed)
 
+        // MARK: (Last.fm, slice A4) About at the foot of the artist and album pages - the same words on both
+
+        add("AboutWords.heading", AboutWords.heading)
+        add("AboutWords.more", AboutWords.more)
+        add("AboutWords.less", AboutWords.less)
+        add("AboutWords.moreWords", AboutWords.moreWords)
+        add("AboutWords.source(wikipedia)", AboutWords.source(.wikipedia))
+        add("AboutWords.source(lastfm)", AboutWords.source(.lastfm))
+        add("AboutWords.spoken", AboutWords.spoken(AboutBlock.Drawn(
+            paragraph: AboutBlock.Paragraph(text: "Dummy is the debut album by Portishead.", source: .lastfm, url: nil),
+            subtitle: "1994 studio album by Portishead")))
+
         // MARK: (the redesign, slice R9) Getting albums' cancel note - the phone's ✕, the Mac's Cancel and Leave - and
         // where Sign in keeps the sign-in: each written for its device, so both are named in theMacsWordsDiffer's own
 

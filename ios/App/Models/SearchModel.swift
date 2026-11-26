@@ -55,6 +55,10 @@ final class SearchModel {
     /// One more each time `ownedIndex` changes - what a page keeping something made from it compares, rather than the
     /// whole index (the artist page's rows, 15 Nov).
     private(set) var ownedVersion = 0
+    /// (Last.fm, slice A4's review) One more each time `/library/owned`'s ask ends - answered, the same as before, or
+    /// failed: what a page that asked it compares, to know its word is in (the album page's About, which waits for it
+    /// rather than for a fixed time).
+    private(set) var ownedAnswers = 0
     /// The MusicBrainz album whose row is asking the id bridge (its busy look) - a group's id, or a song's key and its
     /// album's id (`songAlbumKey`) - nil when none is.
     private(set) var opening: String?
@@ -851,6 +855,8 @@ final class SearchModel {
             let fetched = try? await client.owned(ifNoneMatch: tag)
             guard let self, epoch == self.epoch else { return }
             self.askingOwned = false
+            // (A4's review) after the index below, in the same turn: a page reading both sees them together
+            defer { self.ownedAnswers += 1 }
             guard case .fresh(let answer, let etag)? = fetched else { return }
             self.ownedTag = etag
             if answer != self.owned {

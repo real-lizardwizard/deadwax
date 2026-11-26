@@ -52,6 +52,9 @@ ALLOWED = {
     ("Artist/TopSongsSection.swift", "LastfmLink.url(lastfmPage)"):
         "Top Songs' From Last.fm - the artist's page on last.fm (LastfmLink: https on last.fm only, as deadwax "
         "passes it on)",
+    ("Shared/AboutSection.swift", "AboutBlock.url(drawn.paragraph)"):
+        "(Last.fm, slice A4) About's More on Last.fm or From Wikipedia - the artist's or the album's page there, its "
+        "Link and VoiceOver's action (AboutBlock.url: https on last.fm, or on en.wikipedia.org, only)",
 }
 
 #? what the app shares (ShareLink's item), the same way: each a file or words made on the phone, none an address
@@ -676,6 +679,20 @@ def test_each_way_out_goes_to_a_site_that_isnt_deadwax():
     assert 'text.hasPrefix("https://")' in link and '!text.contains("@")' in link
     assert 'return host == "last.fm" || host.hasSuffix(".last.fm") ? text : nil' in link
     assert "checked(link).flatMap { URL(string: $0) }" in link
+    # (Last.fm, slice A4) About's link is AboutBlock.url's alone: Last.fm's by LastfmLink, Wikipedia's an https address
+    # on en.wikipedia.org itself, read the same way - (A4's review) but for its `@`: a title may hold one, so it is a
+    # name or password before the host that is refused (the exact host stops "en.wikipedia.org@evil.com" as it is)
+    code, _ = views((CORE / "AboutBlock.swift").read_text(encoding="utf-8"))
+    about = code[code.index("public static func link(_ source: Source, _ url: String?) -> String? {"):]
+    about = about[:about.index("\n    }\n")]
+    assert "case .lastfm: return LastfmLink.checked(url)" in re.sub(r"\s+", " ", about)
+    assert 'text.hasPrefix("https://")' in about and '!text.contains("@")' not in about
+    assert ("let parts = URLComponents(string: text), parts.user == nil, parts.password == nil, let written = "
+            "parts.percentEncodedHost, !written.contains(\"%\")") in re.sub(r"\s+", " ", about)
+    assert 'return written.lowercased() == "en.wikipedia.org" ? text : nil' in about
+    url = code[code.index("public static func url(_ paragraph: Paragraph?) -> URL? {"):]
+    url = url[:url.index("\n    }\n")]
+    assert "return link(paragraph.source, paragraph.url).flatMap { URL(string: $0) }" in url
 
 
 def test_the_web_apps_way_out_is_gone():

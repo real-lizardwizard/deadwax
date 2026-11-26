@@ -54,6 +54,11 @@ import SwiftUI
 /// the library's (asked if they aren't in hand), round tiles in a row, See All past four. The Mac's page draws both from
 /// the desk.
 ///
+/// ABOUT (Last.fm, slice A4 - lastfm.md 3.9; notes/ios.md "Last.fm, slice A4"): at the page's foot, after Similar
+/// Artists, "About" - deadwax's description of them (Last.fm's words first, else Wikipedia's, else Navidrome's), with
+/// Wikidata's subtitle, four lines and More (AboutSection; on the Mac the desk's `about`). Asked by their MusicBrainz id
+/// and Navidrome's once their answer is in hand and who they are is settled (`aboutQuestion`); absent with no words.
+///
 /// THE REDESIGN (slice R6 - notes/ios.md "The redesign, slice R6: an artist"; iArtist.dc.html, Artist.dc.html): on the
 /// phone flat, as iArtist draws it - the top as R1c drew it (the round picture beside the name) with who they are on
 /// MusicBrainz under the name ("Group · Sydney · since 1973", MBArtistPage.factsLine) and the listeners; Play and
@@ -131,6 +136,18 @@ struct ArtistView<Desk: View>: View {
                         client: server.client, online: reachability.online, artists: artists, again: again)
     }
 
+    /// (Last.fm, slice A4) About's question for the page now (AboutBlock.artist): once their answer is in hand, and who
+    /// they are on MusicBrainz is settled - the library's folders answered or waited for, and with an id, MusicBrainz's
+    /// facts in (the lookup deadwax's Wikipedia side makes too) - by that id and Navidrome's.
+    private var aboutQuestion: AboutBlock.Question {
+        AboutBlock.artist(answered: model.answer != nil, gone: model.gone, navidromeId: route.id, mbid: mbid,
+                          indexKnown: search.ownedIndex != nil, waited: ownedWaited,
+                          factsSettled: model.factsSettled(for: mbid))
+    }
+
+    /// (A4) About asked for the page and the question, and whether deadwax can be reached - so only the newest draws.
+    private var aboutKey: String { "\(taskKey)|\(aboutQuestion.token)|\(reachability.online)" }
+
     /// MusicBrainz's albums of theirs to draw: online, once `/library/owned` has answered or been waited for, the answer
     /// for the question asked now - or, while Studio only is asked again, the last one, kept on screen.
     private func theirGroups(online: Bool) -> [ReleaseGroup]? {
@@ -202,6 +219,8 @@ struct ArtistView<Desk: View>: View {
                                 // (A2) Similar Artists, under the albums (and a late Top Songs)
                                 if similar.shows { similarArtists(similar) }
                             }
+                            // (A4) About, at the page's foot - once what lies above it is drawn
+                            if !arrival.holding, let about = model.about.drawn(for: taskKey) { AboutSection(drawn: about) }
                             if let foot = lastfm.foot { lastfmFoot(foot) }
                         }
                     }
@@ -264,6 +283,11 @@ struct ArtistView<Desk: View>: View {
         // (Last.fm) asked once their answer is in hand, for who they are now; the page shown is the one its Top Songs
         // page reads
         .task(id: lastfmKey) { askLastfm() }
+        // (Last.fm, slice A4) About, asked for the page and who they are now - the session's answer drawn at once
+        .task(id: aboutKey) {
+            model.about.ask(page: taskKey, person: server.person, question: aboutQuestion, client: server.client,
+                            online: reachability.online)
+        }
         // (Last.fm, slice A2) the library's artists, to meet Similar Artists with - asked if they aren't in hand, the
         // tiles' own wait begun with the ask (A2's review); with nothing to ask (in hand, or deadwax out of reach) none
         .task(id: "\(taskKey)|\(similarListed)|\(reachability.online)") {
@@ -724,6 +748,7 @@ struct ArtistView<Desk: View>: View {
                                                               waited: ownedWaited),
             lastfm: lastfm, arrival: arrival,
             top: lastfm.topSongs && !arrival.holding ? topRows(mine, online: online) : [], similar: similar,
+            about: model.about.drawn(for: taskKey),
             mostPlayed: mostPlayed(mine, online: online),
             songs: albums.reduce(0) { (count: Int, album: Album) -> Int in count + max(album.songCount ?? 0, 0) },
             playable: online ? model.asks.playable : !offlineAlbums.isEmpty,
@@ -833,6 +858,8 @@ struct ArtistDesk {
     let top: [TopSongs.Row]
     /// (A2) Similar Artists: whether it is listed, its tiles and whether they are drawn.
     let similar: SimilarShown
+    /// (A4) About's words for the page - nil for none.
+    let about: AboutBlock.Drawn?
     /// The songs you have played most (MostPlayedSongs).
     let mostPlayed: [MostPlayedSongs.Row]
     /// The songs of your albums of theirs, as Navidrome counts them - the status bar's.
