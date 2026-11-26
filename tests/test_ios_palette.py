@@ -941,8 +941,9 @@ TICKING = [
      "the Mac status bar's speed"),
     ("Requests/RequestCards.swift", "Text(row.data ?? \" \")\n                                .font(Typeface.Phone.mono(.extraSmall))",
      None),
-    # what this device holds, growing as songs come: You's Downloads row (the drawings have no figure there)
-    ("You/DownloadsRow.swift", "Text(Bytes.words(downloads.bytesHere))\n                            .font(Typeface.readout(.body))",
+    # what this device holds, growing as songs come: You's Downloads row (the drawings have no figure there) - (R9)
+    # SettingsGo's readout, which DownloadsRow hands it (test_ios_settings_look holds the hand-over)
+    ("You/YouView.swift", "Text(readout)\n                        .font(Typeface.Phone.mono(.small))",
      "You's Downloads value"),
     # Library care's facts: the scan's age
     ("Manage/LibraryCareScreen.swift",

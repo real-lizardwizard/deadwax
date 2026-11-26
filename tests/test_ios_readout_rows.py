@@ -77,6 +77,13 @@ ALONE = [
      "the song playing's length, centred on its cover and two lines as iQueue draws it"),
     ("UpNext/UpNextScreen.swift", ".font(Platform.mac ? Typeface.Look.text(.chip) : Typeface.Phone.mono(.extraSmall))",
      "the time left on the phone, beside the Shuffle and Repeat buttons' boxes, centred on them as iQueue draws it"),
+    # (R9) on the Mac an address typed in its well beside Check's faced button: two boxes, centred on each other as
+    # SignIn draws them - the words inside each box centred in it. (R9's review) The phone's Check is flat words, no box:
+    # it sits on the address's first text baseline (SignInView, ServerAddressView), so neither is said here
+    ("Mac/Settings/MacSignIn.swift", ".onSubmit { check() }\n                        .font(Typeface.Mac.mono(.base))",
+     "the address typed in its well, beside Check's button (SignIn's Where deadwax is)"),
+    ("Mac/Settings/MacSignIn.swift", "Text(server.address?.description ?? \"\")\n                .font(Typeface.Mac.mono(.small))",
+     "over the app, the address in use said alone in Where deadwax is: nothing beside it"),
 ]
 
 
@@ -249,7 +256,9 @@ def test_the_macs_tables_and_status_bar_are_set_on_one_baseline():
                      "Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift",
                      "Mac/Library/MacPlaylistsPage.swift",
                      # (R7) Get's tracklist
-                     "Mac/Search/MacGetPage.swift"]
+                     "Mac/Search/MacGetPage.swift",
+                     # (R9) Downloaded's albums and playlists
+                     "Mac/Settings/MacDownloadedPage.swift"]
     # (R7) Search's table draws its own row (MacSearchRow): its cells on one first text baseline too
     search = code_only((APP / "Mac" / "Search" / "MacSearchPage.swift").read_text(encoding="utf-8"))
     row = search[search.index("struct MacSearchRow<Name: View>: View {"):]
@@ -262,7 +271,9 @@ COVERS = re.compile(r"\b(?:LibraryCover|ArtistPicture|PlaylistCover|ArchiveCover
 CELL_BUILDERS = {"Mac/Library/MacAlbumsPage.swift": "private func cell(", "Mac/Library/MacArtistsPage.swift":
                  "private func cell(", "Mac/Library/MacPlaylistsPage.swift": "private func cell(",
                  "Mac/Album/MacAlbumPage.swift": "private func cell(", "Mac/Album/MacPlaylistPage.swift":
-                 "private func cell(", "Mac/Requests/MacRequestsPage.swift": "private func albumCell("}
+                 "private func cell(", "Mac/Requests/MacRequestsPage.swift": "private func albumCell(",
+                 # (R9) Downloaded's album cell (its playlist cell, the same, is test_ios_settings_look's)
+                 "Mac/Settings/MacDownloadedPage.swift": "private func cell(_ row: AlbumRow"}
 
 
 def test_a_tables_cover_rides_on_its_title():
@@ -289,7 +300,7 @@ def test_a_tables_cover_rides_on_its_title():
         if "MacAlbumPage" in name:
             assert 'Image(systemName: "ellipsis")' in (APP / name).read_text(encoding="utf-8")
             assert "QueueMenu(request: desk.row(song, album)) { Image(systemName: " in re.sub(r"\s+", " ", cells)
-    assert covers == 4, covers
+    assert covers == 5, covers  # (R9) Downloaded's album cover the fifth
     # the rehearsal: a cover alone in its cell, and a cover in a stack on the foot, are each seen
     alone = "func cell() -> some View { switch column { case 0: LibraryCover(id: x) default: Text(y) } }"
     head = blocks_around(alone, alone.index("LibraryCover("))[0][0]

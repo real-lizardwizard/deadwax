@@ -33,6 +33,9 @@ MAC = APP / "Mac"
 PLATFORM = "Shared/Platform.swift"
 #? the Mac's frame: the files that may name App/Mac's types (Platform's Mac half too - read apart, below)
 FRAME_FILES = {"Root/DesktopFrame.swift", "Root/MacSidebarView.swift", "Player/PlayerBar.swift", "Player/MacPanels.swift"}
+#? (R9) one Mac name a phone file names, each once, inside its `if Platform.mac {` (held below): the sign-in's dialog,
+#? drawn where the phone draws its one screen (RootView's signIn(reason:why:))
+NAMED_FROM_THE_PHONES = {"Root/RootView.swift": "MacSignIn"}
 
 
 def _load(name: str):
@@ -128,7 +131,8 @@ def reach_problems(sources: dict[str, str]) -> list[str]:
             left += [f"{name} (its Mac half): {found.group(0)}" for found in phone.finditer(mac_half)]
             continue
         if not the_macs(name):
-            left += [f"{name}: {found.group(0)}" for found in mac.finditer(code)]
+            left += [f"{name}: {found.group(0)}" for found in mac.finditer(code)
+                     if found.group(0) != NAMED_FROM_THE_PHONES.get(name)]
         if the_macs(name) or name.startswith("Look/"):
             left += [f"{name}: {found.group(0)}" for found in phone.finditer(code)]
     return left
@@ -149,6 +153,11 @@ def test_app_mac_is_named_only_from_the_macs_frame():
         assert gone not in names, gone
     left = reach_problems(app_sources())
     assert not left, left
+    # (R9) the sign-in's dialog named from RootView once, as the Mac's half of its one choice - the iPhone's SignInView
+    root = bare(app_sources()["Root/RootView.swift"])
+    assert root.count("MacSignIn") == 1
+    assert re.search(r"if Platform\.mac \{\s*MacSignIn\(reason: reason, reasonWhy: why\)\s*\} else \{\s*"
+                     r"SignInView\(reason: reason, reasonWhy: why\)\s*\}", root)
 
 
 def test_the_three_zones_are_read():
@@ -321,10 +330,12 @@ def test_the_frame_stacks_are_the_macs_with_its_own_routes():
         assert re.search(r"MacTabStack\(path: paths\." + tab + r"(, ownTop: true)?\) \{ " + re.escape(root) +
                          r" \}\s*\.tag\(AppTab\." + tab + r"\)", page), tab
     # each root the phone's own, as MainTabs draws it - but Requests', since R8 the Mac's own table (MacRequestsPage),
-    # (R2) the Library's, with the Mac's own Albums and Artists in it (asserted below), and (R7) Search's, SearchScreen
+    # (R2) the Library's, with the Mac's own Albums and Artists in it (asserted below), (R7) Search's, SearchScreen
     # with the Mac's own table as its desk
     for area, view in (("Search/MacSearch.swift", "SearchScreen { MacSearchPage() }"),
-                       ("Requests/MacRequests.swift", "MacRequestsPage()"), ("Settings/MacSettings.swift", "YouView()")):
+                       ("Requests/MacRequests.swift", "MacRequestsPage()"),
+                       # (R9) Settings', the Mac's page of boxes - the phone's pages row for row
+                       ("Settings/MacSettings.swift", "MacSettingsRoot()")):
         assert re.search(r"static func root\(\) -> some View \{\s*" + re.escape(view) + r"\s*\}", bare(app["Mac/" + area]))
     assert re.search(r"static func root\(\) -> some View \{\s*LibraryView\(desk: \{ \(page: LibraryPage, scope: AlbumScope\) "
                      r"-> MacLibraryDesk in\s*MacLibraryDesk\(page: page, scope: scope\)\s*\}\)\s*\}",
@@ -358,8 +369,9 @@ def test_mac_routes_says_every_route_once_each_to_its_area():
 #? R5 took .album and .playlist: the phone's pages still, drawing the Mac's own in their List's place (their `desk`).
 #? R6 took .artist the same way (ArtistView's desk, MacArtistPage); .topSongs stays the phone's page.
 #? R7 took .group: GroupView still, drawing the Mac's Get page (MacGetPage) as its desk - asserted below.
-PHONES_PAGES = {"downloaded", "downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
-                "account", "thisPhone", "about", "downloadedPlaylists", "allSongs",
+#? R9 took .downloaded and .downloadedPlaylists: the Mac's Downloaded (MacDownloadedPage), on its two tabs.
+PHONES_PAGES = {"downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
+                "account", "thisPhone", "about", "allSongs",
                 "mbArtist", "topSongs", "chooseFolder", "needsALook", "libraryCare", "heldByNobody",
                 "serverSettings", "serverSettingsGroup", "eventLog", "changePassword", "people", "person"}
 

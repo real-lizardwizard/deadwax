@@ -382,6 +382,12 @@ enum DeviceWords {
         add("LastfmWords.footRefused", LastfmWords.footRefused)
         add("LastfmWords.serverSettings", LastfmWords.serverSettings)
 
+        // MARK: (the redesign, slice R9) Getting albums' cancel note - the phone's ✕, the Mac's Cancel and Leave - and
+        // where Sign in keeps the sign-in: each written for its device, so both are named in theMacsWordsDiffer's own
+
+        add("RequestWords.cancelAsksNote", RequestWords.cancelAsksNote(device))
+        add("SettingsWords.kept", SettingsWords.kept(device))
+
         // MARK: Debug
 
         let utc = TimeZone(identifier: "UTC")!
@@ -528,6 +534,9 @@ enum DeviceWords {
             // slice 7's (notes/ios.md "The Mac app, slice 7: managing on a big screen"): what quitting does to a run
             "LibraryCare.quitNote(covers)", "LibraryCare.quitNote(disc)", "LibraryCare.quitNote(lyrics)",
             "RetimeRun.quitNote",
+            // R9's (notes/ios.md "The redesign, slice R9: Downloaded, Settings and Sign in"): the cancel note names the
+            // Mac's Cancel and Leave where the phone's names its ✕, and the Mac keeps its sign-in in a file
+            "RequestWords.cancelAsksNote", "SettingsWords.kept",
         ]
         // a line of the downloads' everyLine (the banned-words checks' list) is no word of its own: one that differs
         // repeats a named word - or one part of one, a banner's line - on both devices, and is held where that is

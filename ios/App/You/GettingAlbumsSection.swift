@@ -6,13 +6,14 @@ import SwiftUI
 /// the asking: deadwax is asked for the three each time the page shows (changed on another device, they show here), on
 /// its pull and as deadwax comes back into reach - the web asks them each time You's tab opens, and on Check again. What
 /// is in hand stands meanwhile. Nothing else asks for them on Settings now: the root draws none of them (and Get asks
-/// for itself - the album you don't have as it shows, the Sources sheet before every search).
+/// for itself - the album you don't have as it shows, the Sources sheet before every search). (R9) Flat, a Settings page
+/// (SettingsPage).
 struct GettingAlbumsPage: View {
     @Environment(GetSettingsModel.self) private var getting
     @Environment(Reachability.self) private var reachability
 
     var body: some View {
-        List {
+        SettingsPage {
             GettingAlbumsSection()
         }
         .navigationTitle(RequestWords.gettingAlbums)
@@ -40,7 +41,14 @@ struct GettingAlbumsPage: View {
 ///   into it; deadwax's database unable to keep them ("Tell whoever runs deadwax." for anyone but whoever runs it); and
 ///   a choice not kept, said to VoiceOver as the choice goes back.
 /// - **Confirm before cancelling** (slice 1), this phone's own - Requests' ✕ reads it at the tap - kept in UserDefaults
-///   under the web's key, on unless turned off. After the three's note, so neither reads as being about the other.
+///   under the web's key, on unless turned off. After the three's note, so neither reads as being about the other. (R9)
+///   Its note names each device's own button (RequestWords.cancelAsksNote): the phone's ✕, word for word as before;
+///   the Mac's Cancel and Leave, the words its Requests table's button has (R8's MacRequestsPage reads the same
+///   setting at the click).
+///
+/// (R9) Each a flat row on its group's hairline (SettingsChoiceRow), the notes under their groups (SettingsNote), the
+/// switch the purple one (`.toggleStyle(.phoneSwitch)`). Quality floor is today's row, deadwax's own setting - the
+/// drawing's root-level Quality floor isn't drawn (the build plan's 3.8, answer 5).
 struct GettingAlbumsSection: View {
     @AppStorage(ConfirmCancel.storageKey) private var stored: String?
     @Environment(GetSettingsModel.self) private var getting
@@ -50,7 +58,7 @@ struct GettingAlbumsSection: View {
     var body: some View {
         let settings = getting.settings
         let live = settings != nil && reachability.online
-        Section {
+        PhoneGroup {
             choice(GettingWords.modeTitle(Platform.device), GetMode.allCases, chosen: settings?.mode, live: live,
                    name: { (mode: GetMode) -> String in mode.label }) { (mode: GetMode) -> Void in
                 getting.choose(GetChoice(mode: mode))
@@ -63,41 +71,37 @@ struct GettingAlbumsSection: View {
                    name: { (format: FormatPreference) -> String in format.label }) { (format: FormatPreference) -> Void in
                 getting.choose(GetChoice(format: format))
             }
-        } footer: {
-            footer
         }
+        footer
 
-        Section {
+        PhoneGroup {
             Toggle(RequestWords.confirmCancel, isOn: Binding<Bool>(get: { ConfirmCancel.read(stored) },
                                                                   set: { (on: Bool) -> Void in
                                                                       stored = ConfirmCancel.stored(on)
                                                                   }))
-        } footer: {
-            Text(RequestWords.confirmCancelNote)
-                .font(Typeface.footnote)
+            .toggleStyle(.phoneSwitch)
+            .settingsRow()
         }
+        SettingsNote(words: RequestWords.cancelAsksNote(Platform.device))
     }
 
     /// The note under the three, and what stands in the way of keeping them.
     private var footer: some View {
         let problem = getting.problem(admin: server.access.seesDetail)
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 0) {
             if !reachability.online {
                 // why none can be chosen just now - the Sources sheet's and the album page's words
-                Text(StoreLine.offline)
+                SettingsNote(words: StoreLine.offline)
             }
-            Text(GettingWords.note)
+            SettingsNote(words: GettingWords.note)
             if !getting.canSave {
-                Text(GettingWords.unsavedLine(runsDeadwax: server.access.seesDetail))
-                    .foregroundStyle(Palette.danger)
+                SettingsNote(words: GettingWords.unsavedLine(runsDeadwax: server.access.seesDetail),
+                             colour: DWPalette.redChipText)
             }
             if reachability.online, let problem {
-                Text(problem)
-                    .foregroundStyle(Palette.danger)
+                SettingsNote(words: problem, colour: DWPalette.redChipText)
             }
         }
-        .font(Typeface.footnote)
-        .fixedSize(horizontal: false, vertical: true)
         // a choice that wasn't kept, heard as it goes back
         .onChange(of: problem) { _, said in
             if let said, reachability.online { Notice.announce(said) }
@@ -110,19 +114,22 @@ struct GettingAlbumsSection: View {
     private func choice<Choice: Hashable>(_ title: String, _ choices: [Choice], chosen: Choice?, live: Bool,
                                           name: @escaping (Choice) -> String,
                                           pick: @escaping (Choice) -> Void) -> some View {
-        Picker(title, selection: Binding<Choice?>(get: { chosen }, set: { (now: Choice?) -> Void in
-            guard live, let now, now != chosen else { return }
-            pick(now)
-        })) {
-            // nothing known yet: the one value the row can show is none - never a default claimed as chosen
-            if chosen == nil {
-                Text(verbatim: "").tag(Choice?.none)
+        SettingsChoiceRow(title: title) {
+            Picker(title, selection: Binding<Choice?>(get: { chosen }, set: { (now: Choice?) -> Void in
+                guard live, let now, now != chosen else { return }
+                pick(now)
+            })) {
+                // nothing known yet: the one value the row can show is none - never a default claimed as chosen
+                if chosen == nil {
+                    Text(verbatim: "").tag(Choice?.none)
+                }
+                ForEach(choices, id: \.self) { (option: Choice) in
+                    Text(name(option)).tag(Choice?.some(option))
+                }
             }
-            ForEach(choices, id: \.self) { (option: Choice) in
-                Text(name(option)).tag(Choice?.some(option))
-            }
+            .pickerStyle(.menu)
+            .disabled(!live)
         }
-        .pickerStyle(.menu)
-        .disabled(!live)
+        .opacity(live ? 1 : DWPalette.off)
     }
 }

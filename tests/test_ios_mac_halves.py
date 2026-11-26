@@ -161,6 +161,8 @@ def mac_halves() -> dict[str, str]:
 #? ArtistView.macHero's pin (3acb28f11dad5501) retired with it: MacArtistPage's band is R6's own, pinned as R6 left it.
 #? (R6's review) The band re-pinned (it was d2227dd82a6d4bf1): its chips take who may get albums, so "10 more to get" is
 #? drawn only for them. And its three shared reads pinned as R6 left them.
+#? (R9's review) The first ask takes `macRoom`, the room round it on the Mac's own Downloaded page - EdgeInsets() for
+#? every other caller, so what the Mac drew there is unchanged (its digest before, f7d6bf161c90975f).
 PINNED = {
     "Look/DWButtonStyle.swift": "05ac2b1f28675581",
     "Look/DWChip.swift": "cf86e3708a29bfc1",
@@ -177,7 +179,7 @@ PINNED = {
     "ArtistHeroPicture": "62b50dcf0400dac1",
     "LastfmCredit": "af492e61b5a3bda3",
     "ArtistTheirFoot": "f19dafdb6bb6738c",
-    "FirstAskCard": "f7d6bf161c90975f",
+    "FirstAskCard": "63ad9fb3f0571d83",
     "EmptyLibraryNote": "72f1e022695aeff8",
 }
 

@@ -1311,7 +1311,9 @@ def test_the_phone_is_flat():
 #?   iOS's own box - no plain style taking it away, and every way the field is reached held in a Form, a List that
 #?   isn't plain, an alert or a .searchable (Platform's searchField on the phone): walked out from the field through its
 #?   blocks, and on through each use of the view or the helper it is declared in (TYPING_HOPS at most).
-#? R1c left iOS's own as they were: Settings', People's, the editors' and the EQ's are wave D's slices.
+#? R1c left iOS's own as they were: Settings', People's, the editors' and the EQ's are wave D's slices. (R9) Settings' are
+#? the app's own boxes now: the sign-in's address, name and password, This phone's address, Change password's three - each
+#? on FieldLook (SignInView's), as the sign-in's two were.
 WELL, OWN, SYSTEM = "the look's well", "the app's own box", "iOS's own box"
 TEXT_INPUTS = {
     "Artist/ArtistImagesSheet.swift": [SYSTEM], "Artist/ArtistMoveSheet.swift": [SYSTEM],
@@ -1326,11 +1328,13 @@ TEXT_INPUTS = {
     "Playlists/PlaylistPicker.swift": [SYSTEM],
     # (R1c's review) Edit's name and description: a plain List's rows draw no box, so the look's wells
     "Playlists/PlaylistView.swift": [WELL, WELL],
-    "Root/ServerAddressView.swift": [SYSTEM], "Root/SignInView.swift": [OWN, OWN],
+    # (R9) the sign-in's one screen: where deadwax is, then who you are; This phone's address - FieldLook, each
+    "Root/ServerAddressView.swift": [OWN], "Root/SignInView.swift": [OWN, OWN, OWN],
     "Search/PressingPickerSheet.swift": [SYSTEM],
     # (R7's review) Search's field: its page's own, the look's well (iSearch's .well.sfield) where .searchable's was
     "Search/SearchScreen.swift": [WELL],
-    "You/ChangePasswordScreen.swift": [SYSTEM] * 3,
+    # (R9) out of the Form, each password on FieldLook
+    "You/ChangePasswordScreen.swift": [OWN] * 3,
 }
 TYPING = re.compile(r"\b(?:TextField|SecureField|TextEditor)\(|\.searchable\(|\.searchField\(")
 TYPING_HOPS = 3
@@ -1609,7 +1613,14 @@ R4B_FACE = {"Player/ScrubberView.swift"}
 R6_PAGES = {"Artist/ArtistView.swift", "Artist/TopSongsSection.swift"}
 R7_PAGES = {"Search/SearchScreen.swift", "Search/GroupView.swift", "Search/PressingPickerSheet.swift",
             "Get/SourcesSheet.swift", "Get/SourceCardView.swift", "Get/StoreLineView.swift"}
-SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES
+#? R9: Settings on the phone, flat (iSettings - the account card, its groups, their rows, the switches), the sign-in's one
+#? screen (iSignIn) and This phone's address on their boxes, Change password's fields and button, and Settings >
+#? Downloads' plain list with iArtists' rows
+R9_PAGES = {"You/YouView.swift", "You/AccountSection.swift", "You/PlaybackSection.swift", "You/ThisPhoneSection.swift",
+            "You/GettingAlbumsSection.swift", "You/ManageSection.swift", "You/DownloadsRow.swift",
+            "You/ChangePasswordScreen.swift", "Root/SignInView.swift", "Root/ServerAddressView.swift",
+            "Downloads/DownloadsScreen.swift"}
+SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

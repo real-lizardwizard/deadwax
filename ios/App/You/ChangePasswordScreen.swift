@@ -9,8 +9,12 @@ import SwiftUI
 /// fields the password manager knows - the current one's, then a new one's - no capitals, no autocorrection); under
 /// them what's wrong as typed (People's rules for a new password, and not the one you have); then Change - on only when
 /// the form is ready and deadwax is in reach, "Changing…" while it asks; then what came of it, announced once; and the
-/// footer: on plain http the note that a password typed here crosses the network readable, and that Amperfy and other
+/// notes: on plain http the note that a password typed here crosses the network readable, and that Amperfy and other
 /// apps need the new password too (from the start, so it is read before the change, not only after).
+///
+/// (The redesign, slice R9) Flat, a Settings page (SettingsPage) with no Form: each field still a box - the sign-in's
+/// own (FieldLook, the look's well under it, its edge the accent's while focused) - and Change the purple button across
+/// the page (the build plan's 3.6: the small sheets take the shared buttons and fields in R9).
 ///
 /// One change at a time (Core's OwnPasswordFlow takes its ticket synchronously in the tap), never sent again by itself.
 /// While it is out the page can't be left by Back or a swipe, nor by its tab tapped again (AppNavigation): its answer is
@@ -24,6 +28,7 @@ struct ChangePasswordScreen: View {
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var flow = OwnPasswordFlow()
     @FocusState private var focused: Field?
 
@@ -32,19 +37,14 @@ struct ChangePasswordScreen: View {
     var body: some View {
         let user = server.me?.user ?? ""
         let offered = OwnPassword.changeOffered(server.me)
-        // one Form whatever it shows: the page's shows and hides stay on one view
-        Form {
+        // one page whatever it shows: the page's shows and hides stay on one view
+        SettingsPage {
             if offered || flow.changing || flow.said != nil {
-                Section {
-                    Text(OwnPassword.changeLine(user))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                fieldsSection(user)
-                changeSection(user)
+                SettingsNote(words: OwnPassword.changeLine(user))
+                fieldsGroup(user)
+                changeButton(user)
                 if let said = flow.said {
-                    saidSection(said)
+                    saidNote(said)
                 }
             }
         }
@@ -81,95 +81,100 @@ struct ChangePasswordScreen: View {
 
     // MARK: the parts
 
-    private func fieldsSection(_ user: String) -> some View {
+    private func fieldsGroup(_ user: String) -> some View {
         let problem = flow.problem(user: user)
         let note = OwnPassword.httpNote(at: server.address)
-        return Section {
-            SecureField(OwnPassword.currentLabel, text: typing(\.current))
-                .textContentType(.password)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.next)
-                .focused($focused, equals: .current)
-                .onSubmit { focused = .password }
-            SecureField(OwnPassword.newLabel, text: typing(\.password))
-                .textContentType(.newPassword)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.next)
-                .focused($focused, equals: .password)
-                .onSubmit { focused = .again }
-            SecureField(OwnPassword.againLabel, text: typing(\.again))
-                .textContentType(.newPassword)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.done)
-                .focused($focused, equals: .again)
-                .onSubmit { change(user) }
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: SettingsLook.fieldGap) {
+                SecureField(OwnPassword.currentLabel, text: typing(\.current))
+                    .textContentType(.password)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.next)
+                    .focused($focused, equals: .current)
+                    .onSubmit { focused = .password }
+                    .modifier(FieldLook(focused: focused == .current))
+                SecureField(OwnPassword.newLabel, text: typing(\.password))
+                    .textContentType(.newPassword)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.next)
+                    .focused($focused, equals: .password)
+                    .onSubmit { focused = .again }
+                    .modifier(FieldLook(focused: focused == .password))
+                SecureField(OwnPassword.againLabel, text: typing(\.again))
+                    .textContentType(.newPassword)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .focused($focused, equals: .again)
+                    .onSubmit { change(user) }
+                    .modifier(FieldLook(focused: focused == .again))
+            }
+            .padding(.top, CGFloat(PhoneLook.groupAbove) / 2)
             if let problem {
                 // what's wrong as typed: read where it is, never announced at each key
-                Text(problem)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .fixedSize(horizontal: false, vertical: true)
+                SettingsNote(words: problem)
             }
-        } footer: {
-            VStack(alignment: .leading, spacing: 4) {
-                if let note {
-                    Text(note)
-                        .foregroundStyle(Palette.amber)
-                }
-                Text(OwnPassword.appsLine)
+            if let note {
+                SettingsNote(words: note, colour: DWPalette.amberText)
             }
-            .font(Typeface.footnote)
-            .fixedSize(horizontal: false, vertical: true)
+            Text(OwnPassword.appsLine)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, SettingsLook.noteAbove)
         }
     }
 
-    private func changeSection(_ user: String) -> some View {
+    private func changeButton(_ user: String) -> some View {
         let on = flow.canChange(user: user, online: reachability.online, signInOver: server.signInOver != nil)
-        return Section {
-            Button {
-                change(user)
-            } label: {
-                HStack(spacing: 8) {
-                    if flow.changing {
-                        ProgressView()
-                            .accessibilityHidden(true)
-                    }
-                    Text(flow.changing ? OwnPassword.changing : OwnPassword.change)
+        return Button {
+            change(user)
+        } label: {
+            HStack(spacing: 8) {
+                if flow.changing {
+                    ProgressView()
+                        .accessibilityHidden(true)
                 }
+                // (R9's review) the button's words on up to three lines at the accessibility sizes
+                Text(flow.changing ? OwnPassword.changing : OwnPassword.change)
+                    .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+                    .multilineTextAlignment(.center)
             }
-            .disabled(!on)
         }
+        .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
+        .disabled(!on)
+        .padding(.top, CGFloat(PhoneLook.groupAbove))
     }
 
     /// What came of the last change, as one element: done (and deadwax's warning), or what went wrong and how to fix it.
-    @ViewBuilder private func saidSection(_ said: OwnPassword.Said) -> some View {
-        Section {
-            VStack(alignment: .leading, spacing: 4) {
-                switch said {
-                case .done(let words, let warning):
-                    Text(words)
-                        .foregroundStyle(Palette.held)
-                    if let warning {
-                        Text(warning)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.amber)
-                    }
-                case .problem(let words, let fix):
-                    Text(words)
-                        .foregroundStyle(Palette.danger)
-                    if let fix {
-                        Text(fix)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
-                    }
+    @ViewBuilder private func saidNote(_ said: OwnPassword.Said) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            switch said {
+            case .done(let words, let warning):
+                Text(words)
+                    .foregroundStyle(DWPalette.greenText)
+                if let warning {
+                    Text(warning)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.amberText)
+                }
+            case .problem(let words, let fix):
+                Text(words)
+                    .foregroundStyle(DWPalette.redChipText)
+                if let fix {
+                    Text(fix)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                 }
             }
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityElement(children: .combine)
         }
+        .font(Typeface.Phone.text(.row))
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, CGFloat(PhoneLook.groupAbove) / 2)
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: what it does

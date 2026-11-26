@@ -126,11 +126,12 @@ def test_no_word_the_app_shows_calls_the_tab_you():
     assert "Opens the web app's" not in (CORE / "Managing.swift").read_text(encoding="utf-8")
 
 
-def test_the_root_is_the_headline_then_rows_that_open_pages():
+def test_the_root_is_the_account_card_then_rows_that_open_pages():
     root = body(struct(code(ROOT), "YouView"))
     in_order(root, [
-        "headline(lines)",
-        "if let unverified = lines.unverified",
+        # (R9) the headline is iSettings' account card now, the UNVERIFIED line under it
+        "AccountCardView(card: AccountCard(lines: lines, access: server.access, address: server.address)",
+        "unverified: lines.unverified",
         "NavigationLink(value: AppRoute.gettingAlbums)",
         "NavigationLink(value: AppRoute.playback)",
         "DownloadsRow()",
@@ -141,19 +142,24 @@ def test_the_root_is_the_headline_then_rows_that_open_pages():
         "NavigationLink(value: AppRoute.thisPhone)",
         "NavigationLink(value: AppRoute.about)",
     ])
-    # Getting albums, Playback and Downloads one group, Downloads last so its footer is under its row
+    # Getting albums, Playback and Downloads one group, Downloads last so its footer - (R9) a note under the flat group
+    # now - is under its row
     first = root.index("NavigationLink(value: AppRoute.gettingAlbums)")
-    group = root[root.rindex("Section {", 0, first):root.index("ManageSection()")]
-    assert "} footer: {" in group and "DownloadsFooter()" in group.split("} footer: {", 1)[1]
-    # the values at the right: the server's host, the app's version - both the data face
+    group = root[root.rindex("PhoneGroup {", 0, first):root.index("ManageSection()")]
+    assert "DownloadsRow()" in group and group.index("DownloadsRow()") < group.index("DownloadsFooter()")
+    # the values at the right: the server's host, the app's version - both the readout face (SettingsGo's readout, on
+    # the words' first text baseline)
     this_phone = root[root.index("AppRoute.thisPhone"):root.index("AppRoute.about")]
-    assert "LabeledContent(YouWords.thisDevice(Platform.device))" in this_phone and "server.address?.host" in this_phone
+    assert "Text(YouWords.thisDevice(Platform.device))" in this_phone
+    assert "SettingsGo(readout: server.address?.host)" in this_phone
     about = root[root.index("AppRoute.about"):]
-    assert "LabeledContent(YouWords.about)" in about and "Text(Self.appVersion)" in about
-    assert this_phone.count("Typeface.mono(.body)") == 1 and about.count("Typeface.mono(.body)") == 1
-    # the sections that moved to pages are drawn nowhere on the root
+    assert "Text(YouWords.about)" in about and "SettingsGo(readout: Self.appVersion)" in about
+    go = body(struct(code(ROOT), "SettingsGo"))
+    readout = go[go.index("HStack(alignment: .firstTextBaseline"):go.index("PhoneChevron()")]
+    assert "if let readout, !readout.isEmpty {" in readout and ".font(Typeface.Phone.mono(.small))" in readout
+    # the sections that moved to pages are drawn nowhere on the root - (R9) nor a List's grey cells
     for gone in ("GettingAlbumsSection()", "PlaybackSection()", "AccountSection(", "ThisPhoneSection(",
-                 "LabeledContent(YouWords.version)", "ErrorNote("):
+                 "PhoneKV(label: YouWords.version", "ErrorNote(", "List {", "Section {", "Form {"):
         assert gone not in root, gone
     # the row's own section is the root's now: DownloadsRow is the row, DownloadsFooter the footer
     row = body(struct(code(DOWNLOADS_ROW), "DownloadsRow"))
@@ -200,7 +206,9 @@ def test_each_page_is_a_route_of_its_own():
         assert re.search(rf"\bcase {case}\n", route), case
         assert f"case .{case}: {view}()" in destinations, case
         page = body(struct(code(path), view))
-        assert page.lstrip().startswith("let lines") or page.lstrip().startswith("List {"), view
+        # (R9) flat: a Settings page, never a List
+        assert page.lstrip().startswith("let lines") or page.lstrip().startswith("SettingsPage {"), view
+        assert "SettingsPage {" in page and "List {" not in page, view
         assert f".navigationTitle({title})" in page, view
     # Downloads, Change address, Debug and the EQ are pushed as before
     for kept in ("case .downloads: DownloadsScreen()", "case .serverAddress: ServerAddressView()",
@@ -215,15 +223,15 @@ def test_each_page_holds_its_section():
     assert "if lines.account, let me = server.me {" in account and "AccountSection(user: me.user)" in account
     assert "ThisPhoneSection(debug: lines.debug)" in body(struct(code(THIS_PHONE), "ThisPhonePage"))
     about = body(struct(code(ROOT), "AboutPage"))
-    in_order(about, ["LabeledContent(YouWords.version)", "if let logins = lines.logins",
-                     "LabeledContent(YouWords.app)", "if lines.failed, let failure = server.meFailure",
+    in_order(about, ["PhoneKV(label: YouWords.version", "if let logins = lines.logins",
+                     "PhoneKV(label: YouWords.app", "if lines.failed, let failure = server.meFailure",
                      "ErrorNote(failure)"])
     # Account: Change password, then Sign out; This phone: the address, Change address, Debug for an admin alone
     section = body(struct(code(ACCOUNT), "AccountSection"))
     in_order(section, ["if OwnPassword.changeOffered(server.me) {", "NavigationLink(value: AppRoute.changePassword)",
                        "await server.signOut()"])
     phone = body(struct(code(THIS_PHONE), "ThisPhoneSection"))
-    in_order(phone, ["LabeledContent(YouWords.server)", "NavigationLink(value: AppRoute.serverAddress)",
+    in_order(phone, ["PhoneKV(label: YouWords.server", "NavigationLink(value: AppRoute.serverAddress)",
                      "if debug {", "NavigationLink(value: AppRoute.debug)"])
     # the EQ is still a push from Playback
     assert "EQLink(route: .now)" in body(struct(code(PLAYBACK), "PlaybackSection"))
@@ -276,14 +284,14 @@ def test_every_choice_is_one_menu_row():
     choice = block(getting, getting.index("{", getting.index("private func choice<")))
     assert "Picker(title, selection: Binding<Choice?>" in choice
     assert "guard live, let now, now != chosen else { return }" in choice
-    assert 'if chosen == nil {\n                Text(verbatim: "").tag(Choice?.none)' in choice
+    assert 'if chosen == nil {\n                    Text(verbatim: "").tag(Choice?.none)' in choice
     assert ".tag(Choice?.some(option))" in choice and ".disabled(!live)" in choice
     for title, cases, chosen in (("GettingWords.modeTitle(Platform.device)", "GetMode.allCases", "settings?.mode"),
                                  ("GettingWords.floorTitle", "QualityFloor.allCases", "settings?.floor"),
                                  ("GettingWords.formatTitle", "FormatPreference.youOrder", "settings?.format")):
         assert f"choice({title}, {cases}, chosen: {chosen}, live: live," in getting, title
     # Playback: Now Playing opens as and Normalization, each a Picker; Pause winds the record down stays a Toggle
-    in_order(playback, ["LabeledContent(YouWords.gapless, value: YouWords.gaplessOn)",
+    in_order(playback, ["PhoneKV(label: YouWords.gapless, value: YouWords.gaplessOn)",
                         "Picker(TurntableWords.opensAs, selection: Binding<TurntableSettings.Look>",
                         "Toggle(TurntableWords.windDown",
                         "Picker(Normalization.title, selection: Binding<Normalization>",
@@ -300,18 +308,21 @@ def test_a_choices_own_line_moved_into_its_footer():
     playback = struct(code(PLAYBACK), "PlaybackSection")
     normalization = playback[playback.index("Picker(Normalization.title"):playback.index("EQLink(route: .now)")]
     assert ".accessibilityHint(player.normalization.note)" in normalization
-    footer = normalization.split("} footer: {", 1)[1]
-    in_order(footer, ["Text(player.normalization.note)", "Text(YouWords.normalizationNote)", "Text(YouWords.kept(Platform.device))"])
+    # (R9) the footer is the flat group's notes under it now
+    footer = normalization.split(".accessibilityHint(player.normalization.note)", 1)[1]
+    in_order(footer, ["SettingsNote(words: player.normalization.note)", "SettingsNote(words: YouWords.normalizationNote)",
+                      "SettingsNote(words: YouWords.kept(Platform.device))"])
     downloads = struct(code(DOWNLOADS), "DownloadOverSection")
     assert "let chosen = DownloadWords.over(downloads.downloadOver, device: Platform.device)" in downloads
     assert ".accessibilityHint(chosen.note)" in downloads
-    in_order(downloads.split("} footer: {", 1)[1], ["Text(chosen.note)", "DownloadWords.overNow(", "DownloadWords.overKept(Platform.device)"])
+    in_order(downloads.split(".accessibilityHint(chosen.note)", 1)[1],
+             ["Text(chosen.note)", "DownloadWords.overNow(", "DownloadWords.overKept(Platform.device)"])
     # the looks and Getting albums' choices had no line of their own: their footers are as they were
-    assert "Text(TurntableWords.lookNote)" in playback
+    assert "SettingsNote(words: TurntableWords.lookNote)" in playback
     getting = code(GETTING)
     footer = block(getting, getting.index("{", getting.index("private var footer: some View")))
-    in_order(footer, ["Text(StoreLine.offline)", "Text(GettingWords.note)", "GettingWords.unsavedLine(",
-                      "Text(problem)", "Notice.announce(said)"])
+    in_order(footer, ["SettingsNote(words: StoreLine.offline)", "SettingsNote(words: GettingWords.note)",
+                      "GettingWords.unsavedLine(", "SettingsNote(words: problem", "Notice.announce(said)"])
 
 
 def test_the_tab_tapped_again_goes_back_then_up():

@@ -13,6 +13,12 @@ import SwiftUI
 /// Every word is DownloadWords', every rule Core's; this draws DownloadModel's records, by album (the app is album-
 /// shaped: an album's page shows its songs one by one). A row opens its album's page, pushed on Settings' stack; a swipe
 /// removes it (VoiceOver has it as an action); progress moves while the screen shows (`followProgress`).
+///
+/// (The redesign, slice R9) Flat, as Settings' other pages: a plain list on the page's black - no inset-grouped grey
+/// cells - each group's legend and its note rows of their own (ListLegend, ListNote), each album's and playlist's row
+/// iArtists' tall row (the cover at 44, the name, the line under it in the second colour, its hairline), the switches
+/// the purple ones, Remove All Downloads the red button. Every row, choice and swipe is as it was: the Storage limit and
+/// Download over among them.
 struct DownloadsScreen: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(PlayerModel.self) private var player
@@ -31,25 +37,26 @@ struct DownloadsScreen: View {
             DownloadOverSection(waitingForIt: shelf.waitingForNetwork)
             if downloads.storeProblem != nil {
                 // downloads are off for this launch: no list to draw, nothing to remove
-                Section {} footer: { Text(DownloadWords.lastFooter(Platform.device)).font(Typeface.footnote) }
+                Section {
+                    ListNote(words: DownloadWords.lastFooter(Platform.device))
+                }
+                .flatRows()
             } else if shelf.isEmpty {
                 Section {
+                    ListLegend(words: DownloadWords.downloadedHeader)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(DownloadWords.nothingYet)
+                            .font(Typeface.Phone.text(.row))
                         Text(DownloadWords.nothingYetHow)
-                            .font(Typeface.subheadline)
-                            .foregroundStyle(Palette.quiet)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(DWPalette.t2)
                     }
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 8)
                     .accessibilityElement(children: .combine)
-                } header: {
-                    Text(DownloadWords.downloadedHeader)
-                        .font(Typeface.footnote)
-                } footer: {
-                    Text(DownloadWords.lastFooter(Platform.device))
-                        .font(Typeface.footnote)
+                    ListNote(words: DownloadWords.lastFooter(Platform.device))
                 }
+                .flatRows()
             } else {
                 if !shelf.downloading.isEmpty || downloads.libraryProgress != nil || !shelf.playlistsGoing.isEmpty {
                     DownloadingSection(rows: shelf.downloading, playlists: shelf.playlistsGoing,
@@ -65,9 +72,10 @@ struct DownloadsScreen: View {
                     Button(role: .destructive) {
                         askingRemoveAll = true
                     } label: {
-                        Text(DownloadWords.removeAll)
-                            .frame(maxWidth: .infinity)
+                        ButtonWords(words: DownloadWords.removeAll)
                     }
+                    .buttonStyle(DWButtonStyle(kind: .danger, fills: true))
+                    .padding(.top, CGFloat(PhoneLook.groupAbove))
                     // from the button itself, so it comes up from it ("The ••• menus open from the •••")
                     .confirmationDialog(DownloadWords.removeAllTitle, isPresented: $askingRemoveAll,
                                         titleVisibility: .visible) {
@@ -77,19 +85,16 @@ struct DownloadsScreen: View {
                         }
                         Platform.dialogCancel()
                     } message: {
-                        let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
-                        Text([DownloadWords.removeAllMessage(songs: shelf.songsHere, bytes: downloads.bytesHere, device: Platform.device),
-                              downloads.follower.on ? AutoDownloadWords.removeAllToo(scope) : nil,
-                              PlaylistDownloadWords.removeAllToo(playlists: PlaylistDownloads.shelf(downloads.playlists.kept).count, device: Platform.device)]
-                            .compactMap { $0 }.joined(separator: " "))
+                        Text(shelf.removeAllMessage(downloads, server: server))
                     }
-                } footer: {
-                    Text(DownloadWords.lastFooter(Platform.device))
-                        .font(Typeface.footnote)
+                    ListNote(words: DownloadWords.lastFooter(Platform.device))
                 }
+                .flatRows()
             }
         }
-        .listStyle(.insetGrouped)
+        // (R9) flat: a plain list, as the Library's are, no grey cells - each group's legend and note rows of its own
+        // (a plain list's header would stand pinned on a bar), each row its own hairline
+        .listStyle(.plain)
         .navigationTitle(DownloadWords.downloads)
         .animation(.default, value: shelf.isEmpty)
         .pullToRefresh {
@@ -111,8 +116,8 @@ struct DownloadsScreen: View {
 // MARK: the records, by album
 
 /// The screen's albums, made once per drawing from DownloadModel's records: each section's rows in its order, with the
-/// words each draws.
-private struct DownloadShelf {
+/// words each draws. (R9) The Mac's Downloaded draws its columns from the same shelf (MacDownloadedPage).
+struct DownloadShelf {
     struct Going: Identifiable {
         let id: String
         let album: Album?
@@ -135,6 +140,10 @@ private struct DownloadShelf {
         let bytes: Int64
         let line: String
         let verdict: DownloadRules.Verdict
+        /// (R9) Its songs here, of how many the album has, and when each came - the Mac's columns.
+        let songs: Int
+        let total: Int
+        let doneAt: [Int64?]
     }
 
     /// (slice 3) A downloaded playlist's row: Downloading's while songs of it are to come, Downloaded's while some are
@@ -146,6 +155,10 @@ private struct DownloadShelf {
         let line: String
         let spoken: String
         let fraction: Double?
+        /// (R9) Downloaded's: its songs here, of how many, and their size - the Mac's columns.
+        var songs = 0
+        var total = 0
+        var bytes: Int64 = 0
     }
 
     let downloading: [Going]
@@ -197,7 +210,7 @@ private struct DownloadShelf {
             let line = DownloadWords.downloadedRow(here: here.here, of: here.of, bytes: here.bytes)
             let name = entry.name.isEmpty ? PlayerWords.untitled : entry.name
             return PlaylistLine(id: entry.id, name: name, coverArt: entry.answer?.playlist.coverArt, line: line,
-                            spoken: "\(name), \(line)", fraction: nil)
+                            spoken: "\(name), \(line)", fraction: nil, songs: here.here, total: here.of, bytes: here.bytes)
         }
         downloading = Self.byAlbum(ownRows).map { albumID, records in
             let all = downloads.songIDs(album: albumID)?.compactMap { downloads.records[$0] } ?? records
@@ -241,10 +254,23 @@ private struct DownloadShelf {
             let total = max(album?.song?.count ?? album?.songCount ?? records.count, records.count)
             let verdict = DownloadRules.verdict(records.map { ($0.check ?? .unchecked, $0.flac != nil) })
             return Here(id: albumID, album: album, bytes: bytes,
-                        line: DownloadWords.downloadedRow(here: records.count, of: total, bytes: bytes), verdict: verdict)
+                        line: DownloadWords.downloadedRow(here: records.count, of: total, bytes: bytes), verdict: verdict,
+                        songs: records.count, total: total, doneAt: records.map(\.doneAt))
         }
         // largest first - the order iOS's own storage lists keep, since this is where space is made
         downloaded = here.sorted { $0.bytes != $1.bytes ? $0.bytes > $1.bytes : $0.id < $1.id }
+    }
+
+    /// Remove All Downloads' question: what goes, and that your library and the downloaded playlists go too - Settings >
+    /// Downloads' and (R9) the Mac's Downloaded's Remove all….
+    @MainActor
+    func removeAllMessage(_ downloads: DownloadModel, server: ServerModel) -> String {
+        let scope = downloads.follower.scope ?? AlbumScope.albums(for: server.me)
+        return [DownloadWords.removeAllMessage(songs: songsHere, bytes: downloads.bytesHere, device: Platform.device),
+                downloads.follower.on ? AutoDownloadWords.removeAllToo(scope) : nil,
+                PlaylistDownloadWords.removeAllToo(playlists: PlaylistDownloads.shelf(downloads.playlists.kept).count,
+                                                   device: Platform.device)]
+            .compactMap { $0 }.joined(separator: " ")
     }
 
     /// The records grouped by album, in the order the first of each came.
@@ -275,11 +301,12 @@ private struct StorageSection: View {
         let limit = downloads.storageLimit
         let over = limit.bytes.map { bytes > $0 } ?? false
         Section {
+            ListLegend(words: DownloadWords.storage)
             VStack(alignment: .leading, spacing: 8) {
                 if shelf.songsHere > 0 {
                     let used = DownloadWords.used(bytes, limit: limit)
                     // one Text, so at the largest sizes it wraps as a sentence
-                    Text("\(Text(used.amount).font(Typeface.title2.bold()))\(Text(used.rest).font(Typeface.title2).foregroundStyle(Palette.quiet))")
+                    Text("\(Text(used.amount).font(Typeface.title2.bold()))\(Text(used.rest).font(Typeface.title2).foregroundStyle(DWPalette.t2))")
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text(DownloadWords.nothingYetHeadline)
@@ -288,41 +315,45 @@ private struct StorageSection: View {
                 DownloadBar(fraction: over ? 1 : fraction(bytes, limit: limit), amber: over)
                     .padding(.vertical, 2)
                 Text(DownloadWords.usageLine(albums: shelf.albumsHere, songs: shelf.songsHere, free: free, device: Platform.device))
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
                 if over {
                     Text(DownloadWords.overLimit(limit))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.amber)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.amberText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 10)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(DownloadWords.downloads)
             .accessibilityValue([DownloadWords.usageSpoken(bytes, limit: limit, free: free, device: Platform.device),
                                  over ? DownloadWords.overLimit(limit) : nil].compactMap { $0 }.joined(separator: ". "))
 
-            Picker(DownloadWords.storageLimit, selection: $downloads.storageLimit) {
-                ForEach(StorageLimit.allCases, id: \.self) { choice in
-                    Text(choice.label).tag(choice)
+            SettingsChoiceRow(title: DownloadWords.storageLimit) {
+                Picker(DownloadWords.storageLimit, selection: $downloads.storageLimit) {
+                    ForEach(StorageLimit.allCases, id: \.self) { choice in
+                        Text(choice.label).tag(choice)
+                    }
                 }
+                .pickerStyle(.menu)
             }
-            .pickerStyle(.menu)
 
             if downloads.otherBytes > 0 {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(DownloadWords.otherAccounts(Platform.device))
+                            .font(Typeface.Phone.text(.row))
                         Text(Bytes.words(downloads.otherBytes))
-                            .font(Typeface.subheadline)
-                            .foregroundStyle(Palette.quiet)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(DWPalette.t2)
                     }
                     .accessibilityElement(children: .combine)
                     Spacer(minLength: 8)
                     Button(DownloadWords.remove, role: .destructive) { askingRemoveOthers = true }
-                        .buttonStyle(.borderless)
+                        .buttonStyle(DWButtonStyle(kind: .danger, size: .small))
                         .confirmationDialog(DownloadWords.removeOthersTitle, isPresented: $askingRemoveOthers,
                                             titleVisibility: .visible) {
                             Button(DownloadWords.remove, role: .destructive) { downloads.removeOthers() }
@@ -331,19 +362,17 @@ private struct StorageSection: View {
                             Text(DownloadWords.removeOthersMessage(downloads.otherBytes, device: Platform.device))
                         }
                 }
+                .padding(.vertical, 8)
+                .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
             }
 
             if let problem = downloads.storeProblem {
                 ErrorNote(text: DownloadWords.storeUnreadable(Platform.device), detail: problem)
-                    .foregroundStyle(Palette.amber)
+                    .foregroundStyle(DWPalette.amberText)
             }
-        } header: {
-            Text(DownloadWords.storage)
-                .font(Typeface.footnote)
-        } footer: {
-            Text(DownloadWords.storageFooter)
-                .font(Typeface.footnote)
+            ListNote(words: DownloadWords.storageFooter)
         }
+        .flatRows()
     }
 
     /// The bar's fill: what's here over the limit - with No limit, over what's here and the phone's free space.
@@ -371,21 +400,22 @@ private struct LibrarySection: View {
         let follower = downloads.follower
         let scope = follower.scope ?? AlbumScope.albums(for: server.me)
         Section {
+            ListLegend(words: AutoDownloadWords.header(scope))
+            // (R9's review) the switch is iOS's own switch to VoiceOver (PhoneSwitchStyle's representation; the Mac's
+            // Toggle): its name, its note as the hint, and its state - no element of our own over it
             Toggle(isOn: Binding(get: { follower.on }, set: { turn($0) })) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(AutoDownloadWords.switchName(scope))
                     Text(AutoDownloadWords.note(scope, device: Platform.device))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(.vertical, 8)
             }
-            .accessibilityElement(children: .ignore)
             .accessibilityLabel(AutoDownloadWords.switchName(scope))
             .accessibilityHint(AutoDownloadWords.note(scope, device: Platform.device))
-            .accessibilityValue(follower.on ? "On" : "Off")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { turn(!follower.on) }
+            .settingsSwitch()
             // from the switch itself, so it comes up from it
             .confirmationDialog(AutoDownloadWords.offTitle(scope, albums: offAlbums), isPresented: $askingOff,
                                 titleVisibility: .visible) {
@@ -401,16 +431,13 @@ private struct LibrarySection: View {
                    let question = AutoDownloadWords.question(held, scope: scope, here: albumsHere(follower), device: Platform.device) {
                     QuestionRow(question: question)
                 }
+                footer(follower)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
+                    .padding(.top, SettingsLook.noteAbove)
             }
-        } header: {
-            Text(AutoDownloadWords.header(scope))
-                .font(Typeface.footnote)
-        } footer: {
-            Group {
-                if follower.on { footer(follower) }
-            }
-            .font(Typeface.footnote)
         }
+        .flatRows()
     }
 
     /// The switch, turned: on at once; off at once only with nothing of it here - else asked first, and nothing goes
@@ -440,14 +467,19 @@ private struct LibrarySection: View {
                     .fixedSize(horizontal: false, vertical: true)
                 DownloadBar(fraction: Double(reading.read) / Double(reading.of))
             }
-            .padding(.vertical, 2)
+            .padding(.vertical, 8)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(AutoDownloadWords.reading(scope, read: reading.read, of: reading.of))
             .accessibilityAddTraits(.updatesFrequently)
         } else if let plan = downloads.libraryFill {
             Text(AutoDownloadWords.fit(plan, limit: downloads.storageLimit, bytes: plan.bytes, device: Platform.device))
-                .foregroundStyle(plan.allFit ? Color.primary : Palette.amber)
+                .font(Typeface.Phone.text(.row))
+                .foregroundStyle(plan.allFit ? DWPalette.text : DWPalette.amberText)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 10)
+                .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
                 .accessibilityElement(children: .combine)
         }
     }
@@ -456,7 +488,7 @@ private struct LibrarySection: View {
     private func footer(_ follower: LibraryFollower) -> some View {
         if let error = follower.lastError {
             ErrorNote(error, failed: AutoDownloadWords.couldntCheck)
-                .foregroundStyle(Palette.amber)
+                .foregroundStyle(DWPalette.amberText)
         } else {
             // read again every half minute, so "3 minutes ago" moves
             TimelineView(.periodic(from: .now, by: 30)) { _ in
@@ -476,7 +508,8 @@ private struct LibrarySection: View {
 }
 
 /// (slice 3, 3.1's third row) Only while charging, under the fit line while Download your library is on - drawn as
-/// iOS's Settings draws a switch with an explanation, VoiceOver reading it as one.
+/// iOS's Settings draws a switch with an explanation, VoiceOver reading it as one: (R9's review) iOS's own switch, its
+/// name, its note as the hint, and its state.
 private struct ChargingToggle: View {
     let scope: AlbumScope
 
@@ -488,46 +521,74 @@ private struct ChargingToggle: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(AutoDownloadWords.onlyWhileCharging)
                 Text(AutoDownloadWords.chargingNote(scope, device: Platform.device))
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.vertical, 8)
         }
-        .accessibilityElement(children: .ignore)
         .accessibilityLabel(AutoDownloadWords.onlyWhileCharging)
         .accessibilityHint(AutoDownloadWords.chargingNote(scope, device: Platform.device))
-        .accessibilityValue(downloads.onlyWhileCharging ? "On" : "Off")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAction { downloads.onlyWhileCharging.toggle() }
+        .settingsSwitch()
     }
 }
 
 /// The empty list's or the large drop's question (2.3), amber, with Keep Them and Remove - Remove asking nothing more:
-/// the question is the asking, and what it lets go still waits for a check ten minutes on to agree.
+/// the question is the asking, and what it lets go still waits for a check ten minutes on to agree. (R9's review) At the
+/// accessibility sizes the two go one over the other, each across the row on up to three lines.
 private struct QuestionRow: View {
     let question: String
 
     @Environment(DownloadModel.self) private var downloads
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
+        let stacked = typeSize.isAccessibilitySize
         VStack(alignment: .leading, spacing: 10) {
             Text(question)
-                .foregroundStyle(Palette.amber)
+                .foregroundStyle(DWPalette.amberText)
                 .fixedSize(horizontal: false, vertical: true)
             Text(AutoDownloadWords.questionNote)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 12) {
-                Button(AutoDownloadWords.keepThem) { downloads.follower.keepThem() }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(Corners.controlBorder)
-                Button(AutoDownloadWords.remove, role: .destructive) { downloads.follower.removeThem() }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(Corners.controlBorder)
+            if stacked {
+                VStack(alignment: .leading, spacing: 10) { buttons(stacked: true) }
+            } else {
+                HStack(spacing: 12) { buttons(stacked: false) }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
+    }
+
+    @ViewBuilder private func buttons(stacked: Bool) -> some View {
+        Button {
+            downloads.follower.keepThem()
+        } label: {
+            ButtonWords(words: AutoDownloadWords.keepThem)
+        }
+        .buttonStyle(DWButtonStyle(size: .small, fills: stacked))
+        Button(role: .destructive) {
+            downloads.follower.removeThem()
+        } label: {
+            ButtonWords(words: AutoDownloadWords.remove)
+        }
+        .buttonStyle(DWButtonStyle(kind: .danger, size: .small, fills: stacked))
+    }
+}
+
+/// (R9's review) A button's words on Settings > Downloads: one line, three at the accessibility sizes, centred - the
+/// innermost limit, so it holds over DWButtonStyle's one (the button fills its row there, so they can wrap).
+private struct ButtonWords: View {
+    let words: String
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        Text(words)
+            .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            .multilineTextAlignment(.center)
     }
 }
 
@@ -539,31 +600,36 @@ private struct PlaylistLineRow: View {
 
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.dynamicTypeSize) private var typeSize
-    @ScaledMetric(relativeTo: .body) private var cover: CGFloat = 44
 
     var body: some View {
         let large = typeSize.isAccessibilitySize
         Button {
             navigation.open(.playlist(PlaylistRoute(id: row.id)))
         } label: {
-            HStack(alignment: .center, spacing: 12) {
-                PlaylistCover(id: row.coverArt, side: cover, pixels: CoverSize.row)
-                VStack(alignment: .leading, spacing: 2) {
+            // (R9) iArtists' tall row: the cover at 44, the name, the line under it in the second colour, the hairline
+            HStack(alignment: .center, spacing: 0) {
+                PlaylistCover(id: row.coverArt, side: LibraryLook.rowCover, pixels: CoverSize.row)
+                    .frame(width: LibraryLook.rowCover, height: LibraryLook.rowCover)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(row.name)
-                        .foregroundStyle(.primary)
+                        .font(Typeface.body)
+                        .foregroundStyle(DWPalette.text)
                         .lineLimit(large ? nil : 1)
                     Text(row.line)
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                     if let fraction = row.fraction {
                         DownloadBar(fraction: fraction)
                             .padding(.top, 4)
                     }
                 }
+                .padding(.horizontal, LibraryLook.rowTextSide)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                LibraryChevron()
             }
-            .padding(.vertical, 2)
+            .tallRow(macRoom: 4)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -589,24 +655,29 @@ private struct LibraryDownloadingRow: View {
         Button {
             navigation.open(.downloaded)
         } label: {
-            HStack(alignment: .center, spacing: 12) {
+            // (R9) iArtists' tall row, the download's mark in the cover's place
+            HStack(alignment: .center, spacing: 0) {
                 Image(systemName: DownloadWords.downloadSymbol)
                     .font(Typeface.symbol(.title3))
-                    .foregroundStyle(Palette.accent)
-                    .frame(minWidth: 44)
-                VStack(alignment: .leading, spacing: 2) {
+                    .foregroundStyle(DWPalette.acc)
+                    .frame(width: LibraryLook.rowCover, height: LibraryLook.rowCover)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(AutoDownloadWords.downloadingTitle(scope))
-                        .foregroundStyle(.primary)
+                        .font(Typeface.body)
+                        .foregroundStyle(DWPalette.text)
                     Text(line)
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                     DownloadBar(fraction: progress.fraction)
                         .padding(.top, 4)
                 }
+                .padding(.horizontal, LibraryLook.rowTextSide)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                LibraryChevron()
             }
-            .padding(.vertical, 2)
+            .tallRow(macRoom: 4)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -632,28 +703,34 @@ private struct DownloadOverSection: View {
     var body: some View {
         let chosen = DownloadWords.over(downloads.downloadOver, device: Platform.device)
         Section {
-            Picker(DownloadWords.downloadOver, selection: Binding<DownloadOver>(get: { downloads.downloadOver },
-                                                                              set: { (choice: DownloadOver) -> Void in
-                                                                                  downloads.downloadOver = choice
-                                                                              })) {
-                ForEach(DownloadOver.allCases, id: \.self) { (choice: DownloadOver) in
-                    Text(DownloadWords.over(choice, device: Platform.device).name).tag(choice)
+            SettingsChoiceRow(title: DownloadWords.downloadOver) {
+                Picker(DownloadWords.downloadOver, selection: Binding<DownloadOver>(get: { downloads.downloadOver },
+                                                                                  set: { (choice: DownloadOver) -> Void in
+                                                                                      downloads.downloadOver = choice
+                                                                                  })) {
+                    ForEach(DownloadOver.allCases, id: \.self) { (choice: DownloadOver) in
+                        Text(DownloadWords.over(choice, device: Platform.device).name).tag(choice)
+                    }
                 }
+                .pickerStyle(.menu)
+                .accessibilityHint(chosen.note)
             }
-            .pickerStyle(.menu)
-            .accessibilityHint(chosen.note)
-        } footer: {
-            Group {
-                VStack(alignment: .leading, spacing: 8) {
-                    // the chosen one's own line first: what it does
-                    Text(chosen.note)
-                    Text(DownloadWords.overNow(reachability.path, setting: downloads.downloadOver, device: Platform.device))
-                        .foregroundStyle(waitingForIt ? Palette.amber : Palette.quiet)
-                    Text(DownloadWords.overKept(Platform.device))
-                }
+            .padding(.top, CGFloat(PhoneLook.groupAbove))
+            // (R9) the group's note, flat: its own row under the choice, as Settings' other pages draw theirs
+            VStack(alignment: .leading, spacing: 8) {
+                // the chosen one's own line first: what it does
+                Text(chosen.note)
+                Text(DownloadWords.overNow(reachability.path, setting: downloads.downloadOver, device: Platform.device))
+                    .foregroundStyle(waitingForIt ? DWPalette.amberText : DWPalette.t2)
+                Text(DownloadWords.overKept(Platform.device))
             }
-            .font(Typeface.footnote)
+            .font(Typeface.Phone.text(.small))
+            .foregroundStyle(DWPalette.t2)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, SettingsLook.noteAbove)
         }
+        .flatRows()
     }
 }
 
@@ -669,6 +746,7 @@ private struct DownloadingSection: View {
 
     var body: some View {
         Section {
+            ListLegend(words: DownloadWords.downloadingHeader)
             if let progress = downloads.libraryProgress {
                 LibraryDownloadingRow(progress: progress)
             }
@@ -679,8 +757,8 @@ private struct DownloadingSection: View {
             ForEach(rows) { row in
                 AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row), updates: row.fraction != nil) {
                     Text(row.line)
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                     if let fraction = row.fraction {
                         DownloadBar(fraction: fraction)
                             .padding(.top, 4)
@@ -688,19 +766,13 @@ private struct DownloadingSection: View {
                 }
                 .removable(name: row.album?.name) { downloads.remove(album: row.id) }
             }
-        } header: {
-            Text(DownloadWords.downloadingHeader)
-                .font(Typeface.footnote)
-        } footer: {
-            Group {
-                let lines = [allWaitForWifi ? DownloadWords.allWaitForWifi(Platform.device) : nil,
-                             downloads.forceQuitShown ? DownloadWords.forceQuit(Platform.device) : nil].compactMap { $0 }
-                if !lines.isEmpty {
-                    Text(lines.joined(separator: "\n\n"))
-                }
+            let lines = [allWaitForWifi ? DownloadWords.allWaitForWifi(Platform.device) : nil,
+                         downloads.forceQuitShown ? DownloadWords.forceQuit(Platform.device) : nil].compactMap { $0 }
+            if !lines.isEmpty {
+                ListNote(words: lines.joined(separator: "\n\n"))
             }
-            .font(Typeface.footnote)
         }
+        .flatRows()
     }
 
     /// "Dummy, Portishead, 4 of 12 songs, 40 percent" (6.8) - the section's header already says it is downloading.
@@ -716,24 +788,25 @@ private struct FailedSection: View {
     let rows: [DownloadShelf.Failed]
 
     @Environment(DownloadModel.self) private var downloads
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         Section {
+            ListLegend(words: DownloadWords.didntDownloadHeader)
             ForEach(rows) { row in
                 FailedRow(row: row)
             }
             if rows.count > 1 {
+                // (R9's review) across the row at the accessibility sizes, so its words can wrap
                 Button {
                     downloads.tryAllAgain()
                 } label: {
-                    Text(DownloadWords.tryAllAgain)
-                        .foregroundStyle(Palette.accent)
+                    ButtonWords(words: DownloadWords.tryAllAgain)
                 }
+                .buttonStyle(DWButtonStyle(fills: typeSize.isAccessibilitySize))
             }
-        } header: {
-            Text(DownloadWords.didntDownloadHeader)
-                .font(Typeface.footnote)
         }
+        .flatRows()
     }
 }
 
@@ -754,28 +827,28 @@ private struct FailedRow: View {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     DownloadMark(mark: .failed, font: Typeface.symbol(.caption))
                     Text(DownloadWords.didntDownload(row.records.count))
-                        .font(Typeface.subheadline.weight(.medium))
-                        .foregroundStyle(Palette.amber)
+                        .font(Typeface.Phone.text(.small).weight(.medium))
+                        .foregroundStyle(DWPalette.amberText)
                 }
                 Text(row.reason.said)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
             } trailing: {
                 Button(DownloadWords.tryAgain) { tryAgain() }
-                    .buttonStyle(.borderless)
-                    .font(Typeface.subheadline.weight(.semibold))
+                    .buttonStyle(DWButtonStyle(size: .small))
             }
             // the raw words for whoever runs deadwax - ErrorNote's split, its own element
             if server.access.seesDetail, let detail = row.reason.detail, !detail.isEmpty {
                 DisclosureGroup(ErrorWords.forWhoever) {
                     Text(detail)
                         .font(Typeface.mono(.footnote))
-                        .foregroundStyle(Palette.quiet)
+                        .foregroundStyle(DWPalette.t2)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(Typeface.footnote)
+                .font(Typeface.Phone.text(.small))
+                .tint(DWPalette.acc)
                 .padding(.leading, AlbumLineInset.text)
             }
         }
@@ -846,6 +919,7 @@ private struct DownloadedSection: View {
 
     var body: some View {
         Section {
+            ListLegend(words: DownloadWords.downloadedHeader)
             ForEach(playlists) { row in
                 PlaylistLineRow(row: row)
                     .removable(name: row.name) { downloads.remove(playlist: row.id) }
@@ -854,21 +928,17 @@ private struct DownloadedSection: View {
                 let large = typeSize.isAccessibilitySize
                 AlbumLine(album: row.album, albumID: row.id, spoken: spoken(row)) {
                     Text(row.line)
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                     if large { verdict(row.verdict).padding(.top, 2) }
                 } trailing: {
                     if !large { verdict(row.verdict) }
                 }
                 .removable(name: row.album?.name) { downloads.remove(album: row.id) }
             }
-        } header: {
-            Text(DownloadWords.downloadedHeader)
-                .font(Typeface.footnote)
-        } footer: {
-            Text(DownloadWords.downloadedFooter)
-                .font(Typeface.footnote)
+            ListNote(words: DownloadWords.downloadedFooter)
         }
+        .flatRows()
     }
 
     /// The album's check: "Checked" with its mark in the library's green; "Checked by size" and "Checking…" quiet.
@@ -878,11 +948,11 @@ private struct DownloadedSection: View {
         if verdict == .checked {
             Label(words, systemImage: DownloadWords.Mark.checked.rawValue)
                 .labelStyle(VerdictLabel())
-                .foregroundStyle(Palette.held)
+                .foregroundStyle(DWPalette.greenText)
         } else {
             Text(words)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
         }
     }
 
@@ -898,17 +968,17 @@ private struct VerdictLabel: LabelStyle {
     func makeBody(configuration: Configuration) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 3) {
             configuration.icon.font(Typeface.symbol(.caption))
-            configuration.title.font(Typeface.footnote)
+            configuration.title.font(Typeface.Phone.text(.small))
         }
     }
 }
 
 // MARK: one album's row
 
-/// Where an album row's words start: the cover (44 points at the default size) and its gap - a detail under the row
-/// lines up with them.
+/// Where an album row's words start: the cover (iArtists' 44) and its words' room - a detail under the row lines up with
+/// them.
 private enum AlbumLineInset {
-    static let text: CGFloat = 44 + 12
+    static let text: CGFloat = LibraryLook.rowCover + LibraryLook.rowTextSide
 }
 
 /// An album's row on the screen (6.5, 6.6): the cover at the leading edge (44 points, growing with the text), the album
@@ -927,7 +997,6 @@ private struct AlbumLine<Lines: View, Trailing: View>: View {
 
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.dynamicTypeSize) private var typeSize
-    @ScaledMetric(relativeTo: .body) private var cover: CGFloat = 44
 
     init(album: Album?, albumID: String, spoken: String, updates: Bool = false, tryAgain: (() -> Void)? = nil,
          @ViewBuilder lines: @escaping () -> Lines, @ViewBuilder trailing: @escaping () -> Trailing) {
@@ -942,29 +1011,34 @@ private struct AlbumLine<Lines: View, Trailing: View>: View {
 
     var body: some View {
         let large = typeSize.isAccessibilitySize
-        HStack(alignment: .center, spacing: 12) {
+        // (R9) iArtists' tall row: the cover at 44, the album, the artist and the section's lines under it in the second
+        // colour, what trails, and the row's hairline
+        HStack(alignment: .center, spacing: CGFloat(PhoneLook.goGap)) {
             Button {
                 navigation.open(.album(album.map { AlbumRoute($0) } ?? AlbumRoute(id: albumID)))
             } label: {
-                HStack(alignment: .center, spacing: 12) {
-                    CoverImage(id: album?.coverArt, size: cover)
-                        .frame(width: cover, height: cover)
+                HStack(alignment: .center, spacing: 0) {
+                    CoverImage(id: album?.coverArt, size: LibraryLook.rowCover)
+                        .frame(width: LibraryLook.rowCover, height: LibraryLook.rowCover)
                         .clipShape(Corners.artShape)
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text(album?.name ?? "")
-                            .foregroundStyle(.primary)
+                            .font(Typeface.body)
+                            .foregroundStyle(DWPalette.text)
                             .lineLimit(large ? nil : 1)
                         if let artist = album?.artist, !artist.isEmpty {
                             Text(artist)
-                                .font(Typeface.subheadline)
-                                .foregroundStyle(Palette.quiet)
+                                .font(Typeface.Phone.text(.small))
+                                .foregroundStyle(DWPalette.t2)
                                 .lineLimit(large ? nil : 1)
                         }
                         lines()
                     }
+                    .padding(.horizontal, LibraryLook.rowTextSide)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.vertical, 2)
+                .padding(.vertical, 4)
+                .tallRow()
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -979,6 +1053,7 @@ private struct AlbumLine<Lines: View, Trailing: View>: View {
             trailing()
                 .accessibilityHidden(true)
         }
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
     }
 }
 
@@ -999,6 +1074,17 @@ private extension View {
                    remove: @escaping () -> Void) -> some View {
         modifier(Removable(name: name, asks: asks, ask: ask, offered: offered, remove: remove))
     }
+
+    /// (R9's review) iArtists' tall row's height: on the phone 60 at least (lookHeight's minHeight); on the Mac its
+    /// content's own, `macRoom` above and below - lookHeight is exact there and the Mac's tallRowHeight its table's 30,
+    /// which cut the 44-point cover and the three lines beside it.
+    @ViewBuilder func tallRow(macRoom: CGFloat = 0) -> some View {
+        if Platform.mac {
+            padding(.vertical, macRoom)
+        } else {
+            lookHeight(DWLook.here.tallRowHeight)
+        }
+    }
 }
 
 private struct Removable: ViewModifier {
@@ -1016,7 +1102,7 @@ private struct Removable: ViewModifier {
                 EmptyView()
             } else if asks {
                 Button(DownloadWords.remove, systemImage: "trash") { ask() }
-                    .tint(.red) // the destructive swipe's own red
+                    .tint(Palette.danger) // the destructive swipe's own red
             } else {
                 Button(DownloadWords.remove, systemImage: "trash", role: .destructive) {
                     remove()
@@ -1024,5 +1110,45 @@ private struct Removable: ViewModifier {
                 }
             }
         }
+    }
+}
+
+// MARK: (R9) flat, in a plain list
+
+/// A group's legend, as PhoneGroup draws it (`.dw.ph .group > .legend`), as a row of the list's own: the legend's 13,
+/// semibold, the second colour, the group's room above it - a plain list's section header would stand pinned on a bar.
+private struct ListLegend: View {
+    let words: String
+
+    var body: some View {
+        Text(words)
+            .font(Typeface.Phone.text(.legend).weight(.semibold))
+            .foregroundStyle(DWPalette.t2)
+            .lookHeight(PhoneLook.legendLine)
+            .padding(.leading, CGFloat(PhoneLook.legendSide))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, CGFloat(PhoneLook.groupAbove - PhoneLook.legendLift))
+            .padding(.bottom, CGFloat(PhoneLook.legendLift - PhoneLook.legendLine))
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// A group's note under its rows (iOS Settings' footer, flat), as a row of the list's own - Settings' SettingsNote.
+private struct ListNote: View {
+    let words: String
+    var colour: Color = DWPalette.t2
+
+    var body: some View {
+        SettingsNote(words: words, colour: colour)
+    }
+}
+
+private extension View {
+    /// A section's rows drawn flat (R9): no list hairlines (each row draws its own), the page's sides, no cell behind.
+    func flatRows() -> some View {
+        listRowSeparator(.hidden)
+            .listSectionSeparator(.hidden)
+            .listRowInsets(EdgeInsets(top: 0, leading: LibraryLook.side, bottom: 0, trailing: LibraryLook.side))
+            .listRowBackground(Color.clear)
     }
 }

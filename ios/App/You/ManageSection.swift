@@ -22,6 +22,10 @@ import SwiftUI
 /// slice 12 with WebAppRow and the openURL extension that opened them: nothing in the app takes you to the web app
 /// (tests/test_ios_no_web_app.py). Nothing is asked of deadwax here - the page each opens asks it itself, says for
 /// itself that it needs deadwax, and refuses for itself without its permission.
+///
+/// (The redesign, slice R9) iSettings' Manage group: its legend, "Manage", standing over flat `.go` rows (SettingsGo),
+/// each on its hairline - Needs a look's count at its right in the third colour, words as today's row has them (the
+/// drawing's badge isn't drawn: the count stays the value test_ios_needs_look holds).
 struct ManageSection: View {
     @Environment(ServerModel.self) private var server
     @Environment(QueueCountModel.self) private var queueCount
@@ -29,49 +33,55 @@ struct ManageSection: View {
     var body: some View {
         let tools = Managing.tools(server.access)
         if !tools.isEmpty {
-            Section {
+            PhoneGroup(legend: ManagingWords.title) {
                 ForEach(tools, id: \.self) { (tool: Managing.Tool) in
                     if tool == .edit {
                         // (Phase 8, slice 1) the app's own: Choose the folder
                         NavigationLink(value: AppRoute.chooseFolder) {
-                            Text(ManagingWords.label(tool))
+                            SettingsGo { Text(ManagingWords.label(tool)) }
                         }
+                        .buttonStyle(.plain)
                     } else if tool == .queue {
                         // (Phase 8, slice 6) the app's own: the review queue - its count at the right, as a value
                         // (You.tsx's badge; never on a tab), nothing while nobody knows it or it is none
                         NavigationLink(value: AppRoute.needsALook) {
-                            LabeledContent(ManagingWords.label(tool)) {
+                            SettingsGo {
+                                Text(ManagingWords.label(tool))
+                            } value: {
                                 Text(queueCount.count.value)
+                                    .foregroundStyle(DWPalette.t3)
                             }
                             // read once: "Needs a look, 3 albums" (needsLookLabel)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(queueCount.count.spoken)
                         }
+                        .buttonStyle(.plain)
                     } else if tool == .care {
                         // (Phase 8, slice 7) the app's own: Rescan, the runs and In nobody's library
                         NavigationLink(value: AppRoute.libraryCare) {
-                            Text(ManagingWords.label(tool))
+                            SettingsGo { Text(ManagingWords.label(tool)) }
                         }
+                        .buttonStyle(.plain)
                     } else if tool == .settings {
                         // (Phase 8, slice 8) the app's own: Connections, the verdict and the server's settings
                         NavigationLink(value: AppRoute.serverSettings) {
-                            Text(ManagingWords.label(tool))
+                            SettingsGo { Text(ManagingWords.label(tool)) }
                         }
+                        .buttonStyle(.plain)
                     } else if tool == .log {
                         // (Phase 8, slice 9) the app's own: the event log, live
                         NavigationLink(value: AppRoute.eventLog) {
-                            Text(ManagingWords.label(tool))
+                            SettingsGo { Text(ManagingWords.label(tool)) }
                         }
+                        .buttonStyle(.plain)
                     } else if tool == .people {
                         // (Phase 8, slice 11) the app's own: People, unlocked with your Navidrome password
                         NavigationLink(value: AppRoute.people) {
-                            Text(ManagingWords.label(tool))
+                            SettingsGo { Text(ManagingWords.label(tool)) }
                         }
+                        .buttonStyle(.plain)
                     }
                 }
-            } header: {
-                Text(ManagingWords.title)
-                    .font(Typeface.footnote)
             }
         }
     }

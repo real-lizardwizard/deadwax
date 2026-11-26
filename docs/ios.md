@@ -338,6 +338,24 @@ menus and keys, and these differences.
   yours for its menu. The tables are part of the page, which scrolls as one; ↑ and ↓ move through the table you last
   clicked, bringing its row into view. VoiceOver reads an album's row as one - "Low, 1977, in your library, FLAC" - its
   Play, Open and Get as its actions. The status bar: "16 albums", "6 in your library", "59 songs".
+  **Downloaded** is the Mac's own since the new look: **Albums | Playlists**, **Remove all…** (which asks first) and
+  **Find** in its toolbar, the phone's **Download your library?** question over the albums until it's answered, then
+  the columns **Album** (or **Playlist**), **Artist**, **Songs** ("7 of 13" while only some are
+  here), **Size** and **On this Mac** - a meter while it downloads, amber words if some of it didn't, else the day its
+  last song came (today, yesterday, 4 days ago, 21 Nov). Double-click or Return opens it, right-click for its page's
+  ••• items; the status bar says how many albums, songs and how much are on this Mac, how many are downloading, and
+  the free space. The full Downloads page - Download your library, other accounts' downloads, what didn't download -
+  is Settings' **Downloading and downloaded…**. The Downloaded list has no sort, grid or index down the edge: it's a
+  table, the albums still coming first.
+  **Settings** is one page of boxes since the new look, the phone's pages row for row: **Playback** (Gapless, a fact;
+  Normalization; **Open the EQ**, the side panel's), **Getting albums** (the three, and Confirm before cancelling),
+  **This Mac** (what's downloaded, the free space, Storage limit, Download over, **Show Downloaded**, **Downloading and
+  downloaded…**, the address and **Change address…**, **Debug…** for an admin), **Account** and **About** - each
+  note under its control; two columns only in a very wide window (from about 1300 points), one in the window's
+  first size and beside a side panel; **Server settings** (if it's yours) and **Sign out** in its
+  toolbar; the status bar says "Saved as you change them". Manage is the sidebar's.
+  **Sign in** is one dialog - Where deadwax is, then Who you are - over the same calls as the phone's; Return in the
+  password does what the button that's on would (Check until deadwax has answered, then Sign in).
   The album you don't have sits in the middle of the page at a readable width (760 points); it scrolls with the pointer
   anywhere across the page, their scroll bar at its right edge. Pages you've opened stay as you left them as you move
   between the sidebar's rows - Library, Search, Requests and Settings each keep their pages, where you'd scrolled to and
@@ -371,7 +389,7 @@ menus and keys, and these differences.
   Album info, an artist's their name and Go to artist, headed **Selected album** or **Selected artist** - and with
   nothing selected about the song playing, headed **Playing**. When the queue ends the Queue closes, and Info unless
   something is selected; Lyrics stays, saying Nothing playing. With nothing playing, the Queue tab - and Info, with
-  nothing selected either - says **Nothing playing** too. Settings > Playback's **EQ** row opens the EQ tab. Going to an album from
+  nothing selected either - says **Nothing playing** too. Settings' **Open the EQ** (Playback) opens the EQ tab. Going to an album from
   the bar, Info or ⌘L closes a panel lying over the page, so it doesn't cover the album.
 - **No Now Playing.** The Mac has no Now Playing screen, and so no turntable: everything Now Playing has is in the bar
   and the side panel.
@@ -446,7 +464,7 @@ The rest of the differences:
   and the window comes back on the tab and page you left, the Library on the page it showed. **⌘Q** quits deadwax,
   and the music stops. While Edit album has changes, or a playlist's Edit has, the window can't be closed - Close
   Window is dimmed and the red button off - until you've finished or thrown them away.
-- **No turntable**: there's no Now Playing on the Mac to show it, and Settings > Playback hasn't Now Playing opens as
+- **No turntable**: there's no Now Playing on the Mac to show it, and Settings' Playback hasn't Now Playing opens as
   or Pause winds the record down. The turntable stays the phone's.
 - **Your sign-in** is kept in a file rather than the Keychain - see [Where the Mac keeps your sign-in](#where-the-mac-keeps-your-sign-in).
 - **EQ files.** An Equalizer APO setting - a `.txt` from AutoEq, say - comes in five
@@ -508,7 +526,7 @@ The rest of the differences:
   for their picture - their EQ the same one the Mac kept before, under another name - and its Import from Files… is
   **Import…**. The address screen says macOS 15 or later asks about the local network, and when deadwax can't be
   reached the words point to the Mac's **System Settings > Privacy & Security > Local Network** - on macOS 15 or
-  later: macOS 14 has no such switch, and never asks. **Settings > This Mac > Debug** says "This install doesn't
+  later: macOS 14 has no such switch, and never asks. **Settings > This Mac > Debug…** says "This install doesn't
   expire: a Mac keeps opening deadwax without installing it again." - see below - or, for a build installed with a
   provisioning profile (`install-mac.sh --allow-profile`), the date it runs out.
 - **Sleep.** Playing when the Mac goes to sleep - the lid closed, Apple menu > Sleep, or asleep by itself when left -
@@ -517,7 +535,7 @@ The rest of the differences:
   doesn't sleep, so it plays on.
 - **Headphones out.** Unplugging headphones, AirPods or a Bluetooth speaker disconnecting, a USB DAC pulled out: the
   music pauses, as on the phone. Choosing another output yourself (the menu bar's Sound, say) doesn't pause.
-- **Download over** (Settings > Downloads) is **Wi-Fi or Ethernet only** (the default) or **Any connection** - "Downloads
+- **Download over** (Settings > This Mac, and Settings > Downloads) is **Wi-Fi or Ethernet only** (the default) or **Any connection** - "Downloads
   use Wi-Fi or a cable alone - never a hotspot or Low Data Mode." and "Downloads use a hotspot too, when this Mac is on
   one." Under it the Mac says "On Wi-Fi or Ethernet now." (a cable counts as Wi-Fi), and on a phone's hotspot -
   over Wi-Fi, a cable or Bluetooth - "On a hotspot now - downloads wait until you're off it." A download waiting for
@@ -629,6 +647,11 @@ itself never needs that. If you chose Don't Allow, macOS remembers it, and `ls` 
 macOS keeping one app's data from another, not a missing file.
 
 ## The first time you open it
+
+The sign-in is one screen (one dialog on the Mac) since the build after the phone went flat (still 0.13): **Where
+deadwax is** - the address and **Check** - then **Who you are** - your name, password and **Sign in**. Sign in stays
+dim until Check has found deadwax at the address in the box; change the address and it's dim again until you Check
+it. With logins off, Check alone opens the app.
 
 1. **deadwax's address**: the address you open deadwax at, by IP (`192.168.1.20:8090`) or by name.
    `http://` is assumed when you don't type it, and a pasted web-app link (`.../player/`) works too.
@@ -2382,8 +2405,10 @@ Settings is: each row opens a page of its own, and **Back**, or a swipe in from 
 **Settings** in the tab bar on one of its pages and it goes back to the first screen; tap it again there, and it goes
 to the top.
 
-- **At the top**: who you're signed in as, or "No sign-in needed" with logins off - and, in amber, "Some things an
-  admin let you do are off for now - sign out and in again to get them back." when deadwax says so.
+- **At the top**, a card: your initial in a circle, who you're signed in as - or "No sign-in needed" with logins off -
+  the address deadwax is at, **Admin** for an admin and **Sign out** (with logins on; it is Account's). Under it, in
+  amber, "Some things an admin let you do are off for now - sign out and in again to get them back." when deadwax
+  says so. VoiceOver reads the card as one heading, Sign out among its actions.
 - **Getting albums**, **Playback** and **Downloads**, each opening its page - Downloads with what's on this phone at its
   right ("2.1 GB"). Under the three, only while something is happening: "Downloading - 6 songs to go", what it's
   waiting for, or, in amber, "2 songs didn't download".
@@ -2400,7 +2425,12 @@ and About follow what it last said.
 menu of the choices opens, the chosen one ticked; tap another to choose it. What a choice does is said under the row -
 for Normalization and Download over, what the chosen one does, first. VoiceOver reads the row's name and what's chosen
 ("Normalization, Automatic"), and Normalization and Download over add what the chosen one does; a double tap opens the
-menu. A switch (Confirm before cancelling, Pause winds the record down) is still a switch.
+menu. A switch (Confirm before cancelling, Pause winds the record down) is still a switch - the purple one, which
+VoiceOver reads as a switch, on or off.
+
+Every page is flat since the build after the phone went flat (still 0.13): its rows on thin lines, its notes under them
+in grey, nothing in a grey box. On the Mac, Settings is one page of boxes instead - the same rows, see [The Mac
+app](#the-mac-app).
 
 ### Getting albums
 
@@ -2424,7 +2454,8 @@ runs deadwax." for anyone but an admin.
 
 Then **Confirm before cancelling**, a switch, on by default - "The ✕ on a download in Requests asks first. Kept on
 this device." Off, the ✕ on a card in [Requests](#requests) cancels at once. It's this phone's, not your account's,
-as it is each browser's in the web app.
+as it is each browser's in the web app. On the Mac it's a checkbox, and its note names the Mac's own buttons: "Cancel
+on a download in Requests asks first, and so does Leave. Kept on this Mac."
 
 ### Playback
 
@@ -6818,6 +6849,53 @@ so something is downloading, waiting and done.
   At the largest text sizes a card's two buttons stand one over the other, their words on more than one line.)
 - **573 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 572, or "not done yet".
 
+#### Downloaded, Settings and Sign in (574-579)
+
+**Not done yet.** Settings, Downloaded and the sign-in in the new look. Settings keeps every page and every row it has
+today, drawn flat on the phone, as boxes on the Mac - nothing new to set, and nothing gone. Download an album or two
+first, and start one more so something is coming.
+
+- **574 Downloaded.** **Not done yet.** On the Mac the counts, the sizes and the free space agree with Finder. (The
+  sidebar's **Downloaded** is a list: **Albums | Playlists** at the top left, **Remove all…**, which asks first, and
+  **Find** at the right - type part of an album's name or its artist. Until you've answered it, the phone's **Download
+  your library?** question sits over the albums. The columns are Album, Artist, Songs ("7 of 13" when only some are
+  here), Size and On this Mac - a meter while it downloads, amber words if some of it didn't, otherwise the day its
+  last song came: today, yesterday, 4 days ago, 21 Nov. A double click or Return opens it; a right click has its
+  page's ••• items, Remove Download among them. **View > Row Size** makes the rows and covers bigger. The status bar
+  says the albums, songs and size on this Mac, how many are downloading, and the free space at its right - compare the
+  size with the deadwax folder's in Finder, and the free space with Finder's.)
+- **575 Settings.** **Not done yet.** On the Mac each row does what the phone's does; Sign out works. (Settings is one
+  page of boxes, each note under its control - one column in the window's first size and beside a side panel, two
+  only when the window is about 1300 points wide or more: Playback - Gapless (a fact, not a
+  checkbox), Normalization's four, **Open the EQ** opening the side panel's EQ; Getting albums - When I click Get,
+  Quality floor and Format (empty and dimmed until deadwax answers), **Confirm before cancelling**, its note naming
+  Requests' **Cancel** and **Leave**; This Mac - what's downloaded, the free space, Storage limit, Download over,
+  **Show Downloaded**, **Downloading and downloaded…** (the full Downloads page - its two switches the Mac's own and
+  clickable, its rows not squashed), the address with **Change
+  address…**, and **Debug…** for an admin; Account - who you are, **Admin** for an admin, that your sign-in is kept in
+  a file on this Mac, **Change password…** and **Sign out**; About. **Server settings** and **Sign out** are in the
+  toolbar too. Change a choice here and see it on the phone - Getting albums' three follow you; Normalization, the
+  storage limit and Download over are this Mac's own.)
+- **576 Sign in.** **Not done yet.** On the Mac: Sign out, then back in through one dialog; a wrong address says so at
+  Check. (The dialog has Where deadwax is - the address and **Check** - and Who you are - Name and Password - and
+  **Sign in** stays dim until Check has found deadwax at that address. Type a wrong address and Check: the dialog
+  says what went wrong, in the words the server address screen used. Return in the password checks until Check has
+  answered, then signs in. With logins off, Check opens the app.)
+- **577 Settings on the phone.** **Not done yet.** Every page and every row is there, flat; the switches work with
+  VoiceOver. (Settings opens on a card with your initial in a circle, your name, the address in the typewriter face,
+  **Admin** for an admin and **Sign out**; then Getting albums, Playback and Downloads; Manage; Account, This phone and
+  About - each a row with a › that opens its page, none of them a grey box. Each page is the same: its rows on thin
+  lines, its notes under them in grey. The switches - Confirm before cancelling, Pause winds the record down, Download
+  your library and Only while charging - are the purple ones; with VoiceOver each reads as a switch, on or off, and a
+  double tap turns it. Settings > Downloads keeps its storage bar, Storage limit and Download over, and its albums and
+  playlists are rows like the Library's Artists: a cover, the name, a line under it. Change password's three
+  boxes and its purple **Change password**.)
+- **578 Sign in on the phone.** **Not done yet.** Sign out, then back in on one screen: Where deadwax is, **Check**,
+  then Who you are and **Sign in** - which stays dim until Check has answered for the address in the box. (A wrong
+  address says what went wrong under the box. The cursor starts in the first empty box, and at the largest text
+  sizes Check goes under the address. This phone > Change address is the old screen, in a box now.)
+- **579 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 577-578, or "not done yet".
+
 #### Row Size (608-609)
 
 **Not done yet.** On the Mac, **View > Row Size** makes every list's rows Small, Medium or Large, and ⌘+ and ⌘− step
@@ -6878,7 +6956,7 @@ and glyphs on the page, thin lines between things. Only the purple button (and t
 track, a picture and anywhere you type keep a face. Nothing works any differently, and the Mac doesn't change. Have a
 download or two on Requests and something queued.
 
-**Not flat yet**, each until the slice that redraws it: Settings and its pages, Sign in and the server address (R9);
+**Not flat yet**, each until the slice that redraws it: Settings' Debug page;
 Edit album's pages (R10 and R11); Needs a look (R12); Library care and the Event log (R13); People and Server settings
 (R14); and the EQ's own pages - Correction's search and a filter's editor - and an artist's Artist images and Move
 albums sheets, which no slice has taken yet. Those keep iOS's grouped lists and their grey rows for now: don't count
@@ -6886,7 +6964,8 @@ them in 612.
 
 - **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
   Requests, an album, a playlist, an artist's page, Now Playing's sheet, Search Soulseek…'s sheet, Search, an album
-  you don't have and Choose a source - not the screens
+  you don't have, Choose a source, Settings and its pages (Debug aside), Settings > Downloads and the sign-in -
+  not the screens
   above that aren't flat yet: is anything still a grey box laid on top? Is every button still plainly a button, and
   does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while
   your finger is on it - an album's Shuffle, **Same source again**, a card's ✕, the EQ's output, Downloaded's **Not
@@ -6907,8 +6986,9 @@ them in 612.
   before; at the accessibility sizes, touch and hold a page's word in the Library's switch: it shows large.
 - **613 Every place you type is still a box.** **Not done yet.** None of them has gone flat: the Library's Find (a dark
   sunken box, its edge purple while it has the cursor), Search's field, Requests' **Search Soulseek…** sheet's Artist
-  and Album, a playlist's Edit name and description, Edit album's fields, Server settings' values, sign-in's two,
-  People's and Change password's. (The manual search's two and a playlist's Edit two are now dark sunken boxes like
+  and Album, a playlist's Edit name and description, Edit album's fields, Server settings' values, the sign-in's
+  three, Change address's, People's and Change password's (the sign-in's, Change address's and Change password's are
+  boxes of their own since 574-579). (The manual search's two and a playlist's Edit two are now dark sunken boxes like
   Find's, square, the edge purple while you type in one, and a tap on the box or just above or below it puts the
   cursor there; a playlist's description grows a line at a time as before. Apart from those and Find, each is drawn as
   it was before this build.) Requests' **Search Soulseek…** row itself is purple words on a thin line, with no box -

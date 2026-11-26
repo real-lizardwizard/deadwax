@@ -14,12 +14,17 @@ struct RootView: View {
     @Environment(EventLogModel.self) private var eventLog
     @Environment(PeopleModel.self) private var people
     @Environment(\.scenePhase) private var scenePhase
+    /// (R9) The sign-in's one screen was up when the launch went to `.checking`: its own Check, so it stays up.
+    @State private var signInUp = false
+    /// (R9's review) Why it was up - a 401's words - kept through its own Check, so the line stays where it was.
+    @State private var keptReason: String?
+    @State private var keptWhy: String?
 
     var body: some View {
         ZStack {
             gate
             if server.launch == .ready, let over = server.signInOver {
-                SignInView(reason: over.reason, reasonWhy: over.why)
+                signIn(reason: over.reason, why: over.why)
                     .background(Color(.systemBackground).ignoresSafeArea())
                     .accessibilityAddTraits(.isModal)
                     .transition(.opacity)
@@ -32,6 +37,24 @@ struct RootView: View {
         // sign-out - as the desktop frame names it for its page. Nothing on the iPhone
         .namesWindow(gateName)
         .task { await server.start() }
+        // (R9) the one screen up, and kept up through its own Check; the app, or the can't-reach screen, puts it away
+        .onChange(of: server.launch, initial: true) { (_: ServerModel.Launch, launch: ServerModel.Launch) -> Void in
+            switch launch {
+            case .signedOut(let reason, let why):
+                signInUp = true
+                keptReason = reason
+                keptWhy = why
+            case .needsAddress:
+                signInUp = true
+                keptReason = nil
+                keptWhy = nil
+            case .checking: break
+            case .unreachable, .ready:
+                signInUp = false
+                keptReason = nil
+                keptWhy = nil
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             // (Phase 8, slice 7) a Library care run stops after the album out as the app goes, its screen let sleep - and
             // (slice 8) a Re-time run the same
@@ -111,22 +134,56 @@ struct RootView: View {
         }
     }
 
-    @ViewBuilder private var gate: some View {
+    /// (The redesign, slice R9) The sign-in's one screen is up: no address yet (or Change address pressed), a sign-in
+    /// asked for - and through the screen's own Check, the launch's `.checking` while it asks (`signInUp`), so what is
+    /// typed stays. The launch's own checking (a saved address) is the spinner, as before.
+    private var showsSignIn: Bool {
         switch server.launch {
-        case .needsAddress:
-            NavigationStack { ServerAddressView() }
-        case .checking:
-            ProgressView()
-                .controlSize(.large)
-                .accessibilityLabel(AlbumPageLines.loading)
-        case .unreachable(let failure):
-            UnreachableView(failure: failure)
-        case .signedOut(let reason, let why):
+        case .needsAddress, .signedOut: return true
+        case .checking: return signInUp
+        case .unreachable, .ready: return false
+        }
+    }
+
+    /// Why the sign-in shows: a 401's words (`.signedOut`) - (R9's review) kept through the screen's own Check, so the
+    /// line doesn't go while it asks and come back - none while the address is still to check.
+    private var signInReason: (reason: String?, why: String?) {
+        switch server.launch {
+        case .signedOut(let reason, let why): return (reason, why)
+        case .checking: return signInUp ? (keptReason, keptWhy) : (nil, nil)
+        case .needsAddress, .unreachable, .ready: return (nil, nil)
+        }
+    }
+
+    @ViewBuilder private var gate: some View {
+        if showsSignIn {
+            signIn(reason: signInReason.reason, why: signInReason.why)
+        } else {
+            switch server.launch {
+            case .needsAddress, .signedOut:
+                // drawn above, as the one screen (showsSignIn)
+                EmptyView()
+            case .checking:
+                ProgressView()
+                    .controlSize(.large)
+                    .accessibilityLabel(AlbumPageLines.loading)
+            case .unreachable(let failure):
+                UnreachableView(failure: failure)
+            case .ready:
+                app
+                    .accessibilityHidden(server.signInOver != nil)
+                    .allowsHitTesting(server.signInOver == nil)
+            }
+        }
+    }
+
+    /// (R9) The sign-in, where deadwax is and who you are, today's calls in today's order (Check, then Sign in): on the
+    /// iPhone one screen (SignInView, iSignIn), on the Mac one dialog (MacSignIn, SignIn.dc.html) - the same calls.
+    @ViewBuilder private func signIn(reason: String?, why: String?) -> some View {
+        if Platform.mac {
+            MacSignIn(reason: reason, reasonWhy: why)
+        } else {
             SignInView(reason: reason, reasonWhy: why)
-        case .ready:
-            app
-                .accessibilityHidden(server.signInOver != nil)
-                .allowsHitTesting(server.signInOver == nil)
         }
     }
 

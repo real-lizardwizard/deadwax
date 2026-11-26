@@ -20633,3 +20633,348 @@ Fix 11 is words (docs/ios.md's and these notes' meta line), and has no mutation.
 - The phone: the rows' hairlines out to the edges with the swipe still inset, the ▶'s and Get's words at the row's
   end, the strip at the largest sizes, the plain meta line (only the maybe dashed), the pressing in the accent and the
   facts line's lines at the accessibility sizes, and the song's bar on iGet, the cards flat on iSources.
+
+## The redesign, slice R9: Downloaded, Settings and Sign in (2026-11-25)
+
+The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R9, with 3.8's answer 5 -
+James's, **"Today's pages as cards"**: today's Settings pages and every row on them, drawn as cards, the account card
+on top, and no Gapless switch or Quality row of the drawing's own. The drawings are Downloaded, Settings and SignIn
+(the Mac's) and iSettings and iSignIn (the phone's), in ~/Desktop/Code/deadwax-plans/mac-redesign/. Built on 31cab12d
+(R1c, the phone flat). The app is still 0.13 (13); `__version__` untouched; no server data new (no diff to Core's
+DeadwaxClient or Routes, nor App/Shared/Routes.swift); no engine file touched.
+
+### What "no Gapless or Quality floor" was read as
+
+The drawings put rows on Settings that have no setting behind them: iSettings' root has a Sound group with a **Gapless**
+switch and a Getting albums group with a **Quality floor** row on the root itself; Settings.dc.html has Playback's
+**Gapless** checkbox and a Sound box with **Quality**. None of those is drawn. What stays is what today has:
+Playback's **Gapless: On** - a fact, a PhoneKV on the phone and a MacSettingsFact on the Mac, never a switch or a
+checkbox - and Getting albums' real **Quality floor** (GetSettings' choice, saved per person on deadwax), on its page on
+the phone and in its box on the Mac. "Every page and row still there" and "no Gapless or Quality floor" are both kept
+that way. **Unsure**: if answer 5 meant to drop Getting albums' own Quality floor too, that is one row on each device
+(`choice(GettingWords.floorTitle, ...)`) - but it is a setting with something behind it, so it stayed.
+
+### The phone (iSettings, iSignIn)
+
+- **Settings' root** (YouView) is a SettingsPage - a ScrollView of flat groups, no List, no inset grey: the **account
+  card** first (AccountCardView, Core's AccountCard: the round avatar with the person's letter, `@ScaledMetric` from
+  44 relative to title; the name bold, "No sign-in needed" with logins off; the address deadwax is at in the readout
+  face; **Admin** as a DWChip for an admin signed in; **Sign out**, a flat button in the accent, with logins on alone)
+  - one VoiceOver element, its words a heading and Sign out its action. Under it, as today: Getting albums, Playback
+  and Downloads (its value at the right, its footer under the group while something happens); Manage, with a row to
+  draw; Account (logins on), This phone (the host at the right) and About (the version at the right). Each a
+  SettingsGo - PhoneGo's row with its chevron - in a PhoneGroup, on the hairlines. A row's **readout** (the host, the
+  version, what's downloaded) is SettingsGo's own `readout`, in the readout face and t3, set beside the row's words on
+  their first text baseline (the fonts' rule: Courier Prime centred beside Libre Franklin sits 1 to 2 points high); any
+  other value is PhoneGo's, centred - Needs a look's count is its words, as today's row has them (the drawing's badge
+  isn't drawn: test_ios_needs_look holds the count as Manage's value), and Playback's EQ row keeps the preset's short
+  name in the row's face, centred on its two lines as today's does.
+- **The pages** (PlaybackPage, GettingAlbumsPage, AccountPage, ThisPhonePage, AboutPage, ChangePasswordScreen, the
+  Manage rows' pages untouched) are SettingsPages too: the same rows in the same order, each group a PhoneGroup, a
+  choice a SettingsChoiceRow (its title, the menu Picker at the right), a fact a PhoneKV, a note a SettingsNote in t2
+  under its row. The switches - Confirm before cancelling, Pause winds the record down, Download your library and Only
+  while charging - are the purple one (`.toggleStyle(.phoneSwitch)`; Settings > Downloads' two through
+  `settingsSwitch()`, whose phone half it is), PhoneSwitchRow's Toggle what VoiceOver reads - a switch, its name and
+  its state.
+- **Settings > Downloads** (DownloadsScreen) keeps its List (its rows swipe to remove) - `.listStyle(.plain)`, every
+  row's background clear, no separators, its sections' headings ListLegend (a PhoneGroup legend's metrics) and its
+  footers ListNote. Its albums and playlists are **iArtists' rows** (the Library's LibraryListRow measures: a 44 cover,
+  10 to the words, the name in the body face, a t2 line under it, the row's hairline; a playlist's and the library's
+  with LibraryChevron) - no `@ScaledMetric` of its own. Storage (the bar, Storage limit) and Download over stay, as
+  SettingsChoiceRows; the questions' buttons and Remove all are DWButtonStyle (Remove all the red one, across). The
+  Mac pushes this page too (This Mac's Downloading and downloaded…): see "After the review" for what it draws there.
+- **The sign-in** is **one screen** (SignInView): deadwax and the lede; **Where deadwax is** - the address in its own
+  box and **Check** (ServerModel.checkAddress, the Server address screen's call), what Check found under it in Phase 0's
+  words, or the green "deadwax answered"; **Who you are** - the user name and the password; the reason, the failure,
+  **Sign in** (the purple button across), and where the sign-in is kept (SettingsWords.kept). Core's
+  **SignInGate.signInOn**: Sign in can be pressed only once deadwax has answered at the address shown and asked for a
+  sign-in, no Check is out and no sign-in is on its way - so Sign in is never asked before Check answers, and an address
+  typed after Check has to be checked again. Over the app (a session ended mid-use) the address is the one in use,
+  said, not typed. RootView keeps the screen up through its own Check (`signInUp`: the launch goes to `.checking` while
+  it asks, and a screen swapped for the spinner would lose what was typed); the launch's own checking of a saved
+  address is the spinner, as before; with logins off, Check alone lets you in. Every RootView branch is kept -
+  needsAddress, checking, unreachable, signedOut, ready, and the sign-in over the app.
+- **Change address** (ServerAddressView, from This phone) is the old screen, its field on FieldLook (a box) now, and
+  **Change password**'s three fields are FieldLook boxes, its button the purple one across - out of the Form.
+- **Debug** stays a Form, the one Settings page not flat (docs/ios.md's "Not flat yet" now begins with it).
+
+### The Mac (Settings, Downloaded, SignIn)
+
+- **Settings** (MacSettingsRoot - not MacSettingsPage, which App/Shared/MacCommands.swift's ViewModifier already is)
+  is one page of MacGroupBoxes, **row for row the phone's pages**: Playback (Gapless's fact; Normalization as a
+  DWSegmented of its four - Automatic, By song, By album, Off; the EQ, **Open the EQ** - EQLink(route: .now), the side
+  panel's EQ); Getting albums (When I click Get, Quality floor and Format as DWPopUps, empty and dimmed until /me's
+  GetSettings answer is in - the same three `choice(...)` calls as the phone's page, a choice written only when live
+  and different; Confirm before cancelling, a MacCheckbox, with the Mac's own note); This Mac (what is downloaded -
+  SettingsWords.downloadsFact from DownloadShelf's counts - the free space, Storage limit, Download over, **Show
+  Downloaded**, **Downloading and downloaded…** - the phone's Settings > Downloads, pushed, its lists the Mac's only
+  way to them - the address with **Change address…**, and **Debug…** for an admin, as This phone offers it); Account
+  (Signed in as, the name, Admin, Kept, **Change password…** where OwnPassword offers it, **Sign out**, its footnote);
+  About. The toolbar: the lede, **Server settings** for whoever has it, **Sign out** with logins on. The status bar:
+  "Saved as you change them", the version. Every choice is the same model's the phone writes (PlayerModel,
+  GetSettingsModel, DownloadModel, ConfirmCancel's AppStorage).
+- **Fit** (as the review had it worked out - "After the review"): two columns only from a page of 1072, where every
+  row fits its column; one column below that - at the window's opening 1280 too (a page of 1060), beside the side
+  panel and at the smallest window. Each row's line under its control.
+- **Downloaded** (MacDownloadedPage) replaces the sidebar's Downloaded (MacSettings.page(.downloaded);
+  `.downloadedPlaylists` its Playlists tab): **Albums | Playlists** at the toolbar's left (DWSegmented, large),
+  **Remove all…** at its right - Settings > Downloads' own dialog and words (DownloadShelf.removeAllMessage). A
+  MacColumnList: Album (the cover at
+  `rowSize.cover`, View > Row Size's), Artist 132, Songs 62 ("7 of 13" while only some are here), Size 82, On this Mac
+  158 - a DWMeter while it downloads, amber words if some of it didn't, else the day its last song came
+  (MacDownloaded.when, ArtistTotals' day words, turning with the calendar's day). A playlist has no Artist; its On this
+  Mac is a chip. Double click or Return opens the album or playlist; a right click is its page's own menu
+  (AlbumRightClick, PlaylistRightClick - Remove Download among them). The status bar is DownloadModel's: the albums,
+  songs and size here, how many downloading, the free space at its right. Every number is DownloadShelf's - Settings >
+  Downloads' own reading of DownloadModel, made internal for this. Fit: the four fixed columns are 434, so the name has
+  ~620 in a 1060 page, ~220 in 660, ~150 beside the side panel.
+- **Sign in** is **one dialog** (MacSignIn), drawn in RootView's `Platform.mac` branch alone (`signIn(reason:why:)`):
+  Where deadwax is, Check, Who you are, Sign in - the phone's calls and SignInGate, its submit guarded by the same
+  `signInOn` (Return can't go round it). Return in the address is Check and Return in the password what the button
+  that is on would do (after the review: Sign in once Check has answered, Check until then), as the phone's Go keys
+  are; Sign in is not the dialog's default button - Return never confirms in the app
+  (test_ios_mac's `test_escape_presses_close_and_return_never_confirms`, which the first draft's
+  `.keyboardShortcut(.defaultAction)` failed).
+- **The fields' faces** are set on each field, the modifier (FieldLook on the phone, MacSignInField on the Mac) drawing
+  only the box: the address in the readout face, the rest in the field's own. On the Mac a readout beside Check's
+  faced button is a box beside a box - centred on each other as SignIn draws them - said so in test_ios_readout_rows'
+  ALONE (the Mac's typed address, and its address said alone over the app). The phone's Check is flat words, no box:
+  after the review it sits on the address's first text baseline, so the phone's two need no ALONE entry.
+- **The cancel note**: Getting albums' note under Confirm before cancelling names each device's own control -
+  RequestWords.cancelAsksNote(device): the phone's is confirmCancelNote word for word (its ✕), the Mac's names R8's
+  **Cancel** and **Leave** on a row of Requests' table. Used on both devices' pages.
+
+### The words (iphone.json and mac.json, by hand)
+
+Two keys added to each, both named in DeviceWordsTests' list of words that differ by design:
+- `RequestWords.cancelAsksNote` - iPhone: today's confirmCancelNote, unchanged; Mac: "Cancel on a download in Requests
+  asks first, and so does Leave. Kept on this Mac."
+- `SettingsWords.kept` - iPhone: "Your sign-in is kept in this phone's Keychain - never your password."; Mac: "Your
+  sign-in is kept in a file on this Mac - never your password." (SessionStore's two homes.) New on the phone too - the
+  sign-in's last line and the Mac's Account box's Kept.
+
+No other phone word changed. SettingsWords' others (Where deadwax is, Who you are, deadwax answered, Admin, the Mac's
+lede and status line, Show Downloaded, Downloading and downloaded…, Signed in as, Kept, Change password…, Change
+address…, Open the EQ, the downloads fact) and MacDownloaded's are device-free and in SettingsCardsTests.
+
+### Left out, and why
+
+- On the Mac's Settings, the drawing's rows with no setting behind them: Sound's Quality, Playback's Gapless checkbox,
+  Complete albums only, Playlists I follow, Library runs keep awake, Show albums as, the sidebar's Edit order, Open the
+  guide, Keyboard shortcuts (plan section 4's left-outs). The Manage group: the sidebar holds every managing page.
+- The phone-only rows on the Mac: Opens as and Pause winds the record down (the turntable is the phone's Now Playing).
+- Downloaded's Play and Shuffle and a Songs tab (the drawing's): nothing today plays "what's downloaded" on the Mac as
+  one list. Every way to `.downloaded` on the Mac opens the new page - the sidebar's Downloaded, the Library's •••
+  Downloaded, This Mac's Show Downloaded, and Navidrome-down's On this Mac row - where it opened the phone's
+  AlbumsScreen(list: .downloaded) before. The Library's own offline pager (`pager(albums: .downloaded)`, while deadwax
+  can't be reached) is untouched. test_ios_mac_reach's PHONES_PAGES gives up `.downloaded` and `.downloadedPlaylists`,
+  as its comment asks of a slice that redraws a route.
+- **What the Mac's Downloaded doesn't have** of the page it replaced (AlbumsScreen(list: .downloaded)), exactly, after
+  the review gave it back the first ask and Find: the **sort** (LibraryModel.sort's menu - the rows are coming, then
+  didn't come, then here, largest first); **Grid | List** (it is a table, always); **the index** down the edge
+  (ShelfIndexStrip) and the sort's **group headers**; the **count line** over the albums ("38 albums" - the status
+  bar says what is here instead); the **Downloaded playlists** row (its Playlists tab instead); the **pull** (none on
+  the Mac); and while deadwax can't be reached, the page's "Downloaded" title and "Only downloaded albums play until
+  deadwax is back." (the Library's own offline pager still says it). Its progress rings are On this Mac's meter.
+- Debug's Form (above).
+
+### Tests
+
+- tests/test_ios_settings_look.py (new): every Settings page on the phone flat (no List, Form, Section or inset style;
+  the root's account card first); Downloads' rows iArtists'; each switch the purple one, by count per file; no row
+  with no setting behind it (QualityFloor only in Getting albums' and the Mac's choice, no Gapless Toggle or checkbox,
+  none of the drawing's undrawn rows); Download over and the Storage limit drawn on both devices; the account card on
+  top; Sign in waiting for Check (SignInGate in the button's `.disabled` and in the Mac's submit); the dialog the Mac's
+  alone; the Mac's cancel note its own; the Mac's Settings the phone's pages row for row (after the review, MAC_ROWS:
+  every row by its label, in order); the Mac's Downloaded
+  DownloadModel's, its covers grown with Row Size.
+  And (after the first full run) `test_settings_on_the_phone_draws_no_grey_box`: everything R9's phone files draw on
+  the phone's path, by test_ios_phone_look's own matcher (R1c's `drawn()`), is a hairline or the sign-in's field box -
+  without it, a grey face planted on the account card passed every look test. And
+  `test_a_rows_readout_is_settingsgos_on_the_words_baseline`: DownloadsRow hands its size to SettingsGo's readout,
+  which sets it on the words' baseline; Manage's count and the EQ's preset are words.
+- tests/test_ios_settings.py (the root's rows and pages, re-pinned to the cards and SettingsGo's readout),
+  tests/test_ios_phone_look.py (R9's files in SLICES; TEXT_INPUTS: the sign-in's three, Change address's and Change
+  password's three are FieldLook now).
+- The shared files, R9's entries only: test_ios_mac.py (the turntable's rows - Opens as is named twice now, its row's
+  title and its Picker's, both inside `if !Platform.mac`, neither on the Mac's Settings; This phone's row is a Text in
+  DEVICE_WORDS), test_ios_mac_reach.py (NAMED_FROM_THE_PHONES: RootView names MacSignIn once, as the Mac's half of
+  its one `if Platform.mac`; PHONES_PAGES without `.downloaded` and `.downloadedPlaylists`; Settings' root
+  `MacSettingsRoot()`), test_ios_readout_rows.py (two ALONE entries, above - four until the review put the phone's
+  Check on its field's baseline; Downloaded among MacColumnList's pages and
+  its album cell among CELL_BUILDERS, the covers 5), test_ios_palette.py (the ticking numbers' "You's Downloads value"
+  is SettingsGo's readout now, the departure the same: the drawings have no figure there, the row keeps today's).
+- Core: SettingsCardsTests (AccountCard, SignInGate, MacDownloaded's columns, songs, days and status, downloadsFact,
+  cancelAsksNote); DeviceWordsTests' fixtures.
+
+### Mutations
+
+Each applied alone to a copy of the worktree, the named tests run, the file put back (tests/test_ios_settings_look.py
+unless named). Every one caught:
+- A Gapless switch on Playback: `test_each_switch_is_the_purple_one` (a Toggle more than the file's count). A Gapless
+  checkbox on the Mac, a Quality row on the Mac's Playback, a Quality floor on Settings' root:
+  `test_no_row_has_no_setting_behind_it`.
+- Download over gone from Settings > Downloads, the Storage limit gone from the Mac's This Mac:
+  `test_download_over_and_the_storage_limit_stay`.
+- A switch drawn as an image (a Button with `switch.2` beside Confirm before cancelling), and one drawn as iOS's own
+  green (`.toggleStyle(.switch)` on Only while charging): `test_each_switch_is_the_purple_one`.
+- Sign in asked before Check answers - the phone's button `.disabled(lines.disabled)`, the Mac's submit without
+  SignInGate: `test_sign_in_waits_for_check`. In Core, SignInGate.signInOn without `isChecked`: SettingsCardsTests'
+  `signInWaitsForCheckToAnswerForTheAddressShown`.
+- The dialog on the phone (RootView's `if Platform.mac {` as `if true {`): `test_the_dialog_is_the_macs_alone`.
+- The common flat rule: Settings > Downloads `.insetGrouped`, a grey cell under its rows (`listRowBackground` a
+  panel), a Form back on Change password: `test_every_settings_page_on_the_phone_is_flat`; a grey face behind the
+  account card, a row on a grey card: `test_settings_on_the_phone_draws_no_grey_box` (added for them: before it,
+  every look test passed the first).
+- The typing rule: Change address's field without FieldLook: test_ios_phone_look's
+  `test_every_place_you_type_on_the_phone_is_still_a_box`.
+- The fonts' rule: SettingsGo's readout centred beside its words: test_ios_readout_rows'
+  `test_every_readout_beside_words_sits_on_their_baseline`.
+- Return confirming: Sign in the Mac dialog's default button: test_ios_mac's
+  `test_escape_presses_close_and_return_never_confirms`.
+- The Mac's cancel words: the phone's ✕ words (RequestWords.confirmCancelNote) on the Mac's Settings:
+  `test_the_macs_cancel_note_names_the_macs_own_buttons` (the Mac pushes no Getting albums page: its box is the
+  page's own); in Core,
+  cancelAsksNote(.mac) returning confirmCancelNote: SettingsCardsTests' `eachDevicesCancelNoteNamesItsOwnButton`, and
+  DeviceWordsTests' `theMacsWordsAreTheOnesWritten` and `theMacsWordsDifferWhereThePhonesSayPhone`.
+- Downloaded's status bar given 0 bytes for DownloadModel's, its covers 20 whatever Row Size says:
+  `test_the_macs_downloaded_is_downloadmodels`.
+
+### Not verified - only a phone and a Mac can say (checks 574-579)
+
+- Anything on a screen: no Simulator, no phone, no Mac run of this build. Whether the account card's avatar, name,
+  address and chip sit as iSettings draws them at the standard size and at the accessibility sizes; whether Settings'
+  pages read as flat; the switches with VoiceOver (each a switch, on or off, a double tap turning it).
+- The sign-in's one screen: the keyboard over Who you are while typing the password; the password manager filling
+  both from the one screen; RootView keeping the screen up through Check (what was typed staying); Sign in dim until
+  Check answers, and dim again once the address is edited.
+- Settings > Downloads' plain list: the swipe to remove on iArtists' rows, the legends' spacing between sections.
+- The Mac: built for Mac Catalyst, never run (no smoke run: James's installed app was running); its Settings in two
+  columns and one, each note under its control, the pop-ups' menus, Open the EQ opening the side panel; Downloaded's
+  columns, the meter, the day words, Row Size, the status bar's numbers against Finder, its first ask and Find; the
+  sign-in dialog in its scroll view and Return in it; Settings > Downloads on the Mac (its switches the system's,
+  clickable, its rows their content's height, a trackpad's swipe to Remove).
+
+### After the review (2026-11-25)
+
+The review held the RootView branches, the rows, the cancel words, SettingsCards and the two shared-test exceptions,
+and the reading of Gapless and the Quality floor (James is told one line about the Quality floor; it is unchanged).
+What it found, and what was done - each pinned by a test and its mutation shown failing (below):
+
+1. **The Mac drew the phone's pieces in its own exact frames.** The pages the Mac pushes under Settings are the
+   phone's own - Settings > Downloads (and through it Download your library, the other accounts' downloads, what
+   didn't download, each album's Remove), Change address, Debug, Change password - and `lookHeight` is exact on the
+   Mac: an album's and a playlist's row were 30 tall holding a 44 cover and three lines, `settingsRow()` 46, and a
+   switch's row (PhoneSwitchRow, DWLook's target tall) 0 - its hit shape zero tall, so Download your library and Only
+   while charging took no click. Now each is Platform-aware: `settingsRow()` is its content's height on the Mac with
+   `SettingsLook.macRowRoom` (8) above and below (the phone's 46 at least unchanged); `settingsSwitch()` is the purple
+   switch on the phone and the Mac's own - a plain `Toggle` `.toggleStyle(.switch)` tinted the accent - on the Mac;
+   DownloadsScreen's `tallRow(macRoom:)` is the phone's 60 at least and the Mac's content height (AlbumLine's own 4
+   above and below, a playlist's and the library's row 4). A row's Remove stays its swipe (a trackpad's on the Mac): a
+   right-click of its own was tried and taken out, test_ios_mac's rule being that a right-click is only ever the •••
+   menus' own items - the Mac's Downloaded page's right-click is the album's •••, Remove Download among them. The
+   words keep the phone's faces on these pages, as before R9. Held by
+   `test_the_pages_the_mac_pushes_under_settings_draw_at_the_macs_sizes`: `mac_path()` - test_ios_phone_look's
+   phone_path turned round - over those pages and the pieces they draw finds no `.phoneSwitch`, PhoneSwitchRow,
+   `lookHeight(DWLook.here.target)` or `tallRowHeight`, and no settingsRow 46 or PhoneGo/PhoneKV; and the phone's
+   Getting albums, Playback, Account, This phone and About pages are opened from the phone's root alone (the Mac has
+   its boxes).
+2. **Two columns started too narrow.** At 1280 (a page of 1060) This Mac's two buttons wanted ~478 of a 475 column; at
+   1100 (a page of 880) ~93 past a 385 one; and Normalization's line beside its four segments had ~98 at 1280, 8 at
+   1100. Worked out from the bundled faces (tests/ios_fonts.py, semibold from above): a row is the label's 124 and 8,
+   then its control - This Mac's Show Downloaded and Downloading and downloaded… (12.5, 11 either side, 6 apart) the
+   widest at ~478 (481 semibold) - so a column needs it plus its box's 12 either side, and two columns 2 × (478 + 24)
+   + 18 + 44 = ~1066 (1071 semibold): **`twoColumns` is 1072**. So the window's opening 1280 (1060) shows one column,
+   as do the side panel's (1280 - 220 - 401 = 659) and the smallest window's (660); two from a 1292 window, or 1693
+   with the side panel open. Every row's line - a choice's, a fact's, the EQ's, Confirm before cancelling's - is
+   **under its control**, lined up with it (MacSettingsNote's 132 in), never beside it. Held by
+   `test_the_macs_settings_take_two_columns_only_where_they_fit` (the sum, from the Core words and the faces; one
+   column wherever it falls back; the notes' place).
+3. **The account card at the largest sizes.** At AX5 its row wanted ~487 of the phone's 343; at xxxLarge the name had
+   ~83 (39 while "Signing out…"). From xxxLarge and every accessibility size (`typeSize.isAccessibilitySize ||
+   typeSize == .xxxLarge` - from xxxLarge, where the name was already cramped) the Admin chip and Sign out go **under
+   the name**, Sign out across the card on up to three lines; the card on top, `.top`-aligned. Held by
+   `test_the_account_card_stacks_from_the_largest_sizes`.
+4. **Labels cut at AX5**: Remove All Downloads, Try All Again, Keep Them and Remove, Change password, "Signing in…".
+   Each button's words are `lineLimit(typeSize.isAccessibilitySize ? 3 : 1)` on the label (DownloadsScreen's
+   ButtonWords, as earlier slices' are), the button across its row there so they can wrap (Try All Again
+   `fills: typeSize.isAccessibilitySize`; the others already fill); QuestionRow's two small buttons go **one over the
+   other** at the accessibility sizes. Held by `test_a_buttons_words_take_three_lines_at_the_accessibility_sizes`.
+5. **The Mac's Downloaded lost more than was said.** The first ask (FirstAskCard) was only in AlbumsScreen's
+   `downloadedTop`: it is back, over the albums, on the same condition (deadwax in reach, the Library's albums
+   answered, nothing typed into Find; the card's own: not asked, downloads open, the switch off) - FirstAskCard takes
+   `macRoom`, room drawn only with the card (EdgeInsets() for every other caller; test_ios_mac_halves' FirstAskCard
+   pin moved to 63ad9fb3f0571d83, its comment saying why). The Mac's other tables have a Find (R2's MacAlbumsPage, 230
+   wide at the toolbar's end), so Downloaded has the same one: every word typed in an album's name or artist, a
+   playlist's name (Core's `MacDownloaded.finds`, Shelf's rule), "No albums match “…”." when none does, let go with a
+   change of tab. What it still doesn't have is listed exactly above ("What the Mac's Downloaded doesn't have"). Held
+   by `test_the_macs_downloaded_keeps_the_first_ask_and_find` and SettingsCardsTests'
+   `theMacsDownloadedFindsAsTheAlbumsPageDoes`.
+6. **The sign-in's wiring is held now** - each of the review's passing mutations fails: `shownAddress` always the
+   address in use, `asksSignIn` always true (the phone's and, separately, the Mac's), `showsSignIn` ignoring
+   `signInUp` for `.checking` (`test_the_sign_in_is_held_on_both_devices`); a Gapless checkbox laid over two lines
+   (`calls()` reads a call whole, its trailing closure too), an added "Sound quality" row on the Mac (MAC_ROWS: every
+   row by its label in order, the controls counted; no string on those pages with Sound, Quality...) -
+   `test_no_row_has_no_setting_behind_it`; the account card's accessibility actions emptied
+   (`test_the_account_card_is_on_top`).
+7. **Words that weren't true.** Download your library and Only while charging were `.accessibilityElement(children:
+   .ignore)` with `.isButton`, a value and an action: VoiceOver read a button with a value, not a switch. The override
+   is gone - each is the system's switch to VoiceOver (PhoneSwitchStyle's representation; the Mac's Toggle), its name
+   the label and its note the hint, on the Toggle itself - and `test_each_switch_is_the_purple_one` fails any element
+   of our own, `.isButton`, value or action on a switch's chain. "Normalization's three" is four (above, and
+   docs/ios.md's check). "The Getting albums page the Mac pushes" was wrong: nothing pushes it - the Mac's is a box.
+8. **Smaller.** The Mac's This Mac draws Storage limit and Download over with the downloads unreadable too, the reason
+   under them, as the phone's page does. The `.signedOut` reason stays up through Check (RootView keeps it -
+   `keptReason`, `keptWhy` - while `.checking` with the screen up) instead of going and coming back. As the sign-in
+   comes up the cursor is in the **first empty field** (the address unless over the app, the name, the password; all
+   filled, the address - Check is next - or over the app the password), and once Check answers in the first of the
+   name and password still empty. **Return in the password** does what the button that is on would (Core's
+   `SignInGate.returnSignsIn`: Sign in once deadwax has answered at the address shown and asked for one, Check until
+   then) - on both devices. At the accessibility sizes the phone's Check goes **under the address**; otherwise it sits
+   on the address's **first text baseline** (it is flat words beside a box; centred, it was ~1.5 off), on the sign-in
+   and on Change address - so test_ios_readout_rows' two phone ALONE entries are gone (their reason was wrong: Check is
+   no box on the phone). The Mac's dialog is in a **ScrollView**, centred while it fits (`minHeight` the window's), so
+   at large text or in a short window Sign in never falls off.
+
+No word changed in iphone.json or mac.json; `__version__`, the app's 0.13 (13), Core's DeadwaxClient and Routes,
+App/Shared/Routes.swift and the engine files untouched.
+
+#### The review's mutations
+
+Each applied alone to a copy of the worktree and the named tests run (scratchpad r9-mutate2.py and
+r9-core-mutate2.py); all 37 and the three in Core fail:
+- The Mac's half of `settingsSwitch()` the purple style; the Mac's half of `settingsRow()` the phone's 46; the Mac's
+  half of `tallRow()` the phone's `lookHeight`; a `lookHeight(DWLook.here.target)` on Change address; a PhoneSwitchRow
+  on Settings > Downloads: `test_the_pages_the_mac_pushes_under_settings_draw_at_the_macs_sizes` (with the switch, the
+  flat-page and the tall-row tests for the first three). A right-click of the rows' own (a `contextMenu` on
+  Removable): test_ios_mac's `test_a_right_click_is_the_menus_own_items` and `test_downloads_rows_are_iartists_rows`.
+- `twoColumns` back at 880; a row's note back beside its control:
+  `test_the_macs_settings_take_two_columns_only_where_they_fit` (and the row-for-row pin of 1072).
+- The account card never stacked, or stacked only from AX1: `test_the_account_card_stacks_from_the_largest_sizes`.
+- ButtonWords one line at every size; QuestionRow always side by side; Try All Again never across; Change password's
+  and "Signing in…"'s words one line: `test_a_buttons_words_take_three_lines_at_the_accessibility_sizes`.
+- FirstAskCard gone from the Mac's Downloaded; Find's filter dropped; Find's field gone:
+  `test_the_macs_downloaded_keeps_the_first_ask_and_find`. In Core, `finds` matching any one word, or the name
+  alone: `theMacsDownloadedFindsAsTheAlbumsPageDoes`.
+- The six the review's log names (`shownAddress`, `asksSignIn` on each device, `showsSignIn`'s `.checking`, a
+  two-line Gapless checkbox, a "Sound quality" row, the card's actions emptied): the tests in 6 above.
+- The switches' override back (`.accessibilityElement(children: .ignore)` and `.isButton` on Download your library):
+  `test_each_switch_is_the_purple_one`.
+- The Mac's two rows inside `if downloads.storeProblem == nil` again: `test_download_over_and_the_storage_limit_stay`.
+  The reason dropped while `.checking`; the first field "the name" always (each device); Return in the password
+  `submit()` alone (each device); Check beside the field at every size (the sign-in, Change address); the dialog out of
+  its ScrollView: `test_the_sign_in_is_held_on_both_devices`.
+  In Core, `returnSignsIn` without `asksSignIn`: `returnInThePasswordDoesWhatTheButtonThatIsOnWould`.
+- Check centred beside the field (the HStack without `.firstTextBaseline`): test_ios_readout_rows'
+  `test_every_readout_beside_words_sits_on_their_baseline` and `test_the_sign_in_is_held_on_both_devices`.
+
+#### Not verified, after the review
+
+- Whether Catalyst's `.toggleStyle(.switch)` draws the Mac's switch (it is taken as the system's own in the Mac idiom)
+  and takes a click on the row's words; a row's swipe to Remove on a trackpad; the rows' heights by eye.
+- Whether a TextField's first text baseline, through FieldLook's padding and box, lines up with the flat Check's
+  words as SwiftUI propagates baselines through padding and frames - by eye, on a phone.
+- The account card at xxxLarge and AX1-AX5, the buttons' three lines, QuestionRow stacked; the focus in the first
+  empty field with VoiceOver on; Return in the password running Check.
+- The Mac's Settings: one column at 1280 by eye (the sum says the two buttons need 478 of 475); the first ask on the
+  Mac's Downloaded.

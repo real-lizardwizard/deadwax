@@ -792,7 +792,11 @@ def test_the_mac_has_no_turntable():
     playback = bare(app["You/PlaybackSection.swift"])
     block = playback[playback.index("if !Platform.mac {"):playback.index("Picker(Normalization.title")]
     assert "Picker(TurntableWords.opensAs" in block and "Toggle(TurntableWords.windDown" in block
-    assert playback.count("TurntableWords.opensAs") == 1 and playback.count("TurntableWords.windDown,") == 1
+    # (R9) every mention of the two inside it - Opens as is its row's title and its Picker's name, a SettingsChoiceRow
+    assert playback.count("TurntableWords.opensAs") == block.count("TurntableWords.opensAs") == 2
+    assert playback.count("TurntableWords.windDown,") == block.count("TurntableWords.windDown,") == 1
+    assert "opensAs" not in bare(app["Mac/Settings/MacSettingsRoot.swift"])
+    assert "windDown" not in bare(app["Mac/Settings/MacSettingsRoot.swift"])
 
 
 # ----------------------------------------------------------------------------- every presentation carries the app's models
@@ -1149,7 +1153,7 @@ DEVICE_WORDS = {
     "Models/ServerModel.swift": [
         "DeadwaxClient(server: address, session: session, transport: transport, device: Platform.device)",
         "rekey.ended(outcome, device: Platform.device)"],
-    "You/YouView.swift": ["LabeledContent(YouWords.thisDevice(Platform.device))"],
+    "You/YouView.swift": ["Text(YouWords.thisDevice(Platform.device))"],
     "You/ThisPhoneSection.swift": [".navigationTitle(YouWords.thisDevice(Platform.device))"],
     "EQ/EQImport.swift": ["Label(EQWords.Import.fromFiles(Platform.device), systemImage: \"doc\")"],
     "EQ/EQScreen.swift": ["EQOtherOutputRow(output: other.output(Platform.device),"],

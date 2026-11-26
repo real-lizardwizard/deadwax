@@ -469,6 +469,9 @@ struct LibraryLayoutSwitch: View {
 /// of the page's (PhoneCard - 14 above and below, a hairline under it), Turn On the purple and Not Now a flat button's
 /// words in the accent. On the Mac's Downloaded page, which borrows it, the card as it was (its fill, the pill).
 struct FirstAskCard: View {
+    /// (R9's review) Room round the card on the Mac - its Downloaded page's sides - drawn only with the card.
+    var macRoom = EdgeInsets()
+
     @Environment(DownloadModel.self) private var downloads
     @AppStorage(AutoDownload.askedKey) private var asked = false
 
@@ -481,6 +484,7 @@ struct FirstAskCard: View {
                     .background(Corners.cardShape.fill(Palette.toggledFill))
                     .accessibilityElement(children: .contain)
                     .padding(.bottom, 12)
+                    .padding(macRoom)
             } else {
                 PhoneCard {
                     ask
