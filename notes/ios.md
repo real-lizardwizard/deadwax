@@ -19893,3 +19893,247 @@ way:
   own material face behind it); no jump as it appears (its word is measured as it comes, under the opacity's fade in);
   at AX5 no bigger than at xxxLarge. The Large Content Viewers on Close, the look button and the •••.
 - The Mac: built for Mac Catalyst; Now Playing is never opened there; not looked at.
+
+
+## The redesign, slice R6: an artist (2026-11-25)
+
+An artist's page in the new look on both devices: mac-redesign-build.md 3.4 "R6 - An artist", drawn in Artist.dc.html
+(the Mac) and iArtist.dc.html (the phone). Built on R1c (31cab12d). **No new server data**: DeadwaxClient and Core's
+Routes have no diff, nor App/Shared/Routes.swift, the engine files, ArtistPageModel or the artist sheets. The app is
+still 0.13 (13), `__version__` is untouched, and no words fixture key changed (iphone.json and mac.json have no diff).
+The facts under the name (MusicBrainz's "Group · Sydney · since 1973") were asked only for someone who manages until
+now; they are asked for everyone, as the drawing puts them under every artist's name - `model.theirFacts` is the same
+ask the page already made, cached on the server.
+
+### The Mac: a page of its own
+
+R5's pattern: `ArtistView<Desk>` keeps its model, every ask, wait, sheet and letting go, and on the Mac draws
+`desk(ArtistDesk)` in its ScrollView's place; on the iPhone there is no desk (`init(route:)`, `Desk == EmptyView`).
+MacArtist's `page(for:)` hands `MacArtistPage.init(desk:)`; Routes.swift's `ArtistView(route:)` is unchanged. ArtistDesk
+carries the page's model, its rows, what it draws of Last.fm, the managers' offer, and its own calls - Play, Shuffle,
+an album played or opened, theirs opened, Studio only, a tool's sheet, a top song played or its album opened, a
+most-played song played, and the three Try agains. **`App/Mac/Artist/MacArtistPage.swift`** draws, and asks nothing:
+
+- **The toolbar** (MacToolbar, `ViewThatFits`): Play (pri, the sharp glyph), Shuffle, then - once their discography
+  is asked - the groove and Studio only | Everything (DWSegmented, large); at its end, each only as
+  ArtistManage.offered says, Artist images… (dimmed until their folder is known, as the phone's ••• had it), Move
+  albums… (its full "Move albums to Ye…" as `.help` and VoiceOver's label) and Which artist is this?. Folded, the three
+  are a ••• (the phone's items, with their glyphs). The drawing's ‹ Artists is the window's back; its Pin is left out.
+- **The band** (559): ArtistHeroPicture at 88 (the phone's picture, now shared: their folder's square once Artist images
+  wrote it, else Navidrome's), the name (.h1, bold), MBArtistPage.factsLine, the listeners line (kept from the first
+  frame, as the phone's), the chosen-here line; at its end ArtistPageFacts.chips - "6 in your library" (good), "2 in the
+  collection", "10 more to get" (only for someone who may get albums, after review). On `card` (the drawing's #2a1d28 is
+  no token), the frame's rule under it, 132 tall at least. Its Mac half pinned in test_ios_mac_halves.py in macHero's
+  place (below).
+- **Top Songs** (560) and **Most played** (560): each a MacColumnList, its header and rows lines of the page's own lazy
+  stack (after review - see "After review" below; at first each was framed to its rows' height). Columns # 46, Title
+  (the cover at `rowSize.cover`, beside the title in a centred stack - the fonts' rule for a table's cover), Album; Most
+  played adds Plays 70, the row's `playsWords` ("1,411") in the readout, spoken "1,411 plays". Return or a double-click
+  plays, as an album's songs do: a top song you have through `desk.playTop` (ArtistView's, TopSongs.play - every top
+  song you have that plays now, from it), one you don't have through `desk.openTop` (the opener's ask, the spinner in
+  its row, its trouble in its line); a most-played one through `desk.playMost` (MostPlayedSongs.play). A right-click on
+  a song you have is its ••• (SongRightClick; SongRightClickIfHeld for Top Songs). Top Songs shows all ten (no See All),
+  "From Last.fm" under it (the phone's LastfmCredit, given the Mac's small face and 8 above it - its two new parameters,
+  the phone's the defaults), in place under the band or after the discography for a late answer (LastfmPage.placeOf, as
+  the phone). Most played is the last section, room left under it for A2's albums order.
+- **The discography** (561): MacColumnList, columns Album (cover and title, `.help`), Year 56, Songs 60, In your library
+  (flexible) and the buttons 140. In your library: Whose.heldLabel's chip and the album's format (ArtistPageFacts.format
+  - Album info's own Format row of its songs in hand), "2 pressings" for one of theirs held twice, "not in your library"
+  for one nobody holds. The buttons: Play (desk.playAlbum - the album's songs in hand, at the album level) and Open for
+  yours; Get (`.on`) for one nobody holds, which opens the album you don't have - Open for someone who may not get
+  albums (after review); Open for one of theirs the library holds; the spinner while the id bridge is asked. Return or a
+  double-click opens a row; a right-click on yours is its page's ••• (DiscographyRightClick -> AlbumRightClick).
+  Offline, an album with nothing on this Mac is dimmed and does nothing. ArtistTheirFoot (the phone's foot, its words in
+  the Mac's base) under it.
+- **The status bar**: ArtistPageFacts.status - "16 albums", "6 in your library", "59 songs".
+- Left out, each said in the file: the drawing's Type column (Navidrome's albums carry none), its Pin, the description
+  (A4's; room under the facts and at the foot), "MusicBrainz asked 4 minutes ago" (the page keeps no time for it).
+- `.topSongs` on the Mac is still the phone's TopSongsScreen (test_ios_mac_reach.py's PHONES_PAGES keeps it), now
+  reached from nowhere on the Mac: the Mac's page shows all ten.
+
+### The phone: iArtist, flat
+
+- **The top** as R1c drew it, the facts line now under the name (Phone small, `t2`).
+- **Play and Shuffle**: AlbumPlayPair, R5's pair (Play the purple, Shuffle its word in the accent; one over the other
+  at the largest sizes), the line under it held at its height. R5's dead PlayButtons (the artist's until now) went.
+- **Top Songs** where A1 puts it, flat: ArtistSectionHead (iArtist's .row.grp: 38 at least, 15 semibold, `head`),
+  See All a flat small button, each row ArtistSongFace (LibraryListRow's sizes: 44 cover, 17 over 13, 60 tall at least,
+  3 lines each at the accessibility sizes) on ArtistRowRule (`rowRule`). A song you have is one VoiceOver element: its
+  tap plays, Add to Queue and Add to a playlist… its actions (R5's rule); the ••• 44 square.
+- **The strip** (PhoneStrip): Studio only and Everything as its tabs once their discography is asked, then - as
+  `pushes`, PhoneStrip's new part (R6): buttons after the tabs, outside the tabs' tab bar trait, never drawn chosen,
+  still the strip's one Button - the managers' Artist images… (once their folder is known) and Move albums…, each only
+  as ArtistManage.offered says (ArtistStripPart.pushes). Nothing at all with neither. Which artist is this? stays in
+  the bar's ••• (the drawing has no room on the strip for a third, and it is the rarest).
+- **Albums**: ArtistSectionHead with ArtistPageFacts.heading at its end in the readout face on the baseline ("16 · 6
+  yours"; the count alone with none or every one yours; spoken "16 albums, 6 yours") - the heading draws the count
+  itself (`count`, `spoken`, and an init with nothing trailing), so test_ios_readout_rows.py's walk finds it inside
+  the heading's first-baseline HStack; drawn in the page's own trailing closure it was "in ArtistSectionHead(...)", a
+  view of another file the walk can't follow. Yours: ArtistAlbumRow, now
+  LibraryListRow with the chevron, no tick (the line says whose). Theirs: ArtistTheirRow (in place of MBArtistAlbumRow,
+  which the MusicBrainz artist page keeps) - its cover through the relay, MBArtistPage.line, and Get (`.on`, small, on
+  the row's hairline) only where ArtistPageFacts.offersGet - `held == false`: nobody holds it, the library has said so -
+  else the chevron; Get and the row open the album you don't have. One VoiceOver element, Get its action.
+- The bar's •••: Which artist is this? alone; never on the Mac's desk (`onDesk`), whose toolbar has all three.
+
+### Core (pure, tested on Linux)
+
+- **`MostPlayedSongs`** (MostPlayed.swift - "songs" so it isn't read as A2's albums order): every take with a play
+  count over 0 and a title that keys (LastfmMatch.key, Top Songs' own), ids seen once; per key the most-played take,
+  a tie the first in album order; most plays first, ties in album order; ten. `play(_:from:playable:)` as TopSongs'.
+- **`ArtistPageFacts`**: the counts of the page's rows (yours as the rows mark them; held-not-yours; nobody's), the
+  phone's heading and its spoken form, the band's chips, the status bar, an album's format (AlbumInfo.quality's Format),
+  "N pressings", `offersGet`, a row's title and year for the Mac's table (ArtistJoin.Row's are internal), and the
+  page's words.
+
+### The gate's files outside the brief's list
+
+- **`App/Phone/PhoneStrip.swift`**: `pushes` (above) - the strip's look unchanged (test_the_phone_is_flat's FLAT_DRAWS
+  the same), its tab bar trait moved onto the tabs alone.
+- **`App/Album/AlbumHero.swift`**: PlayButtons removed (nothing drew it after R6), AlbumPlayPair's doc says the
+  artist's too.
+- **`App/Mac/Artist/MacArtist.swift`**: `.artist` hands the desk.
+- **Core `ArtistPageFacts.swift`** beside MostPlayed.swift, with both their tests.
+
+### Tests
+
+- **Core**: MostPlayedTests (4) - each song once across its pressings, its plays one take's never a sum; a song is its
+  Top Songs key; the ten most; a tap plays the list from its row. ArtistPageFactsTests (6) - the counts are the rows'
+  own marks; the phone's heading; the band's chips and the status bar; only an album nobody holds offers Get; an
+  album's format is Album info's; the words.
+- **test_ios_artist_look.py** (17): flat on the phone (what it draws with a fill or an edge: the rows' hairlines alone;
+  no face but AlbumPlayPair's purple), square, tokens only, a readout on its words' baseline, the phone's order top to
+  foot, the strip and its pushes, the managers' buttons only as offered, Get only for an album nobody holds, every play
+  an existing call in the tap (no await or Task), the Mac drawn by the phone's page and asking nothing, the band and
+  the toolbar and the status, the discography's row size and fit, Top Songs' and Most played's (and each table's
+  cover beside its title, test_ios_readout_rows.py's rule for this page's three cell builders, which its CELL_BUILDERS
+  can't hold - one builder a file), the toolbar folding to
+  every page (added up from Libre Franklin's widths, tests/ios_fonts.py), Most played wired, each row one element and
+  growing with the text, and Queue never "Up Next".
+- **Shared files, the functions R6 names**: test_ios_phone_look's SLICES gains R6_PAGES (ArtistView,
+  TopSongsSection); test_ios_mac_reach's PHONES_PAGES loses `artist`; test_ios_lastfm (the hero's line in the phone's
+  top and the Mac's band, Top Songs' place on the Mac's page, the dimming's token, the row's rule) and
+  test_ios_artist_discography (ArtistTheirRow, ArtistTheirFoot) follow the code; test_ios_lastfm's Mac credit is
+  now the phone's LastfmCredit, so test_ios_no_web_app.py's ALLOWED keeps its one Last.fm entry (a copy of the link on
+  the Mac's page was refused as "not one of the app's links out"); test_ios_readout_rows.py's list of MacColumnList's
+  pages gains Mac/Artist/MacArtistPage.swift.
+- **test_ios_mac_halves.py, re-pinned**: R1c pinned "ArtistView.macHero" (3acb28f11dad5501) - the Mac's artist top -
+  with its dispatcher and its 200. R6 replaces that top with MacArtistPage's band, so macHero and the dispatcher are
+  gone and the pin with them; "MacArtistPage.band" (the band and the drawing's numbers it reads) is pinned in its
+  place, as R6 left it (d2227dd82a6d4bf1), for A2 and A4. The phone-only check asserts the desk's branch draws only the
+  desk.
+
+### Mutations
+
+Each applied alone, its tests run, the file put back (scratch r6-mutate.py, the tree compared after):
+
+- **A song counted twice across pressings** (MostPlayed keyed on `song.id`, not LastfmMatch.key): MostPlayedTests -
+  eachSongOnceItsPlaysOneTakesNeverASum, aSongIsItsTopSongsKey and aTapPlaysTheListFromItsRow (7 issues).
+- **Top Songs' play awaited** (`Task { await player.play(...) }` in TopSongRow.play): test_ios_artist_look's
+  test_every_play_is_an_existing_call_in_the_tap.
+- **Get on an album you hold** (offersGet `row.held != nil`): ArtistPageFactsTests' onlyAnAlbumNobodyHoldsOffersGet
+  (2 issues; test_get_is_only... reads the call sites, not the rule).
+- **The managers' buttons shown to a listener** (ArtistStripPart.pushes adding Artist images… unconditionally):
+  test_ios_artist_look's test_the_managers_buttons_only_as_the_page_offers_them.
+- **A flat piece given its face back** (`.background(DWPalette.buttonFace)` on ArtistAlbumRow): test_ios_artist_look's
+  test_the_phones_artist_page_is_flat ("background: DWPalette.buttonFace" beside the rows' hairlines).
+
+### After review
+
+R6's review found eight things; each is fixed in the same commit, and each fix's mutation fails (below).
+
+- **Get only for someone who may get albums.** Neither device checked `server.access.can(.request)`, as the album you
+  don't have and Requests do. Now ArtistDesk carries `mayGet` (the request permission) and every call of
+  `ArtistPageFacts.offersGet(_:mayGet:)` says who is asking: the phone's ArtistTheirRow draws its chevron in Get's
+  place, the Mac's buttons column Open, and the band's chips leave out "10 more to get" (`chips(_:mayGet:)`). The row
+  still opens the album you don't have, whose own page hides Get the album without the permission.
+- **The Mac's tables are lazy rows of the page's own scroll view.** A MacColumnList with its scroll off, framed to its
+  rows' height in the page's ScrollView, made every row at once - on Everything for an artist with hundreds of albums
+  every ArchiveCover asked together, and the relay refuses past 64 under way. MacColumnList gains a `flow` mode
+  (`MacListFlow`): given one, its body is `flowing`, its header and a ForEach of its lines - no box, no ScrollView, no
+  GeometryReader - which the page's LazyVStack flattens into its own rows, made as they come. The columns' widths are
+  the page's width, measured inside the scroll view (`onGeometryChange`), as the box measured its own. The selection,
+  Row Size and the widths are the list's as before; its keys are the page's (below). Without `flow` the body is `box`,
+  the old body verbatim.
+- **How ↑ ↓ reach a row now.** The page's ScrollView is focusable and hears the keys (`.listKeys`), routed to the table
+  a click last went to (`keysFor` - `flow.clicked` tells the page); `MacListKeys.pressed` is the list's own rule,
+  shared, so the page and the box answer a key the same way. Each line's ForEach identity is its flow key
+  (`MacListFlow.key`, "discography:<row id>"), and a selection changed by a key or a click is brought into view by the
+  page's ScrollViewReader, `proxy.scrollTo(key)` - a lazy stack scrolls to an identity it hasn't made yet. Row Size
+  changing brings the selected row back the same way; rows gone from a list (Studio only, a scan) drop the selection
+  by MacTable.kept, as the box did.
+- **Every other list draws as before**: MacColumnList's box (its old body), header, heading and a row's drawing up to
+  its hit shape are digested as at 31cab12d and pinned (test_every_other_list_draws_as_before); no other page passes
+  `flow` or `voice`, and only an album's page passes `controls`.
+- **The double line** under each table is gone with the frame: `boxHeight` added 2 for a box edge these tables don't
+  have. The last row's rule is the table's foot now.
+- **A double-click on a row's buttons is the buttons'.** The row's `TapGesture(count: 2)` fired through a cell's
+  buttons, so a double-click on Play played twice and opened the album. It is a `SpatialTapGesture(count: 2)` now,
+  and opens only where `MacTable.opens(at:widths:controls:)` says - outside the columns a list names as `controls`.
+  The artist's buttons column (Play, Open, Get) is one, and so is an album's ••• column (MacAlbumPage: a double-click
+  on its QueueMenu opened the menu and then played the song). The other lists - Albums, Artists, Playlists, a
+  playlist - have no button in a cell (test_a_double_click_on_a_rows_buttons_is_theirs reads each one's cells).
+- **VoiceOver on the Mac's discography** read the buttons folded into the row (`.combine`). A list can be given a
+  `voice` (`MacRowVoice`): its row is then one element (`.ignore`), its label ArtistPageFacts.spoken ("Low, 1977, in
+  your library, FLAC"; "Powerage, 1976, not in your library"), and the row's buttons its actions in their own words -
+  Play and Open for yours, Get or Open for theirs - each only as its button is drawn. Without a voice, as before.
+- **The facts line keeps its room on the phone.** With a two-line name, or at the accessibility sizes, the line landed
+  after Play was drawn and pushed it down by about 18. ArtistPageFacts.holdsFacts says when its room is held: once the
+  facts are in hand, or asked (an MBID, deadwax in reach); held for the page's life (`factsRoomFor`, as `lineKept`
+  holds the listeners'), blank and hidden from VoiceOver until they come.
+- **The halves pin's shared reads**: ArtistHeroPicture, LastfmCredit and ArtistTheirFoot - drawn by both devices -
+  are pinned in test_ios_mac_halves.py's PARTS, and MacArtistPage.band re-pinned (7c6c1f9fac106e83; its chips take
+  `mayGet`).
+- **The three mutations that survived** are caught: PhoneStrip's tab bar trait is in the strip exactly once, the
+  pushes after its block; a row of theirs and of yours has exactly one `.accessibilityElement(`; the Mac's Artist
+  images… keeps `.disabled(!desk.managing.known)` in the toolbar and the folded •••.
+- **Smaller ones.** Move albums… is said in full again - "Move albums to Ye…" as the strip's push's VoiceOver label and
+  help (PhoneStrip's new `said`, ArtistStripPart.said), as the Mac's button already was. The strip's tab bar is
+  "Which of their albums" (`studioLabel`), true of what it holds: the pushes are outside it (`stripLabel`, which named
+  both, is gone - no words fixture held it). The Mac's discography has an "Albums" heading row, the phone's heading's
+  words, its end (a Spacer) where A2's albums order - a menu - will go, nothing there yet. The docs say the strip
+  sits over the albums, under Play or under Top Songs.
+- **Two "Most played"s.** The Mac's song section keeps the plan's name, "Most played". A2's albums order is to have a
+  "Most played" of its own; when it comes it needs its own words beside this section's (ArtistPageFacts.mostPlayed's
+  doc says so).
+- **MostPlayed's key is a song's title** (LastfmMatch.key, Top Songs' own): that is what makes a song count once
+  across its pressings - and its limit is that two songs that only share a title merge, an "Intro" on two albums
+  counted as one song (the most-played take's plays, its album). Kept, said here; the docs say that with no plays at
+  all the section isn't drawn.
+
+Files the review's fixes touched beyond R6's own: **`App/Mac/Components/MacColumnList.swift`** (`flow`, `voice`,
+`controls`, `MacListKeys`, the box kept verbatim), **Core `MacTable.swift`** (`column(at:widths:)`, `opens`) with
+MacTableControlsTests, **`App/Mac/Album/MacAlbumPage.swift`** (its ••• column a control) with test_ios_album_look.py's
+call literal. New tests: Core ArtistPageFactsTests' theFactsLineKeepsItsRoomOnceAsked and aMacRowIsSpokenAsItsCells,
+MacTableControlsTests' aDoubleClickOnAButtonsColumnIsTheButtons; test_ios_artist_look.py's
+test_the_facts_line_keeps_its_room_once_asked, test_every_other_list_draws_as_before,
+test_the_macs_lists_are_lazy_rows_of_the_pages_own_scroll_view, test_a_double_click_on_a_rows_buttons_is_theirs and
+test_voiceover_reads_a_discography_row_as_one_with_its_buttons_its_actions, and more asserts in the strip's, the
+managers', Get's, the rows' and the discography's.
+
+Mutations, each alone (scratch r6-mutate2.py, the tree's diff compared after): Get for anyone on the phone, in the
+Mac's desk, the Mac's row and the band's chips (test_get_is_only...; the chips also test_the_macs_band... and the halves
+pin), Core's offersGet and chips ignoring `mayGet` (ArtistPageFactsTests); the discography or Top Songs its own box
+again, a flowing section framed, a row brought into view by its bare id, the page's keys dropped, the old frame back
+(test_the_macs_lists_are_lazy...), every other list's box changed (test_every_other_list_draws_as_before); each of the
+three shared reads changed phone-side (the halves pin); the facts room never held, held only while asked
+(test_the_facts_line...), Core's rule only once in hand (ArtistPageFactsTests); the pushes in a tab bar of their own
+(the strip's test), ArtistTheirRow's `.contain` after `.ignore` (each row one element), Artist images… undimmed in
+the toolbar or the ••• (the managers' test); the double-click's guard gone, the artist's or an album's controls
+unnamed, Core's opens() true in a controls column (MacTableControlsTests); the discography unvoiced, a voiced row
+combined, its Get action gone (the VoiceOver test), Core's spoken without the format; Move albums… said short, the tab
+bar given another name, the Mac's Move help gone, the Albums heading gone, its Spacer gone.
+
+### Not verified - checks 559 to 563
+
+docs/ios.md's checks 559-563, each **Not done yet.**: 559 the band on the Mac (the facts, the listeners, the chips), 560
+Top Songs and Most played (each plays from a double-click; Most played's numbers against the albums' Plays), 561 the
+discography (the format, Play, Open, Get; Studio only and Everything; offline), 562 the phone as drawn (Top Songs plays;
+Get opens the album you don't have; the managers' two open their sheets; VoiceOver), 563 both phones. Nothing here ran
+on a device or the Mac: the Swift built for both (xcodebuild, unsigned), and the rules are held by the tests above. Only
+a device can say: whether the hairlines and Get's purple words read on the black; the strip's words at the standard size
+on a narrow phone (four parts: two tabs and two pushes - nothing measured them together); the band's chips beside a long
+name at 880; the tables at each Row Size with the page scrolling, and that the lazy rows really are made as they come
+(after review: a MacColumnList's lines in the page's LazyVStack - never run, nor its covers counted); ↑ and ↓ in a
+table bringing the row into the page's view through the page's ScrollViewReader; a double-click on a row's buttons
+landing on the buttons alone; VoiceOver's rotor on a discography row (its Play, Open and Get).

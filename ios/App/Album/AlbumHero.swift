@@ -166,47 +166,11 @@ struct DownloadLine: View {
     }
 }
 
-/// Play (the primary pill) and Shuffle (the secondary), side by side - one above the other at the largest text sizes. An album's page's,
-/// and a playlist's (Phase 4) - since R5 the artist's alone, until its slice (R6) redraws it.
-struct PlayButtons: View {
-    let enabled: Bool
-    let play: () -> Void
-    let shuffle: () -> Void
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 12) { buttons }
-                .frame(maxWidth: 420)
-            VStack(spacing: 10) { buttons }
-        }
-        .disabled(!enabled)
-    }
-
-    @ViewBuilder private var buttons: some View {
-        Button(action: play) {
-            Label {
-                Text("Play")
-            } icon: {
-                SharpSymbol(.play)
-            }
-                .font(Typeface.body.weight(.semibold))
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(PrimaryFace(large: true))
-
-        Button(action: shuffle) {
-            Label("Shuffle", systemImage: "shuffle")
-                .font(Typeface.body.weight(.semibold))
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(SecondaryPill(large: true))
-    }
-}
-
-/// (R5, iAlbum.dc.html and iPlaylist.dc.html) An album's and a playlist's Play and Shuffle: the shared buttons, large
-/// (48 at least) and filling - Play the phone's purple with its sharp glyph, Shuffle the plain face - 12 apart, side by
-/// side, one above the other when the words won't fit beside each other (the largest text sizes), each word taking up to
-/// three lines there. Both dimmed until there is something to play; each is the page's own call, in the tap.
+/// (R5, iAlbum.dc.html and iPlaylist.dc.html) An album's and a playlist's - (R6) and an artist's - Play and Shuffle:
+/// the shared buttons, large (48 at least) and filling - Play the phone's purple with its sharp glyph, Shuffle the plain
+/// face - 12 apart, side by side, one above the other when the words won't fit beside each other (the largest text
+/// sizes), each word taking up to three lines there. Both dimmed until there is something to play; each is the page's
+/// own call, in the tap.
 struct AlbumPlayPair: View {
     let enabled: Bool
     let play: () -> Void

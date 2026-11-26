@@ -45,8 +45,21 @@ import SwiftUI
 /// answer later than that puts Top Songs after the albums for the page's life (LastfmPage.placeOf); the session's answer
 /// draws at once, in place. With Last.fm off or refused nothing of it is drawn - and for whoever runs deadwax the page's
 /// foot says so, with Server settings to open its Connections.
-struct ArtistView: View {
+///
+/// THE REDESIGN (slice R6 - notes/ios.md "The redesign, slice R6: an artist"; iArtist.dc.html, Artist.dc.html): on the
+/// phone flat, as iArtist draws it - the top as R1c drew it (the round picture beside the name) with who they are on
+/// MusicBrainz under the name ("Group · Sydney · since 1973", MBArtistPage.factsLine) and the listeners; Play and
+/// Shuffle, the album page's pair (AlbumPlayPair); Top Songs where A1 puts it; the strip (PhoneStrip): Studio only and
+/// Everything once their discography is asked, then the managers' Artist images… and Move albums… - each by its
+/// permission, as the ••• offered them (ArtistManage.offered); the Albums heading with its count ("16 · 6 yours",
+/// ArtistPageFacts.heading), and the rows on their hairlines, Get on an album nobody holds. The bar's ••• keeps Which
+/// artist is this?. On the Mac (`desk`, from MacArtist.page(for:)), MacArtistPage draws the artist in the ScrollView's
+/// place, handed this page's model, its rows and its actions (ArtistDesk): every ask, wait and letting go stays this
+/// page's - the Mac draws, nothing more. On the iPhone there is no desk (`init(route:)`).
+struct ArtistView<Desk: View>: View {
     let route: ArtistRoute
+    /// (R6) The Mac's artist page, drawn in the ScrollView's place - none on the iPhone.
+    private let desk: ((ArtistDesk) -> Desk)?
 
     @Environment(ServerModel.self) private var server
     @Environment(PlayerModel.self) private var player
@@ -66,19 +79,14 @@ struct ArtistView: View {
     @State private var toolSheet: ArtistToolSheet?
     /// One more each time the library's word on their names is wanted again (a save, a move, a pull).
     @State private var summaryAsks = 0
+    /// (R6's review) The page whose top holds the room of the line under the name (ArtistPageFacts.holdsFacts) - held
+    /// for the page's life once it is, so the line landing late, or not at all, moves nothing under it.
+    @State private var factsRoomFor: String?
 
-    /// The picture's side, in points (CoverImage asks the nearest step for the screen's scale: 1024 on an iPhone).
-    private static let pictureSide: CGFloat = 200
-    /// (R1c) The phone's top, iArtist's: the round picture beside the name, between the two, the name's letters drawn
-    /// closer, and the room above it.
-    private static let phonePictureSide: CGFloat = 84    // drawn: iArtist .cover width
-    private static let phoneHeroGap: CGFloat = 14        // drawn: iArtist's top .f gap
-    private static let phoneNameTracking: CGFloat = -0.4 // drawn: iArtist's name letter-spacing
-    private static let phoneHeroAbove: CGFloat = 8       // drawn: iArtist's top .f padding-top
-    private static let edge: CGFloat = 16
-
-    init(route: ArtistRoute) {
+    /// (R6) The Mac's: the artist drawn by `desk` (MacArtistPage).
+    init(route: ArtistRoute, desk: @escaping (ArtistDesk) -> Desk) {
         self.route = route
+        self.desk = desk
         _model = State(initialValue: ArtistPageModel(route: route))
     }
 
@@ -119,6 +127,9 @@ struct ArtistView: View {
         return (discography.shown ?? discography.albums)?.groups
     }
 
+    /// (R6) Whether the page is the Mac's desk (MacArtistPage) - its toolbar then the desk's, the phone's ••• not drawn.
+    private var onDesk: Bool { desk != nil && Platform.mac }
+
     var body: some View {
         let online = reachability.online
         let personal = server.access.hasLibrary
@@ -134,37 +145,52 @@ struct ArtistView: View {
                                       reserved: model.lineKept(page: taskKey))
         let arrival = model.arrival(page: taskKey, state: server.access.lastfm, online: online,
                                     kept: artists.keptLastfm(route.id))
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                hero(managing, lastfm: lastfm)
-                    .onAppear { nameInBar = false }
-                    .onDisappear { nameInBar = true }
-                if model.answer == nil && !online && mine.isEmpty {
-                    // nothing of theirs in hand, and deadwax out of reach: a state, not a failure - nothing was asked
-                    ShelfNote(DownloadWords.onlyDownloadedPlay)
-                } else if model.gone {
-                    ErrorNote(text: ErrorWords.artistGone)
-                        .padding(.top, 8)
-                } else if let failure = model.failure, model.answer == nil, online {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ErrorNote(failure, gone: ErrorWords.artistGone, retry: true)
-                        Button(LibraryWords.tryAgain) { reload() }
+        let factsAsked = ArtistPageFacts.holdsFacts(mbid: mbid, online: online, facts: model.facts)
+        Group {
+            if let desk, Platform.mac {
+                desk(artistDesk(rows: rows, albums: albums, mine: mine, managing: managing, offered: offered,
+                                lastfm: lastfm, arrival: arrival, online: online, personal: personal))
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        phoneHero(managing, lastfm: lastfm, factsRoom: factsAsked || factsRoomFor == taskKey)
+                            .onAppear { nameInBar = false }
+                            .onDisappear { nameInBar = true }
+                        if model.answer == nil && !online && mine.isEmpty {
+                            // nothing of theirs in hand, and deadwax out of reach: a state, not a failure - nothing
+                            // was asked
+                            ShelfNote(DownloadWords.onlyDownloadedPlay)
+                        } else if model.gone {
+                            ErrorNote(text: ErrorWords.artistGone)
+                                .padding(.top, 8)
+                        } else if let failure = model.failure, model.answer == nil, online {
+                            VStack(alignment: .leading, spacing: 10) {
+                                ErrorNote(failure, gone: ErrorWords.artistGone, retry: true)
+                                Button(LibraryWords.tryAgain) { reload() }
+                                    .buttonStyle(DWButtonStyle())
+                            }
+                            .padding(.top, 8)
+                        } else {
+                            plays(rows: mine, online: online, personal: personal)
+                            if !arrival.holding {
+                                let top = lastfm.topSongs ? topRows(mine, online: online) : []
+                                if !top.isEmpty && arrival.place == .inPlace { topSongs(top) }
+                                strip(managing, offered, online: online)
+                                albumsList(rows, albums: albums, online: online, personal: personal)
+                                // an answer that came once the albums were drawn: after them, for the page's life
+                                if !top.isEmpty && arrival.place != .inPlace { topSongs(top) }
+                            }
+                            if let foot = lastfm.foot { lastfmFoot(foot) }
+                        }
                     }
-                    .padding(.top, 8)
-                } else {
-                    plays(rows: mine, online: online, personal: personal)
-                    if !arrival.holding {
-                        let top = lastfm.topSongs ? topRows(mine, online: online) : []
-                        if !top.isEmpty && arrival.place == .inPlace { topSongs(top) }
-                        albumsList(rows, albums: albums, online: online, personal: personal)
-                        // an answer that came once the albums were drawn: after them, for the page's life
-                        if !top.isEmpty && arrival.place != .inPlace { topSongs(top) }
-                    }
-                    if let foot = lastfm.foot { lastfmFoot(foot) }
+                    .padding(.horizontal, ArtistDrawn.edge)
+                    .padding(.bottom, 24)
                 }
             }
-            .padding(.horizontal, Self.edge)
-            .padding(.bottom, 24)
+        }
+        // (R6's review) the facts line's room, once asked, kept for the page's life
+        .onChange(of: factsAsked, initial: true) { (_: Bool, asked: Bool) -> Void in
+            if asked && factsRoomFor != taskKey { factsRoomFor = taskKey }
         }
         .navigationTitle(model.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -176,9 +202,11 @@ struct ArtistView: View {
                     .opacity(nameInBar ? 1 : 0)
                     .accessibilityHidden(!nameInBar)
             }
-            if offered.any {
+            // (R6) the phone's •••: Which artist is this? - Artist images… and Move albums… are the strip's; on the Mac
+            // all three are MacArtistPage's toolbar's
+            if offered.who && !onDesk {
                 ToolbarItem(placement: .topBarTrailing) {
-                    toolsMenu(managing, offered)
+                    toolsMenu(offered)
                 }
             }
         }
@@ -200,10 +228,9 @@ struct ArtistView: View {
         .task(id: "\(taskKey)|\(mbid ?? "")") {
             // their albums on MusicBrainz, once who they are there is known - or let go when it no longer is
             model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online)
-            // (Phase 8, slice 5) and their name now, for the artist tools - only for someone who manages
-            if Managing.artistManaging(server.access.permissions).any {
-                await model.theirFacts(client: server.client, online: reachability.online)
-            }
+            // (Phase 8, slice 5) and who they are there - their name now, for the artist tools - and (R6) for everyone,
+            // the line under their name
+            await model.theirFacts(client: server.client, online: reachability.online)
         }
         .task {
             // MusicBrainz's rows wait a moment for /library/owned, once a page's life
@@ -255,9 +282,7 @@ struct ArtistView: View {
             await model.load(key: key, client: server.client, online: reachability.online, artists: artists)
             if model.asks.someMissing { model.again(client: server.client) }
             model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true)
-            if Managing.artistManaging(server.access.permissions).any {
-                await model.theirFacts(client: server.client, online: reachability.online)
-            }
+            await model.theirFacts(client: server.client, online: reachability.online)
         }
     }
 
@@ -269,112 +294,57 @@ struct ArtistView: View {
 
     // MARK: the hero
 
-    /// Their picture and name - (Phase 8, slice 5) the square from their folder once Artist images wrote to it while the
-    /// app runs, or where Navidrome has none (the web's `square`: Navidrome keeps its own copy of the picture it had);
-    /// and, who they are chosen here, that it was. On the Mac the 200 pt picture centred over the name; on the phone
-    /// (phoneHero) iArtist's top.
-    @ViewBuilder
-    private func hero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown) -> some View {
-        if Platform.mac {
-            macHero(managing, lastfm: lastfm)
-        } else {
-            phoneHero(managing, lastfm: lastfm)
-        }
-    }
-
     /// (R1c - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)"; iArtist) The phone's top, with no
-    /// band behind it: the round picture, 84, beside the name (28, bold) and its lines under it - their listeners, and
-    /// who they are chosen here - 14 between; at the accessibility sizes the picture over the name, so the name keeps
-    /// its room. No shadow under the picture: it sits on the page.
-    private func phoneHero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown) -> some View {
+    /// band behind it: the round picture, 84, beside the name (28, bold) and its lines under it - (R6) who they are on
+    /// MusicBrainz ("Group · Sydney · since 1973"), their listeners, and who they are chosen here - 14 between; at the
+    /// accessibility sizes the picture over the name, so the name keeps its room. No shadow under the picture: it sits
+    /// on the page. The picture: (Phase 8, slice 5) the square from their folder once Artist images wrote to it while
+    /// the app runs, or where Navidrome has none (ArtistHeroPicture). The Mac's top is MacArtistPage's band. (R6's
+    /// review) The facts line's room is held once they are asked (`factsRoom`), blank until they come - so a two-line
+    /// name, or the accessibility sizes, never see Play pushed down as the line lands.
+    private func phoneHero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown, factsRoom: Bool) -> some View {
         let stacked = typeSize.isAccessibilitySize
-        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: Self.phoneHeroGap))
-            : AnyLayout(HStackLayout(alignment: .center, spacing: Self.phoneHeroGap))
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: ArtistDrawn.phoneHeroGap))
+            : AnyLayout(HStackLayout(alignment: .center, spacing: ArtistDrawn.phoneHeroGap))
+        let facts = MBArtistPage.factsLine(model.facts)
         return layout {
-            picture(managing, side: Self.phonePictureSide, pixels: CoverSize.tile)
+            ArtistHeroPicture(managing: managing, coverArt: model.coverArt, side: ArtistDrawn.phonePictureSide,
+                              pixels: CoverSize.tile)
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.name)
                     .font(Typeface.title.bold())
-                    .tracking(Self.phoneNameTracking)
+                    .tracking(ArtistDrawn.phoneNameTracking)
                     .lineLimit(3)
                     .accessibilityAddTraits(.isHeader)
+                // (R6) who they are, once MusicBrainz says - iArtist's line under the name; (R6's review) its room held
+                // from the moment they are asked, blank until (and unless) they come
+                if factsRoom || !facts.isEmpty {
+                    Text(facts.isEmpty ? " " : facts)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityHidden(facts.isEmpty)
+                }
                 // (Last.fm) "2.3M listeners": its line there from the first frame whenever it can be drawn, blank until
                 // (and unless) the answer says - so nothing under it moves
                 if lastfm.heroLine {
                     Text(lastfm.listeners ?? " ")
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .lineLimit(1)
                         .accessibilityHidden(lastfm.listeners == nil)
                 }
                 if byChoice {
                     Text(ArtistManageWords.chosen)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.top, Self.phoneHeroAbove)
+        .padding(.top, ArtistDrawn.phoneHeroAbove)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// Their picture, round, at `side`: the square from their folder, or Navidrome's.
-    @ViewBuilder
-    private func picture(_ managing: ArtistManaged, side: CGFloat, pixels: Int) -> some View {
-        if let square = managing.square(navidrome: model.coverArt, written: { (path: String) -> Int in
-            server.client.map { ArtistFolderVersions.shared.version($0, path: path) } ?? 0
-        }) {
-            ArtistFolderPicture(path: square, kind: "thumb", square: true, round: true)
-                .frame(width: side, height: side)
-                .clipShape(Circle())
-        } else {
-            ArtistPicture(id: model.coverArt, side: side, pixels: pixels)
-        }
-    }
-
-    /// The Mac's: the 200 pt picture centred over the name, as before R1c.
-    private func macHero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown) -> some View {
-        VStack(spacing: 0) {
-            Group {
-                if let square = managing.square(navidrome: model.coverArt, written: { (path: String) -> Int in
-                    server.client.map { ArtistFolderVersions.shared.version($0, path: path) } ?? 0
-                }) {
-                    ArtistFolderPicture(path: square, kind: "thumb", square: true, round: true)
-                        .frame(width: Self.pictureSide, height: Self.pictureSide)
-                        .clipShape(Circle())
-                } else {
-                    ArtistPicture(id: model.coverArt, side: Self.pictureSide, pixels: CoverSize.hero)
-                }
-            }
-            .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
-            .padding(.top, 8)
-            Text(model.name)
-                .font(Typeface.title.bold())
-                .multilineTextAlignment(.center)
-                .lineLimit(3)
-                .padding(.top, 18)
-                .accessibilityAddTraits(.isHeader)
-            // (Last.fm) "2.3M listeners": its line there from the first frame whenever it can be drawn, blank until (and
-            // unless) the answer says - so nothing under it moves
-            if lastfm.heroLine {
-                Text(lastfm.listeners ?? " ")
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .lineLimit(1)
-                    .padding(.top, 4)
-                    .accessibilityHidden(lastfm.listeners == nil)
-            }
-            if byChoice {
-                Text(ArtistManageWords.chosen)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .multilineTextAlignment(.center)
-                    .padding(.top, 6)
-            }
-        }
-        .frame(maxWidth: .infinity)
     }
 
     // MARK: Last.fm (slice A1)
@@ -395,13 +365,13 @@ struct ArtistView: View {
     private func lastfmFoot(_ words: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(words)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .fixedSize(horizontal: false, vertical: true)
             Button(LastfmWords.serverSettings) {
                 navigation.open(.serverSettingsGroup(ServerSettings.connectionsGroup))
             }
-            .font(Typeface.footnote)
+            .buttonStyle(DWButtonStyle(size: .small))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 28)
@@ -438,30 +408,14 @@ struct ArtistView: View {
                              byChoice: byChoice, current: managing.current, moveNames: managing.moveNames)
     }
 
-    /// The bar's •••: the artist tools offered, each opening its sheet.
-    private func toolsMenu(_ managing: ArtistManaged, _ offered: ArtistManage.Offered) -> some View {
+    /// The bar's •••: (R6) Which artist is this?, opening its sheet - Artist images… and Move albums… are the strip's.
+    private func toolsMenu(_ offered: ArtistManage.Offered) -> some View {
         Menu {
-            if offered.images {
-                Button {
-                    toolSheet = ArtistToolSheet(kind: .images)
-                } label: {
-                    Label(ArtistManageWords.imagesItem, systemImage: "photo.on.rectangle")
-                }
-                // their folder known first: the sheet asks by it
-                .disabled(!managing.known)
-            }
             if offered.who {
                 Button {
                     toolSheet = ArtistToolSheet(kind: .who)
                 } label: {
                     Label(ArtistManageWords.whoItem, systemImage: "person.crop.circle.badge.questionmark")
-                }
-            }
-            if offered.move, let current = managing.current {
-                Button {
-                    toolSheet = ArtistToolSheet(kind: .move)
-                } label: {
-                    Label(ArtistManageWords.moveItem(current), systemImage: "folder")
                 }
             }
         } label: {
@@ -510,33 +464,37 @@ struct ArtistView: View {
 
     // MARK: Play and Shuffle
 
-    /// Play and Shuffle, the line under them (held at its height whatever it says), and Try again when some albums'
-    /// songs didn't come.
+    /// Play and Shuffle - (R6) the album page's pair (AlbumPlayPair: Play the purple, Shuffle its words in the accent),
+    /// side by side, one over the other at the largest text sizes - the line under them (held at its height whatever it
+    /// says), and Try again when some albums' songs didn't come.
     @ViewBuilder
     private func plays(rows: [ArtistPage.Row], online: Bool, personal: Bool) -> some View {
         let order = ArtistPage.playOrder(rows)
         let offlineAlbums = online ? [] : offlinePlayable(order)
         let playable = online ? model.asks.playable : !offlineAlbums.isEmpty
-        let line = online ? model.asks.line(library: model.library, personal: personal)
-            : DownloadWords.onlyDownloadedPlay
-        VStack(spacing: 8) {
-            PlayButtons(enabled: playable,
-                        play: { play(shuffle: false, online: online, offlineAlbums: offlineAlbums) },
-                        shuffle: { play(shuffle: true, online: online, offlineAlbums: offlineAlbums) })
+        let line = playsLine(online: online, personal: personal)
+        VStack(spacing: 0) {
+            AlbumPlayPair(enabled: playable,
+                          play: { play(shuffle: false, online: online, offlineAlbums: offlineAlbums) },
+                          shuffle: { play(shuffle: true, online: online, offlineAlbums: offlineAlbums) })
             Text(line.isEmpty ? " " : line)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityHidden(line.isEmpty)
             if online, model.asks.someMissing {
                 Button(LibraryWords.tryAgain) { model.again(client: server.client) }
-                    .font(Typeface.footnote)
+                    .buttonStyle(DWButtonStyle(size: .small))
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 20)
         .padding(.bottom, 8)
+    }
+
+    /// The line under Play and Shuffle: what of their albums plays - offline, only what's downloaded.
+    private func playsLine(online: Bool, personal: Bool) -> String {
+        online ? model.asks.line(library: model.library, personal: personal) : DownloadWords.onlyDownloadedPlay
     }
 
     /// What plays offline: each album of theirs in the page's order, its kept answer's songs on this phone only.
@@ -552,29 +510,81 @@ struct ArtistView: View {
         player.play(artist: albums, shuffle: shuffle)
     }
 
+    /// (R6, the Mac's table) One album of yours played from its first song, in the tap: its songs in hand - offline,
+    /// those on this Mac - at the album level, as its page's Play.
+    private func playAlbum(_ id: String, online: Bool) {
+        guard let playable = playableAlbum(id, online: online) else { return }
+        player.play(songs: playable.songs, album: playable.album, at: 0)
+    }
+
+    /// The album's answer and its songs that play now: in hand online, on this device offline - nil with none.
+    private func playableAlbum(_ id: String, online: Bool) -> (album: Album, songs: [Song])? {
+        guard let album = model.asks.ready[id] ?? (online ? nil : downloads.keptAlbum(id)) else { return nil }
+        let songs = (album.song ?? []).filter { (song: Song) -> Bool in online || downloads.isHere(song.id) }
+        return songs.isEmpty ? nil : (album, songs)
+    }
+
+    // MARK: the strip (R6)
+
+    /// (R6, iArtist's .chips) The strip over the albums (under Play, or under Top Songs where they are drawn): Studio
+    /// only and Everything once their discography is asked (online, who they are known) - VoiceOver's tab bar, "Which
+    /// of their albums" - then the managers' two - Artist images… once their folder is known, Move albums… (said in full
+    /// to VoiceOver, "Move albums to Ye…") - each only as the ••• offered it (ArtistManage.offered: by its permission,
+    /// deadwax in reach). Nothing at all with neither. A tab's tap asks the discography again
+    /// (MBArtistModel.toggleStudio); a manager's opens its sheet.
+    @ViewBuilder
+    private func strip(_ managing: ArtistManaged, _ offered: ArtistManage.Offered, online: Bool) -> some View {
+        let theirs = online ? model.discography : nil
+        let tabs: [ArtistStripPart] = theirs == nil ? [] : [.studio, .everything]
+        let pushes = ArtistStripPart.pushes(offered, known: managing.known)
+        if !tabs.isEmpty || !pushes.isEmpty {
+            PhoneStrip(options: tabs, words: { (part: ArtistStripPart) -> String in part.words },
+                       shown: Binding(get: { theirs?.studioOnly == false ? .everything : .studio },
+                                      set: { (part: ArtistStripPart) -> Void in chose(part, theirs: theirs) }),
+                       spoken: ArtistPageFacts.Words.studioLabel, pushes: pushes,
+                       said: { (part: ArtistStripPart) -> String in part.said(current: managing.current) })
+                // the strip's own sides and hairline run to the screen's edges
+                .padding(.horizontal, -ArtistDrawn.edge)
+        }
+    }
+
+    /// A tap on the strip: the switch to the other of Studio only and Everything, or a manager's sheet - in the tap.
+    private func chose(_ part: ArtistStripPart, theirs: MBArtistModel?) {
+        switch part {
+        case .studio, .everything:
+            guard let theirs, theirs.studioOnly != (part == .studio) else { return }
+            theirs.toggleStudio(client: server.client, online: reachability.online)
+        case .images:
+            toolSheet = ArtistToolSheet(kind: .images)
+        case .move:
+            toolSheet = ArtistToolSheet(kind: .move)
+        }
+    }
+
     // MARK: their albums
 
-    /// Albums: the heading (Studio only at its end once MusicBrainz is asked), your albums and theirs among them, and
-    /// under them what MusicBrainz is doing. With neither, nothing: the line under Play and Shuffle says so ("None of
-    /// their albums are here to play.").
+    /// Albums: the heading (R6: its count at its end, "16 · 6 yours"), your albums and theirs among them, and under them
+    /// what MusicBrainz is doing. With neither, nothing: the line under Play and Shuffle says so ("None of their albums
+    /// are here to play."). (R6) Each row iArtist's tall row on its hairline: yours with the chevron, theirs the library
+    /// holds with the chevron too, theirs nobody holds with Get (ArtistPageFacts.offersGet) - which opens the album you
+    /// don't have, as the row's tap does.
     @ViewBuilder
     private func albumsList(_ rows: [ArtistJoin.Row], albums: [Album], online: Bool, personal: Bool) -> some View {
         // offline the page is your albums alone: nothing of MusicBrainz's is drawn, said or asked
         let theirs = online ? model.discography : nil
         if !rows.isEmpty || theirs != nil {
-            albumsHead(theirs)
+            albumsHead(ArtistPageFacts.counts(rows, personal: personal))
             ForEach(rows) { (row: ArtistJoin.Row) in
                 switch row {
                 case .yours(let mine):
                     ArtistAlbumRow(row: mine, line: ArtistPage.line(mine, personal: personal),
-                                   marked: ArtistPage.marked(mine, personal: personal),
                                    dimmed: !online && !downloads.album(id: mine.albumId).hasSongsHere) {
                         open(mine, albums: albums)
                     }
                 case .theirs(let other):
-                    MBArtistAlbumRow(row: other, line: MBArtistPage.line(other, personal: personal),
-                                     marked: MBArtistPage.marked(other, personal: personal),
-                                     busy: theirs?.opening == other.key) {
+                    ArtistTheirRow(row: other, line: MBArtistPage.line(other, personal: personal),
+                                   get: ArtistPageFacts.offersGet(other, mayGet: server.access.can(.request)),
+                                   busy: theirs?.opening == other.key) {
                         theirs?.open(other, client: server.client, online: reachability.online, navigation: navigation)
                     }
                 }
@@ -586,32 +596,336 @@ struct ArtistView: View {
         }
     }
 
-    /// "Albums", and Studio only at its end - laid out whether or not MusicBrainz is asked, so the heading is one height
-    /// before who they are is known and after.
-    private func albumsHead(_ theirs: MBArtistModel?) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(ArtistWords.albumsHeading)
-                .font(Typeface.title3.weight(.semibold))
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 8)
-            Toggle(MBArtistPage.studioOnly, isOn: Binding(get: { theirs?.studioOnly ?? true }, set: { (_: Bool) -> Void in
-                theirs?.toggleStudio(client: server.client, online: reachability.online)
-            }))
-            .toggleStyle(.button)
-            .font(Typeface.footnote)
-            .opacity(theirs == nil ? 0 : 1)
-            .disabled(theirs == nil)
-            .accessibilityHidden(theirs == nil)
-        }
-        .padding(.top, 18)
-        .padding(.bottom, 4)
+    /// (R6, iArtist's .row.grp) "Albums", and their count at its end in the readout face - "16 · 6 yours" - laid out
+    /// whatever it says, so the heading is one height before who they are is known and after.
+    private func albumsHead(_ counts: ArtistPageFacts.Counts) -> some View {
+        ArtistSectionHead(words: ArtistWords.albumsHeading, count: ArtistPageFacts.heading(counts),
+                          spoken: ArtistPageFacts.headingSpoken(counts))
+            .padding(.top, 4)
     }
 
-    /// Under the rows, MusicBrainz's word, once (ArtistJoin.foot): asking, and the moment its rows wait for the library
-    /// (`holding`); its trouble in a listener's words, with Try again; the cut at 500; or - with no row at all - why there
-    /// are none.
-    @ViewBuilder
+    /// Under the rows, MusicBrainz's word, once (ArtistTheirFoot) - its Try again asking their albums again.
     private func theirFoot(_ theirs: MBArtistModel, holding: Bool, rows: Int) -> some View {
+        ArtistTheirFoot(theirs: theirs, holding: holding, rows: rows) {
+            model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true)
+        }
+    }
+
+    /// A row's tap: its album's page, what the artist's answer knew of it drawn at once - the artist line their link.
+    private func open(_ row: ArtistPage.Row, albums: [Album]) {
+        var album = albums.first { (album: Album) -> Bool in album.id == row.albumId }.map { (album: Album) -> AlbumRoute in
+            AlbumRoute(album)
+        } ?? AlbumRoute(id: row.albumId, name: row.title, coverArt: row.coverArt)
+        if album.artist == nil { album.artist = model.name }
+        if album.artistId == nil { album.artistId = route.id }
+        navigation.open(.album(album))
+    }
+
+    // MARK: the Mac (R6)
+
+    /// What the Mac's page is handed (ArtistDesk): this page's model, its rows, what it draws of Last.fm, the managers'
+    /// tools, and its own calls - so MacArtistPage asks and plays nothing this page doesn't.
+    private func artistDesk(rows: [ArtistJoin.Row], albums: [Album], mine: [ArtistPage.Row], managing: ArtistManaged,
+                            offered: ArtistManage.Offered, lastfm: LastfmPage.Shown, arrival: LastfmPage.Arrival,
+                            online: Bool, personal: Bool) -> ArtistDesk {
+        let order = ArtistPage.playOrder(mine)
+        let offlineAlbums = online ? [] : offlinePlayable(order)
+        let theirs = online ? model.discography : nil
+        return ArtistDesk(
+            model: model, route: route, mbid: mbid, byChoice: byChoice, online: online, personal: personal,
+            mayGet: server.access.can(.request), rows: rows,
+            theirs: theirs, holding: !ArtistJoin.drawsTheirs(online: online, indexKnown: search.ownedIndex != nil,
+                                                              waited: ownedWaited),
+            lastfm: lastfm, arrival: arrival,
+            top: lastfm.topSongs && !arrival.holding ? topRows(mine, online: online) : [],
+            mostPlayed: mostPlayed(mine, online: online),
+            songs: albums.reduce(0) { (count: Int, album: Album) -> Int in count + max(album.songCount ?? 0, 0) },
+            playable: online ? model.asks.playable : !offlineAlbums.isEmpty,
+            line: playsLine(online: online, personal: personal), managing: managing, offered: offered,
+            play: { play(shuffle: false, online: online, offlineAlbums: offlineAlbums) },
+            shuffle: { play(shuffle: true, online: online, offlineAlbums: offlineAlbums) },
+            playAlbum: { (id: String) -> Void in playAlbum(id, online: online) },
+            playTop: { (rows: [TopSongs.Row], row: TopSongs.Row) -> Void in playTop(rows, from: row) },
+            openTop: { (row: TopSongs.Row) -> Void in openTop(row) },
+            playMost: { (rows: [MostPlayedSongs.Row], row: MostPlayedSongs.Row) -> Void in playMost(rows, from: row) },
+            playsAlbum: { (id: String) -> Bool in playableAlbum(id, online: online) != nil },
+            open: { (row: ArtistPage.Row) -> Void in open(row, albums: albums) },
+            openTheirs: { (row: MBArtistPage.Row) -> Void in
+                theirs?.open(row, client: server.client, online: reachability.online, navigation: navigation)
+            },
+            studio: { (studio: Bool) -> Void in chose(studio ? .studio : .everything, theirs: theirs) },
+            tool: { (kind: ArtistToolSheet.Kind) -> Void in toolSheet = ArtistToolSheet(kind: kind) },
+            tryAgain: { model.again(client: server.client) },
+            theirsAgain: { model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true) },
+            reload: { reload() })
+    }
+
+    /// (R6, the Mac's Top Songs) A top song you have, in the tap: every top song you have that plays now, in Last.fm's
+    /// order, from this one (TopSongs.play) - as TopSongRow's tap; nothing awaited first.
+    private func playTop(_ rows: [TopSongs.Row], from row: TopSongs.Row) {
+        let online = reachability.online
+        guard let plan = TopSongs.play(rows, from: row.rank, playable: { (song: Song) -> Bool in
+            online || downloads.isHere(song.id)
+        }) else { return }
+        player.play(playlist: plan.songs, at: plan.at)
+    }
+
+    /// (R6, the Mac's Top Songs) A top song you don't have: the album you don't have, asked of MusicBrainz as
+    /// TopSongRow's tap asks it (TopSongOpener) - nothing offline, nothing while it is already asked.
+    private func openTop(_ row: TopSongs.Row) {
+        guard reachability.online, model.opener.opening != TopSongOpener.key(row.top) else { return }
+        model.opener.open(row.top, mbid: mbid, name: model.name, client: server.client, online: reachability.online,
+                          admin: server.access.seesDetail, navigation: navigation)
+    }
+
+    /// (R6, the Mac's Most played) A song of Most played, in the tap: the listed songs that play now, from this one
+    /// (MostPlayedSongs.play) - nothing awaited first.
+    private func playMost(_ rows: [MostPlayedSongs.Row], from row: MostPlayedSongs.Row) {
+        let online = reachability.online
+        guard let plan = MostPlayedSongs.play(rows, from: row.rank, playable: { (song: Song) -> Bool in
+            online || downloads.isHere(song.id)
+        }) else { return }
+        player.play(playlist: plan.songs, at: plan.at)
+    }
+
+    /// (R6, the Mac's Most played) The songs of their albums in hand you have played most (MostPlayedSongs) - once every
+    /// album's songs have come or failed, as Top Songs waits; offline, of what is in hand or on this Mac.
+    private func mostPlayed(_ mine: [ArtistPage.Row], online: Bool) -> [MostPlayedSongs.Row] {
+        guard !(online && model.answer == nil),
+              let library = TopSongs.library(order: ArtistPage.playOrder(mine), asks: model.asks, online: online,
+                                             kept: { (id: String) -> Album? in downloads.keptAlbum(id) })
+        else { return [] }
+        return MostPlayedSongs.rows(library.albums)
+    }
+}
+
+/// (R1c) The phone's top, iArtist's: the round picture beside the name, between the two, the name's letters drawn closer,
+/// and the room above it; and (R6) the page's side margin. Here, not on ArtistView: a generic type holds no stored static.
+private enum ArtistDrawn {
+    static let phonePictureSide: CGFloat = 84    // drawn: iArtist .cover width
+    static let phoneHeroGap: CGFloat = 14        // drawn: iArtist's top .f gap
+    static let phoneNameTracking: CGFloat = -0.4 // drawn: iArtist's name letter-spacing
+    static let phoneHeroAbove: CGFloat = 8       // drawn: iArtist's top .f padding-top
+    static let edge: CGFloat = 16
+}
+
+extension ArtistView where Desk == EmptyView {
+    /// The iPhone's page (and every one but the Mac's own): no desk.
+    init(route: ArtistRoute) {
+        self.route = route
+        desk = nil
+        _model = State(initialValue: ArtistPageModel(route: route))
+    }
+}
+
+/// (R6) What the Mac's artist page (MacArtistPage) is handed by ArtistView: the page's own model, its rows and what it
+/// draws, and its calls - so every ask, wait, letting go and play stays ArtistView's, and the Mac draws.
+struct ArtistDesk {
+    let model: ArtistPageModel
+    let route: ArtistRoute
+    /// Who they are on MusicBrainz, and whether that was chosen on this visit.
+    let mbid: String?
+    let byChoice: Bool
+    let online: Bool
+    let personal: Bool
+    /// (R6's review) The person may get albums (the request permission): Get, and "10 more to get", only then.
+    let mayGet: Bool
+    /// The discography: your albums and theirs among them (ArtistJoin.rows).
+    let rows: [ArtistJoin.Row]
+    /// Their albums on MusicBrainz (online, who they are known) - its Studio only, its asking and its trouble - and
+    /// whether its rows wait a moment for the library.
+    let theirs: MBArtistModel?
+    let holding: Bool
+    /// What of Last.fm's is drawn, whether it is still waited for and where Top Songs goes - and its rows.
+    let lastfm: LastfmPage.Shown
+    let arrival: LastfmPage.Arrival
+    let top: [TopSongs.Row]
+    /// The songs you have played most (MostPlayedSongs).
+    let mostPlayed: [MostPlayedSongs.Row]
+    /// The songs of your albums of theirs, as Navidrome counts them - the status bar's.
+    let songs: Int
+    /// Play and Shuffle have something to play; the line the phone draws under them.
+    let playable: Bool
+    let line: String
+    /// The artist tools: what the person may do, and what the page offers now (ArtistManage.offered).
+    let managing: ArtistManaged
+    let offered: ArtistManage.Offered
+    /// ArtistView's own calls, each in the tap: Play, Shuffle, an album of yours played or opened, theirs opened (the
+    /// album you don't have, or yours through the id bridge), Studio only or Everything, a tool's sheet, the albums
+    /// that didn't come asked again, MusicBrainz asked again, the artist asked again.
+    let play: () -> Void
+    let shuffle: () -> Void
+    let playAlbum: (String) -> Void
+    /// A top song you have played from (with Top Songs' rows), one you don't opened, a most-played one played from.
+    let playTop: ([TopSongs.Row], TopSongs.Row) -> Void
+    let openTop: (TopSongs.Row) -> Void
+    let playMost: ([MostPlayedSongs.Row], MostPlayedSongs.Row) -> Void
+    let playsAlbum: (String) -> Bool
+    let open: (ArtistPage.Row) -> Void
+    let openTheirs: (MBArtistPage.Row) -> Void
+    let studio: (Bool) -> Void
+    let tool: (ArtistToolSheet.Kind) -> Void
+    let tryAgain: () -> Void
+    let theirsAgain: () -> Void
+    let reload: () -> Void
+}
+
+/// (R6) The strip's parts (iArtist's .chips): the two tabs - Studio only, Everything - and the managers' two, pushes.
+enum ArtistStripPart: Hashable {
+    case studio, everything, images, move
+
+    var words: String {
+        switch self {
+        case .studio: return ArtistPageFacts.Words.studioOnly
+        case .everything: return ArtistPageFacts.Words.everything
+        case .images: return ArtistPageFacts.Words.images
+        case .move: return ArtistPageFacts.Words.moveAlbums
+        }
+    }
+
+    /// (R6's review) What VoiceOver and the pointer's help say of a part: its words - Move albums… in full, "Move albums
+    /// to Ye…", as the ••• named it, while their name now is known.
+    func said(current: String?) -> String {
+        guard self == .move, let current else { return words }
+        return ArtistManageWords.moveItem(current)
+    }
+
+    /// The managers' two the page offers now: each only as ArtistManage.offered says (its permission, deadwax in reach)
+    /// - Artist images… once their folder is known, as the ••• had it, since the sheet asks by it.
+    static func pushes(_ offered: ArtistManage.Offered, known: Bool) -> [ArtistStripPart] {
+        var pushes: [ArtistStripPart] = []
+        if offered.images && known { pushes.append(.images) }
+        if offered.move { pushes.append(.move) }
+        return pushes
+    }
+}
+
+/// (R6) An artist's round picture: the square from their folder once Artist images wrote to it while the app runs, or
+/// where Navidrome has none (ArtistManaged.square) - else Navidrome's (ArtistPicture). The phone's top and the Mac's
+/// band.
+struct ArtistHeroPicture: View {
+    let managing: ArtistManaged
+    let coverArt: String?
+    let side: CGFloat
+    let pixels: Int
+
+    @Environment(ServerModel.self) private var server
+
+    var body: some View {
+        if let square = managing.square(navidrome: coverArt, written: { (path: String) -> Int in
+            server.client.map { ArtistFolderVersions.shared.version($0, path: path) } ?? 0
+        }) {
+            ArtistFolderPicture(path: square, kind: "thumb", square: true, round: true)
+                .frame(width: side, height: side)
+                .clipShape(Circle())
+                .accessibilityHidden(true)
+        } else {
+            ArtistPicture(id: coverArt, side: side, pixels: pixels)
+        }
+    }
+}
+
+/// One album of the artist's you have (ArtistPage.tsx's row; since R6 iArtist's tall row, LibraryListRow): its cover,
+/// its title and "1994 · in your library", and the chevron. Read as one: "Dummy, 1994, in your library". Dimmed, and
+/// opening nothing, while deadwax can't be reached and nothing of it is on this phone.
+private struct ArtistAlbumRow: View {
+    let row: ArtistPage.Row
+    let line: String
+    let dimmed: Bool
+    let open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            LibraryListRow(title: row.title, line: line) {
+                LibraryCover(id: row.coverArt, pixels: CoverSize.row)
+                    .clipShape(DWCorners.chipShape)
+            } trailing: {
+                LibraryChevron()
+            }
+            .contentShape(Rectangle())
+            .opacity(dimmed ? DWPalette.off : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(dimmed)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([row.title, line].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", "))
+        .accessibilityValue(dimmed ? DownloadWords.notOnDevice(Platform.device) : "")
+        .accessibilityAddTraits(dimmed ? [] : .isButton)
+        .accessibilityAction {
+            if !dimmed { open() }
+        }
+        // (the Mac app, slice 2) the album page's ••• on a right-click; nothing on the iPhone
+        .albumRightClick(AlbumRoute(id: row.albumId, name: row.title, coverArt: row.coverArt))
+    }
+}
+
+/// (R6) One album of theirs none of yours claims (MBArtistPage's row, iArtist's tall row): its cover through deadwax's
+/// relay, its title and "1976 · not in your library" - and Get at its end for one nobody holds (`get`), else the
+/// chevron. Its tap, and Get's, open the album you don't have (or yours through the id bridge), the spinner in place of
+/// the chevron or Get while that is asked. One element to VoiceOver: its tap opens it, Get its action.
+private struct ArtistTheirRow: View {
+    let row: MBArtistPage.Row
+    let line: String
+    let get: Bool
+    let busy: Bool
+    let open: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Button(action: open) {
+                LibraryListRow(title: row.title, line: line) {
+                    ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: row.group.id),
+                                 size: ArchiveCoverSize.row)
+                        .clipShape(DWCorners.chipShape)
+                } trailing: {
+                    if busy {
+                        ProgressView()
+                    } else if !get {
+                        LibraryChevron()
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(busy)
+            if get && !busy {
+                Button(ArtistPageFacts.Words.get, action: open)
+                    .buttonStyle(DWButtonStyle(kind: .on, size: .small))
+                    // the row's height, on its hairline as the rest of the row is
+                    .frame(maxHeight: .infinity)
+                    .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([row.title, line].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", "))
+        .accessibilityValue(busy ? SearchWords.loading : "")
+        .accessibilityAddTraits(busy ? [] : .isButton)
+        .accessibilityAction {
+            if !busy { open() }
+        }
+        .accessibilityActions {
+            if get && !busy {
+                Button(ArtistPageFacts.Words.get, action: open)
+            }
+        }
+    }
+}
+
+/// Under the discography's rows, MusicBrainz's word, once (ArtistJoin.foot): asking, and the moment its rows wait for
+/// the library (`holding`); its trouble in a listener's words, with Try again (`again`); the cut at 500; or - with no
+/// row at all - why there are none. The phone's page's and (R6) the Mac's (MacArtistPage), its words in the face the
+/// page gives (`font`: the phone's small words, the Mac's base).
+struct ArtistTheirFoot: View {
+    let theirs: MBArtistModel
+    let holding: Bool
+    let rows: Int
+    var font = Typeface.Phone.text(.small)
+    let again: () -> Void
+
+    @Environment(Reachability.self) private var reachability
+
+    var body: some View {
         let shown = theirs.shown
         switch ArtistJoin.foot(asking: theirs.asking, answered: shown != nil, failed: theirs.trouble != nil,
                                truncated: shown?.truncated == true, holding: holding, rows: rows) {
@@ -619,7 +933,8 @@ struct ArtistView: View {
             HStack(spacing: 10) {
                 ProgressView()
                 Text(MBArtistPage.loading)
-                    .foregroundStyle(Palette.quiet)
+                    .font(font)
+                    .foregroundStyle(DWPalette.t2)
             }
             .accessibilityElement(children: .combine)
             .padding(.top, 12)
@@ -633,10 +948,9 @@ struct ArtistView: View {
                 case nil:
                     EmptyView()
                 }
-                Button(SearchWords.tryAgain) {
-                    model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true)
-                }
-                .disabled(reachability.probing)
+                Button(SearchWords.tryAgain, action: again)
+                    .buttonStyle(DWButtonStyle(size: .small))
+                    .disabled(reachability.probing)
             }
             .padding(.top, 12)
         case .truncated:
@@ -645,71 +959,6 @@ struct ArtistView: View {
             ShelfNote(MBArtistPage.none(studio: theirs.studioOnly))
         case .nothing:
             EmptyView()
-        }
-    }
-
-    /// A row's tap: its album's page, what the artist's answer knew of it drawn at once - the artist line their link.
-    private func open(_ row: ArtistPage.Row, albums: [Album]) {
-        var album = albums.first { (album: Album) -> Bool in album.id == row.albumId }.map { (album: Album) -> AlbumRoute in
-            AlbumRoute(album)
-        } ?? AlbumRoute(id: row.albumId, name: row.title, coverArt: row.coverArt)
-        if album.artist == nil { album.artist = model.name }
-        if album.artistId == nil { album.artistId = route.id }
-        navigation.open(.album(album))
-    }
-}
-
-/// One album of the artist's (ArtistPage.tsx's row): its cover at the rows' size, its title, and "1994 · in your
-/// library" with the green tick before it for an album marked (ArtistPage.marked). Read as one. Dimmed, and opening
-/// nothing, while deadwax can't be reached and nothing of it is on this phone.
-private struct ArtistAlbumRow: View {
-    let row: ArtistPage.Row
-    let line: String
-    let marked: Bool
-    let dimmed: Bool
-    let open: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Button(action: open) {
-                HStack(spacing: 12) {
-                    LibraryCover(id: row.coverArt, pixels: CoverSize.row)
-                        .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                        .clipShape(Corners.artShape)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(row.title)
-                            .foregroundStyle(.primary)
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            if marked {
-                                Image(systemName: "checkmark")
-                                    .font(Typeface.symbol(.caption2).weight(.bold))
-                                    .foregroundStyle(Palette.held)
-                                    .accessibilityHidden(true)
-                            }
-                            Text(line)
-                                .font(Typeface.subheadline)
-                                .foregroundStyle(Palette.quiet)
-                        }
-                    }
-                    .lineLimit(1)
-                    Spacer(minLength: 8)
-                    Image(systemName: "chevron.right")
-                        .font(Typeface.symbol(.footnote).weight(.semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-                .opacity(dimmed ? Palette.off : 1)
-            }
-            .buttonStyle(.plain)
-            .disabled(dimmed)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel([row.title, line].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", "))
-            .accessibilityValue(dimmed ? DownloadWords.notOnDevice(Platform.device) : "")
-            // (the Mac app, slice 2) the album page's ••• on a right-click; nothing on the iPhone
-            .albumRightClick(AlbumRoute(id: row.albumId, name: row.title, coverArt: row.coverArt))
-            Divider().padding(.leading, LibraryRow.textInset)
         }
     }
 }

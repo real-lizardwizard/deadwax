@@ -358,7 +358,8 @@ def test_the_macs_columns_are_the_drawings():
     assert "MacAlbumFacts.number(" not in flat(bare(source(MAC_ALBUM)))
     songs = flat(body(bare(source(MAC_ALBUM)), "private func songs(_ album: Album) -> some View {"))
     assert "let drawn = MacAlbumFacts.songLines(songs, headings: desk.model.headings)" in songs
-    assert "MacColumnList(columns: Self.columns, rows: rows, lines: drawn, selected: $selected," in songs
+    assert ("MacColumnList(columns: Self.columns, rows: rows, lines: drawn, controls: [Self.columns.count - 1], "
+            "selected: $selected,") in songs
     # the headings the phone's own (AlbumModel's headings, DiscHeadings'), drawn by the list as group rows
     model = flat(bare(source("Models/AlbumModel.swift")))
     assert "DiscHeadings" in model and "headings" in model

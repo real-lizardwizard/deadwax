@@ -476,7 +476,9 @@ struct MacAlbumPage: View {
         // the page
         let tall = CGFloat(rowSize.boxHeight(rows: rows.count, headings: headings))
         let least = CGFloat(rowSize.boxLeast(rows: rows.count, headings: headings, room: boxRoom))
-        return MacColumnList(columns: Self.columns, rows: rows, lines: drawn, selected: $selected,
+        // (R6's review) a double-click on a song's ••• is the menu's, never the song played as well (MacTable.opens)
+        return MacColumnList(columns: Self.columns, rows: rows, lines: drawn, controls: [Self.columns.count - 1],
+                             selected: $selected,
                              open: { (line: Line) -> Void in open(line) },
                              menu: { (line: Line) -> SongRightClick in SongRightClick(menu: desk.row(line.song, album)) }
         ) { (line: Line, column: Int) in

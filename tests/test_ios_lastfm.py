@@ -21,6 +21,7 @@ SCREEN = APP / "Artist" / "TopSongsScreen.swift"
 OPENER = APP / "Models" / "TopSongOpener.swift"
 PAGE_MODEL = APP / "Models" / "ArtistPageModel.swift"
 ROUTES = APP / "Shared" / "Routes.swift"
+MAC_PAGE = APP / "Mac" / "Artist" / "MacArtistPage.swift"
 NEW = [SECTION, SCREEN, OPENER]
 
 
@@ -50,15 +51,16 @@ def test_the_artist_page_draws_only_what_lastfm_page_shown_says():
     assert artist.count("LastfmPage.shown(") == 1
     assert ("online: online, answer: model.lastfm, seesDetail: server.access.seesDetail,\n"
             "                                      reserved: model.lineKept(page: taskKey))") in artist
-    # the hero's line, there from the first frame whenever it can be drawn, blank until the answer says - (R1c) in
-    # both tops, the Mac's under its centred name and the phone's beside its round picture
-    hero = block(artist, "private func hero(")
-    assert re.sub(r"\s+", " ", hero).strip() == ("if Platform.mac { macHero(managing, lastfm: lastfm) } else { "
-                                                 "phoneHero(managing, lastfm: lastfm) }")
-    for top in ("private func macHero(", "private func phoneHero("):
-        drawn = re.sub(r"\s+", " ", block(artist, top))
-        assert 'if lastfm.heroLine { Text(lastfm.listeners ?? " ")' in drawn, top
-        assert ".accessibilityHidden(lastfm.listeners == nil)" in drawn, top
+    # the hero's line, there from the first frame whenever it can be drawn, blank until the answer says - (R1c) the
+    # phone's beside its round picture, (R6) the Mac's in its band (MacArtistPage), from the page's own judgement
+    mac = code(MAC_PAGE)
+    for top in (block(artist, "private func phoneHero("), block(mac, "private func band(")):
+        drawn = re.sub(r"\s+", " ", top)
+        assert 'if lastfm.heroLine { Text(lastfm.listeners ?? " ")' in drawn
+        assert ".accessibilityHidden(lastfm.listeners == nil)" in drawn
+    assert "let lastfm = desk.lastfm" in block(mac, "private func band(") and "LastfmPage.shown(" not in mac
+    assert "phoneHero(managing, lastfm: lastfm, factsRoom: factsAsked || factsRoomFor == taskKey)" in artist
+    assert "macHero" not in artist
     # Top Songs only with Last.fm on and an answer to draw, below Play - waiting on the arrival
     body = block(artist, "var body: some View {")
     held = block(body, "if !arrival.holding {")
@@ -73,6 +75,25 @@ def test_the_artist_page_draws_only_what_lastfm_page_shown_says():
     assert "if let foot = lastfm.foot { lastfmFoot(foot) }" in body
     foot = block(artist, "private func lastfmFoot(")
     assert "Button(LastfmWords.serverSettings) {\n                navigation.open(.serverSettingsGroup(ServerSettings.connectionsGroup))" in foot
+    # (R6) the Mac's page the same: Top Songs where it belongs, or after the discography for a late answer, waiting on
+    # the arrival; the foot line its own, to the same place
+    page = block(mac, "@ViewBuilder private var page: some View {")
+    held = block(page, "if !desk.arrival.holding {")
+    first, table, after = (held.index("if !desk.top.isEmpty && desk.arrival.place == .inPlace { topSongs }"),
+                           held.index("discography"),
+                           held.index("if !desk.top.isEmpty && desk.arrival.place != .inPlace { topSongs }"))
+    assert first < table < after and held.count("topSongs") == 2
+    assert "if let foot = desk.lastfm.foot { lastfmFoot(foot) }" in page
+    assert "navigation.open(.serverSettingsGroup(ServerSettings.connectionsGroup))" in block(mac, "struct MacLastfmFoot: View {")
+    # its credit the phone's own LastfmCredit (opened beside the app), in the Mac's face - no copy of its own
+    assert ("LastfmCredit(lastfmPage: desk.model.lastfm?.url, font: Typeface.Mac.text(.small), above: Drawn.headBelow)"
+            in mac) and "MacLastfmCredit" not in mac
+    credit = block(code(SECTION), "struct LastfmCredit: View {")
+    assert "if let page = LastfmLink.url(lastfmPage) {" in credit and "Link(LastfmWords.credit, destination: page)" in credit
+    assert "var font = Typeface.Phone.text(.small)" in credit and ".font(font)" in credit
+    # what the desk hands it: Top Songs' rows only once nothing waits, by the same rule
+    desk = block(artist, "private func artistDesk(")
+    assert "top: lastfm.topSongs && !arrival.holding ? topRows(mine, online: online) : []," in desk
 
 
 def test_the_top_songs_page_is_the_artist_pages_own_rows():
@@ -89,15 +110,18 @@ def test_the_top_songs_page_is_the_artist_pages_own_rows():
     section = code(SECTION)
     assert "if rows.count > TopSongs.shown {" in section and "navigation.open(.topSongs(route))" in section
     assert "ForEach(rows.prefix(TopSongs.shown))" in section
+    # (R6) the Mac's artist page lists all ten in a list of its own (MacArtistPage), so no See All there
+    mac = code(MAC_PAGE)
+    assert "TopSongsSection(" not in mac and "let lines = desk.top.map" in mac
     assert "case .topSongs(let artist): TopSongsScreen(route: artist).readableOnMac()" in code(ROUTES)
 
 
 def test_a_row_does_only_what_its_kind_allows():
     row = block(code(SECTION), "struct TopSongRow: View {")
     # waiting, and maybe yours (an album of theirs not in hand): drawn, the latter dimmed, and nothing to tap
-    waiting = row[row.index("case .waiting:"):row.index("Divider()")]
+    waiting = row[row.index("case .waiting:"):row.index(".overlay(alignment: .bottom) { ArtistRowRule() }")]
     assert "Button" not in waiting and "onTapGesture" not in waiting
-    assert "case .unknown:" in waiting and ".opacity(Palette.off)" in waiting[waiting.index("case .unknown:"):]
+    assert "case .unknown:" in waiting and ".opacity(DWPalette.off)" in waiting[waiting.index("case .unknown:"):]
     # a song you have: played in the tap, nothing awaited first (the gesture rule)
     play = block(row, "private func play() {")
     assert "player.play(playlist: plan.songs, at: plan.at)" in play

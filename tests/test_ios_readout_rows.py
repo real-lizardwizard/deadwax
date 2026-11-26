@@ -245,8 +245,9 @@ def test_the_macs_tables_and_status_bar_are_set_on_one_baseline():
     # the walk reaches every cell through the page's cell(...) and MacColumnList's closure: these are its pages
     pages = sorted(str(path.relative_to(APP)) for path in APP.rglob("*.swift") if "MacColumnList(" in path.read_text(
         encoding="utf-8") and path.name != "MacColumnList.swift")
-    assert pages == ["Mac/Album/MacAlbumPage.swift", "Mac/Album/MacPlaylistPage.swift", "Mac/Library/MacAlbumsPage.swift",
-                     "Mac/Library/MacArtistsPage.swift", "Mac/Library/MacPlaylistsPage.swift"]
+    assert pages == ["Mac/Album/MacAlbumPage.swift", "Mac/Album/MacPlaylistPage.swift", "Mac/Artist/MacArtistPage.swift",
+                     "Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift",
+                     "Mac/Library/MacPlaylistsPage.swift"]
 
 
 #? the covers a Mac table's cell draws (Row Size grows them: 20, 28, 40; Requests' 22, 28, 40)

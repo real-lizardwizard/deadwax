@@ -119,10 +119,18 @@ def read_statics(code: str, text: str) -> str:
 #? R1c's one-off screens with a Mac half: RefreshProblemNote (the Mac's Downloaded and Songs pages borrow it) and the
 #? artist page's top - (R1c's review) its dispatcher with it, `hero()`, so the Mac sent to the phone's top is a change,
 #? and the statics it reads (its 200 pt picture); and the review's two, the Downloaded page's first ask (the Mac's
-#? Downloaded borrows it) and the empty library's See All music
+#? Downloaded borrows it) and the empty library's See All music. (R6) The artist's top on the Mac is MacArtistPage's
+#? band now - macHero and its dispatcher gone, the whole page the Mac's desk - so the band is pinned in its place, with
+#? the drawing's numbers it reads, for the slices after R6 (A2, A4) that touch the artist's page. (R6's review) And the
+#? band's shared reads, each drawn by both devices: the artist's picture (ArtistHeroPicture), Last.fm's credit under Top
+#? Songs (LastfmCredit) and the foot under their discography (ArtistTheirFoot) - a phone-side change to one is a change
+#? to the Mac's page too
 PARTS = {
     "RefreshProblemNote": ("Library/AlbumsScreen.swift", [r"struct RefreshProblemNote: View \{"]),
-    "ArtistView.macHero": ("Artist/ArtistView.swift", [r"private func hero\(", r"private func macHero\("]),
+    "MacArtistPage.band": ("Mac/Artist/MacArtistPage.swift", [r"    enum Drawn \{", r"private func band\("]),
+    "ArtistHeroPicture": ("Artist/ArtistView.swift", [r"struct ArtistHeroPicture: View \{"]),
+    "LastfmCredit": ("Artist/TopSongsSection.swift", [r"struct LastfmCredit: View \{"]),
+    "ArtistTheirFoot": ("Artist/ArtistView.swift", [r"struct ArtistTheirFoot: View \{"]),
     "FirstAskCard": ("Library/AlbumsScreen.swift", [r"struct FirstAskCard: View \{"]),
     "EmptyLibraryNote": ("Library/AlbumsScreen.swift", [r"struct EmptyLibraryNote: View \{"]),
 }
@@ -149,7 +157,10 @@ def mac_halves() -> dict[str, str]:
 #? dispatcher and its 200 (macHero alone is still a3c6345e7963ca6a); DWChip's unchanged by `keepsFace` and `.facedChip`
 #? (the ternaries read as the Mac's halves); and three new, each R2b's code where the Mac draws it: DWWellField (its Mac
 #? half the field as its page drew it), the Downloaded page's first ask (its words moved into `ask`) and the empty
-#? library's See All music (inside its `if Platform.mac`). A change to one is a change to what the Mac draws.
+#? library's See All music (inside its `if Platform.mac`). A change to one is a change to what the Mac draws. (R6)
+#? ArtistView.macHero's pin (3acb28f11dad5501) retired with it: MacArtistPage's band is R6's own, pinned as R6 left it.
+#? (R6's review) The band re-pinned (it was d2227dd82a6d4bf1): its chips take who may get albums, so "10 more to get" is
+#? drawn only for them. And its three shared reads pinned as R6 left them.
 PINNED = {
     "Look/DWButtonStyle.swift": "05ac2b1f28675581",
     "Look/DWChip.swift": "cf86e3708a29bfc1",
@@ -162,7 +173,10 @@ PINNED = {
     "Look/DWToggleStyle.swift": "1d0c62c233c1c4c6",
     "Look/DWWellField.swift": "24c48997e0b50edb",
     "RefreshProblemNote": "b1701810fad9be68",
-    "ArtistView.macHero": "3acb28f11dad5501",
+    "MacArtistPage.band": "7c6c1f9fac106e83",
+    "ArtistHeroPicture": "62b50dcf0400dac1",
+    "LastfmCredit": "af492e61b5a3bda3",
+    "ArtistTheirFoot": "f19dafdb6bb6738c",
     "FirstAskCard": "f7d6bf161c90975f",
     "EmptyLibraryNote": "72f1e022695aeff8",
 }
@@ -190,12 +204,20 @@ def test_the_phones_own_parts_are_named_from_the_phone_alone():
     assert "dot" not in re.findall(r"\b\w+\b", chip)
     # (R1c's review) and the New mark's kept face is the phone's alone: the Mac's chip names none of it
     assert not re.search(r"\bkeepsFace\b|\.facedChip\b|\bDWFlat\.", chip), chip
-    # the artist's top on the Mac is macHero, its picture 200 - the dispatcher and the static pinned with it
+    # (R6) the artist's page on the Mac is its desk, MacArtistPage, top to foot: the phone's top and the phone's rows
+    # unreached - the band pinned above, with its picture 88
     artist = bare((APP / "Artist" / "ArtistView.swift").read_text(encoding="utf-8"))
-    hero = mac_path(part(artist, r"private func hero\(") + part(artist, r"private func macHero\("))
-    assert re.sub(r"\s+", " ", hero).startswith(
-        "private func hero(_ managing: ArtistManaged, lastfm: LastfmPage.Shown) -> some View { macHero(managing, ")
-    assert read_statics(artist, hero) == "private static let pictureSide: CGFloat = 200"
+    body = part(artist, r"    var body: some View \{")
+    branch = re.search(r"if let desk, Platform\.mac \{", body)
+    assert branch, "the desk's branch"
+    opened, closed = block(body, branch.start())
+    assert re.sub(r"\s+", " ", body[opened + 1:closed]).strip().startswith("desk(artistDesk(rows: rows,")
+    assert re.match(r"\s*else \{", body[closed + 1:]), "the phone's page its else"
+    assert "macHero" not in artist and "private func hero(" not in artist
+    for phone in ("phoneHero(", "albumsList(", "strip(", "topSongs("):
+        assert phone not in body[opened:closed], phone
+    mac_page = bare((APP / "Mac" / "Artist" / "MacArtistPage.swift").read_text(encoding="utf-8"))
+    assert "static let picture: CGFloat = 88" in part(mac_page, r"    enum Drawn \{")
 
 
 def test_the_mac_path_is_read_as_the_mac_runs_it():

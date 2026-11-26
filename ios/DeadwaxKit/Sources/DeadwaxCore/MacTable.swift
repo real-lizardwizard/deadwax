@@ -110,4 +110,24 @@ public enum MacTable {
     public static func returned<ID: Hashable>(_ selected: ID?, in rows: [ID]) -> ID? {
         kept(selected, in: rows)
     }
+
+    /// (R6's review) The column a point `x` points across a row falls in - the columns side by side from the row's
+    /// leading edge at `widths` - nil before the first or past the last.
+    public static func column(at x: Double, widths: [Double]) -> Int? {
+        guard x >= 0 else { return nil }
+        var edge = 0.0
+        for (index, width) in widths.enumerated() {
+            edge += width
+            if x < edge { return index }
+        }
+        return nil
+    }
+
+    /// (R6's review) Whether a double-click at `x` opens the row: anywhere but a column of `controls` - those whose
+    /// cells hold buttons (an artist's Play, Open and Get, an album's •••), where the double-click is the button's own.
+    /// None: the whole row opens, as every list did before.
+    public static func opens(at x: Double, widths: [Double], controls: Set<Int>) -> Bool {
+        guard !controls.isEmpty, let column = column(at: x, widths: widths) else { return true }
+        return !controls.contains(column)
+    }
 }

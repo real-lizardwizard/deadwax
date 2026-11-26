@@ -79,6 +79,25 @@ import Testing
     }
 }
 
+/// (R6's review) A double-click on a cell's button is the button's: the row opens from every other column alone.
+@Suite struct MacTableControlsTests {
+    @Test func aDoubleClickOnAButtonsColumnIsTheButtons() {
+        // an artist's discography at 660: Album and In your library share what Year 56, Songs 60 and the buttons 140 leave
+        let widths = MacTable.widths([.flexible, .fixed(56), .fixed(60), .flexible, .fixed(140)], total: 660)
+        #expect(widths == [202, 56, 60, 202, 140])
+        #expect(MacTable.column(at: 0, widths: widths) == 0 && MacTable.column(at: 201.9, widths: widths) == 0)
+        #expect(MacTable.column(at: 202, widths: widths) == 1 && MacTable.column(at: 659.9, widths: widths) == 4)
+        #expect(MacTable.column(at: 660, widths: widths) == nil && MacTable.column(at: -1, widths: widths) == nil)
+        // the buttons' column (4) opens nothing; every other column opens the row
+        #expect(!MacTable.opens(at: 600, widths: widths, controls: [4]))
+        #expect(MacTable.opens(at: 100, widths: widths, controls: [4]) && MacTable.opens(at: 400, widths: widths,
+                                                                                         controls: [4]))
+        // a list with no buttons opens from anywhere, as before - past its last column too
+        #expect(MacTable.opens(at: 600, widths: widths, controls: []))
+        #expect(MacTable.opens(at: 700, widths: widths, controls: [4]))
+    }
+}
+
 /// The redesign's sizes (MacLook), each dw.css's own - held there number by number by tests/test_ios_mac_look.py; here,
 /// that they fit together in the Mac's window.
 @Suite struct MacLookTests {

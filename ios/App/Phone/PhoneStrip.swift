@@ -19,7 +19,9 @@ import SwiftUI
 /// - It starts at the leading edge (.chips) and never wraps: where its buttons don't fit the width, the strip scrolls
 ///   sideways, and the shown button is brought into view whenever it changes - by a tap or by the page's own swipe -
 ///   moving as the Library's swipe does (`.snappy`, none with Reduce Motion).
-/// - VoiceOver hears a tab bar: each button a tab, the one shown selected.
+/// - VoiceOver hears a tab bar: each button a tab, the one shown selected. (R6 - notes/ios.md "The redesign, slice R6:
+///   an artist") A button that opens something of its own (an artist's Artist images… and Move albums…, `pushes`)
+///   follows the tabs in the same row, drawn as they are and never lit: a button to VoiceOver, outside the tab bar.
 /// - Capped at xxxLarge, as the tab bar is.
 struct PhoneStrip<Part: Hashable>: View {
     let options: [Part]
@@ -27,6 +29,12 @@ struct PhoneStrip<Part: Hashable>: View {
     @Binding var shown: Part
     /// What VoiceOver calls the strip.
     let spoken: String
+    /// (R6) The buttons after the tabs that open something of their own: a tap sets `shown` to one - the page's
+    /// binding opens it and keeps the tab shown - and it is drawn as the others, never lit.
+    var pushes: [Part] = []
+    /// (R6's review) What VoiceOver and the pointer's help say of a part, where its words are short of it (an artist's
+    /// Move albums…, "Move albums to Ye…"). nil: its words, as every strip before.
+    var said: ((Part) -> String)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -56,17 +64,26 @@ struct PhoneStrip<Part: Hashable>: View {
         // .dw.ph .chips: margin-bottom 10px, under the hairline
         .padding(.bottom, CGFloat(PhoneLook.stripFoot))
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.isTabBar)
-        .accessibilityLabel(spoken)
     }
 
     private var row: some View {
         // the gap is the buttons' own room (`room`), so the buttons touch and a finger's target reaches the next one's
         HStack(spacing: 0) {
-            ForEach(options, id: \.self) { (option: Part) in
-                button(option)
-                    .id(option)
+            // the tabs, a tab bar to VoiceOver - (R6) and the pushes after them, buttons
+            if !options.isEmpty {
+                HStack(spacing: 0) {
+                    ForEach(options, id: \.self) { (option: Part) in
+                        button(option)
+                            .id(option)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                .accessibilityAddTraits(.isTabBar)
+                .accessibilityLabel(spoken)
+            }
+            ForEach(pushes, id: \.self) { (push: Part) in
+                button(push)
+                    .id(push)
             }
         }
         // .chips padding 0 16px, less the first button's room before its words and the last's after
@@ -86,7 +103,8 @@ struct PhoneStrip<Part: Hashable>: View {
     }
 
     private func button(_ option: Part) -> some View {
-        let on = option == shown
+        // (R6) a push is never lit
+        let on = option == shown && !pushes.contains(option)
         return Button {
             shown = option
         } label: {
@@ -114,5 +132,21 @@ struct PhoneStrip<Part: Hashable>: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(on ? .isSelected : [])
+        .modifier(StripPartSaid(words: said?(option)))
+    }
+}
+
+/// (R6's review) A strip part's words in full, where the page gives them: its help and VoiceOver's label.
+private struct StripPartSaid: ViewModifier {
+    let words: String?
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let words {
+            content
+                .help(words)
+                .accessibilityLabel(words)
+        } else {
+            content
+        }
     }
 }

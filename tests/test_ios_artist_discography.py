@@ -74,18 +74,21 @@ def test_offline_nothing_of_musicbrainzs_is_drawn_said_or_asked():
     assert "client.discography" not in model
 
 
-def test_a_row_of_theirs_is_the_musicbrainz_pages_own():
+def test_a_row_of_theirs_is_opened_by_the_musicbrainz_pages_model():
     view = code(VIEW)
     listed = function(view, "private func albumsList(")
     assert "ForEach(rows) { (row: ArtistJoin.Row) in" in listed
     assert "case .yours(let mine):" in listed and "ArtistAlbumRow(row: mine, line: ArtistPage.line(mine" in listed
     assert "case .theirs(let other):" in listed
-    assert "MBArtistAlbumRow(row: other, line: MBArtistPage.line(other, personal: personal)" in listed
-    assert "marked: MBArtistPage.marked(other, personal: personal)" in listed
+    # (R6) the page's own flat row, the MusicBrainz page's words and its model's open - Get only where nobody holds it
+    assert "ArtistTheirRow(row: other, line: MBArtistPage.line(other, personal: personal)" in listed
+    assert ("get: ArtistPageFacts.offersGet(other, mayGet: server.access.can(.request)),\n"
+            "                                   busy: theirs?.opening == other.key)") in listed
     assert "theirs?.open(other, client: server.client, online: reachability.online, navigation: navigation)" in listed
-    # the MusicBrainz page's row, shared: its cover through deadwax's relay
+    # its cover through deadwax's relay, as the MusicBrainz page's row has it
+    row = function(view, "private struct ArtistTheirRow: View {")
+    assert "ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: row.group.id)" in row
     mb = code(MB_VIEW)
-    assert "\nstruct MBArtistAlbumRow: View {" in mb
     assert "ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: row.group.id)" in mb
     # a row asking the id bridge lets go once the page stops showing, as on that page
     assert ".onChange(of: navigation.tab) { _, _ in model.discography?.standDown() }" in view
@@ -100,11 +103,14 @@ def test_musicbrainzs_trouble_is_said_once_in_a_listeners_words():
     each = function(listed, "ForEach(rows) { (row: ArtistJoin.Row) in")
     assert "ErrorNote" not in each and "theirFoot" not in each
     assert listed.count("theirFoot(") == 1
-    foot = function(view, "private func theirFoot(")
+    # (R6) the foot a view of its own, the Mac's page's too - its Try again the page's ask
+    asks = function(view, "private func theirFoot(")
+    assert "model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true)" in asks
+    foot = function(view, "struct ArtistTheirFoot: View {")
     assert "switch ArtistJoin.foot(" in foot
     assert "ErrorNote(text: MBArtistPage.away)" in foot
     assert "ErrorNote(error, retry: true)" in foot
-    assert "model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true)" in foot
+    assert "Button(SearchWords.tryAgain, action: again)" in foot
     # no words of its own: each comes from Core
     assert not re.search(r'Text\("', foot)
 

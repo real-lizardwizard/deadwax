@@ -51,7 +51,7 @@ album's ••• or Settings > Manage > Edit an album (see [Edit album](#edit-a
 file, everything in it, and its tags edited on one track or many at once. Then its **Artwork** and **Lyrics**: the
 cover and CD art, each full screen, and Get cover, Get CD art and Get lyrics on the phone. Then its **Delete**: what
 deleting the folder takes, read as it is now, and whose libraries it's in, asked once more before it goes - and with
-it nothing in Edit album opens the web app any more. Then **the artist tools**, from an artist page's •••: **Artist
+it nothing in Edit album opens the web app any more. Then **the artist tools**, from an artist's page: **Artist
 images…**, every picture of them found, chosen and saved into their folder; **Which artist is this?**; and **Move
 albums to …**, their albums filed under an old name moved under the one they have now (see [Managing an
 artist](#managing-an-artist)). Then **Needs a look**: the albums that need fixing and the new downloads nobody has
@@ -321,8 +321,24 @@ menus and keys, and these differences.
   Edit - dimmed for one you can't change), the mosaic, the name, whose it is and when it changed, its songs and length,
   then the songs in columns - **#**, **Title**, **Album** and **Length**. Its **Edit** is the phone's form, as before.
   There's no Play Next or Play Last (the queue's one item is Add to Queue, as on the phone and in the right-click), and
-  no list of the album's other pressings. An artist's page and the album you don't have sit in the middle of the page at a readable
-  width (760 points); they scroll with the pointer
+  no list of the album's other pressings.
+  **An artist's page** is the Mac's own too: a toolbar of **Play**, **Shuffle** and - once their albums on MusicBrainz
+  are asked - **Studio only | Everything**, with **Artist images…**, **Move albums…** and **Which artist is this?** at
+  its end for someone who may ([Managing an artist](#managing-an-artist)), folded into a **•••** in a narrow window.
+  Under it a band: their round picture, their name, who they are on MusicBrainz ("Group · Sydney · since 1973"), their
+  Last.fm listeners, and chips at its right - "6 in your library", "2 in the collection", "10 more to get" (that one
+  only for someone who can get albums). Then **Top Songs** (all ten, with **From Last.fm** under them - after the albums
+  when Last.fm answered late), **Albums**: the discography in columns - **Album**, **Year**, **Songs**, **In your
+  library** (a chip, then the album's format once its songs have come, "2 pressings", or "not in your library") and the
+  buttons: **Play** and **Open** for an album of yours, **Get** for one nobody has (it opens the album you don't have;
+  for someone who can't get albums - with logins on, an admin gives **Get albums** - it's **Open**), **Open** for one of
+  theirs the library holds - and **Most played**: the songs of theirs you've played most, each once however many
+  pressings it's on, with its plays (no section at all until you've played one of them). Double-click or Return plays
+  from a song or opens an album - a double-click on a row's buttons is the buttons', not the row's; right-click one of
+  yours for its menu. The tables are part of the page, which scrolls as one; ↑ and ↓ move through the table you last
+  clicked, bringing its row into view. VoiceOver reads an album's row as one - "Low, 1977, in your library, FLAC" - its
+  Play, Open and Get as its actions. The status bar: "16 albums", "6 in your library", "59 songs".
+  The album you don't have sits in the middle of the page at a readable width (760 points); it scrolls with the pointer
   anywhere across the page, their scroll bar at its right edge. Pages you've opened stay as you left them as you move
   between the sidebar's rows - Library, Search, Requests and Settings each keep their pages, where you'd scrolled to and
   what you'd typed or begun, a playlist's Edit included, as the phone's tabs keep them. One thing starts again: All's
@@ -414,7 +430,7 @@ The rest of the differences:
   smallest window and beside the side panel, and Requests still fits a window as it first opens. In a short window an
   album's songs box gives way first, scrolling inside, so Properties stays on the page at Large too. Row Size is kept
   on this Mac, as Grid or List is, and is as you left it after you quit; the phone has no Row Size, and its rows don't
-  change. All songs, Search and an artist's page are still the phone's pages, so they don't follow it yet.
+  change. All songs and Search are still the phone's pages, so they don't follow it yet.
 - **Escape** closes the sheet in front - its Close, Cancel or Done, so where Close asks before throwing away what you
   typed (Edit album, Artist images, a playlist's Edit), Escape asks too. Where Close doesn't ask, Escape does nothing
   while you've typed something Close would throw away - Add a person's passwords, Reset password's, Which artist is
@@ -1370,10 +1386,13 @@ last listed shows. If deadwax can't be asked, the list stays as it was, under "C
 showing it as it was." An empty Your artists says "No artists in your library yet.", with **See All
 music**. A pull shuffles, as on the other pages.
 
-**An artist's page**: their picture and name, **Play** and **Shuffle**, and **Albums** - their albums in
-the collection, newest first (undated ones last), each with its cover, its title, and a line like "1994 ·
-in your library", a green tick before it for the ones in your library ("in the collection" and no tick for
-the rest). With logins off every album is ticked. **Tap an album** to open its page.
+**An artist's page**: their round picture beside their name, with who they are on MusicBrainz under it ("Group ·
+Sydney · since 1973") once deadwax has asked - its place kept, blank until it comes, so Play doesn't move as it lands;
+**Play** and **Shuffle** side by side; a strip of **Studio only** and **Everything** (below); and **Albums**, its count
+at the heading's end ("16 · 6 yours") - their albums in the
+collection, newest first (undated ones last), each on a thin line with its cover, its title, and a line like "1994 ·
+in your library" ("in the collection" for the rest; with logins off every one says "in your library"). **Tap an
+album** to open its page.
 
 - **Play** plays every album of theirs, in the page's order, each as an album - from the first song of the
   newest. **Shuffle** plays every song of them once, in a random order. With Normalization on, Play levels
@@ -1385,10 +1404,12 @@ the rest). With logins off every album is ticked. **Tap an album** to open its p
   didn't load" - with **Try again** under it.
 - **Their albums you don't have** come in among yours a moment later, from MusicBrainz, as the web app's
   artist page lists them: newest first, each once, with its cover, its title and a line like "2008 · Live
-  album · not in your library". Tap one: the album you don't have's page, as from Search. One the
-  library holds that Navidrome lists under another artist is ticked, "in your library", and opens your
-  album. **Studio only**, at the end of the Albums heading, is on until you turn it off; off, their live
-  albums, compilations and the rest join the list. It's kept for each artist, and shared with that
+  album · not in your library", and **Get** at its end - tap it, or the row: the album you don't have's page, as
+  from Search. (Get is only for someone who can get albums - with logins on, an admin gives **Get albums**; anyone
+  else's row has the arrow, and opens the same page.) One the library holds that Navidrome lists under another artist
+  says "in your library", has no Get, and opens your album. **Studio only**, on the strip over the albums (under Play,
+  or under Top Songs when they're there), is chosen until you tap **Everything**; then their
+  live albums, compilations and the rest join the list. It's kept for each artist, and shared with that
   artist's page in Search. Your own albums don't change: the same rows, ticks and lines, and **Play** and
   **Shuffle** still play only what you have. Under the list: "Loading their albums…" while they come,
   "Showing their first 500 albums." for an artist with more, or - if MusicBrainz couldn't list them -
@@ -1398,8 +1419,8 @@ the rest). With logins off every album is ticked. **Tap an album** to open its p
   reached, the page lists only your albums and says nothing about the rest.
 - An artist deadwax no longer has says "This artist isn't here any more - their albums may have been moved
   or deleted."
-- Not on the phone yet: the description, the facts and pins. Their pictures and the names their albums
-  are filed under are [managed from the page's •••](#managing-an-artist).
+- Not on the phone yet: the description and pins. Their pictures and the names their albums are filed
+  under are [managed from the page](#managing-an-artist).
 
 **From Last.fm** (with `LASTFM_API_KEY` set on deadwax - see [configuration](configuration.md) - and **deadwax
 2.1.41 or later**): under the name, how many people listen to them on Last.fm ("2.3M listeners"), and **Top Songs**
@@ -1448,9 +1469,11 @@ downloaded albums play until deadwax is back.").
 ### Managing an artist
 
 For someone who can **Edit albums** or **Look after the library** (everyone while logins are off; with
-them on, Navidrome's admins and whoever an admin gave those), an artist's page has a **•••** at the top
-right holding what the web app's artist page offers them - only while deadwax can be reached, and only
-what that person may do:
+them on, Navidrome's admins and whoever an admin gave those), an artist's page offers what the web app's
+artist page offers them - only while deadwax can be reached, and only what that person may do. On the phone
+**Artist images…** and **Move albums…** are on the strip over the albums, after Studio only and Everything, and
+**Which artist is this?** is in the **•••** at the top right; on the Mac all three are at the end of the page's
+toolbar (in its **•••** in a narrow window):
 
 - **Artist images…** (Edit albums), once the library files albums under their name. It's dimmed for a
   moment as the page opens, while deadwax says which folder is theirs.
@@ -6641,6 +6664,45 @@ where the download button was. Nothing is played, added or downloaded any differ
   Cancel stand one over the other at the largest text sizes.)
 - **558 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 556-557, or "not done yet".
 
+#### An artist (559-563)
+
+**Not done yet.** On the Mac an artist's page becomes its own: a toolbar, a band with their picture, name and facts, Top
+Songs, the discography as a table, and the songs of theirs you have played most. On the phone the page under the top is
+redrawn flat: **Play** and **Shuffle** side by side, a strip of Studio only and Everything, and the albums on thin lines.
+Nothing is played, asked or opened any differently. Open an artist with a few albums of yours and some you don't have,
+with Last.fm on.
+
+- **559 The band.** **Not done yet.** On the Mac: the name, the facts, the listeners and the chips. (Their round
+  picture, their name, who they are on MusicBrainz - "Group · Sydney · since 1973" - under it, then "2.3M listeners"
+  once Last.fm answers, and at the band's right the chips: "6 in your library" in green, "2 in the collection", "10
+  more to get". The toolbar: **Play**, **Shuffle**, then Studio only | Everything once their albums on MusicBrainz are
+  asked, and - only for someone who may - **Artist images…**, **Move albums…** and **Which artist is this?** at its end;
+  in a window of 880 those three fold into a **•••**. The status bar: "16 albums", "6 in your library", "59 songs".)
+- **560 Top Songs and Most played.** **Not done yet.** Each plays from the tap; Most played matches the albums' plays.
+  (On the Mac a double-click or Return plays from a song, as an album's songs do; a top song you don't have opens the
+  album you don't have, its row spinning while it's asked; a right-click on a song you have gives its menu. Top Songs
+  shows all ten, with "From Last.fm" under it, and comes after the discography when Last.fm answered late. Most played
+  lists each song once - a song on two pressings is one row, its number the most-played copy's, the number its album's
+  page shows under **Plays**. A song you have never played isn't listed.)
+- **561 The discography.** **Not done yet.** Each album shows its format; Play, Open and Get work. (Columns: Album,
+  Year, Songs, In your library - the chip, then the album's format, "FLAC · 24-bit / 96 kHz", once its songs have come,
+  or "2 pressings" for one of theirs you hold twice, or "not in your library" - and the buttons. An album of yours has
+  **Play** and **Open**; one nobody has, **Get**, which opens the album you don't have; one of theirs the library holds,
+  **Open**. A double-click or Return opens a row; a right-click on an album of yours gives its menu. Studio only and
+  Everything change the rows. Offline an album with nothing on this Mac is dimmed and does nothing. The table is as
+  tall as its rows at every View > Row Size: the page scrolls, never the table.)
+- **562 An artist on the phone.** **Not done yet.** As drawn. Top Songs plays; Get opens the album you don't have; the
+  managers' two open their sheets. (Under the round picture and the name, who they are on MusicBrainz and the
+  listeners; **Play** the purple button and **Shuffle** its word in purple, side by side - one over the other at the
+  largest text sizes; Top Songs' five on thin lines with **See All**; then the strip: **Studio only** and
+  **Everything**, the chosen one white over a short purple line, then - only for someone who may - **Artist images…**
+  and **Move albums…**, which open their sheets and are never shown chosen; then **Albums** with its count at its end,
+  "16 · 6 yours", and each album on a thin line: yours and theirs the library holds with the chevron, one nobody has
+  with **Get** in purple words. The bar's **•••** holds Which artist is this?. With VoiceOver an album is one item -
+  "Low, 1977 · not in your library" - its actions holding Get; a top song you have is one item whose actions hold Add
+  to Queue and Add to a playlist….)
+- **563 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 562, or "not done yet".
+
 #### Requests (570-573)
 
 **Not done yet.** Requests in the new look: on the Mac a table of its own, with Search Soulseek in the toolbar and the
@@ -6724,13 +6786,13 @@ track, a picture and anywhere you type keep a face. Nothing works any differentl
 download or two on Requests and something queued.
 
 **Not flat yet**, each until the slice that redraws it: Settings and its pages, Sign in and the server address (R9);
-Search, an album's Get and Choose a source's cards (R7); the rest of an artist's page below its top, and its Artist
-images and Move albums sheets (R6); Edit album's pages (R10 and R11); Needs a look (R12); Library care and the Event
-log (R13); People and Server settings (R14); and the EQ's own pages - Correction's search and a filter's editor -
-which no slice has taken yet. Those keep iOS's grouped lists and their grey rows for now: don't count them in 612.
+Search, an album's Get and Choose a source's cards (R7); Edit album's pages (R10 and R11); Needs a look (R12); Library
+care and the Event log (R13); People and Server settings (R14); and the EQ's own pages - Correction's search and a
+filter's editor - and an artist's Artist images and Move albums sheets, which no slice has taken yet. Those keep iOS's
+grouped lists and their grey rows for now: don't count them in 612.
 
 - **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
-  Requests, an album, a playlist, an artist's top, Now Playing's sheet and Search Soulseek…'s sheet - not the screens
+  Requests, an album, a playlist, an artist's page, Now Playing's sheet and Search Soulseek…'s sheet - not the screens
   above that aren't flat yet: is anything still a grey box laid on top? Is every button still plainly a button, and
   does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while
   your finger is on it - an album's Shuffle, **Same source again**, a card's ✕, the EQ's output, Downloaded's **Not
@@ -6743,7 +6805,7 @@ which no slice has taken yet. Those keep iOS's grouped lists and their grey rows
   line, the same black as the page under them - an album's and a playlist's page too, with no seam where they meet -
   and the mini player's cover has no line at its right; drag along its line and the time over your finger is in a
   small dark box. A Done row's ▶ is a bare purple glyph. An artist's page opens on their round picture beside their
-  name.) A tap a little beside a small button still takes: between two of the sheet's Queue, Info and EQ, the nearer
+  name, and its albums and top songs sit on thin lines.) A tap a little beside a small button still takes: between two of the sheet's Queue, Info and EQ, the nearer
   one opens; just beside the Queue's Edit or its •••, that button. With four pages (logins off), the Library's switch
   sits under the glyphs at the standard text size on a narrow phone: say whether that's all right. On the Queue,
   Shuffle and Repeat are purple words, bold while on: can you tell on from off? With the •••'s menu open, the •••

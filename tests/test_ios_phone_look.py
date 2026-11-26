@@ -1591,7 +1591,8 @@ def declared(folder: Path) -> set[str]:
 #? R4: the mini player (PhoneMiniGround, PhoneLook's sizes, DWPalette's seek line) and the tab bar (PhoneLitLine, DWCount)
 #? R5: an album's page and a playlist's on the phone (iAlbum, iPlaylist - their heroes, rows and ground), and the Add to
 #? a playlist sheet's shared buttons (PlaylistPicker's NewPlaylistFields, the Look's alone); (R1c's review) Requests'
-#? manual search sheet (its two wells, DWWellField, and the page's black)
+#? manual search sheet (its two wells, DWWellField, and the page's black); R6: an artist's page on the phone (iArtist -
+#? its top, the pair, the strip and its pushes, the rows on their hairlines) and Top Songs' section and rows
 R2_LIBRARY = {"Library/LibraryTop.swift", "Library/LibraryView.swift", "Library/LibraryTiles.swift",
               "Library/AlbumsScreen.swift", "Library/ArtistsScreen.swift", "Library/SongsScreen.swift",
               "Playlists/PlaylistsScreen.swift", "Library/LibraryLine.swift"}
@@ -1601,7 +1602,8 @@ R4_BARS = {"Player/MiniPlayerView.swift", "Root/MainTabs.swift"}
 R5_PAGES = {"Album/AlbumHero.swift", "Album/TrackRow.swift", "Album/AlbumView.swift", "Playlists/PlaylistView.swift"}
 #? R4b: Now Playing's scrubber, sunken as the meter is (DWCorners' meter shapes, DWPalette's well and fill)
 R4B_FACE = {"Player/ScrubberView.swift"}
-SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE
+R6_PAGES = {"Artist/ArtistView.swift", "Artist/TopSongsSection.swift"}
+SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",
