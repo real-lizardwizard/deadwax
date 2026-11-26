@@ -434,8 +434,8 @@ The rest of the differences:
   downloaded one's menu shows at once. After Edit album writes to an album, or a change you make to a playlist, the
   menu waits for deadwax's new answer, so it never queues songs that have gone. An album deadwax no longer has but
   that's downloaded on this Mac has its page's menu - Add to Queue and Album info, no Add to a playlist, Edit album or
-  download items. Artists have no right-click menu, as their rows have no •••. The EQ's correction and the event log's
-  lines keep their long-press menus, as a right-click.
+  download items. Artists have no right-click menu, as their rows have no •••. The EQ's correction keeps its long-press
+  menu, as a right-click; the event log's lines have none on the Mac (its toolbar's Copy, and ⌘C).
 - **Row Size.** **View > Row Size** sets how tall the rows are in every list the Mac draws as its own: **Small** - as
   they've always been, rows 30 points tall with a cover 20 across - **Medium** (40, with a cover of 28) or **Large**
   (52, with a cover of 40). The one in use is ticked. **Make Bigger** ⌘+ and **Make Smaller** ⌘− go one size at a time
@@ -490,9 +490,10 @@ The rest of the differences:
   - **Edit album** is a sheet 760 points wide - the width an artist's page reads at - and as tall as the window less 40
     points above and below, so it always fits inside the window, whatever its size (on macOS 15 or later; on macOS 14
     it's the size macOS gives a sheet). Release, Tags, Artwork, Lyrics and Delete album… open inside it, as on the phone.
-  - **Manage's pages** - Edit an album's Choose the folder, Needs a look, Library care, In nobody's library, Server
-    settings and each of its groups, the event log, People and a person's page - sit in the middle of the page at the
-    same readable width as an album's, scrolling with the pointer anywhere across the page.
+  - **Manage's pages** - Edit an album's Choose the folder, Needs a look, Server settings and each of its groups,
+    People and a person's page - sit in the middle of the page at the same readable width as an album's, scrolling
+    with the pointer anywhere across the page. **Library care** (In nobody's library with it) and the **event log** are
+    the Mac's own pages, across the whole page: their buttons in the toolbar, their counts in the status bar.
   - **Tab** goes to the next field, and **Shift-Tab** back, in the order they're drawn: Edit album's Release and Edit
     tags, People's Add a person and Reset password. Past the last field (or before the first) Tab is the Mac's own.
   - **Return in a field never applies, saves or deletes** there: Apply, Save changes and Delete permanently are clicks.
@@ -504,7 +505,8 @@ The rest of the differences:
   - **The event log's lines** are selected as a Mac list's rows are: click a line, ⌘-click to add another, ⇧-click for
     a run of them, or - once a line is selected - **Edit > Select All** ⌘A for every one. **Edit > Copy** ⌘C copies
     them as they're shown - each line's time, level, part and words, one to a line, newest first - ready to paste into
-    Notes or a message. Copy is dimmed with no line selected. Right-click a line for Copy of that one line, as before.
+    Notes or a message. Edit > Copy is dimmed with no line selected; the toolbar's **Copy** takes the lines selected,
+    or every line shown when none is. A line has no right-click menu.
   - **A run and ⌘Q.** While a Library care run (or Re-time saved lyrics) is under way its page says what quitting
     does: "Quitting deadwax stops the run - open deadwax again, and Get covers carries on." (Get CD art or Get lyrics
     for theirs; "Quitting deadwax stops it - open deadwax again, and running it again carries on." for Re-time). ⌘Q
@@ -2636,24 +2638,29 @@ on."
 "Reading the library" while deadwax reads it; if that fails, "Couldn't read the library." with **Try again**; when
 deadwax has no library to read (`LIBRARY_PATH` unset or missing), it says so instead. Then:
 
-- **Rescan**: what the library holds and how old the scan is ("7 albums · 87 tracks · 425 MB · Scanned 3 min ago in
-  2s"), the **Rescan** button, and under it why it's there: "Use Rescan after editing tags in another program:
+- **Rescan**: the **Rescan the library** button, with how many albums the library holds and how old the scan is
+  beside it ("7 albums · 3 min ago"; VoiceOver hears the whole line, "7 albums · 87 tracks · 425 MB · Scanned 3 min
+  ago in 2s", which is the Mac's Last read), and over it why it's there: "Use Rescan after editing tags in another program:
   deadwax spots a changed album by its folder's date, and editing tags in place doesn't change it. Albums added from a
   download show up without it." Rescan reads every file again - "Rescanning…" on the button, "Rescanning - reading
   every file again…" in the line above, a minute or more on a big library - and the count beside Needs a look follows
   once it's done. If it gets no answer in five minutes, it says "deadwax may have finished this - looking again" and
-  reads the library to see. If reading it again fails, "Couldn't read the library just now." with **Try again**.
+  reads the library to see. If reading it again fails, "Couldn't read the library just now." with **Try again** (under the words, across
+  the page, at the largest text sizes).
 - **Covers, CD art and lyrics**: **Narrow to** (Artist, album or folder) and what the runs act on ("The runs act on
   the whole library: 8 album folders.", or "The runs act on 3 of 8 album folders: those matching "portishead"."),
-  then **Covers**, **CD art** and **Lyrics**, each with **Get covers · N**, **Get CD art · N** or **Get lyrics · N** -
-  N the album folders it would take, and no button when there are none - and what it will do, as the web app says it
+  then a row each for **Covers**, **CD art** and **Lyrics**: what its run would take, short ("14 albums without a
+  cover", or "Every matched album has its cover"), and **Get · N** - N the album folders it would take, and no button
+  when there are none. VoiceOver hears the whole of it: "Get covers · 14", and what it will do as the web app says it
   ("14 album folders matched to a release with no cover in the whole library. Each cover comes from the Cover Art
   Archive…"). A cover is fetched for an album matched to a release with no cover, CD art for one matched to a release
-  with no disc picture from deadwax yet, lyrics for one with no lyrics at all.
+  with no disc picture from deadwax yet, lyrics for one with no lyrics at all. Under the three: "One album at a time,
+  and nothing else about an album changes. The screen stays on while a run is under way and this page shows."
 
 **A run** fetches one album at a time, each through the same step as that album's own **Get** in [Edit
-album](#edit-album). While it runs, its button is **Stop after this album · 3 of 12** (the third album is the one
-being fetched): tap it and it says "Stopping after 3 of 12", finishes that album and goes no further. When it ends it
+album](#edit-album). While it runs, its row has a meter and where it is - "3 of 12 · Post · Björk", the third album
+being the one fetched - and **Stop** (VoiceOver: "Stop after this album · 3 of 12"): tap it and it says
+**Stopping…**, finishes that album and goes no further. When it ends it
 says what it did, as the web app does ("Got 10 covers. 1 has none in the Cover Art Archive. 1 failed - run it again to
 try it again."; lyrics are counted in tracks), VoiceOver reads it, and it stays on the page until that run starts
 again. Needs a look's count follows each album a run saved something for. After a run that saved something, the page
@@ -2663,8 +2670,7 @@ never comes back over the albums it has just done.
 **One run at a time on the phone** (the web app runs the three at once): while one goes, the others' buttons are
 dimmed, with "One run at a time - this one can start once Covers has finished." under them. The run is the app's, not
 the page's: go back to Settings, or to another tab, and it carries on, its result still there when you come back. **The
-screen stays on** while a run goes and Library care is in front ("The screen stays on while a run is under way and this
-page shows." under its button) - and only then. **A run stops after the album it's on** when the app goes to the
+screen stays on** while a run goes and Library care is in front (the note under the three says so) - and only then. **A run stops after the album it's on** when the app goes to the
 background (lock the phone, or switch apps: iOS stops an app soon after), when deadwax goes out of reach, when your
 session ends, or when an admin takes Edit albums away (deadwax refuses the next album - counted as failed - and the run
 stops there) - and says so after its result: "Got 14 covers. Stopped at 14 of 60. It stopped as the app went to the
@@ -2673,8 +2679,8 @@ Start it again and it takes only the albums still without, since it asks again w
 ends, nothing is read under the sign-in; sign in again and Library care reads the library again. Signing out stops a
 run before its next album, and the next person's Library care starts afresh.
 
-**In nobody's library** (with logins on, for someone with Look after the library) is a row under the runs, opening a
-page of its own: how many albums nobody has in their library ("3 albums nobody has in their library", or "Every album
+**In nobody's library** (with logins on, for someone with Look after the library) is a row under the runs, in **The
+collection** with **Flagged downloads** - each with its count, and both opening the same page of its own: how many albums nobody has in their library ("3 albums nobody has in their library", or "Every album
 in the collection is in somebody's library."), the first 20 of them with their folders, then **Show all 37** (and
 **Show fewer**). Under **Flagged downloads**, each download nobody was given because every file was already in a
 folder that holds another pressing or an untagged copy - who asked for it and why - with **Add for them** (it goes
@@ -2784,11 +2790,16 @@ opens or for Settings > Manage > Server settings - and it can't be closed, or sw
 logins are off) is the web app's event log on the phone: what deadwax has said since it started - the last 500 lines it
 keeps - newest first, and each new line as deadwax logs it. It's a page pushed on Settings:
 
-- **Under the bar**, where the live feed stands, in one line: "Connecting…" with a grey dot, "Live" with a green one
-  once deadwax is sending, and "Lost the live feed - reconnecting…" in amber while it's gone. It's never a line of the
-  log itself, so a feed that drops and comes back fills nothing with failures.
-- **What it's for**: "What deadwax has said since it started - the last 500 lines - newest first. Clear empties this
-  view only."
+- **In the bar**, where the live feed stands, in a chip: "Connecting…", "Live" in green once deadwax is sending,
+  "Reconnecting…" in amber while it's gone, and "Not live" when deadwax refused it. It's never a line of the log
+  itself, so a feed that drops and comes back fills nothing with failures. Beside it, **Copy** and **Clear**. At the
+  largest text sizes (the slider's two top steps in Settings > Display & Brightness > Text Size, and every
+  accessibility size) the chip moves under the bar, over the levels, so Back, Copy and Clear keep their room; it
+  stops growing at the slider's top step, as the bars do, and VoiceOver hears the whole line ("Lost the live feed -
+  reconnecting…").
+- **Under the bar**, the levels: **Everything**, **Warnings** and **Errors**, each with how many lines it shows
+  ("Warnings 2") - Warnings shows the errors too, Errors the errors (and CRITICAL) alone. "No warnings or errors in
+  this view." when a level has none.
 - **The lines**, newest at the top: each its time on the phone's clock (14:03:27), its level - ERROR (and CRITICAL) in
   red and WARNING in amber, their words the same colour; the rest plain - and which part of deadwax said it, over what
   it said, which wraps. "Reading what deadwax kept…" until the first read answers; "Nothing logged yet." when there's
@@ -2796,16 +2807,20 @@ keeps - newest first, and each new line as deadwax logs it. It's a page pushed o
 
 **Copy**: a long press on a line offers **Copy**, which puts it on the clipboard as drawn - its time, level and part,
 then its words, all on one line unless the words run over several - to paste into a message or an issue. VoiceOver has
-Copy among a line's actions. (The web app has no Copy: select the text there.)
+Copy among a line's actions. **Copy** in the bar puts every line the level shows there, newest first ("Copied 6
+lines", VoiceOver says). (The web app has no Copy: select the text there.) On the Mac the lines are a table you select
+in, with Find in the log in the toolbar (see [the Mac](#the-mac-app)).
 
-**Clear**, in the bar, empties the page on this phone: "Cleared. New lines show here as deadwax logs them." Nothing is
+**Clear**, in the bar, empties the page on this phone (VoiceOver's hint: "Empties this view only - deadwax keeps its
+lines, and new ones still come."), whichever level shows: "Cleared. New lines show here as deadwax logs them." Nothing is
 cleared on deadwax - the web app's log still has every line - and what was cleared doesn't come back when you leave and
 return: only what deadwax logs after it does. It's dimmed with nothing to clear.
 
 **The feed is live only while the page shows with the app in front.** Go back to Settings, to another tab, or out of
 the app, or open Now Playing over it, and it stops: nothing keeps the phone awake or runs in the background for it.
 Come back and the lines deadwax kept are read again, then the feed picks up from the last line the page has - what was
-logged meanwhile fills in, nothing twice. If the feed drops, the line says "Lost the live feed - reconnecting…" and it's
+logged meanwhile fills in, nothing twice. If the feed drops, the chip says "Reconnecting…" (VoiceOver: "Lost the live
+feed - reconnecting…") and it's
 asked for again 5 seconds later from the last line held, so nothing logged meanwhile is missed (as long as deadwax
 still keeps it: its last 500). While deadwax answers with an error - restarting behind a proxy, say - it's asked again
 every 5 seconds until it's back. If nothing answers at all - WireGuard off, the Wi-Fi gone - the app soon finds
@@ -2814,11 +2829,11 @@ keepalive every 15 seconds while it has nothing to say, so a connection that goe
 lost within 45 seconds. When deadwax has restarted, its new lines come in above the last run's.
 
 **While deadwax can't be reached**, a page that has heard nothing yet says "Managing needs deadwax. This opens once
-it's back."; one that has keeps its lines under the amber line Edit album shows, with "Lost the live feed -
-reconnecting…" under the bar, and picks up once deadwax is back. If the kept lines can't be read, it says so in red -
+it's back."; one that has keeps its lines under the amber line Edit album shows, with "Reconnecting…" in the bar's
+chip, and picks up once deadwax is back. If the kept lines can't be read, it says so in red -
 "Couldn't load the lines deadwax kept - what happens from now still shows.", or why ("Can't connect to deadwax. Check
 your connection.") - with **Try again**, and the feed opens all the same: new lines still come in, and the next read
-fills in the rest. If deadwax refuses the feed, the line says "Not live", why is said in red ("Couldn't open the live
+fills in the rest. If deadwax refuses the feed, the chip says "Not live", why is said in red ("Couldn't open the live
 feed." when deadwax gave no words of its own) with Try again, and it isn't asked for again until you tap it - or until
 the page is shown again, the app comes back from the background, deadwax comes back in reach, or Now Playing is put
 away. Without Settings and the log - an admin took it away - it says "This page needs a permission an admin
@@ -2828,7 +2843,7 @@ line once - its words, then its level, time and part - and says when the feed is
 the same breath: "Not live. Couldn't open the live feed."), and when it's live again after either, and when the kept
 lines couldn't be read; when deadwax goes out of reach, the app's own banner line and its "Back online" say it instead.
 With Reduce Motion on, new lines don't slide in; at the largest text sizes a line's time, level and part stack over
-its words, the part wrapping rather than cut short.
+its words, the part wrapping rather than cut short, and **Try again** goes under what went wrong, across the page.
 
 ### People
 
@@ -6896,6 +6911,46 @@ first, and start one more so something is coming.
   sizes Check goes under the address. This phone > Change address is the old screen, in a box now.)
 - **579 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 577-578, or "not done yet".
 
+#### Library care and the Event log (594-597)
+
+**Not done yet.** Library care, In nobody's library and the Event log in the new look - the Mac's toolbar and boxes,
+the phone's flat pages. Nothing works any differently: a run still fetches one album at a time, and Stop still lets
+the album under way finish. Have a few albums without a cover (or CD art, or lyrics), and a warning or an error in the
+log.
+
+- **594 Library care.** **Not done yet.** On the Mac, run Get covers, then Stop after this album. (The sidebar's
+  **Library care**: the toolbar has **Rescan the library**, then **Get covers · N**, **Get CD art · N** and **Get
+  lyrics · N** - dimmed with nothing to get - and the page has boxes: Rescan, with when the library was last read;
+  Covers, CD art and lyrics, with Narrow to and a row for each; and, with logins on, In nobody's library and Flagged
+  downloads - at the right in the window as it opens, under the rest in a narrower one. Click Get covers: it lights
+  up - "Getting covers · 1 of 14" - the row's meter moves album by album with the album being fetched under it, and
+  **Stop after this album** shows at the toolbar's right. Click it: it says "Stopping after 4 of 14", the album under
+  way finishes, the run stops there and its result shows under the row. Get covers again carries on with the albums
+  still without. The status bar says how many album folders there are and what each Get would take, and the run at its
+  right. Hold the pointer over anything cut short - the album being fetched, an album or its artist in In nobody's
+  library, a flag's name or who asked - and its whole words show, an album's folder too; an album without tags reads
+  "Unknown album", its artist only in the Artist column.)
+- **595 The log.** **Not done yet.** Live, the filters, Copy and Clear work. (On the Mac, the sidebar's **Event log**:
+  the chip says **Live** once deadwax is sending, and new lines come in at the top. **Everything | Warnings | Errors**
+  narrows the lines - Warnings shows the errors too - and **Find in the log** narrows them to the lines holding every
+  word you type. Click a line, ⇧- or ⌘-click more, and **Copy** (or ⌘C) puts those on the clipboard - with none
+  selected, every line shown: paste into a note to see. **Clear this view** empties it; nothing is cleared on deadwax,
+  the cleared lines don't come back under any level, and new ones still come. Select an INFO line and pick
+  **Errors**: it's let go of, so Copy and ⌘C take the errors shown, and it isn't selected when you go back to
+  Everything. The stripes stay with their lines as new ones come in at the top, and a From cut short shows the whole
+  part under the pointer. The status bar counts the lines kept, the warnings and the errors.)
+- **596 Both on the phone.** **Not done yet.** 594-595 on the phone. (Settings > Manage > **Library care** is flat:
+  **Rescan the library** with the scan's short facts beside it, "7 albums · 3 min ago" - VoiceOver reads the whole
+  line; Narrow to in its box; a row each for Covers, CD art and
+  Lyrics with what it would take and **Get · N** - tap one and its row has a meter, "4 of 14 · Post · Björk" and
+  **Stop**, which turns to **Stopping…** and lets that album finish. The collection's two rows, In nobody's library and
+  Flagged downloads, both open In nobody's library. The **Event log** has the chip, **Copy** and **Clear** in its bar
+  and **Everything | Warnings 2 | Errors 1** under it - the counts the lines each shows; a line's long press still has
+  Copy. At the two largest Text Size steps and the accessibility sizes, the chip is under the bar instead, over the
+  levels, with Back, Copy and Clear all in reach; Try again, on either page, goes under its words. Show all in In
+  nobody's library scrolls smoothly with a few hundred albums.)
+- **597 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 596, or "not done yet".
+
 #### Row Size (608-609)
 
 **Not done yet.** On the Mac, **View > Row Size** makes every list's rows Small, Medium or Large, and ⌘+ and ⌘− step
@@ -6957,14 +7012,14 @@ track, a picture and anywhere you type keep a face. Nothing works any differentl
 download or two on Requests and something queued.
 
 **Not flat yet**, each until the slice that redraws it: Settings' Debug page;
-Edit album's pages (R10 and R11); Needs a look (R12); Library care and the Event log (R13); People and Server settings
-(R14); and the EQ's own pages - Correction's search and a filter's editor - and an artist's Artist images and Move
+Edit album's pages (R10 and R11); Needs a look (R12); People and Server settings (R14); and the EQ's own pages - Correction's search and a filter's editor - and an artist's Artist images and Move
 albums sheets, which no slice has taken yet. Those keep iOS's grouped lists and their grey rows for now: don't count
 them in 612.
 
 - **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
   Requests, an album, a playlist, an artist's page, Now Playing's sheet, Search Soulseek…'s sheet, Search, an album
-  you don't have, Choose a source, Settings and its pages (Debug aside), Settings > Downloads and the sign-in -
+  you don't have, Choose a source, Settings and its pages (Debug aside), Settings > Downloads, Library care, In
+  nobody's library, the Event log and the sign-in -
   not the screens
   above that aren't flat yet: is anything still a grey box laid on top? Is every button still plainly a button, and
   does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while

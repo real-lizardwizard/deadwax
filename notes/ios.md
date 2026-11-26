@@ -20978,3 +20978,238 @@ r9-core-mutate2.py); all 37 and the three in Core fail:
   empty field with VoiceOver on; Return in the password running Check.
 - The Mac's Settings: one column at 1280 by eye (the sum says the two buttons need 478 of 475); the first ask on the
   Mac's Downloaded.
+
+## The redesign, slice R13: Library care and the Event log (2026-11-25)
+
+The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R13: Library care and the
+event log, each in its own look on each device - the Mac's toolbar and boxes (LibraryCare.dc.html, EventLog.dc.html),
+the phone's flat pages (iLibraryCare, iEventLog), in ~/Desktop/Code/deadwax-plans/mac-redesign/. Built on ed819e69
+(R9). The app is still 0.13 (13); `__version__` untouched; no server data new (no diff to Core's DeadwaxClient or
+Routes, nor App/Shared/Routes.swift - R10's in this wave); no engine file touched. **The runs are unchanged**: still
+CareRunModel's, driven from the client one album at a time, Stop ending a run after the album under way (CareRuns'
+`stop` and `next`, not touched), and a Get fetches what the album's own Get in Edit album does - it applies, retags
+or chooses nothing.
+
+### The phone (iLibraryCare, iEventLog)
+
+- **Library care** (LibraryCareScreen) is a SettingsPage - flat groups on the page's black, the large title. Its
+  **Rescan** group: Rescan's words (Core's `rescanWords`, as before), then **Rescan the library** - a flat button - with
+  the scan's facts beside it on its first baseline, in the readout face and t3, their age moving on (TimelineView), and
+  a read again that failed under them. (After review: the drawing's short facts, "140 albums · 2 min ago" - Core's
+  `shortFacts` - the whole line VoiceOver's; and Try again under its words at the accessibility sizes.) Its **Covers, CD art and lyrics** group: **Narrow to** (DWFieldRow with a
+  DWField - a box: anywhere you type keeps its face), what the runs act on, and one row per kind (iLibraryCare's
+  `.go`): its name (62 wide at least), what its Get would take, short ("14 albums without a cover", "Every matched
+  album has its cover", Checking the library… while the scan isn't one to trust - Core's `rowLine`), and **Get · 14**;
+  while its run goes, a meter (DWMeter, the sunken track) and "4 of 14 · Post · Björk" in the readout face (`runLine`:
+  the album being fetched, as Stop says it, and that album; the count alone between two albums), and **Stop**, then
+  **Stopping…** (dimmed) once pressed. The waiting line ("One run at a time - …") and the run's result stay under the
+  row. Under the group, `runsNote`: "One album at a time, and nothing else about an album changes. The screen stays on
+  while a run is under way and this page shows." VoiceOver reads a row once - its name, its line or where its run is
+  (`spokenRow`), the waiting line and the result - with the long words (`note`) its hint and Get's or Stop's whole
+  words (`startLabel`, `stopLabel`) its actions. **The collection** (with logins on, for Look after the library):
+  **In nobody's library** and **Flagged downloads**, each with its count (DWCount), both opening In nobody's library's
+  page - Flagged downloads has no page of its own (that would be a route, and App/Shared/Routes.swift is R10's).
+- **In nobody's library** (HeldByNobodyScreen) is a SettingsPage too: its group (the line, the albums on the
+  hairlines, Show all) and **Flagged downloads** (each flag its name, who asked, why; **Add for them** the purple one,
+  small, and **Dismiss** flat). The model (HeldModel, Held.Flow's one write at a time) is unchanged.
+- **The event log** (EventLogScreen): the bar holds the **chip** (Connecting…, Live, Reconnecting…, Not live - Core's
+  `chipWords`; Live green, Reconnecting… amber, VoiceOver its whole words), **Copy** (every line shown, "Copied 6
+  lines" said) and **Clear** (its hint `clearHint`: "Empties this view only - deadwax keeps its lines, and new ones
+  still come."). Under it the **level strip** (PhoneStrip): Everything, Warnings 2, Errors 1 - each with the count of
+  the lines it would show (`stripWords`, Core's `count`); **Warnings shows the errors too** (`shows`: any level but
+  info). Then the problem in red with Try again, as before, and the lines: time, level and part each in the readout
+  face on one first baseline, the words under them in the body face (red for an error, amber for a warning), the row's
+  hairline (iEventLog's 9 over, 10 under). "Nothing logged yet." / "No warnings or errors in this view." when none
+  shows. A line's long press still has Copy, VoiceOver's actions too. **The old line under the bar is gone** (the
+  StreamLine - "Live" with its dot, "Lost the live feed - reconnecting…"), and the "What it's for" line with it: the
+  chip says where the feed stands and Clear's hint what Clear does. The model (EventLogModel, EventStream) is
+  unchanged, its announcements too. (After review: the chip is in the bar up to xLarge and under it larger, capped at
+  xxxLarge - see "After review" below.)
+
+### The Mac (LibraryCare.dc.html, EventLog.dc.html)
+
+- **Library care** (MacLibraryCarePage, `.libraryCare` and `.heldByNobody` both) is a MacPage. Its **toolbar**:
+  **Rescan the library**, a groove, **Get covers · 14**, **Get CD art · 3**, **Get lyrics · 5** (dimmed with none to
+  take, or while it may not start - its help says why: another run, or what it would do), the running kind's button
+  **lit** - "Getting covers · 4 of 14", pressing nothing - and at the right **Stop after this album**, then "Stopping
+  after 4 of 14". It folds: in a narrow window while a run goes the Gets go into a **Get** pop-up beside the lit one,
+  narrower still everything into a **Library care** pop-up. The page: **Rescan** (its words; Last read, the scan's
+  facts in the readout face, ticking), **Covers, CD art and lyrics** (Narrow to, 300 wide; what the runs act on; a row
+  per kind - its name, its line or the meter with "4 of 14" beside it and the album under it, and the row's own
+  **Stop after this album** or **Get covers · 14**; `runsNote`; and while a run goes what quitting does, as slice 7
+  had it), **In nobody's library** (a table, Album and Artist, striped, Row Size's rows; the line; Show all) and
+  **Flagged downloads** (Album, The flag, the buttons). **Two columns** - the runs at the left, the collection at the
+  right - from a page of 1014 (`twoColumns`: two of Flagged downloads' widest row, 120 + 150 + 180 in a box, the gap
+  and the page's sides), which the window as it opens (a page of 1060) is; one column at the smallest window (660) and
+  beside a side panel (589). A GeometryReader decides, not ViewThatFits (which measures Text unwrapped, so two columns
+  of wrapping notes would never fit). The status bar: "8 album folders · 14 without a cover · 3 without CD art · 5
+  without lyrics" - the very counts the Gets carry - and "Run: 4 of 14" at its right. (After review: all of it from one
+  `LibraryCare.Snapshot` a render; In nobody's library's rows lazy; every cut cell's whole words its help; the Album
+  cell the album alone.)
+- **The event log** (MacEventLogPage): the toolbar - **Everything | Warnings | Errors** (DWSegmented, large), **Find in
+  the log** (260, as drawn: every word typed, across the words, the part and the level - Core's `finds`), the chip,
+  **Copy** and **Clear this view**; it folds to a levels pop-up with Find at 180, then 120 without the chip. The lines
+  are a table - Time, Level, From, What happened (92, 96, 124 and the rest: **Level 96, not the drawing's 78**, since
+  WARNING's chip with its face is 73 wide, in its cell's 10 either side), striped, Row Size's height, each line's cells
+  on one first baseline in the readout face - selectable (SelectingList: click, ⇧ and ⌘; ⌘C copies). **Copy** takes the
+  lines selected still shown, else every line shown (`copyShown`); **Clear this view** empties the view and lets the
+  selection go. No right-click (the pages have no •••). The status bar: "6 lines kept · 2 warnings · 2 errors", and
+  "Live · newest first" at its right. (After review: a selection the level or Find hides is let go of; the stripes
+  follow each line's own number; From's whole words its help.)
+- test_ios_mac_reach's PHONES_PAGES gives up `.libraryCare`, `.heldByNobody` and `.eventLog`; MacManage routes them to
+  the Mac's own pages.
+
+R1c's **Not flat yet** (above, and docs/ios.md over checks 612-614) named "Library care and the Event log (R13)":
+docs/ios.md's list no longer does, and 612 names Library care, In nobody's library and the Event log among the pages to
+look at.
+
+### Core (CarePages.swift)
+
+The words and rules both devices draw: LibraryCare's `collection`, `rescanLibrary`, `lastRead`, `oneAtATime`,
+`runsNote`, `rowLine`, `getShort`, `stopShort`, `runLine`, `runCount`, `runAlbum`, `runFraction`, `getting`,
+`toolbarStop`, `spokenRow` and the Mac's `status`; Held's columns, `askedBy`, `flagShort`, `spokenRow`; EventLog's
+`Shown` (everything, warnings, errors), `shows`, `finds`, `shown`, `count`, `stripWords`, `stripSaid`, `copyShown`,
+`copied`, `chipWords`, `noneShown`, `clearView`, `clearHint`, `findPrompt`, `columns` and the Mac's `status`. Held by
+CarePagesTests (9). After review: LibraryCare's `shortFacts` and `Snapshot`, Held's `albumCell` and `albumHelp`,
+EventLog's `keptSelection` and `striped` - CarePagesTests 14.
+
+### The words (iphone.json and mac.json)
+
+None changed.
+
+### Left out, and why
+
+- **This run's list of albums** (the drawing's per-album lines under a run): CareRuns keeps the run's counts and its
+  album out, not each album's outcome - it would be new model state.
+- **Navidrome's scan status** beside Rescan (the drawing's): nothing on the page holds it.
+- **Add for them ▾** on an album nobody has (the drawing's, giving it to someone): no route or API for it.
+- **A flag's peer** ("from …"): Held.Flag doesn't carry it.
+- **A Flagged downloads page of its own** on the phone: it would need a route (R10's Routes.swift); both rows open In
+  nobody's library, which shows the flags.
+- **A right-click Copy on the Mac's log rows**: the right-click rule (test_ios_mac's PHONE_LONG_PRESSES; the Mac's
+  pages have no •••) - Copy, ⌘C and VoiceOver's action instead.
+- **The drawing's short Rescan words**: Core's `rescanWords` kept, as the web's say it.
+
+### Tests
+
+- tests/test_ios_care_look.py (new): the phone's three pages flat (no Form, List, Section, inset style, old palette or
+  type; SettingsPage; the large title); everything they draw on the phone's path the hairlines alone (R1c's `drawn()`,
+  R13_DRAWS), a planted face caught, the purple Add for them the one faced button, Narrow to a DWField; the rows as
+  drawn (Rescan's baseline, the row's 62, the meter and its line, Get · N and Stop, the `.go` height, the collection's
+  two rows); the strip's counts and Copy's lines; every gate on both devices (the permissions, `rescanOpen`,
+  `startOpen` - each Get's, the toolbar's and the pop-up's counted -, `heldShown`, Held.Flow, `log.allowed`, the
+  hooks); Stop only ever `care.stop` (counted: 2 on the phone, 4 on the Mac) and CareRunModel's `stop` only
+  `runs.stop`; Clear `log.clear()` on both, once; no writer on the care pages; the Mac's routes, no phone piece on its
+  pages, one scroll each, no right-click; Row Size's rows; VoiceOver's elements and actions; the accessibility sizes
+  (stacked, buttons across, three lines); the fits - each toolbar at 1060, 660 and 589 (ios_fonts' widths), the two
+  columns' threshold computed from the constants, the log's Level and Time columns, a phone row's line room.
+- The shared files, R13's entries only: test_ios_phone_look.py (R13_PAGES in SLICES; TEXT_INPUTS gives up Library
+  care's SYSTEM field - Narrow to is a DWField), test_ios_event_log.py (the page as drawn: the chip, the strip, the
+  shown lines, the tones, the readout face per part), test_ios_mac.py (the log's selection read from MacEventLogPage,
+  no right-click on the Mac's; the quit note read from MacRunsBox, `runsNote` holding `screenOnNote`),
+  test_ios_palette.py (TICKING: the phone's facts and the Mac's), test_ios_mac_reach.py (PHONES_PAGES without the
+  three; MACS_OWN).
+- Core: CarePagesTests.
+
+### Mutations
+
+Each applied alone, the named tests run, the file put back - the page ones to a copy of the worktree (scratchpad
+r13-mutate.py), Core's in the worktree (r13-core-mutate.py); tests/test_ios_care_look.py unless named. Every one
+caught:
+- The flat rule: a grey face (`.background(DWPalette.panel)`) on the runs' note - `test_the_phones_pages_draw_no_grey_box`;
+  In nobody's library back in a Form - `test_library_care_and_the_log_are_flat_on_the_phone`.
+- The typing rule: Narrow to a plain TextField - test_ios_phone_look's
+  `test_every_place_you_type_on_the_phone_is_still_a_box`.
+- Warnings hiding errors: the phone's lines filtered by the page itself (warnings alone) - test_ios_event_log's
+  `test_the_page_draws_as_the_spec_says`; the Mac's - `test_clear_empties_this_view_only_on_both`. In Core, `shows`
+  for Warnings as `== .warning` - CarePagesTests' `warningsTakesErrorsTooAndErrorsTheErrorsAlone`.
+- Cleared lines coming back: the phone's Clear not calling `log.clear()`, the Mac's only letting the selection go -
+  `test_clear_empties_this_view_only_on_both`. In Core, `emptied()` forgetting the last line held (`next.last = 0`) -
+  CarePagesTests' `clearedLinesNeverComeBackUnderAnyLevel`.
+- Stop not waiting for the album under way: the Mac's toolbar Stop as `care.reset()`, CareRunModel's `stop` also
+  bumping `generation` (the album out let go) - `test_stop_waits_for_the_album_under_way_everywhere`. In Core,
+  CareRuns' `stop` finishing the run at once - LibraryCareTests' `stopLandsAfterTheAlbumOutOnce`.
+- Smaller: the Mac's toolbar Get without `startOpen`, the phone's Get never dimmed -
+  `test_every_part_is_gated_as_the_phones_page_was_on_both` (the first passed until the toolbar's Gets were counted);
+  two columns from 880, the log's Level back at 78 - `test_the_macs_boxes_take_two_columns_only_where_they_fit`; a
+  run's row without its actions - `test_voiceover_reads_each_row_once_with_its_buttons_as_actions`; a button's words
+  one line at every size - `test_at_the_accessibility_sizes_rows_stack_and_buttons_take_three_lines`.
+
+### After review
+
+The review's ten findings, each fixed in the same commit, each with its test and the mutation that undoes it (scratchpad
+r13-review-mutate.py on a copy, r13-core-review-mutate.py in Core; every one caught - tests/test_ios_care_look.py unless
+named):
+
+1. **The phone's chip had no size cap.** In a ToolbarItemGroup, DWChip's footnote-relative, fixedSize words grew with
+   the accessibility sizes - "Reconnecting…" some 359 points at AX5 - and from AX3 pushed Copy, Clear or Back out of
+   reach. Capped at xxxLarge (plan 3.3, the bars'), it is still 164 points, more than a 375 phone's bar leaves beside
+   Back, Copy and Clear (some 143: the bar's 16 either side, Back's 44, Copy and Clear at 17 with their 12, 8 between) -
+   so the chip is in the bar up to xLarge (133), and under the bar from xxLarge, over the strip, where the old
+   StreamLine was (`LiveChip.inBar`, `barsLargest`). Held down in the bar, the large content viewer shows its words.
+   `test_the_chip_in_the_bar_stops_growing_at_xxxlarge` (the widths from ios_fonts: fits at xLarge, not at xxLarge,
+   fits the page capped, what the cap stops); mutations: the cap removed, the chip in the bar at every size, in the bar
+   to xxxLarge, none under the bar.
+2. **Stop and Get wired to another kind survived** (they were counted, not compared). `test_each_stop_and_get_acts_on_
+   its_own_kind` compares every `care.stop`/`care.start` argument per view - the row's `kind`, the toolbar's
+   `under.kind` - and the totals; mutations: the phone row's Stop as `care.stop(.covers)`, the Mac toolbar's Stop as
+   `care.stop(.covers)`, the Mac row's Get as `care.start(.covers)`.
+3. **Gates and bindings that survived**, each pinned in its own chain: HeldFlagRow's buttons, per button whichever way
+   they are laid out (`buttons(open:)`, both branches call it) - `test_every_part_is_gated_as_the_phones_page_was_on_both`;
+   the Mac row's `.disabled(runs.stopping(kind))` - `test_stop_waits_for_the_album_under_way_everywhere`; the levels
+   pop-up's `selection: $level` - `test_clear_empties_this_view_only_on_both`; the chip's
+   `.accessibilityElement(children: .ignore)`, its whole chain - `test_voiceover_reads_each_row_once_with_its_buttons_
+   as_actions`. Mutations: each dropped, the pop-up on `.constant(level)`.
+4. **The Mac log kept a selection the filters hid** (an INFO line selected, Errors picked: Edit > Copy dimmed while the
+   toolbar's Copy took every error; with Everything again Copy took the stale line alone). `.onChange(of:
+   shown.map(\.id))` lets go of what the lines shown no longer hold (Core's `keptSelection`, the live state's).
+   `test_a_selection_the_level_or_find_hides_is_let_go_of`, CarePagesTests' `aSelectionTheLevelOrFindHidesIsLetGo`;
+   mutations: the prune removed; `keptSelection` returning `selected`.
+5. **The phone's Rescan facts** (`facts`, some 453 points in the readout face) beside a button that leaves some 204.
+   The drawing's line is 158: its short facts, "140 albums · 2 min ago" (`shortFacts`: the albums as the scan counts
+   them, the age; Reading every file again… while it rereads), beside the button; the whole line VoiceOver's (and the
+   Mac's Last read). `test_the_phones_rows_are_the_drawings` and `test_the_phones_rows_fit_a_phone` (the real whole
+   facts string measured, over twice the room; the short ones fit), CarePagesTests'
+   `theFactsBesideRescanAreTheDrawingsShortOnes`; mutations: the whole facts back beside the button; `shortFacts`
+   without its age; counting folders, not albums.
+6. **The live log's stripes flickered** (striped by place: every row flipped as a line came in). `EventLog.striped`: the
+   line's own number from deadwax, else the page's count of lines taken. R6's `MacTable.stripes` counts places - right
+   for a list that holds still, not a live one - so it isn't used here. `test_the_live_logs_stripes_stay_with_their_lines`,
+   CarePagesTests' `aRowsStripeIsItsOwnAsLinesComeIn`; mutations: by place; striped by nothing (`true`); by the count
+   alone.
+7. **Cut Mac cells said nothing more**: `.help` with the whole words on the album being fetched, a flag's name and
+   Asked for by, the Album cell (the album and artist, then the folder - `Held.albumHelp`) and the Artist cell, and the
+   log's From. `test_every_cut_mac_cell_has_its_whole_words_as_help` (every `.truncationMode` on the Mac's two pages has
+   its `.help` before the next cell); mutations: each of the six removed; in Core, the help without its folder.
+8. **An untagged album repeated its artist** ("Unknown album · Björk" beside "Björk"): `Held.albumCell`, the album
+   alone. The same test, CarePagesTests' `theAlbumCellNamesTheAlbumAloneItsHelpTheWhole`; mutations: the cell back to
+   `albumName`; in Core, `albumCell` as `albumName`.
+9. **Try again beside its words at the accessibility sizes**: Library care's failed read again (now RereadFailure) and
+   the log's Problem stack the words over Try again, which goes across the row, its words on up to three lines
+   (CareButtonWords). `test_at_the_accessibility_sizes_rows_stack_and_buttons_take_three_lines`; mutations: each beside
+   at every size; the log's words one line.
+10. **Performance.** In nobody's library's Show all is a LazyVStack on both (inside the page's one scroll, as the List
+    was) - `test_show_all_is_lazy_on_both`; mutations: a VStack on each. The Mac page works its scan out once a render,
+    `LibraryCare.Snapshot` (the scope narrowed once, each kind's targets and Start), passed to the toolbar, the status
+    bar, the runs' box and each row - `test_the_mac_narrows_the_scan_once_a_render`, CarePagesTests'
+    `theMacsSnapshotAnswersAsCareRunsDo` (equal to CareRuns' own in every state: no read, ready, not allowed, out of
+    reach, narrowed, a run under way, behind the disk); mutations: a row building its own snapshot; in Core, Start
+    ignoring the run under way, the scope not narrowed, a kind still checking dropped from the counts (the optional-
+    chain subscript set that bit while it was written).
+
+Left as they were, as the review said: the planWords/careLine change, ErrorNote's font on the Mac, the chip in
+Franklin.
+
+### Not verified - only a phone and a Mac can say (checks 594-597)
+
+- Everything drawn: no Simulator here, and James's installed Mac app was running, so the Mac smoke run wasn't done.
+  Both apps build (the iPhone's Debug, the Mac's Release).
+- Whether Catalyst's List draws its own selection over or under the log's drawn selection fill; the toolbar's glass
+  behind the chip on iOS 26; the Mac's toolbars folding where the sums say.
+- A run's meter and line moving album by album, Stop landing after the album out, and the screen kept on - on a phone
+  and on the Mac (slice 7's display kept awake, unchanged; the note says "the screen" on both).
+- The accessibility sizes, VoiceOver's rows and actions, the strip's counts as lines come in.
+- After review: the bar's room is an estimate (the bar's sides, Back's width, the gaps between items) - whether
+  xLarge is really the last size the chip fits beside Back, Copy and Clear, and the chip under the bar at xxLarge up,
+  are the phone's to say; whether Catalyst's tooltips show the helps on the cut cells; Show all scrolling a few hundred
+  albums.

@@ -1323,7 +1323,8 @@ TEXT_INPUTS = {
     "Get/ManualSearchSheet.swift": [WELL, WELL], "Get/SourcesSheet.swift": [OWN],
     "Library/AlbumsScreen.swift": [SYSTEM], "Library/ArtistsScreen.swift": [SYSTEM], "Library/LibraryView.swift": [WELL],
     "Library/SongsScreen.swift": [SYSTEM], "Look/DWField.swift": [WELL],
-    "Manage/LibraryCareScreen.swift": [SYSTEM], "Manage/PeopleScreen.swift": [SYSTEM],
+    # (R13) Library care's Narrow to is DWField now, the look's well - its file holds no field of its own
+    "Manage/PeopleScreen.swift": [SYSTEM],
     "Manage/PeopleSheets.swift": [SYSTEM] * 7, "Manage/ServerSettingsGroupScreen.swift": [SYSTEM, SYSTEM],
     "Playlists/PlaylistPicker.swift": [SYSTEM],
     # (R1c's review) Edit's name and description: a plain List's rows draw no box, so the look's wells
@@ -1620,7 +1621,11 @@ R9_PAGES = {"You/YouView.swift", "You/AccountSection.swift", "You/PlaybackSectio
             "You/GettingAlbumsSection.swift", "You/ManageSection.swift", "You/DownloadsRow.swift",
             "You/ChangePasswordScreen.swift", "Root/SignInView.swift", "Root/ServerAddressView.swift",
             "Downloads/DownloadsScreen.swift"}
-SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES
+#? R13: Library care, In nobody's library and the event log on the phone, flat (iLibraryCare, iEventLog - the groups and
+#? their hairlines, the runs' rows with their meters, Narrow to on the look's well, the level strip, the mono lines;
+#? tests/test_ios_care_look.py holds what each draws)
+R13_PAGES = {"Manage/LibraryCareScreen.swift", "Manage/HeldByNobodyScreen.swift", "Manage/EventLogScreen.swift"}
+SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R13_PAGES
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

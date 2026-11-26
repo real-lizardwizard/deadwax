@@ -5,15 +5,18 @@ import SwiftUI
 /// Library care > In nobody's library (Phase 8, slice 7 - notes/ios-specs/phase8-managing.md 6; the web's
 /// app/HeldByNobody.tsx, inline on its Library care): with logins on, an admin's (Look after the library) - how many
 /// albums in the store are in nobody's library, the first 20 of them (Show all), and the downloads flagged for a look,
-/// each with Add for them and Dismiss. Pushed here, where the web draws it under the runs.
+/// each with Add for them and Dismiss. Pushed here, where the web draws it under the runs - from both of Library care's
+/// collection rows (there is no route of Flagged downloads' own). (The redesign, slice R13 - notes/ios.md "The redesign,
+/// slice R13: Library care and the Event log") Drawn flat, as Library care is: the large title, two groups on the page's
+/// black, their rows on hairlines. The Mac draws all of it in Library care's own boxes (MacLibraryCarePage).
 ///
 /// One write at a time (Core's Held.Flow): a second tap asks nothing more, and nothing is asked out of reach or before a
 /// read to trust. After each, whatever came of it, the list is read again. A refusal is said in deadwax's words (EditWords
 /// .said over the web's "Couldn't add it for them."); one that never answered may have finished - said, and the list read
 /// again to see. What a write did is spoken as the web's hidden line says it. Rows are known by their ids; VoiceOver reads
-/// each once. Nothing is done past a sign-out: the model's session is AppNavigation's when the page opened. Nothing is
-/// read under the sign-in over the app (its 401 would only be said as a failure); once it goes, the list is read again.
-/// A flag's buttons stay off while the list is read - the read after a write included.
+/// each once, a flag's buttons its actions. Nothing is done past a sign-out: the model's session is AppNavigation's when
+/// the page opened. Nothing is read under the sign-in over the app (its 401 would only be said as a failure); once it
+/// goes, the list is read again. A flag's buttons stay off while the list is read - the read after a write included.
 struct HeldByNobodyScreen: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
@@ -40,11 +43,10 @@ struct HeldByNobodyScreen: View {
                     Text(EditWords.needsDeadwax)
                 }
             } else {
-                list
+                page
             }
         }
         .navigationTitle(Held.title)
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             model.attach(server: server, navigation: navigation, reachability: reachability)
             visible = true
@@ -79,55 +81,64 @@ struct HeldByNobodyScreen: View {
 
     // MARK: the page
 
-    private var list: some View {
+    private var page: some View {
         let online = reachability.online
-        return List {
+        return SettingsPage {
             if let answer = model.answer {
-                Section {
+                PhoneGroup(legend: Held.title) {
                     Text(Held.line(answer.count))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
-                    ForEach(Held.listedAlbums(answer.albums, all: model.all)) { (album: Held.UnheldAlbum) in
-                        HeldAlbumRow(album: album)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, CareLook.groupPad)
+                        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
+                    // (R13's review) lazy, as the List it was: Show all can be hundreds of albums, inside the page's
+                    // one scroll
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(Held.listedAlbums(answer.albums, all: model.all)) { (album: Held.UnheldAlbum) in
+                            HeldAlbumRow(album: album)
+                        }
                     }
                     if let more = Held.showLabel(all: model.all, count: answer.albums.count) {
                         Button(more) {
                             model.all.toggle()
                         }
+                        .buttonStyle(DWButtonStyle())
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, CareLook.rowPad)
                     }
                 }
                 if !answer.flags.isEmpty {
-                    Section {
+                    PhoneGroup(legend: Held.flagged) {
                         ForEach(answer.flags) { (flag: Held.Flag) in
-                            flagRow(flag, online: online)
+                            HeldFlagRow(flag: flag, model: model, online: online)
                         }
-                    } header: {
-                        Text(Held.flagged)
-                            .font(Typeface.footnote)
                     }
                 }
                 if let words = model.refused ?? model.problem {
-                    Section {
-                        ErrorNote(text: words)
-                    }
+                    ErrorNote(text: words)
+                        .padding(.top, CareLook.noteAbove)
                 }
             } else if let problem = model.problem {
-                Section {
+                VStack(alignment: .leading, spacing: CareLook.lines) {
                     ErrorNote(text: problem)
                     Button(LibraryCare.tryAgain) {
                         Task { await model.read() }
                     }
+                    .buttonStyle(DWButtonStyle())
                     .disabled(model.reading || !online)
                 }
+                .padding(.top, CareLook.noteAbove)
             } else {
-                Section {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                        Text(Held.loading).foregroundStyle(Palette.quiet)
-                    }
-                    .accessibilityElement(children: .combine)
+                HStack(spacing: CareLook.gap) {
+                    ProgressView()
+                    Text(Held.loading)
+                        .foregroundStyle(DWPalette.t2)
                 }
+                .font(Typeface.Phone.text(.small))
+                .padding(.top, CareLook.noteAbove)
+                .accessibilityElement(children: .combine)
             }
         }
         .transaction { (transaction: inout Transaction) -> Void in
@@ -139,49 +150,94 @@ struct HeldByNobodyScreen: View {
             await model.read()
         }
     }
+}
 
-    /// A flagged download: its name, who asked and why nobody was given it, and its two buttons.
-    private func flagRow(_ flag: Held.Flag, online: Bool) -> some View {
+/// A flagged download: its name, who asked and why nobody was given it, and its two buttons - Add for them the
+/// primary's face (a filled button keeps its face on the flat phone), Dismiss flat in the accent. One VoiceOver element,
+/// its buttons its actions; at the accessibility sizes the buttons stack, each across the row, their words on up to three
+/// lines.
+private struct HeldFlagRow: View {
+    let flag: Held.Flag
+    let model: HeldModel
+    let online: Bool
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
         let open = model.flow.open(online: online, reading: model.reading)
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: CareLook.lines) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Held.flagName(flag))
-                    .font(Typeface.body.weight(.semibold))
+                    .font(Typeface.Phone.text(.row).weight(.semibold))
+                    .foregroundStyle(DWPalette.text)
                 Text(Held.flagWords(flag))
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
             }
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityElement(children: .combine)
-            HStack(spacing: 16) {
-                Button(Held.addForThem) {
-                    model.act(flag, .add, online: online)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // each button off on its own (R13's review): one gate on each, whichever way they are laid out
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: CareLook.lines) {
+                    buttons(open: open)
                 }
-                .buttonStyle(PrimaryFace())
-                Button(Held.dismiss) {
-                    model.act(flag, .dismiss, online: online)
+            } else {
+                HStack(spacing: CareLook.gap) {
+                    buttons(open: open)
                 }
-                .buttonStyle(.borderless)
             }
-            .disabled(!open)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, CareLook.rowPad)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(Held.flagName(flag)), \(Held.flagWords(flag))")
+        .accessibilityActions {
+            if open {
+                Button(Held.addForThem) { model.act(flag, .add, online: online) }
+                Button(Held.dismiss) { model.act(flag, .dismiss, online: online) }
+            }
+        }
+    }
+
+    @ViewBuilder private func buttons(open: Bool) -> some View {
+        let across = typeSize.isAccessibilitySize
+        Button {
+            model.act(flag, .add, online: online)
+        } label: {
+            CareButtonWords(words: Held.addForThem)
+        }
+        .buttonStyle(DWButtonStyle(kind: .pri, size: .small, fills: across))
+        .disabled(!open)
+        Button {
+            model.act(flag, .dismiss, online: online)
+        } label: {
+            CareButtonWords(words: Held.dismiss)
+        }
+        .buttonStyle(DWButtonStyle(size: .small, fills: across))
+        .disabled(!open)
     }
 }
 
-/// An album nobody has: its name, then its folder - read once.
+/// An album nobody has: its name, then its folder - read once, on the group's hairline.
 private struct HeldAlbumRow: View {
     let album: Held.UnheldAlbum
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(Held.albumName(album))
+                .font(Typeface.Phone.text(.row))
+                .foregroundStyle(DWPalette.text)
             Text(album.path)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .lineLimit(2)
                 .truncationMode(.middle)
         }
+        .padding(.vertical, CareLook.rowPad)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .lookHeight(PhoneLook.goRow)
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
         .accessibilityElement(children: .combine)
     }
 }

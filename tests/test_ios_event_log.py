@@ -272,18 +272,27 @@ def test_the_page_draws_as_the_spec_says():
     # without the permission it says so and asks nothing; out of reach before anything was heard, it needs deadwax
     assert "if !log.allowed {" in body and "Text(EditWords.noPermission)" in body
     assert "Text(EditWords.needsDeadwax)" in body
-    # Clear in the bar, off with nothing to clear; the stream's state under it
+    # Clear in the bar, off with nothing to clear - (R13) its hint what the web's line under the bar said - and where the
+    # stream stands beside it, a chip (iEventLog's), whenever the line under the bar was drawn - (R13's review) in the
+    # bar up to xLarge, under it larger (test_ios_care_look's test_the_chip_in_the_bar_stops_growing_at_xxxlarge)
     assert "Button(EventLog.clear) {\n                        log.clear()" in body
-    assert ".disabled(feed.log.lines.isEmpty)" in body
-    assert ".safeAreaInset(edge: .top, spacing: 0) {" in body and "StreamLine(state: feed.stream)" in body
-    lines = code[code.index("@ViewBuilder private func lines"):code.index("private struct StreamLine")]
-    # the web's line first, then what went wrong with Try again, then the lines newest first - keyed by identity
-    assert lines.index("Text(EventLog.pageLine)") < lines.index("Problem(words: problem)") < lines.index("ForEach(")
-    assert "ForEach(feed.log.lines) { (line: EventLog.Line) in" in lines
+    assert ".disabled(feed.log.lines.isEmpty)" in body and ".accessibilityHint(EventLog.clearHint)" in body
+    assert ("if live(feed) && LiveChip.inBar(typeSize) {\n"
+            "                        LiveChip(state: feed.stream)") in body
+    assert ("private func live(_ feed: EventStream.Feed) -> Bool {\n"
+            "        reachability.online || feed.heard || !feed.log.lines.isEmpty\n    }") in code
+    assert "StreamLine" not in code and ".safeAreaInset(" not in code
+    lines = code[code.index("@ViewBuilder private func lines"):code.index("struct LiveChip")]
+    # (R13) the level strip first, then what went wrong with Try again, then the lines the level shows, newest first -
+    # keyed by identity
+    assert lines.index("PhoneStrip(") < lines.index("Problem(words: problem)") < lines.index("ForEach(")
+    assert "let shown = EventLog.shown(feed.log.lines, level)" in body
+    assert "ForEach(shown) { (line: EventLog.Line) in" in lines
     assert "indices" not in lines and "\\.offset" not in lines and "enumerated()" not in lines
-    # a first read that hasn't answered: said, never "Nothing logged yet." while it isn't known
+    # a first read that hasn't answered: said, never "Nothing logged yet." while it isn't known - and (R13) a level that
+    # shows none of the lines says so, never "Nothing logged yet." over lines kept
     assert "if feed.reading {" in lines and "Text(EventLog.reading)" in lines
-    assert "Text(EventLog.empty(feed.log))" in lines
+    assert "Text(feed.log.lines.isEmpty ? EventLog.empty(feed.log) : EventLog.noneShown(level, find: \"\"))" in lines
     # (after review) no label on the List: on a container that isn't an element of its own it can go to every row
     assert "accessibilityLabel" not in lines and "listLabel" not in code
     # under Reduce Motion, nothing slides in: no animation, and none an `.animation` above could add
@@ -300,13 +309,19 @@ def test_the_page_draws_as_the_spec_says():
     part = row[row.index("private var part: some View {"):row.index("private func copy()")]
     assert ".lineLimit(typeSize.isAccessibilitySize ? nil : 1)" in part
     assert ".fixedSize(horizontal: false, vertical: typeSize.isAccessibilitySize)" in part
-    # levels as the web colours them: errors the danger text, warnings amber
-    assert "case .error: return Palette.danger" in row and "case .warning: return Palette.amber" in row
-    # the time in the data face
-    assert ".font(Typeface.mono(.caption))" in row
-    stream = code[code.index("private struct StreamLine"):code.index("private struct Problem")]
-    assert "case .live: return Palette.greenIcon" in stream and "case .lost: return Palette.amberIcon" in stream
-    assert "state == .lost ? Palette.amber : Palette.quiet" in stream
+    # levels as the web colours them: (R13) errors the red chip's words, warnings amber - the look's own
+    assert "case .error: return DWPalette.redChipText" in row and "case .warning: return DWPalette.amberText" in row
+    # (R13) the time, the level and the part in the readout face (iEventLog's `.mono.xs`)
+    for part in ("private var time: some View {", "private func level(_ tone: Color?) -> some View {",
+                 "private var part: some View {"):
+        drawn = row[row.index(part):]
+        assert drawn[:drawn.index("}")].count(".font(Typeface.Phone.mono(.extraSmall))") == 1, part
+    # (R13) the stream's chip: green live, amber lost, the line's whole words to VoiceOver
+    chip = code[code.index("struct LiveChip"):code.index("private struct Problem")]
+    assert "DWChip(words: EventLog.chipWords(state), tone: Self.tone(state))" in chip
+    assert ".accessibilityLabel(EventLog.words(state))" in chip
+    assert "case .live: return .good" in chip and "case .lost: return .caution" in chip
+    assert "case .connecting, .stopped: return .plain" in chip
     # the route and Manage's row
     routes = _code(app_file("Shared", "Routes.swift"))
     assert "case eventLog\n" in routes and "case .eventLog: EventLogScreen()" in routes

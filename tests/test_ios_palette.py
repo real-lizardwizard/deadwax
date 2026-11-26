@@ -945,9 +945,15 @@ TICKING = [
     # SettingsGo's readout, which DownloadsRow hands it (test_ios_settings_look holds the hand-over)
     ("You/YouView.swift", "Text(readout)\n                        .font(Typeface.Phone.mono(.small))",
      "You's Downloads value"),
-    # Library care's facts: the scan's age
+    # Library care's facts: the scan's age - (R13) iLibraryCare's `.mono.xs.q3` beside Rescan the library (its short
+    # words since R13's review, "140 albums · 2 min ago"), and the Mac's Last read (LibraryCare.dc.html's `.kv`, `.mono.xs`)
     ("Manage/LibraryCareScreen.swift",
-     "Text(care.facts(now: context.date.timeIntervalSince1970 * 1000))\n                    .font(Typeface.readout(.footnote))",
+     "                                        rescanning: care.runs.rescanning, now: now))\n"
+     "                .font(Typeface.Phone.mono(.extraSmall))",
+     None),
+    ("Mac/Manage/MacLibraryCarePage.swift",
+     "Text(care.facts(now: context.date.timeIntervalSince1970 * 1000))\n"
+     "                            .font(Typeface.Mac.mono(.label))",
      None),
     # the EQ's values under a finger: a held slider's, a stepper's (the accessibility sizes' row, not drawn), the
     # selected handle's, the hand preamp's, a filter's row - and deadwax's own preamp, which moves as a band is dragged

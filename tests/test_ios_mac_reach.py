@@ -370,10 +370,14 @@ def test_mac_routes_says_every_route_once_each_to_its_area():
 #? R6 took .artist the same way (ArtistView's desk, MacArtistPage); .topSongs stays the phone's page.
 #? R7 took .group: GroupView still, drawing the Mac's Get page (MacGetPage) as its desk - asserted below.
 #? R9 took .downloaded and .downloadedPlaylists: the Mac's Downloaded (MacDownloadedPage), on its two tabs.
+#? R13 took .libraryCare, .heldByNobody and .eventLog: the Mac's Library care (MacLibraryCarePage, In nobody's library
+#? in its boxes - so both routes open it) and its event log (MacEventLogPage) - asserted below.
 PHONES_PAGES = {"downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
                 "account", "thisPhone", "about", "allSongs",
-                "mbArtist", "topSongs", "chooseFolder", "needsALook", "libraryCare", "heldByNobody",
-                "serverSettings", "serverSettingsGroup", "eventLog", "changePassword", "people", "person"}
+                "mbArtist", "topSongs", "chooseFolder", "needsALook",
+                "serverSettings", "serverSettingsGroup", "changePassword", "people", "person"}
+#? (R13) the routes each slice gave a Mac page of its own in place of the phone's, and the page
+MACS_OWN = {"libraryCare": "MacLibraryCarePage()", "heldByNobody": "MacLibraryCarePage()", "eventLog": "MacEventLogPage()"}
 
 
 def normalised(line: str) -> tuple[str, str]:
@@ -414,3 +418,10 @@ def test_every_area_page_is_still_the_phones_own():
     # (R7) the album you don't have: the phone's GroupView, its Mac half the Get page
     assert phone["group"] == "GroupView(route: _).readableOnMac()"
     assert drawn["group"] == "GroupView(route: _) { (desk: GroupDesk) in MacGetPage(desk: desk) }"
+    # (R13) Library care and the event log: the Mac's own pages, in Manage's area; the phone's are still the phone's
+    for case, page in MACS_OWN.items():
+        assert drawn[case] == page, f".{case}: {drawn[case]}"
+        assert areas["Manage/MacManage.swift"][case] == page, case
+    assert phone["libraryCare"] == "LibraryCareScreen().readableOnMac()"
+    assert phone["heldByNobody"] == "HeldByNobodyScreen().readableOnMac()"
+    assert phone["eventLog"] == "EventLogScreen().readableOnMac()"

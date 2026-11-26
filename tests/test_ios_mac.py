@@ -1708,17 +1708,27 @@ def test_no_key_of_deadwaxs_is_one_the_systems_menus_have():
 
 def test_the_event_logs_lines_are_selected_and_copied_with_the_systems_copy():
     app = app_sources()
-    screen = bare(app["Manage/EventLogScreen.swift"])
-    lines = _body(screen, "@ViewBuilder private func lines(_ feed: EventStream.Feed) -> some View")
-    # the list selects on the Mac (List(selection:)) and is the List it was on the iPhone
+    # (R13) the Mac's own page (MacEventLogPage): the lines the level and Find show, selected as a Mac list's rows are
+    screen = bare(app["Mac/Manage/MacEventLogPage.swift"])
+    lines = _body(screen, "@ViewBuilder private func lines(_ feed: EventStream.Feed, shown: [EventLog.Line]) -> some View")
     assert lines.count("SelectingList(selection: $selected) {") == 1 and "List {" not in lines
     assert "@State private var selected: Set<EventLog.Line.ID> = []" in screen
-    assert ("ForEach(feed.log.lines) { (line: EventLog.Line) in" in lines), "rows tagged by their own identities"
-    # Edit > Copy: the lines selected, as Core says them; Select All every line listed
-    assert re.search(r"\.copiesSelection\(\$selected, of: feed\.log\.lines\.map\(\\\.id\)\) \{ \(chosen: Set<EventLog\.Line\.ID>\) "
-                     r"-> String\? in\s*EventLog\.copyText\(chosen, of: log\.feed\.log\.lines\)\s*\}", lines)
-    # a line's right-click Copy (the phone's long press) stays as it was
-    row = screen[screen.index("private struct LogRow"):]
+    assert "let shown = EventLog.shown(feed.log.lines, level, find: typed)" in screen
+    # (R13's review) by the line's own identity - its stripe too (EventLog.striped), never its place
+    assert "ForEach(shown) { (line: EventLog.Line) in" in lines and "enumerated()" not in lines
+    assert ".listRowBackground(EventLog.striped(line) ? MacPalette.rowStripe : DWPalette.bg)" in lines
+    assert ".tag(line.id)" in lines, "rows tagged by their own identities"
+    # (R13's review) a line the level or Find hides is let go of
+    assert ("onChange(of: shown.map(\\.id)) { _, ids in\n"
+            "            selected = EventLog.keptSelection(selected, shown: ids)") in screen
+    # Edit > Copy: the lines selected, as Core says them; Select All every line shown
+    assert re.search(r"\.copiesSelection\(\$selected, of: shown\.map\(\\\.id\)\) \{ \(chosen: Set<EventLog\.Line\.ID>\) "
+                     r"-> String\? in\s*EventLog\.copyText\(chosen, of: shown\)\s*\}", lines)
+    # (R13) no right-click of its own on the Mac (the page has no •••): Copy is the toolbar's and Edit's; the phone's
+    # long press stays as it was
+    assert "contextMenu" not in screen
+    row = bare(app["Manage/EventLogScreen.swift"])
+    row = row[row.index("private struct LogRow"):]
     assert ".contextMenu {" in row and "UIPasteboard.general.string = EventLog.copyText(line)" in row
     mac, phone = _halves()
     # the Mac's list: selection, no Edit button; the iPhone's: List(content:), its selection never read
@@ -1849,11 +1859,16 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
 
 def test_a_run_under_way_says_what_quitting_does_on_the_mac():
     app = app_sources()
-    care = bare(app["Manage/LibraryCareScreen.swift"])
-    kind = _body(care, "private func kindSection(_ kind: BulkTargets.Kind, online: Bool) -> some View {")
-    running = kind[kind.index("if let stop = runs.stopLabel(kind) {"):kind.index("} else if let targets, !targets.isEmpty {")]
-    assert running.index("Text(LibraryCare.screenOnNote)") < running.index(
-        "if let quit = LibraryCare.quitNote(Platform.device, kind: kind) {\n                    Text(quit)")
+    # (R13) the Mac's own Library care (MacLibraryCarePage): under the runs, one album at a time and the screen kept on
+    # (runsNote), then - while a run goes - what quitting does to it
+    care = bare(app["Mac/Manage/MacLibraryCarePage.swift"])
+    runs = _body(care, "private struct MacRunsBox: View {")
+    assert 'runsNote: String { "\\(oneAtATime) \\(screenOnNote)" }' in (CORE / "CarePages.swift").read_text(encoding="utf-8")
+    assert runs.index("Text(LibraryCare.runsNote)") < runs.index(
+        "if let under = care.runs.under, let quit = LibraryCare.quitNote(Platform.device, kind: under.kind) {\n"
+        "                    Text(quit)")
+    # the phone's says nothing of quitting: its words are none there, and its page isn't the Mac's
+    assert "quitNote" not in bare(app["Manage/LibraryCareScreen.swift"])
     group = bare(app["Manage/ServerSettingsGroupScreen.swift"])
     retime = group[group.index("if run.running {"):]
     retime = retime[:retime.index("} else {")]
