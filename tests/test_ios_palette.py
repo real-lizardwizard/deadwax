@@ -537,9 +537,13 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert "ignoresSafeArea" not in probe_view
     probe = row[row.index("private struct TopProbe: UIViewRepresentable {"):]
     assert "guard let window else { return }" in probe
-    assert "measured?(Sample(top: convert(bounds, to: nil).minY, windowTop: window.safeAreaInsets.top," in probe
+    assert ("let top = convert(bounds, to: nil).minY\n"
+            "            let stood = still.read(top: Double(top), at: Monotonic.seconds(), presented: presented)\n"
+            "            measured?(Sample(top: top, windowTop: window.safeAreaInsets.top, presented: presented, stood: stood,"
+            ) in probe
     # when it reads: UIKit's three moments, a presentation the app made going, the scene in front, SwiftUI's asks
-    for moment in ("override func didMoveToWindow() {\n            super.didMoveToWindow()\n            soon(\"window\")",
+    for moment in ("override func didMoveToWindow() {\n            super.didMoveToWindow()\n"
+                   "            still = TopClearance.Stillness()\n            soon(\"window\")",
                    "override func layoutSubviews() {\n            super.layoutSubviews()\n            soon(\"layout\")",
                    "override func safeAreaInsetsDidChange() {\n            super.safeAreaInsetsDidChange()\n"
                    "            soon(\"safe area\")",
@@ -555,8 +559,9 @@ def test_the_librarys_top_sits_under_the_status_bar():
     clearance = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "TopClearance.swift").read_text(encoding="utf-8")
     assert "TopClearance.kept(" not in top and "func kept(" not in clearance
     take = row[row.index("private func take("):row.index("/// LibraryTop's eyes in UIKit")]
-    assert ("TopClearance.room(kept: Double(clearance), top: Double(sample.top), windowTop: Double(sample.windowTop),\n"
-            "                                     presented: sample.presented)") in take
+    assert ("TopClearance.room(kept: Double(clearance), top: top, windowTop: windowTop, presented: sample.presented,\n"
+            "                                     stood: sample.stood)") in take
+    assert "let top = Double(sample.top)\n        let windowTop = Double(sample.windowTop)\n" in take
     assert "global" not in take
     # no measuring under a presentation: the window's root view controller presenting (or the row's own controller);
     # and every sheet and cover says it has gone once it has
@@ -572,7 +577,8 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert "public static let edge = 1.0\n" in clearance and "func most(" not in clearance
     assert "return max(windowTop - max(top, 0), 0)" in clearance
     assert "private static let gap: TimeInterval = 0.25\n" in probe and "private static let tries = 12\n" in probe
-    assert "presented: presented, cause: cause))\n            readAgain()\n        }" in probe
+    assert ("presented: presented, stood: stood,\n                             cause: cause))\n            readAgain()\n"
+            "        }") in probe
     assert "if presented { readAgain() }" not in probe
     assert "func now(_ cause: String) {\n            follow(cause)\n            read(cause)\n" in probe
     assert "func soon(_ cause: String) {\n            follow(cause)\n            schedule(cause)\n" in probe
@@ -583,6 +589,36 @@ def test_the_librarys_top_sits_under_the_status_bar():
     presenting = (APP / "Shared" / "Presenting.swift").read_text(encoding="utf-8")
     assert presenting.count("onDismiss: gone(onDismiss)") == 4 and "onDismiss: onDismiss)" not in presenting
     assert "onDismiss?()\n        NotificationCenter.default.post(name: .appPresentationGone, object: nil)" in presenting
+    # (25 Nov, James's phone as the app opened: "row -15 · window 62 · down 0 · kept, row above the window · SwiftUI -15,
+    # safe 0 · after scene active, again") a row standing still above its window's edge is followed down: the same
+    # within a point on a reading and its read again (Core's Stillness, for `stillFor`, less than the probe's gap), nothing
+    # presented, no more than a whole inset above the edge - which bounds the room at twice the inset - and brought down
+    # by `windowTop - stood`, never clamped at the edge
+    still_for = float(re.search(r"public static let stillFor = ([0-9.]+)\n", clearance).group(1))
+    gap = float(re.search(r"private static let gap: TimeInterval = ([0-9.]+)\n", probe).group(1))
+    assert still_for == 0.2 and 0 < still_for < gap
+    assert ("public static func follows(top: Double, windowTop: Double) -> Bool {\n"
+            "        top.isFinite && windowTop.isFinite && windowTop > 0 && top < -edge && top >= -windowTop\n") in clearance
+    assert ("guard !presented, !settled(top: top), let stood else { return false }\n"
+            "        return follows(top: stood, windowTop: windowTop)\n") in clearance
+    assert ("if let stood, holds(top: top, windowTop: windowTop, presented: presented, stood: stood) {\n"
+            "            return windowTop - stood\n        }\n"
+            "        return room(kept: kept, top: top, windowTop: windowTop, presented: presented)\n") in clearance
+    still = clearance[clearance.index("public struct Stillness"):clearance.index("public struct Reading")]
+    assert ("guard !presented, top.isFinite, at.isFinite else {\n                self = Stillness()\n"
+            "                return nil\n            }\n") in still
+    assert ("if let stood = self.top, abs(top - stood) <= TopClearance.edge, at >= since {\n"
+            "                return at - since >= TopClearance.stillFor ? stood : nil\n            }\n"
+            "            self.top = top\n            since = at\n            return nil\n") in still
+    # the probe's stillness, on Monotonic's clock, started afresh in each window, said in every reading; take() follows it
+    # and says so in Debug's line ("held")
+    assert "private var still = TopClearance.Stillness()\n" in probe and probe.count("still = TopClearance.Stillness()") == 2
+    assert "let stood = still.read(top: Double(top), at: Monotonic.seconds(), presented: presented)\n" in probe
+    assert "let stood: Double?\n" in probe
+    assert ("let held = TopClearance.holds(top: top, windowTop: windowTop, presented: sample.presented, "
+            "stood: sample.stood)\n") in take
+    assert "presented: sample.presented,\n                                           held: held, cause: sample.cause," in take
+    assert ': held ? "held, row settled above the window" : "kept, row above the window"' in clearance
     # the last reading is Debug's
     assert "if debug.libraryTop != reading { debug.libraryTop = reading }" in take
     assert "var libraryTop: TopClearance.Reading?" in (APP / "Models" / "DebugModel.swift").read_text(encoding="utf-8")

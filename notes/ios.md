@@ -20137,3 +20137,159 @@ name at 880; the tables at each Row Size with the page scrolling, and that the l
 (after review: a MacColumnList's lines in the page's LazyVStack - never run, nor its covers counted); ↑ and ↓ in a
 table bringing the row into the page's view through the page's ScrollViewReader; a double-click on a row's buttons
 landing on the buttons alone; VoiceOver's rotor on a discography row (its Play, Open and Get).
+
+## The Library's top under the island again (2026-11-25)
+
+James, on his iPhone 17 Pro (iOS 27.2), on the ios branch with the redesign's slices in it: the Library tab's top row
+stood under the Dynamic Island as soon as the app opened. Settings > This phone > Debug's Top line, read with the row
+there:
+
+> row -15 · window 62 · down 0 · kept, row above the window · SwiftUI -15, safe 0 · after scene active, again
+
+- **What it says.** The row's top was 15 points ABOVE its window's top edge, UIKit's probe and SwiftUI's global frame
+  agreeing; SwiftUI gave it a top safe area of 0 (as on 15 Nov), the window 62. "after scene active, again" is a read
+  again - one of the twelve, a quarter second apart, after the scene became active - so -15 is where the row stayed,
+  not a moment of a move. 20 Nov's rule (a row more than a point above its window's edge is mid-move and keeps the room
+  it has) kept the 0 it had, read after read, and the row's contents stood from -15 down: in the island.
+- **Not 20 Nov's case.** Then a row read at -117.3 for a moment, just back from under Now Playing's cover, was
+  mid-move, and settled at the edge; Debug read 0 at launch. So since 20 Nov something put the Library 15 points higher.
+
+### What the code says about the 15 points
+
+Looked for from the code alone (no simulator, by the rules; nothing run on the phone), in the four suspects - R2
+(b6f8dcfa: LibraryView and LibraryTop rebuilt), R4 (e1e34d79: MainTabs, the tab bar), R2b (75ea812e: LibraryTopRow, a
+custom Layout) and R1c (31cab12d: PhoneCircleStyle's glyph box) - and in everything between the window and the row.
+**No cause was found that the code can show.**
+
+- **A VStack too tall for its place, centred** - 30 points too tall puts its top at -15 - is the shape that fits the
+  number, and it was checked first. The row's VStack is the pager's (`LibraryView.pager`): LibraryTop, OfflineBanner,
+  then the horizontal ScrollView of pages, each `.containerRelativeFrame([.horizontal, .vertical])`. For it to be 30
+  too tall, one of the three would have to need 30 more than it is given:
+  - **LibraryTop can't grow with what it is offered, nor claim less than it draws.** Its row is LibraryTopRow, whose
+    `sizeThatFits` answers `row.height` from `placed()` - the same computation `placeSubviews` places by - whatever
+    height is proposed: the 52-point band (PhoneLook.row), or the switch's own height where that is taller, or folded
+    the band, the switch and the room under it. The circles are fixed 44-point squares (PhoneCircleFace's two frames -
+    R1c changed the glyph, not the box), the switch's segments at least 36 (`lookHeight`), the hidden DWSegmentedNeed
+    fixed-size and placed on the switch, inside the band. At 0 room LibraryTop is 52 tall: 6 more than the old top's
+    46 (its 44-point circles and 2 under them), not 30.
+  - **The pager's ScrollView shrinks.** On 20 Nov the same pager (R2 only wrapped the top in `if desk == nil`, always
+    true on the iPhone, and the ScrollView in the desk's `else`) took LibraryTop's 62 points of room without the row
+    moving: the row read 0, down 62, and James said "Right height now". Had the pages not given way, the row would have
+    gone up by half of it, to -31.
+  - **The banner** is empty online (nothing drawn); offline it is about 30 tall (a footnote line and 6 above and
+    below), and would only take room from the pages.
+- **Above the pager nothing changed on the iPhone since 20 Nov.** R4 changed AppTabBar's drawing - an overlay on the
+  TabView, which moves nothing under it; TabStack, `clearsPlayer()`, `showsOfflineBanner(false)`, RootView, the scene
+  and OfflineBanner have no layout change on the iPhone (`git diff 7419ca1c`, the Mac's frames and menus aside).
+- **"safe 0" says more than it seems.** Had a parent with the window's 62 placed the row at -15, SwiftUI would say its
+  top safe area was 77, the 62 and the 15 it overlaps. It says 0: the Library's hierarchy has no top safe area at all,
+  as on 15 Nov. Where the 15 points come from is the same unknown as where the 62 went - what the TabView's and the
+  NavigationStack's UIKit containers do with the tab's view on iOS 27.2 with both of iOS's bars hidden (15 Nov: "for a
+  reason inside SwiftUI and the TabView with iOS's bars hidden that can't be found without the phone").
+
+So the cause isn't fixed; the rule that has the row clear the island whatever the cause is.
+
+### What it does now: a row settled above its window is followed
+
+Core's TopClearance, and the probe (LibraryTop.swift):
+- **Standing still** (`TopClearance.Stillness`, held by the probe): each reading is compared with where the row first
+  read in this run. Within a point (`edge`) of it, on every reading, for a fifth of a second and more (`stillFor`, 0.2 -
+  less than the probe's quarter-second gap, so a reading and the read again after it always span it, and two readings
+  in one turn of the main loop never do), the row is standing still there; further than a point, the run starts again
+  from the new top. A reading under a presentation, of no number, or on a clock read going back starts it afresh, and
+  so does the probe moving to a window (didMoveToWindow). Times are `Monotonic.seconds()` (ContinuousClock).
+- **Followed** (`TopClearance.holds`, `room(kept:top:windowTop:presented:stood:)`): with nothing presented, a row above
+  the edge (not `settled`) that has stood still at `stood`, no more than a whole inset above the edge (`follows`:
+  `-windowTop <= stood < -edge`), comes down `windowTop - stood` - not clamped at the edge, so its contents sit under
+  the inset. James's -15 under 62: 77. The room is from where it stood, so it holds still while the row does, a point
+  either way.
+- **Everything else as it was.** Under a presentation the room is kept (18 Nov), standing still or not. A row that keeps
+  moving above the edge keeps its room (20 Nov) - more than a point from where it stood, read after read. A row at the
+  edge (within a point's rounding) or below it is measured afresh - `extra`: 0 laid out under the status bar (15 Nov),
+  the inset at the edge. `room(kept:top:windowTop:presented:)`, `extra` and `settled` are unchanged, and the old
+  vectors pass as they were.
+- **20 Nov's -117 is never followed**: moving, it keeps its room; and even standing there, more than a whole inset
+  above the edge is past `follows` - mid-way through something, as 18 Nov's `most` said of it.
+- **Debug's line** says "held, row settled above the window" for a reading that followed (`Reading.held`); "kept, row
+  above the window" is still a row moving, its room kept. On the phone, as it should read now: "row -15 · window 62 ·
+  down 77 · held, row settled above the window · SwiftUI -15, safe 0 · after …".
+
+### The loop, and its bound
+
+The probe measures the row's own frame, its padding inside it (15 Nov), so a container that lays the row out from its
+top never moves it as its room grows: one follow, and it stays. But the 15 points may be a container that moves the
+row with its own room - a VStack centred because it is too tall (or too short) for its place moves the row up by half
+of whatever its padding grows; one anchored at its foot by all of it. Followed, the row would rise, be followed
+further, and rise again. Two things bound it:
+- **No more than a whole inset above the edge is followed**, so the room followed is never more than twice the inset
+  (124 on a 17 Pro): a row its own room has lifted past that is kept where it is.
+- **The room changes only when the row stands still somewhere new** - more than a point from where it last stood. A
+  container moving the row up by `k` of each change (0 laid out from the top, a half centred, 1 anchored at its foot -
+  never down: the padding is at the frame's top, inside it) moves it `k` times as far each time, so the follows stop
+  once one moves it less than a point, or once it has risen past a whole inset. The room never shrinks along the way.
+  - k 0 (the likely case - 20 Nov's pager took 62 without moving the row): once, 77, the contents at 62.
+  - k a half, from -15: 77 lifts the row to -53.5, 115.5 to -72.75 - past a whole inset, so 115.5 is kept: the
+    contents at 42.75, the glyphs (centred in the 52-point band) about 59 down, clear of the island's foot (about 48).
+  - k 1, from -15: 77 lifts it to -92, past the bound: kept at 77 - the island not cleared, but nothing runs away.
+  - TopClearanceTests' loop test runs k = 0, 0.25, 0.5, 1 and 2 from -15, -1.5, 0 and 20, forty readings a quarter
+    second apart: every room between 0 and 124, never shrinking, the last eight the same.
+- Each step waits for the row to stand still (0.2 s at least, a read again's quarter in practice); each room changed is
+  a layout, an ask, so the probe's reads again go on while the steps do, and stop 3 s after the last.
+
+### Tests
+
+- **TopClearanceTests** (Core, 12 now, the seven before unchanged):
+  - `aRowSettledAboveItsWindowIsFollowedOnceTwoReadsAgree`: James's -15 - kept on the first reading, 77 on the read
+    again, its contents at 62; within a point is standing there; a Home button's phone; the edge's rounding read
+    afresh; laid out right it comes back to 0; no inset, no room.
+  - `aRowThatKeepsMovingIsNeverFollowed`: 20 Nov's -117.3 then 0, never more than 62; -117.3 standing still never
+    followed; tops changing by more than a point; a creep standing afresh; two readings in one turn; a clock going
+    back; no number.
+  - `underAPresentationARowStandingAboveTheEdgeKeepsItsRoom`: presented, kept whatever stood; a reading under one
+    starts the standing afresh.
+  - `aRowThatMovesWithItsOwnRoomStopsAndStaysBounded`: the loop, above, and the centred case's two steps exactly.
+  - `debugSaysARowFollowedAboveTheWindowIsHeld`: the held line; moving, presented and laid out as before.
+- **`test_the_librarys_top_sits_under_the_status_bar`** (tests/test_ios_palette.py), changed only where the code did:
+  the probe's reading (`let top = …`, `stood: stood` into the Sample), didMoveToWindow starting the stillness afresh
+  before its read, and take()'s call with `stood: sample.stood`; and new, each held exactly: `stillFor` and its relation
+  to the probe's gap, `follows`, `holds`, the followed room, Stillness's two branches, the probe's clock and its two
+  starts afresh, take()'s `held` into Debug's reading, and the held word. Nothing it held before is held less.
+  test_ios_library_look.py's `test_the_top_still_clears_the_dynamic_island` passes unchanged.
+
+### Mutations
+
+Each applied alone, its suite run, restored byte for byte (scratch island-mutate.py; the tree's diff hashed before and
+after, the same). All 17 caught:
+- against TopClearanceTests: `follows` with no upper bound (the -117.3 standing still and the loop test); the followed
+  room clamped at the edge (`windowTop - max(stood, 0)`: James's 77, and two more); standing still with no time (two
+  readings in one turn); a presentation not starting the standing afresh; `holds` ignoring a presentation; the
+  standing compared with the last reading rather than where it stood (the creep, the loop); `holds` without the edge's
+  rounding (`-0.6` where it stood at `-1.5`); Debug's held word gone; `stillFor` 0.3, more than the probe's gap;
+- against `test_the_librarys_top_sits_under_the_status_bar`: a new window not starting the standing afresh; the probe
+  saying nothing stood; take() back on the old room; Debug never told held; the probe's clock stopped (`at: 0`);
+  `stillFor` 0.3; `holds` without its presented guard; `follows` with no upper bound.
+
+### Verified, and what only the phone can tell
+
+**Verified** on this tip (5f2f6065 and this commit), on James's Mac, nothing installed and no simulator:
+- `swift test`: 2380 Core, 158 audio and 12 turntable tests passed (TopClearanceTests 12);
+- the unsigned iPhone Debug build (`generic/platform=iOS`) and the unsigned Mac Catalyst Release build (arm64) both
+  succeed, with no warning but the usual AppIntents note; the project file is unchanged;
+- check_project.py: ok;
+- pytest of test_ios_*.py and test_source_bytes.py: 868 passed, 1 skipped; pyflakes over test_ios_palette.py: clean.
+
+**Not verified** - only the phone can tell (docs/ios.md check 249, its new paragraph **Not done yet.**):
+- that the row clears the island as the app opens - cold, and back from the Home Screen - with Debug's Top line
+  reading "down 77 · held, row settled above the window" (or "nothing presented" at the edge, if the 15 points have
+  gone);
+- that the container doesn't move the row with its own room (the loop's k is 0): if it does, Debug's row reads lower
+  than -15 after the follow (-53.5 for a centred container), and the pages' foot runs as far past the screen's - a
+  page's last row would no longer clear the tab bar;
+- no jump as the app opens: the first reading keeps the room it has (0 at launch), so for a quarter second the row may
+  stand in the island before it comes down - watch for a visible step;
+- that Now Playing, sheets, Find and pushed pages still leave it where it was (18 and 20 Nov's steps of 249);
+- where the 15 points come from - the code can't say (above). A reading of where the probe's own view controller's
+  view stands in the window, beside the row's, would say whether UIKit moved the container or SwiftUI's layout is too
+  tall for it: not built here.
+- The Mac runs the same code; its row never stands above its window's edge in any layout read here, so nothing on the
+  Mac should change. Not run on a Mac.

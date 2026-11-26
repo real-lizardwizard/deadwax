@@ -5144,9 +5144,18 @@ measured again once it settled. The build after that (still app 0.13 (13)) ignor
 edge, and measures again for three seconds after each time it measures - the same step, now also: no lower than
 when the app opened. On it, James, after Now Playing: "Right height now".
 
+On 25 Nov, after the redesign's new Library top, James found the row under the island again as soon as the app opened.
+Its Debug line said the row stood 15 points above the screen's top edge, measure after measure, and the build ignored
+it as it had the moment after Now Playing. The build after that (still app 0.13 (13)) brings down a row that stands
+still above the edge - the same on two measures a quarter of a second apart, nothing open over it - by what it stands
+above the edge and the island's room, so the row ends up under the island. One that is still moving is ignored, as
+before. **Not done yet** on that build: the first sentence below, from a cold start (swipe deadwax away in the app
+switcher, then open it) and from the Home Screen with it already running, then the rest of the check.
+
 - **249 Clear of the Dynamic Island.** Open the Library: the magnifying glass, the switch and the ••• sit wholly
   below the Dynamic Island and the status bar's time and battery, none of them touching it, with the bar's colour
-  running up behind the status bar and nothing of the pages showing there. Open Now Playing, close it: the row is
+  running up behind the status bar and nothing of the pages showing there. The row's foot and the line under it (the
+  count, the order, Yours | All) are whole too, and a page's last row still clears the tab bar. Open Now Playing, close it: the row is
   still clear, and no lower than when the app opened - do it a few times, closing it each way you can (its control, a
   swipe down), and once with Find open first. Scroll a page up: it goes under the row's foot, never up behind the status bar. Tap the magnifying glass:
   Find's field opens under the row, the keyboard up, and the row stays put; type, Cancel. Swipe between the pages, and tap the switch: as before. Turn off Wi-Fi and
@@ -5156,7 +5165,8 @@ when the app opened. On it, James, after Now Playing: "Right height now".
   doesn't move. If any of the row still touches the island, or sits lower than it did, a screenshot of it says where
   it stands - and then,
   without opening anything else first, Settings > This phone > Debug's **Library** section: its **Top** line
-  ("row … · window … · down … · …") is the row's last measure; send it as it reads.
+  ("row … · window … · down … · …") is the row's last measure; send it as it reads. "held, row settled above the
+  window" in it means the row stood above the screen's edge and was brought down from there.
 
 ### The tab bar, lower's check (250)
 

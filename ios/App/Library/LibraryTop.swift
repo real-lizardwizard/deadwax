@@ -36,6 +36,12 @@ import UIKit
 /// 117 points above its top edge, came down twice the inset, then settled at the edge with nothing telling the probe. So
 /// a row above its window's top edge keeps the room it has (TopClearance.settled), and every ask is followed by reads
 /// again for a while, whatever is presented, so the row is read once it has settled.
+///
+/// Under the island again as the app opened (25 Nov; notes/ios.md "The Library's top under the island again"): Debug read
+/// the row 15 points above its window's edge, read after read, and 20 Nov's rule kept its 0. So a row standing still
+/// above the edge - the same within a point on a reading and its read again, nothing presented (the probe's
+/// TopClearance.Stillness) - comes down what it stands above the edge and the inset (TopClearance.holds), "held" in
+/// Debug's line; one that moves keeps its room, and one more than a whole inset above the edge is never followed.
 struct LibraryTop<Find: View, Switch: View, More: View>: View {
     /// Find is open: its field drawn under the row.
     let finding: Bool
@@ -53,7 +59,8 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
 
     @Environment(DebugModel.self) private var debug
     /// How far the row comes down under the status bar and the island (TopClearance.room): measured afresh with nothing
-    /// presented, kept as it is under a presentation.
+    /// presented, kept as it is under a presentation and while the row moves above its window's edge, followed down while
+    /// it stands still there (25 Nov).
     @State private var clearance: CGFloat = 0
     /// The probe behind the row, for SwiftUI's own moments: the row appearing, SwiftUI's geometry for it changing.
     @State private var eyes = TopProbe.Eyes()
@@ -137,16 +144,19 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
         wide > 0 && LibraryTopFit.folds(needs: Double(needs), width: Double(wide))
     }
 
-    /// The probe's reading: the room worked out again (TopClearance.room - kept under a presentation, afresh otherwise),
-    /// and the reading kept for Debug, each only when it changed.
+    /// The probe's reading: the room worked out again (TopClearance.room - kept under a presentation or while the row
+    /// moves above its window's edge, afresh at the edge or below it, and since 25 Nov the row standing still above it
+    /// followed down), and the reading kept for Debug, each only when it changed.
     private func take(_ sample: TopProbe.Sample) {
-        let room = TopClearance.room(kept: Double(clearance), top: Double(sample.top), windowTop: Double(sample.windowTop),
-                                     presented: sample.presented)
+        let top = Double(sample.top)
+        let windowTop = Double(sample.windowTop)
+        let room = TopClearance.room(kept: Double(clearance), top: top, windowTop: windowTop, presented: sample.presented,
+                                     stood: sample.stood)
         if CGFloat(room) != clearance { clearance = CGFloat(room) }
         let said = swiftUI.count == 2 ? swiftUI.map { (value: CGFloat) -> Double in Double(value) } : nil
-        let reading = TopClearance.Reading(top: Double(sample.top), windowTop: Double(sample.windowTop), room: room,
-                                           presented: sample.presented, cause: sample.cause,
-                                           swiftTop: said?[0], swiftSafe: said?[1])
+        let held = TopClearance.holds(top: top, windowTop: windowTop, presented: sample.presented, stood: sample.stood)
+        let reading = TopClearance.Reading(top: top, windowTop: windowTop, room: room, presented: sample.presented,
+                                           held: held, cause: sample.cause, swiftTop: said?[0], swiftSafe: said?[1])
         if debug.libraryTop != reading { debug.libraryTop = reading }
     }
 }
@@ -203,6 +213,10 @@ private struct LibraryTopRow: Layout {
 /// read - and a cover going reads afresh as soon as it has gone, even should its onDismiss come before UIKit lets it go.
 /// A sheet left up longer keeps the room until its going is said.
 ///
+/// (25 Nov) Each reading says too where the row has stood still (TopClearance.Stillness, on Monotonic's clock - started
+/// afresh in each window and by a reading under a presentation): a reading and its read again a quarter second later
+/// that agree within a point, so a row settled above its window's edge is followed down, and one moving never is.
+///
 /// Nothing in it is drawn or touchable, and VoiceOver passes it by.
 private struct TopProbe: UIViewRepresentable {
     /// LibraryTop's hold on its probe, for SwiftUI's own moments. Weak: the probe is UIKit's to keep.
@@ -210,12 +224,14 @@ private struct TopProbe: UIViewRepresentable {
         weak var probe: Probe?
     }
 
-    /// One reading: the row's top in its window, the window's top inset, whether something is presented over it, and
-    /// what asked.
+    /// One reading: the row's top in its window, the window's top inset, whether something is presented over it, the
+    /// top the row has stood still at (25 Nov - TopClearance.Stillness; nil while it moves, and under a presentation),
+    /// and what asked.
     struct Sample {
         let top: CGFloat
         let windowTop: CGFloat
         let presented: Bool
+        let stood: Double?
         let cause: String
     }
 
@@ -248,6 +264,9 @@ private struct TopProbe: UIViewRepresentable {
         private var left = 0
         /// The last ask - what Debug's "after …" says of a read again ("window, again").
         private var asked = ""
+        /// (25 Nov) The row's readings in turn: whether it stands still above its window's edge, to be followed down
+        /// (TopClearance.Stillness) - started afresh in each window.
+        private var still = TopClearance.Stillness()
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -264,6 +283,7 @@ private struct TopProbe: UIViewRepresentable {
 
         override func didMoveToWindow() {
             super.didMoveToWindow()
+            still = TopClearance.Stillness()
             soon("window")
         }
 
@@ -315,13 +335,16 @@ private struct TopProbe: UIViewRepresentable {
             }
         }
 
-        /// Where the row's top is in its window, that window's top inset and whether something is presented over it,
-        /// told to LibraryTop - nothing out of a window. Then a read again, while any are left.
+        /// Where the row's top is in its window, that window's top inset, whether something is presented over it and
+        /// where the row has stood still, told to LibraryTop - nothing out of a window. Then a read again, while any are
+        /// left.
         private func read(_ cause: String) {
             guard let window else { return }
             let presented = presentedOver(window)
-            measured?(Sample(top: convert(bounds, to: nil).minY, windowTop: window.safeAreaInsets.top,
-                             presented: presented, cause: cause))
+            let top = convert(bounds, to: nil).minY
+            let stood = still.read(top: Double(top), at: Monotonic.seconds(), presented: presented)
+            measured?(Sample(top: top, windowTop: window.safeAreaInsets.top, presented: presented, stood: stood,
+                             cause: cause))
             readAgain()
         }
 
