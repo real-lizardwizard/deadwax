@@ -474,8 +474,9 @@ def test_the_bars_run_smooth_only_while_the_song_plays():
     assert fill.index("Rectangle().fill(DWPalette.seekFill)") < fill.index("}")
     # (review) the scrubber's two hold its fill and its clocks alone - the track and the touch outside them - and it
     # runs only while it can be seen: Now Playing's flag, the turntable's look and the sheets over it
-    order = [scrubber.index(part) for part in ("Rectangle().fill(Color.primary.opacity(0.2))", "TimelineView(",
-                                               "Rectangle().fill(Color.primary.opacity(0.85))", ".gesture(press(",
+    # (R4b) the track sunken, its fill the meter's (tests/test_ios_now_playing_look.py)
+    order = [scrubber.index(part) for part in ("DWCorners.meterShape\n", "TimelineView(",
+                                               "DWCorners.meterFillShape.fill(DWPalette.meterFill)", ".gesture(press(",
                                                "ScrubberClocks(elapsed:")]
     assert order == sorted(order)
     second = scrubber.index("TimelineView(", order[1] + 1)

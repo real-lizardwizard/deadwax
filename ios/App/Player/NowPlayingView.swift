@@ -7,14 +7,15 @@ import SwiftUI
 /// Previous, Play/Pause, Next, Repeat (2.0.14) - and (the redesign, R3 - notes/ios.md "The redesign, slice R3: the
 /// side panel's tabs; the Now Playing sheet"; iNowPlaying.dc.html) the bottom row in the footer's place: five labelled
 /// icons, Queue, Lyrics, the output, Info, EQ (NowPlayingTabs.row). The ••• is up beside the look button. It closes
-/// from the chevron or a drag down its top half past PlayerWords.dismissDistance, begun past dragStartDistance - the
+/// from Close (the chevron until R4b) or a drag down its top half past PlayerWords.dismissDistance, begun past
+/// dragStartDistance - the
 /// cover and the row above it are the grip, the bar and the buttons below keep their own gestures.
 ///
 /// ONE SHEET (R3): Queue, Info and EQ open Now Playing's one sheet on their tab (NowPlayingSheet) - in place of its
 /// three, Up Next, Info and the EQ - and the sheet up already moves to the tab asked for; Lyrics never opens it.
 ///
 /// LYRICS (app 0.4, notes/app-lyrics.md 4.1-4.3): with Lyrics on, the song's lyrics take the cover's place - the cover
-/// and the room around it - and the chevron's row alone is the grip, so scrolling them never drags the sheet; the title,
+/// and the room around it - and the top row alone is the grip, so scrolling them never drags the sheet; the title,
 /// the scrubber, the transport and the bottom row stay where they are. A song with none (or none kept on this phone,
 /// offline) shows the cover, the button still lit. The backdrop darkens under them so the dim lines read over the
 /// brightest cover.
@@ -39,6 +40,17 @@ import SwiftUI
 /// Every action is PlayerModel's, called straight from the tap. Shuffle and Repeat are named in Up Next's words
 /// (shuffleLabel, repeatLabel), pressed while on, tinted while on; a library's shuffle can't be turned off, so its
 /// Shuffle stays on and does nothing. The Queue button names what is on for VoiceOver (upNextLabel) and is never tinted.
+///
+/// THE FACE (the redesign, slice R4b - notes/ios.md "The redesign, slice R4b: Now Playing's face"; iNowPlaying.dc.html;
+/// the phone alone, the Mac's frame never opens Now Playing): the top is the compact top (PhoneTop, `.topbar`) - Close
+/// at its left, the look button named at its right (NamedLookButton: Turntable, or Cover on the turntable) and the •••,
+/// each the accent's words or glyph with no face, at the top's own 12 from the screen's edges; the cover 24 either side;
+/// the title (22, bold, its letters drawn closer) over "Artist — Album" in the accent, a link to the album; beside them
+/// the readout, "3 of 11" over "FLAC 16/44.1" in Courier Prime - Core's BarDisplay's, as the Mac's bar says them
+/// (NowPlayingReadout) - on the title's baseline, under them at the accessibility sizes; the scrubber sunken
+/// (ScrubberView). The transport, the bottom row, Lyrics in the cover's place, the turntable (its titles too) and every
+/// gesture are as they were. The phone stays flat (R1c): only the cover, the scrubber's track, the speed chip and the notice keep a
+/// face here, each as it was.
 struct NowPlayingView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
@@ -61,10 +73,16 @@ struct NowPlayingView: View {
     /// The cover full screen, from a tap on it (CoverViewer.swift): presented from the root, so it stays up as the
     /// cover's place gives way to Lyrics.
     @State private var viewing: ViewedCover?
+    /// (R4b) How wide the top's two ends are as last laid out - Close, and the look button with the ••• - so the notice
+    /// is laid in the room between them (topRow).
+    @State private var topEnds = TopEnds()
     @Environment(Reachability.self) private var reachability
 
     /// The cover's scale while paused (--pl-paused-scale).
     private static let pausedScale: CGFloat = 0.82
+    /// (R4b) The title's letters drawn closer, and between the title's two lines and the readout beside them.
+    private static let titleTracking: CGFloat = -0.3     // drawn: iNowPlaying's title letter-spacing
+    private static let readoutGap: CGFloat = 10          // drawn: iNowPlaying's title row gap
 
     init() {}
 
@@ -144,10 +162,15 @@ struct NowPlayingView: View {
 
     private func content(_ track: QueueTrack) -> some View {
         VStack(spacing: 0) {
-            // the chevron's row is the grip either way; it stays put as lyrics come and go
+            // the top row is the grip either way; it stays put as lyrics come and go. (R4b) It is the compact top, at its
+            // own 12 from the screen's edges (`.topbar`): out past the column's 24 either side, which everything under
+            // it keeps (the padding at the foot of this column) - its grip the whole width
             topRow(track)
                 .contentShape(Rectangle())
                 .gesture(grip)
+                .padding(.horizontal, -24)
+                // (R4b's review) drawn over what follows it, so a notice laid just under the top shows over the cover
+                .zIndex(1)
             // the cover or the lyrics, crossfading in ONE place: a ZStack, so the one going and the one coming share
             // the room through the fade rather than each taking half of it in the column (the cover shrinking and the
             // lyrics laid out at half height, then grown)
@@ -165,15 +188,16 @@ struct NowPlayingView: View {
                 } else {
                     VStack(spacing: 0) {
                         Spacer(minLength: 12)
+                        // (R4b) the column's width: 24 either side (iNowPlaying's cover) on every phone, where it was
+                        // 32 and at most 360 - still asked at 360, which is the largest size asked (CoverSize.hero) on
+                        // every phone's screen, as before, and the backdrop's
                         CoverImage(id: track.coverArt, size: 360)
-                            .frame(maxWidth: 360)
                             .clipShape(Corners.artShape)
                             // a tap opens the cover full screen; a drag is still the grip's (CoverViewer.swift)
                             .opensCoverFullScreen(track, into: $viewing)
                             .shadow(color: .black.opacity(0.4), radius: 24, y: 12)
                             .scaleEffect(player.isPlaying ? 1 : Self.pausedScale)
                             .animation(.spring(response: 0.45, dampingFraction: 0.7), value: player.isPlaying)
-                            .padding(.horizontal, 8)
                         Spacer(minLength: 12)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -189,9 +213,14 @@ struct NowPlayingView: View {
             // the titles crossfade between the looks (leading on the cover, centred on the turntable) - a fade, not a
             // slide; in a ZStack, so the two share their place through it
             ZStack {
-                titles(track, centred: turntable)
-                    .id(turntable)
-                    .transition(.opacity)
+                // (R4b) the cover's titles and the readout (coverTitles); the turntable's exactly as they were (titles)
+                if turntable {
+                    titles(track, centred: true)
+                        .transition(.opacity)
+                } else {
+                    coverTitles(track)
+                        .transition(.opacity)
+                }
             }
             // on the turntable a failure's line, or the silent record's, is laid over the plinth's foot: its bottom
             // --pl-error-gap above the title, taking no touch, so the plinth never moves for it (2.1, 2.8)
@@ -243,8 +272,10 @@ struct NowPlayingView: View {
         return deck.silentLine
     }
 
-    /// The failure's line (on the cover: above the title, in the flow), the title and "Artist — Album" - centred on the
-    /// turntable, as the web's are.
+    /// The turntable's titles: the title and "Artist — Album", centred over the record, as the web's are. (R4b) Exactly
+    /// as at 31cab12d - the turntable keeps no diff (mac-redesign-build.md 3.6), so its titles keep their own face, the
+    /// quiet byline and no tracking, and nothing beside them; tests/test_ios_now_playing_look.py pins this function and
+    /// `byline` to what they were. Called centred alone: the cover's are coverTitles.
     private func titles(_ track: QueueTrack, centred: Bool) -> some View {
         VStack(alignment: centred ? .center : .leading, spacing: 4) {
             if !centred, let error = player.errorLine, !error.isEmpty {
@@ -261,41 +292,132 @@ struct NowPlayingView: View {
         .frame(maxWidth: .infinity, alignment: centred ? .center : .leading)
     }
 
-    /// The chevron, the notice between it and the rest, and the look button opposite the chevron - (R3) the ••• beside it.
+    /// (R4b) The cover's titles: the failure's line above the title, in the flow; the title and "Artist — Album"; and the
+    /// readout beside them (iNowPlaying's title row) - on the title's first baseline, its words in the readout's face -
+    /// and under them at the accessibility sizes, where beside them it would leave the title too little room
+    /// (tests/test_ios_now_playing_look.py works it out).
+    private func coverTitles(_ track: QueueTrack) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let error = player.errorLine, !error.isEmpty {
+                Text(error)
+                    .font(Typeface.footnote)
+                    .foregroundStyle(DWPalette.t2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            let under = dynamicTypeSize.isAccessibilitySize
+            let layout = under ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Self.readoutGap))
+            layout {
+                coverNames(track)
+                NowPlayingReadout(under: under)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// (R4b) The cover's title - 22, bold, white, its letters drawn closer (iNowPlaying's) - over "Artist — Album" in the
+    /// accent (coverByline).
+    private func coverNames(_ track: QueueTrack) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(track.title)
+                .font(Typeface.title2.bold())
+                .tracking(Self.titleTracking)
+                .foregroundStyle(DWPalette.text)
+                .lineLimit(1)
+            coverByline(track)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// (R4b) The compact top (PhoneTop, iNowPlaying's `.topbar`): Close at its left; the look button named and the ••• at
+    /// its right, 8 apart - each the accent's words or glyph with no face, in a finger's target, as every flat button on
+    /// the phone is. Capped at xxxLarge as the top is, so each shows large under a long press at the sizes past it.
+    ///
+    /// The notice (D11), said over Now Playing - which covers the capsule over the mini player - is in the top's middle,
+    /// between Close and the look button with the •••, as wide as they leave it, so it moves nothing and covers no button
+    /// whatever its length (phase2-downloads.md 4.2; R3's review - centred over the whole row it covered the look button);
+    /// as tall as its lines, taking no touch; in with opacity alone. PhoneTop's middle is its own Spacer, so the notice
+    /// is laid over the top, in from each side by the top's room, that end's width and the gap (`topEnds`, measured).
+    /// (R4b's review) The middle narrows as the top's words grow, so where it is narrower than the notice's longest word
+    /// (NoticeWord, measured - from xxLarge on a 375 pt phone, "Downloading" 116 against 99) the notice is laid the whole
+    /// width just under the top instead, over the cover, still taking no touch - never a word broken in half. Its words
+    /// stop growing at xxxLarge, as the top's do.
     private func topRow(_ track: QueueTrack) -> some View {
-        HStack {
-            Button(action: close) {
-                Image(systemName: "chevron.down")
-                    .font(Typeface.symbol(.title3).weight(.semibold))
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(NowPlayingWords.close)
-            // (the Mac app, slice 2) Escape closes Now Playing; nothing on the iPhone
-            .escapeCloses()
-            // the notice (D11), said over Now Playing - which covers the capsule over the mini player: in the top row's
-            // middle, between the chevron and the look button and the •••, as wide as they leave it, so it moves nothing
-            // and covers no button whatever its length (phase2-downloads.md 4.2; R3's review - centred over the whole
-            // row it covered the look button); as tall as its lines, taking no touch; in with opacity alone
-            Spacer(minLength: 0)
-                .overlay {
-                    if let notice = player.notice {
-                        Notice(text: notice)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .allowsHitTesting(false)
-                            .transition(.opacity)
-                    }
+        let side = CGFloat(PhoneLook.topSide)
+        let gap = CGFloat(PhoneLook.topGap)
+        let middle = Self.noticeInMiddle(topEnds, side: side, gap: gap)
+        return PhoneTop {
+            closeButton
+                .onGeometryChange(for: CGFloat.self) { (end: GeometryProxy) -> CGFloat in
+                    end.size.width
+                } action: { (width: CGFloat) -> Void in
+                    topEnds.leading = width
                 }
-            // named for the look, not for what shows (NowPlaying.tsx:382): over the lyrics, the look's square still says
-            // a tap shows the cover, as it will. None on the Mac, which has no turntable (`look`)
-            if !Platform.mac {
-                LookButton(showingTurntable: look == .turntable, action: lookTapped)
+        } trailing: {
+            HStack(spacing: gap) {
+                // named for the look a tap shows, not for what shows (NowPlaying.tsx:382): over the lyrics it still says
+                // what a tap shows, as it will. None on the Mac, which has no turntable (`look`)
+                if !Platform.mac {
+                    NamedLookButton(showingTurntable: look == .turntable, action: lookTapped)
+                }
+                // (R3) up from the footer, beside the look button (iNowPlaying.dc.html's topbar); the EQ left it for the row
+                menu(track)
             }
-            // (R3) up from the footer, beside the look button (iNowPlaying.dc.html's topbar); the EQ left it for the row
-            menu(track)
+            .onGeometryChange(for: CGFloat.self) { (end: GeometryProxy) -> CGFloat in
+                end.size.width
+            } action: { (width: CGFloat) -> Void in
+                topEnds.trailing = width
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { (top: GeometryProxy) -> CGFloat in
+            top.size.width
+        } action: { (width: CGFloat) -> Void in
+            topEnds.whole = width
+        }
+        .background {
+            // the notice's longest word, measured as the notice draws it, unseen
+            if let notice = player.notice {
+                NoticeWord(text: notice)
+                    .onGeometryChange(for: CGFloat.self) { (word: GeometryProxy) -> CGFloat in
+                        word.size.width
+                    } action: { (width: CGFloat) -> Void in
+                        topEnds.word = width
+                    }
+            }
+        }
+        .overlay(alignment: middle ? Alignment.center : Alignment.bottom) {
+            if let notice = player.notice {
+                Notice(text: notice)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, middle ? side + topEnds.leading + gap : side)
+                    .padding(.trailing, middle ? gap + topEnds.trailing + side : side)
+                    .alignmentGuide(.bottom) { (d: ViewDimensions) -> CGFloat in middle ? d[.bottom] : d[.top] }
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
         }
         .animation(.default, value: player.notice)
+    }
+
+    /// (R4b's review) Notice's own room either side of its words (Notice.swift's `.padding(.horizontal, 16)`).
+    private static let noticePad: CGFloat = 16
+
+    /// (R4b's review) The notice in the top's middle: its longest word fits the room Close and the look button with the
+    /// ••• leave it, inside its own padding - else it lies the whole width under the top.
+    private static func noticeInMiddle(_ ends: TopEnds, side: CGFloat, gap: CGFloat) -> Bool {
+        let room = ends.whole - 2 * side - ends.leading - ends.trailing - 2 * gap - 2 * noticePad
+        return ends.word > 0 && ends.word <= room
+    }
+
+    /// (R4b) Close (iNowPlaying's, where the chevron was): a flat small button, the accent's word. The drag down from the
+    /// top half still closes Now Playing too (`grip`).
+    private var closeButton: some View {
+        Button(NowPlayingWords.close, action: close)
+            .buttonStyle(DWButtonStyle(size: .small))
+            .accessibilityShowsLargeContentViewer { Text(NowPlayingWords.close) }
+            // (the Mac app, slice 2) Escape closes Now Playing; nothing on the iPhone
+            .escapeCloses()
     }
 
     /// The look button (NowPlaying.tsx:343): the other look for as long as this stays open, the lyrics giving way to it;
@@ -328,9 +450,9 @@ struct NowPlayingView: View {
                 VStack(spacing: 12) {
                     ErrorNote(failure, gone: LyricsWords.songGone, failed: LyricsWords.failed, retry: true)
                     if tryAgain {
+                        // (R4b) a flat button, the accent's words with no face, as every one on the flat phone (R1c)
                         Button(LibraryWords.tryAgain) { lyrics.retry() }
-                            .buttonStyle(.bordered)
-                            .buttonBorderShape(Corners.controlBorder)
+                            .buttonStyle(DWButtonStyle())
                     }
                 }
                 .padding(.horizontal, 8)
@@ -366,6 +488,7 @@ struct NowPlayingView: View {
         withAnimation(.easeInOut(duration: 0.25)) { lyrics.showing = tapped.lyricsOn }
     }
 
+    /// The turntable's "Artist — Album", a link to the album. (R4b) Exactly as at 31cab12d, with `titles`: quiet, centred.
     @ViewBuilder private func byline(_ track: QueueTrack, centred: Bool) -> some View {
         let byline = PlayerWords.byline(artist: track.artist, album: track.album)
         if let route = PlayedAlbum.route(track, player: player) {
@@ -385,6 +508,33 @@ struct NowPlayingView: View {
             Text(byline)
                 .font(Typeface.body)
                 .foregroundStyle(Palette.quiet)
+                .lineLimit(1)
+                .frame(minHeight: 28)
+        }
+    }
+
+    /// (R4b) The cover's "Artist — Album": a link to the album in the accent (iNowPlaying's `.acc`), as every flat
+    /// button's words are; for a song that names no album, plain words in the second colour - the accent would say a
+    /// tap goes somewhere.
+    @ViewBuilder private func coverByline(_ track: QueueTrack) -> some View {
+        let byline = PlayerWords.byline(artist: track.artist, album: track.album)
+        if let route = PlayedAlbum.route(track, player: player) {
+            Button {
+                navigation.openAlbum(route)
+            } label: {
+                Text(byline)
+                    .font(Typeface.body)
+                    .foregroundStyle(DWPalette.acc)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(PlayerWords.goToAlbum(byline))
+        } else {
+            Text(byline)
+                .font(Typeface.body)
+                .foregroundStyle(DWPalette.t2)
                 .lineLimit(1)
                 .frame(minHeight: 28)
         }
@@ -441,7 +591,8 @@ struct NowPlayingView: View {
     }
 
     /// The ••• (NowPlayingMenu), up beside the look button since R3: Info opens the sheet on Info; the EQ left it for the
-    /// bottom row (`onEQ` nil).
+    /// bottom row (`onEQ` nil). (R4b) Its glyph in the accent with no face, as the top's flat buttons are (iNowPlaying's
+    /// `.btn.sm`), in the menu's own 44 pt target; large under a long press past xxxLarge, where the top stops growing.
     private func menu(_ track: QueueTrack) -> some View {
         let route = PlayedAlbum.route(track, player: player)
         return NowPlayingMenu(hasAlbum: route != nil, saysSpeed: menuSaysSpeed,
@@ -449,7 +600,8 @@ struct NowPlayingView: View {
                               onPlaylist: reachability.online ? { playlistPick = PlaylistPickRequest(PlaylistPick(playing: track)) } : nil) {
             if let route { navigation.openAlbum(route) }
         }
-        .foregroundStyle(.primary)
+        .foregroundStyle(DWPalette.acc)
+        .accessibilityShowsLargeContentViewer { Image(systemName: "ellipsis") }
     }
 
     /// (R3) The bottom row, in the footer's place (iNowPlaying.dc.html): five labelled icons, as the tab bar's items with
@@ -516,6 +668,86 @@ struct NowPlayingView: View {
 
     private func close() {
         navigation.nowPlayingShown = false
+    }
+}
+
+/// (R4b) How wide the top's two ends are - Close, and the look button with the ••• - the whole top, and (R4b's review)
+/// the notice's longest word.
+private struct TopEnds: Equatable {
+    var leading: CGFloat = 0
+    var trailing: CGFloat = 0
+    var whole: CGFloat = 0
+    var word: CGFloat = 0
+}
+
+/// (R4b's review) The notice's longest word as Notice draws it - its face, its cap at xxxLarge - each word whole on one
+/// line, the widest setting the width; drawn unseen, heard by no one. Split where the notice's lines can break, at
+/// spaces: a word with a hyphen is measured whole, wider than the most it could need.
+private struct NoticeWord: View {
+    let text: String
+
+    var body: some View {
+        let words = text.split(whereSeparator: \.isWhitespace).map(String.init)
+        ZStack {
+            ForEach(words.indices, id: \.self) { (index: Int) in
+                Text(words[index])
+            }
+        }
+        .font(Typeface.subheadline)
+        .fixedSize()
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .hidden()
+        .accessibilityHidden(true)
+    }
+}
+
+/// (R4b) The look button, named (iNowPlaying's "Turntable"): the look a tap shows, in words where its glyph was (the
+/// record, the square - LookButton's, which Now Playing no longer draws) - **Turntable** while the cover shows,
+/// **Cover** while the turntable does, You > Playback's own two words for them. A flat small button (DWButtonStyle,
+/// `.dw.ph .btn.sm`): the accent's word with no face, in a finger's 44 pt target. VoiceOver hears what a tap does, as
+/// before ("Show as a turntable", "Show the cover"); past xxxLarge, where the top stops growing, a long press shows its
+/// word large, as LookButton's did.
+private struct NamedLookButton: View {
+    let showingTurntable: Bool
+    let action: () -> Void
+
+    var body: some View {
+        let words = showingTurntable ? TurntableWords.lookCover : TurntableWords.lookTurntable
+        Button(words, action: action)
+            .buttonStyle(DWButtonStyle(size: .small))
+            .accessibilityLabel(TurntableWords.lookButton(showingTurntable: showingTurntable))
+            .accessibilityShowsLargeContentViewer { Text(words) }
+    }
+}
+
+/// (R4b) The readout beside the title (iNowPlaying's `.mono.xs.q3`): the song's place in what was queued, "3 of 11", over
+/// its format, "FLAC 16/44.1" - each Core's BarDisplay's, as the Mac's player bar says them, never counted here: a song
+/// added with Play Next has no place, a song naming no format no format, and with neither there is no readout. In
+/// Courier Prime (the drawing sets it mono), the third colour, each line whole beside the title - or, under it at the
+/// accessibility sizes (`under`), as many lines as it needs. One element for VoiceOver: "3 of 11, FLAC, 16-bit, 44.1
+/// kHz". A view of its own, so the place and the format are worked out here alone, never in Now Playing's body - which
+/// reads `player.current` (the queue's index and entries) as it always has, so it is drawn again as the song changes
+/// either way.
+private struct NowPlayingReadout: View {
+    let under: Bool
+    @Environment(PlayerModel.self) private var player
+
+    var body: some View {
+        let queue = player.queue
+        let place = BarDisplay.place(queue).map(BarDisplay.Words.place)
+        let format = queue.current.flatMap(BarDisplay.format)
+        if place != nil || format != nil {
+            VStack(alignment: under ? .leading : .trailing, spacing: 4) {
+                if let place { Text(place) }
+                if let format { Text(format) }
+            }
+            .font(Typeface.Phone.mono(.extraSmall))
+            .foregroundStyle(DWPalette.t3)
+            .lineLimit(under ? nil : 1)
+            .fixedSize(horizontal: !under, vertical: true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(BarDisplay.readoutSpoken(queue) ?? "")
+        }
     }
 }
 

@@ -783,7 +783,8 @@ def test_the_mac_has_no_turntable():
     app = app_sources()
     now = bare(app["Player/NowPlayingView.swift"])
     assert "private var look: TurntableSettings.Look { Platform.mac ? .cover : switched ?? deck.opensAs }" in now
-    assert re.search(r"if !Platform\.mac \{\s*LookButton\(showingTurntable: look == \.turntable, action: lookTapped\)\s*\}", now)
+    # (R4b) the look button named (NamedLookButton) - still none on the Mac
+    assert re.search(r"if !Platform\.mac \{\s*NamedLookButton\(showingTurntable: look == \.turntable, action: lookTapped\)\s*\}", now)
     assert now.count("LookButton(") == 1
     playback = bare(app["You/PlaybackSection.swift"])
     block = playback[playback.index("if !Platform.mac {"):playback.index("Picker(Normalization.title")]

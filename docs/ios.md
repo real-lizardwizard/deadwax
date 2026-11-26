@@ -1947,11 +1947,16 @@ actions (swipe up or down to hear them): the only way to skip from the mini play
 reads "Position in the song", "0:12 of 5:00", in 10-second steps. It grows with the text size as far as the tab
 bar does.
 
-**Now Playing**: the cover (a little smaller while paused), the song's title, and "artist — album"
-(tap it to go to the album). Under them:
+**Now Playing**: along the top, **Close** at the left and **Turntable** and **•••** at the right, each a purple word
+or glyph on the page with no box round it; the cover, as wide as the screen less a margin either side (a little
+smaller while paused); the song's title, and under it "artist — album" in purple (tap it to go to the album - a song
+that names no album has it in grey, and it goes nowhere). Beside the title, in small typewriter figures, where the song
+is in what you queued ("3 of 11") and its format ("FLAC 16/44.1", "MP3"), as the Mac's player bar says them; a song
+added with Play Next has no place, and with neither known there's nothing there. VoiceOver reads them as one: "3 of 11,
+FLAC, 16-bit, 44.1 kHz". At the accessibility text sizes they go under the title, so it keeps its room. Under them:
 
-- **The scrubber**, a squared-off bar that thickens under your finger: tap a place to go there, or drag
-  and let go. The clocks say how far in the song is
+- **The scrubber**, a squared-off bar sunk into the page that thickens under your finger: tap a place to go there, or
+  drag and let go. The clocks under it, in the same typewriter figures, say how far in the song is
   and how much is left. VoiceOver reads it as "Position in the song", in 5-second steps.
 - **Shuffle, previous, play/pause, next, Repeat.** Previous goes back to the song before in a song's
   first 3 seconds; after that, or on the first song, it starts the song again. Repeat goes from off to
@@ -1965,18 +1970,20 @@ bar does.
   **EQ** - moves between its three pages without closing it. There is no Lyrics in the sheet: they take the cover's
   place. VoiceOver reads the EQ button with the output's setting ("EQ, Bass Boost"), and the Queue with what's on
   ("Queue - Shuffle on").
-- **•••**, at the top right beside the look button, has **Info**, **Add to a playlist…** for the song playing (while
+- **•••**, at the top right beside **Turntable**, has **Info**, **Add to a playlist…** for the song playing (while
   deadwax can be reached), **Go to album**, **Download** (or Remove Download) for the song playing and **Download the
   Queue** - every song still to play that isn't on the phone, when that's two or more. Go to album closes Now Playing
   and opens the album's page on the tab you're on. What a download item did is said for a moment at the top of Now
-  Playing ("Downloading: Roads", "Downloading 23 songs from the Queue"), between the arrow and the buttons opposite it,
-  never over them.
+  Playing ("Downloading: Roads", "Downloading 23 songs from the Queue"), between **Close** and the buttons opposite
+  it, never over them - or, at the larger text sizes, where a word of it wouldn't fit between them, across the screen
+  just under them, over the top of the cover.
 - **The speed**, when it isn't 1x: a purple `1.25x` just above the bottom row, over the gap between the output and
   Info, clear of every button - tap it to go back to 1x. At the largest text sizes it isn't drawn; the **•••** menu's first line says it instead ("Speed
   1.25x - back to normal speed"), and does the same. The speed is set on [the turntable](#the-speed).
-- **The button at the top right**, beside the •••, shows Now Playing as [a turntable](#the-turntable) instead, and
-  back.
-- The chevron at the top, or a swipe down, closes it.
+- **Turntable**, at the top right beside the •••, shows Now Playing as [a turntable](#the-turntable) instead; there
+  it says **Cover**, and puts the cover back.
+- **Close** at the top left, or a swipe down from the top of Now Playing, closes it. The top stops growing at the
+  largest standard text size; past it, touch and hold one of its buttons to see it large.
 
 **Tap the cover** to see it full screen, on black, as large as Navidrome has it: the cover Now Playing shows comes at
 once, and the full-size picture takes its place as it arrives. Pinch to zoom (as far as 3 times for an ordinary cover,
@@ -1998,7 +2005,7 @@ closes it.
 ### The turntable
 
 Now Playing has a second look, as the web app's does: the song on a record turning on a turntable.
-**The button at the top right** - a round record on the cover, a square on the turntable - switches
+**The button at the top right** - **Turntable** on the cover, **Cover** on the turntable - switches
 between the two for as long as Now Playing stays open. Which one it opens as is **Now Playing opens
 as** in [Settings](#settings) > Playback: **Cover**, the default, or **Turntable**. The button never changes
 that: close Now Playing and open it again, and it's back to what Settings says. With lyrics showing, the
@@ -2057,10 +2064,10 @@ nothing below it moves: the buttons and the row under them stay as they are. The
   song is where the record was going.
 - **With Reduce Motion on**, a flick lands where its momentum says at once rather than coasting, and
   a pause doesn't wind down. Turning the record still has its sound.
-- **VoiceOver**: after the look button, the record is a button that says what a tap does ("The
+- **VoiceOver**: after **Cover** (the look button), the record is a button that says what a tap does ("The
   record: a tap pauses the song"), and the arm is "Tonearm: position in the song", read as "2:31 of
   7:05": swipe up or down to move 5 seconds.
-- **Closing**: on the turntable, only a swipe down from the top row (or the chevron) closes Now
+- **Closing**: on the turntable, only a swipe down from the top row (or **Close**) closes Now
   Playing - a drag on the record or the arm never does. A record coasting back to speed as you close
   it still hands the song back where it was going.
 
@@ -2241,7 +2248,7 @@ and each time you open Now Playing, until you tap **Lyrics** again or quit the a
 - **Scroll** to read ahead or back: the lyrics stay where you put them, the line being sung still
   lighting up. About four seconds after they come to rest they go back to the line being sung, while
   the song plays. Paused, they stay put until you press play. Scrolling them never closes Now
-  Playing; a swipe down from the arrow's row does.
+  Playing; a swipe down from the top row, Close's, does.
 - **Tap a line** to play the song from there, from a pause too.
 - **Lyrics saved without timings** show whole, under "These lyrics aren't synced to the song.", every
   line white, and don't move by themselves. Their verses run together, as Navidrome reads them.
@@ -3790,10 +3797,10 @@ hand: several of these ask how it compares.
 - **P1 The button.** Now Playing's bottom row is Lyrics, AirPlay, Up Next, •••. Lyrics is a speech
   bubble, filled and purple while on. (Since R3 the row is Queue, Lyrics, AirPlay, Info and EQ, each a
   word under its icon, the ••• beside the look button at the top: checks 532-538.)
-- **P2 Opening.** Play "Roads", open Now Playing, tap Lyrics: the lyrics take the cover's place, the
+- **P2 Opening.** **Not done yet.** Play "Roads", open Now Playing, tap Lyrics: the lyrics take the cover's place, the
   title and the buttons don't move, the line being sung is white and about a third of the way down,
   and the lyrics move up smoothly as each line comes. Tap Lyrics again: the cover. Scroll the lyrics
-  hard: Now Playing never starts closing; a swipe down from the arrow's row closes it.
+  hard: Now Playing never starts closing; a swipe down from the top row (Close's, since R4b) closes it.
 - **P3 Your own scroll, and a tap.** Scroll up to read ahead: it stays where you put it, the lit line
   still changing. Let go; about four seconds after it stops, it goes back to the line being sung -
   sooner, later or the same as Apple Music? Tap a line further on: the song jumps there and plays on.
@@ -5148,11 +5155,11 @@ when the app opened. On it, James, after Now Playing: "Right height now".
 **Not done yet.** These come with the build that takes every squared corner to a true corner and draws the transport
 and the Library's icon sharp (still app 0.13 (13)).
 
-- **251 Square corners.** Look for any rounding left on what was squared: covers (an album's page, Now Playing, the
+- **251 Square corners.** **Not done yet.** Look for any rounding left on what was squared: covers (an album's page, Now Playing, the
   Library's tiles, the rows, the play bar's), the album page's Play, the pills, the badges (New, Requests' count),
   Find's field, the notice, the first ask, the sign-in's fields, the EQ's Paste, Settings > Downloads' bars, and on
-  Now Playing the look button at the top right (and its square glyph, on the turntable) and the speed chip on the
-  cover off 1x. Every corner is a point. Say if any reads badly square - Play's light line along its top, a badge
+  Now Playing the speed chip on the cover off 1x (the look button at the top right is a word with no box since
+  R4b, so it has no corners). Every corner is a point. Say if any reads badly square - Play's light line along its top, a badge
   over the Requests icon. Still round, as they should be: the dots, your avatar, artists' pictures, the rings, the
   sliders' knobs. Still slightly
   rounded, as hardware: the turntable's plinth and the speed readout's well at its bottom right - say if you'd rather
@@ -6466,14 +6473,14 @@ and the Mac (the web app keeps Up Next). Each tab's page is still the one it was
 - **536 The bottom row.** **Not done yet.** On the phone, Now Playing's foot has five, each an icon over its name:
   **Queue**, **Lyrics**, the output (AirPlay, the name of where it's playing under it), **Info** and **EQ**. Each opens
   what it names. **Lyrics** shows the lyrics in the cover's place, and again puts the cover back - it never opens the
-  sheet. The **•••** is at the top right beside the look button. Tap the output's name, not its icon: AirPlay's list
+  sheet. The **•••** is at the top right beside the look button (**Turntable** since R4b). Tap the output's name, not its icon: AirPlay's list
   opens. With VoiceOver, the output reads "AirPlay", then where it's playing. Set a speed off 1x on the turntable:
   back on the cover, the chip shows just above the row, over the gap between the output and Info. Tap the very left
   and right of Info and the output's right edge, close beside the chip: each opens what it should and the speed stays;
   only a tap on the chip goes back to 1x. Is the band it sits in a gap that looks meant, with the chip off 1x and at
   1x? On the phone with the smaller screen, is the cover (and the turntable) still a comfortable size? Download the
-  Queue from the •••: "Downloading 23 songs from the Queue" stays between the arrow and the look button, and the look
-  button works while it shows. With Shuffle on, VoiceOver reads the Queue as "Queue - Shuffle on" and the EQ as "EQ,"
+  Queue from the •••: "Downloading 23 songs from the Queue" stays between **Close** (the arrow until R4b) and the look
+  button, and the look button works while it shows. With Shuffle on, VoiceOver reads the Queue as "Queue - Shuffle on" and the EQ as "EQ,"
   and its setting.
 - **537 The sheet.** **Not done yet.** **Queue**, **Info** or **EQ** opens one sheet: **‹ Now Playing** at its top,
   then the strip - **Queue**, **Info**, **EQ** - and the page. Tap the strip: the sheet moves between its pages without
@@ -6562,6 +6569,37 @@ the **•••**. On the phone the mini player and the tab bar take the new loo
   it; the others grey. Requests' count sits over its icon's top right corner. At the largest text sizes the bar
   grows only so far; touch and hold a tab to see it bigger.)
 - **549 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 547-548, or "not done yet".
+
+#### Now Playing's face (550-552)
+
+**Not done yet.** On the phone alone (the Mac never opens Now Playing): Now Playing's top, its cover, its title and its
+scrubber take the drawn look - the phone's flat look was drawn from this screen. Queue an album of a dozen songs or so,
+FLAC if you have one, and open Now Playing.
+
+- **550 The face.** **Not done yet.** As drawn. "3 of 11" and the format match the song; the transport works as
+  before. (Along the top, **Close** at the left, **Turntable** and **•••** at the right: purple, with no box round any
+  of them, each easy to tap. Close closes Now Playing; so does a swipe down from the top row or the cover. The cover
+  is as wide as the screen less the same margin either side as everything under it. The title is white and bold,
+  "Artist — Album" under it in purple - tap it: the album opens. Beside the title, at its right, two small typewriter
+  lines in grey, "3 of 11" over "FLAC 16/44.1" (or "MP3" for a lossy song), its first line level with the title's -
+  skip a song: the number moves on; add a song with Play Next and play it: no number, the format alone. Make the text
+  the largest accessibility size: the two lines go under the title, and the title keeps its room. The scrubber is
+  sunk into the page - a dark track with a thin line round it, the part played grey inside it - and grows under your
+  finger as before; tap and drag still seek where you let go, and VoiceOver still reads "Position in the song" and
+  moves 5 seconds a swipe. Its times under it are in the typewriter figures and hold still as they count. Shuffle,
+  previous, play/pause, next and Repeat look and work as they did. Download the Queue from the •••: the notice shows
+  between Close and the buttons at the right and covers none of them. Make the text two sizes up from the default
+  (xxLarge) and do it again: the notice lies across the screen just under the top row, over the cover, no word broken
+  in half - and at the largest accessibility size it is no bigger than at the largest standard one. Touch and hold
+  Close, Turntable or the ••• at the accessibility sizes: each shows large.)
+- **551 The turntable.** **Not done yet.** Turntable swaps the look, the speed shows, and Lyrics take the cover's
+  place, as before. (Tap **Turntable**: the record, with **Cover** where Turntable was; tap Cover: the cover again.
+  VoiceOver reads them "Show as a turntable" and "Show the cover", as before. On the turntable the title and "Artist —
+  Album" are as they were - centred, "Artist — Album" grey - with no number or format beside them. Set a speed off 1x: the readout on the turntable, the
+  chip above the bottom row on the cover. Tap **Lyrics**: they take the cover's place, the top, the title and the
+  buttons stay put, and scrolling them never closes Now Playing; tap Lyrics again: the cover. A song whose lyrics
+  can't be fetched shows **Try again** as a purple word, with no box.)
+- **552 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 550-551, or "not done yet".
 
 #### An album, Playlists, a playlist (553-558)
 

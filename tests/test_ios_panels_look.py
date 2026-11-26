@@ -178,8 +178,9 @@ def test_each_button_opens_what_it_names_and_lyrics_never_the_sheet():
     assert opens.count(".tab(") == 3 and "case .upNext: return .tab(.upNext)" in opens
     #? the ••• up beside the look button, the EQ out of it for the row
     top = member(now, "func topRow")
-    assert top.index("LookButton(showingTurntable:") < top.index("menu(track)")
-    assert top.index("Spacer(minLength: 0)") < top.index("LookButton(")
+    assert top.index("NamedLookButton(showingTurntable:") < top.index("menu(track)")
+    # (R4b) the compact top: the ••• and the look button at its right, Close at its left
+    assert top.index("closeButton") < top.index("} trailing: {") < top.index("NamedLookButton(")
     assert "menu(track)" not in member(now, "var bottomRow: some View")
     menu = member(now, "func menu")
     assert "onInfo: { open(.info) }, onEQ: nil," in menu

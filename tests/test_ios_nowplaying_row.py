@@ -234,32 +234,35 @@ def test_the_chip_has_a_band_of_its_own_between_the_transport_and_the_row():
 
 # ----------------------------------------------------------------------------- the notice
 
-def test_the_notice_clears_the_chevron_the_look_button_and_the_menu():
+def test_the_notice_clears_close_the_look_button_and_the_menu():
     """R3's review, 2: centred over the whole row with 48 points either side, a notice wider than about 150 points
-    covered the look button and left it dead for its 5 seconds. It is the row's middle now - as wide as the chevron,
-    the look button and the ••• leave it - and takes no touch."""
+    covered the look button and left it dead for its 5 seconds. It is the row's middle - as wide as Close (the chevron
+    until R4b), the look button and the ••• leave it - and takes no touch. (R4b) The row is the compact top (PhoneTop),
+    whose middle is a Spacer of its own: the notice is laid over the top, in from each side by the top's room, that
+    end's measured width and the gap - tests/test_ios_now_playing_look.py works the room out at each text size. (R4b's
+    review) Where the middle is narrower than the notice's longest word, it lies the whole width just under the top."""
     now = bare(NOW_PLAYING)
     top = member(now, "func topRow")
-    stack = top[top.index("HStack {"):]
-    row = block(stack, stack.index("{"))
-    parts = ("Button(action: close)", "Spacer(minLength: 0)\n                .overlay {", "Notice(text: notice)",
-             "LookButton(showingTurntable:", "menu(track)")
-    order = [row.index(part) for part in parts]
+    parts = ("let middle = Self.noticeInMiddle(topEnds, side: side, gap: gap)", "PhoneTop {", "closeButton",
+             "topEnds.leading = width", "} trailing: {", "NamedLookButton(showingTurntable:", "menu(track)",
+             "topEnds.trailing = width", "topEnds.whole = width", ".background {", "NoticeWord(text: notice)",
+             "topEnds.word = width", ".overlay(alignment:", "Notice(text: notice)")
+    order = [top.index(part) for part in parts]
     assert order == sorted(order), order
-    #? the notice is the middle's overlay, never the row's: nothing after the row's brace draws it
-    after = stack[stack.index(row) + len(row):]
-    assert re.sub(r"\s+", " ", after).strip() == "} .animation(.default, value: player.notice)", after
-    notice = row[row.index("Notice(text: notice)"):row.index("LookButton(")]
-    assert ".fixedSize(horizontal: false, vertical: true)" in notice, "as tall as its lines, as wide as the middle"
-    assert ".allowsHitTesting(false)" in notice, "it takes no touch"
-    assert ".padding(.horizontal, 48)" not in now
-    #? worked out: what the middle has on the narrower phone, with the look button there - room for words
-    content = member(now, "func content")
-    inset = number(content, r"\.padding\(\.horizontal, (\d+)\)\n\s*\.padding\(\.bottom, \d+\)\s*$")
-    buttons = 3 * 44
-    middle = 375 - 2 * inset - buttons - 3 * HSTACK_SPACING
-    padding = 2 * number(bare(APP / "Shared" / "Notice.swift"), r"\.padding\(\.horizontal, (\d+)\)")
-    assert middle - padding >= 120, middle
+    #? the notice, exactly: in the middle, in from each end by the top's room, that end and the gap - else under the
+    #? top, in from the screen's edges by the top's room; as tall as its lines, its words capped as the top's are,
+    #? taking no touch, in with opacity alone - and nothing after it draws it
+    notice = re.sub(r"\s+", " ", top[top.index(".overlay(alignment:"):]).strip()
+    assert notice == (
+        ".overlay(alignment: middle ? Alignment.center : Alignment.bottom) { if let notice = player.notice { "
+        "Notice(text: notice) .fixedSize(horizontal: false, vertical: true) "
+        ".padding(.leading, middle ? side + topEnds.leading + gap : side) "
+        ".padding(.trailing, middle ? gap + topEnds.trailing + side : side) "
+        ".alignmentGuide(.bottom) { (d: ViewDimensions) -> CGFloat in middle ? d[.bottom] : d[.top] } "
+        ".dynamicTypeSize(...DynamicTypeSize.xxxLarge) .allowsHitTesting(false) .transition(.opacity) } } "
+        ".animation(.default, value: player.notice)"), notice
+    assert top.count("Notice(text:") == 1 and ".padding(.horizontal, 48)" not in now
+    assert "let side = CGFloat(PhoneLook.topSide)" in top and "let gap = CGFloat(PhoneLook.topGap)" in top
 
 
 # ----------------------------------------------------------------------------- VoiceOver, part by part

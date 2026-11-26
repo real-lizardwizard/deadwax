@@ -1599,7 +1599,9 @@ R3B_PAGES = {"UpNext/UpNextScreen.swift", "Info/InfoView.swift", "EQ/EQScreen.sw
              "EQ/EQCurveView.swift", "EQ/EQOutputViews.swift", "Player/NowPlayingSheet.swift"}
 R4_BARS = {"Player/MiniPlayerView.swift", "Root/MainTabs.swift"}
 R5_PAGES = {"Album/AlbumHero.swift", "Album/TrackRow.swift", "Album/AlbumView.swift", "Playlists/PlaylistView.swift"}
-SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES
+#? R4b: Now Playing's scrubber, sunken as the meter is (DWCorners' meter shapes, DWPalette's well and fill)
+R4B_FACE = {"Player/ScrubberView.swift"}
+SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

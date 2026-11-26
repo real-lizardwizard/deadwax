@@ -18,6 +18,12 @@ import SwiftUI
 /// timelines stop and they show what PlayerModel says, as before. The clocks read the same value as the fill, a view
 /// of their own drawn again only when their words change; VoiceOver's value stays on `shownPosition`, twice a second
 /// at most.
+///
+/// Sunken (the redesign, slice R4b - notes/ios.md "The redesign, slice R4b: Now Playing's face"; iNowPlaying's `.meter`):
+/// a sunken track keeps its face on the flat phone (R1c), so the bar is drawn as DWMeter draws a download's - the well,
+/// its 1 pt line, the shade along its top, square - and the part played is the meter's grey fill inside the line. Its
+/// 12 and 16 points are James's (the drawing's 8 is the download meter's), its target, its drag, its timelines and its
+/// VoiceOver as they were; the clocks under it in Courier Prime, in the second colour (`.mono.xs.q`).
 struct ScrubberView: View {
     @Environment(PlayerModel.self) private var player
     /// The scrubber can be seen: on the cover, with no sheet over Now Playing. The turntable keeps its row (hidden, the
@@ -37,6 +43,8 @@ struct ScrubberView: View {
     private static let barHeight: CGFloat = 12
     private static let heldHeight: CGFloat = 16
     private static let target: CGFloat = 44
+    /// (R4b) The track's line, which the fill sits inside (`.meter`'s border, `.meter > i` inside it).
+    private static let edge: CGFloat = 1
 
     var body: some View {
         let track = player.current?.track.id ?? ""
@@ -51,12 +59,17 @@ struct ScrubberView: View {
             GeometryReader { (bar: GeometryProxy) in
                 let width = bar.size.width
                 ZStack(alignment: .leading) {
-                    Rectangle().fill(Color.primary.opacity(0.2))
+                    // (R4b) the sunken track, DWMeter's: the well with the shade along its top, inside its line
+                    DWCorners.meterShape
+                        .fill(DWPalette.well.shadow(.inner(color: DWPalette.meterShade, radius: 1, x: 0, y: 1)))
+                        .overlay { DWCorners.meterShape.strokeBorder(DWPalette.line, lineWidth: Self.edge) }
                     TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
                         (_: TimelineViewDefaultContext) in
-                        Rectangle().fill(Color.primary.opacity(0.85))
-                            .frame(width: width * Self.part(drawn(held, length: length), length: length))
+                        // the part played, the meter's grey, inside the track's line as `.meter > i` is
+                        DWCorners.meterFillShape.fill(DWPalette.meterFill)
+                            .frame(width: max(0, width - 2 * Self.edge) * Self.part(drawn(held, length: length), length: length))
                     }
+                    .padding(Self.edge)
                 }
                 .frame(height: drag == nil ? Self.barHeight : Self.heldHeight)
                 .frame(maxHeight: .infinity)
@@ -131,7 +144,8 @@ struct ScrubberView: View {
 
 /// The scrubber's two clocks, "1:23" and "-3:33": the bar's own value in whole seconds, so this view is drawn again only
 /// when their words change - a second's step, not every frame the bar is. In the readout face (25 Nov), as iNowPlaying
-/// draws them (`mono xs`): Libre Franklin has no tabular figures, so they'd shift as they count.
+/// draws them (`mono xs`): Libre Franklin has no tabular figures, so they'd shift as they count. (R4b) In the second
+/// colour, the drawing's `.q`.
 private struct ScrubberClocks: View, Equatable {
     let elapsed: String
     let remaining: String
@@ -143,7 +157,7 @@ private struct ScrubberClocks: View, Equatable {
             Text(remaining)
         }
         .font(Typeface.readout(.caption))
-        .foregroundStyle(Palette.quiet)
+        .foregroundStyle(DWPalette.t2)
         .accessibilityHidden(true)
     }
 }

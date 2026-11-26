@@ -19731,3 +19731,165 @@ The review's, the same way (sixteen files now: test_ios_manual_search.py and tes
   playlist's page and the bars.
 - The Mac: built for Mac Catalyst; its halves pinned in code; not looked at. A playlist's Edit fields carry a
   `.focused` binding there now that nothing reads.
+
+## The redesign, slice R4b: Now Playing's face (2026-11-25)
+
+mac-redesign-build.md 3.4's "R4b - Now Playing's face (the phone alone)", drawn by iNowPlaying.dc.html (with
+iLyrics.dc.html for the lyrics' place), built on R1c's 31cab12d. Now Playing is the screen the flat phone was drawn
+from (R1c: "I really like the play screen design"), so this slice keeps what James liked - no new faces, the transport
+as it is (binding 6), the turntable with no diff - and gives the rest the drawing's look. 3.8's answer 2 holds: lyrics
+take the cover's place, and the bottom row's Lyrics turns them on and off. **The Mac has none of it**: its frame never
+opens Now Playing, and no file under App/Mac or of the Mac's frame changed. The app is still 0.13 (13).
+
+### What was built (ios/App/Player/NowPlayingView.swift, ScrubberView.swift)
+
+- **The top** is the compact top, PhoneTop (`.dw.ph .topbar`: 44 tall, 12 from the screen's edges, 8 between, capped
+  at xxxLarge) - the first screen to draw it. **Close** at its left, where the chevron was (NowPlayingWords.close,
+  Core's word since the Mac's Escape; still `.escapeCloses()`); at its right **the look button, named**
+  (NamedLookButton: "Turntable" while the cover shows, "Cover" on the turntable - You > Playback's own two words,
+  TurntableWords.lookTurntable and lookCover; VoiceOver's "Show as a turntable" and "Show the cover" as before) and the
+  **•••** (NowPlayingMenu, its glyph in the accent where it was the primary colour). Close and the look button are
+  DWButtonStyle's flat small button (`.btn.sm`: the accent's words, medium, 6 either side, 44 wide and tall at least);
+  each has a Large Content Viewer, since the top stops growing at xxxLarge (before, the glyphs in their 44-pt frames
+  grew uncapped). LookButton (the record and square glyphs) is drawn nowhere in Now Playing now; it stays in
+  TurntableView.swift, which keeps no diff.
+- **The top row is still the grip, the whole width.** The column is 24 either side (the cover's); the top row is drawn
+  out past it with `.padding(.horizontal, -24)` after its `.contentShape(Rectangle()).gesture(grip)`, so it stands at
+  the top's own 12 and its grip spans the screen. The drag down closes past dismissDistance, as before; Close is the
+  tap.
+- **The notice** (D11) stays in the top's middle, between its ends, taking no touch. PhoneTop's middle is a Spacer of
+  its own, so the two ends' widths are measured (`onGeometryChange` into `topEnds`) and the notice is laid over the top
+  in from each side by the top's 12, that end's width and the gap. Worked out on a 375-pt phone: its words have 129 pt
+  at the default size (R3's review asked 120 at least) - but the middle narrows as the top's words grow (it was 139
+  at every size: the three 44-pt frames didn't), 99 at xxLarge and 84 at xxxLarge, where "Downloading" needs 116 and
+  128. **R4b's review**: the first build broke the word in half there, and with its type uncapped ran it a dozen lines
+  down the cover at AX5. So the notice's longest word is measured as the notice draws it (NoticeWord: its face, each
+  word whole on one line, unseen, heard by no one) and the whole top too, and the notice is in the middle only while
+  that word fits the middle's room inside its own 16 either side (`noticeInMiddle`); else it lies the whole width just
+  under the top (12 from the screen's edges - 319 for its words on a 375, 337 on a 393), over the cover, still taking
+  no touch (the top row drawn over what follows it, `.zIndex(1)`). Its words stop growing at xxxLarge, as the top's
+  do. For the •••'s download notices ("Downloading: Roads": "Downloading:" 120 at xxLarge) that is the middle up to
+  xLarge and under the top from xxLarge, on a 375 and a 393 alike. A word wider than the whole width (a song title of
+  one word over 319 pt at 21) would still break; nothing the app says comes near it.
+- **The cover** is 24 either side on every phone (the drawing's 342 on its 390; 327 on a 375): its `.frame(maxWidth:
+  360)` and `.padding(.horizontal, 8)` went, so it takes the column; it is still asked at 360, the largest size asked
+  (CoverSize.hero), and the backdrop's. Its tap, shadow, pause scale and `.highPriorityGesture(grip)` are as they were.
+- **The title, on the cover** (coverTitles, coverNames, coverByline) is 22 and bold (Typeface.title2), its letters 0.3
+  closer (the drawing's `letter-spacing: -0.3px`), white (DWPalette.text); under it **"Artist — Album" in the accent**
+  (`.acc`), the link to the album as before. A song naming no album has its byline in the second colour (t2) - the
+  accent would say a tap goes somewhere, and that line has none. The failure's line over the title is t2 too
+  (Palette.quiet before).
+- **The turntable's titles are exactly as they were** (R4b's review: the first build shared one title and byline
+  between the looks, so the turntable's byline went purple and its title took the tracking - and the turntable keeps
+  no diff, mac-redesign-build.md 3.6). `titles` and `byline` are 31cab12d's, byte for byte in code (a digest pins them),
+  and the turntable alone calls them, centred: the byline quiet, no tracking, nothing beside them.
+- **The readout** beside the title (`.col.mono.xs.q3`): "3 of 11" over "FLAC 16/44.1", Core's BarDisplay's -
+  `BarDisplay.place(queue).map(BarDisplay.Words.place)` and `queue.current.flatMap(BarDisplay.format)`, the Mac bar's
+  words - never counted in the view. In Courier Prime at the phone's xs (Typeface.Phone.mono(.extraSmall), 12 relative
+  to caption), the third colour, right-aligned, 4 between the lines; on the title's first baseline, 10 from it
+  (HStackLayout(alignment: .firstTextBaseline)). One element to VoiceOver, BarDisplay.readoutSpoken ("3 of 11, FLAC,
+  16-bit, 44.1 kHz"). A view of its own, NowPlayingReadout - the one place Now Playing reads `player.queue` - so the
+  place and the format are worked out there alone. (R4b's review: the first write-up said only it redraws as the queue
+  changes; it doesn't - Now Playing's body reads `player.current`, which reads the queue's index and entries, and is
+  drawn again as the song changes, as it always was.) A song with neither a place nor a format has no readout. Now
+  Playing's own views read no position (`shownPosition`, `barPosition`) - only the scrubber, the turntable's time line
+  and the mini player's seek line do, in their own files - as at 31cab12d. **At the accessibility
+  sizes it goes under the title** (VStackLayout, its lines wrapping): worked out on a 375-pt phone, the widest readout
+  a library's shuffle says ("1,612 of 2,100") leaves the title at least half of the 327-pt column, and the drawn title
+  "One Wing" whole, at every standard size (174 pt at xxxLarge, the title 131), and at accessibility1 neither (149,
+  the title 159). A five-figure count ("12,345 of 23,456") leaves the title 154 at xxxLarge, under half; the title
+  gives way with its ellipsis, the readout whole. On the turntable there is no readout.
+- **The scrubber is sunken** (R1c: a sunken track keeps its face): DWMeter's track exactly - DWCorners.meterShape
+  filled with the well and its inner shade (DWPalette.meterShade, radius 1, 1 down), its 1-pt line (DWPalette.line) -
+  and the part played the meter's grey (DWPalette.meterFill) in DWCorners.meterFillShape, inside the line. Its clocks
+  are Courier Prime (Typeface.readout(.caption), as since the fonts) in the second colour (`.mono.xs.q`; Palette.quiet
+  before). Its 12 and 16 pt, its 44-pt target, its drag, its timelines, its VoiceOver and its seek (`player.seek(to:)`
+  in the gesture's end, nothing awaited) are as they were.
+- **Lyrics' Try again** is DWButtonStyle's flat button (it was `.bordered`, the system's grey face) - the one face the
+  flat rule left in Now Playing's own buttons.
+- Unchanged: the transport (its SharpSymbol and PlayPauseGlyph in their 56 and 72 frames, `.buttonStyle(.plain)`,
+  every play PlayerModel's or the deck's straight from the tap), the bottom row, the speed chip and its band, the
+  backdrop, the turntable (no diff in App/Player/Turntable), the sheets, every gesture.
+
+### Where it departs from the drawing, and why
+
+- **The scrubber is 12 tall (16 held), not the drawing's 8**: 8 is `.dw.ph .meter`, a download's meter. James chose
+  the bar's size on 14 Nov ("a squared off thicker bar for the play progress"), and the turntable's time line shares
+  its row; nothing asked to change either.
+- **The clocks sit 6 under the bar's 44-pt target**, not 7 under the bar: the target is the bar's own, and moving the
+  clocks into it would move the row the turntable's time line shares.
+- **The •••** is the glyph (SF Symbols' ellipsis, NowPlayingMenu's), not the drawing's "•••" text: the menu is shared
+  with the Mac and isn't this slice's.
+- **The speed chip and the notice keep their faces**: the chip is a toggled chip (R3's), the notice the app's own
+  capsule (Shared/Notice.swift); neither is a grey box under the page's words, and neither file is this slice's.
+- **The look button's words are the look a tap shows** (as its glyph was), so the cover's top says "Turntable" - the
+  drawing's - and the turntable's says "Cover".
+- Core's NowPlayingWords.close still describes itself as "The chevron at the top." (Info.swift): Core isn't this
+  slice's to change, and the word itself is right.
+
+### The tests
+
+tests/test_ios_now_playing_look.py (19), read from the source as every look test is: the top (PhoneTop, Close, the
+look button named - Close's and NamedLookButton's whole code exact - the •••, their words in Core, no chevron, no
+LookButton call, the top's sizes against dw.css); the grip the whole width and the drag still closing; the top's fit
+and the notice's words on a 375 and a 393 at each standard size, with real widths from tests/ios_fonts.py, for the
+notices Core says (no word wider than its room; the middle at the default size, under the top from xxLarge); the
+notice measured as drawn and laid by `noticeInMiddle`, exact; no face in any of Now Playing's words, glyphs and buttons
+(FLAT_MEMBERS, through test_ios_phone_look's phone_path; the top's one background, the measurement, exact); the
+transport as it was (a digest of its code, the same at 31cab12d, and its plays straight from the tap); the cover 24
+either side and still the grip; Lyrics in the cover's place; the cover's title and byline, exact; the turntable's
+titles as they were (a digest of `titles` and `byline`, the same at 31cab12d, each called once); the readout's whole
+view exact - its two Texts `Text(place)` and `Text(format)` - nothing counted, `player.queue` read in its view alone;
+its face, baseline and accessibility layout; its fit; no position read anywhere in Now Playing; the scrubber's track
+DWMeter's, its sizes, tokens alone; no face in the scrubber but the track's two shapes, nor on its clocks; the clocks'
+whole view exact; its drag, VoiceOver and seek with no Task, await or async; nothing of it in App/Mac. Dynamic Type's
+caption, subheadline and title2 are Apple's tables, stated with `#?`.
+
+The shared test files, each only where this slice's change reached it: test_ios_nowplaying_row's notice test reads the
+new top (renamed `test_the_notice_clears_close_the_look_button_and_the_menu`, its fit moved to the new file; since the
+review its overlay compared whole, exact);
+test_ios_panels_look's order check names NamedLookButton and the top's two ends; test_ios_mac's no-turntable test
+names NamedLookButton; test_ios_palette's smooth-bars order names the sunken track and the meter's fill;
+test_ios_phone_look's SLICES gains R4B_FACE (ScrubberView now draws DWCorners and DWPalette; NowPlayingView was
+already listed).
+
+### Mutations, each made, seen failing and put back
+
+- The readout counted in the view ("\(queue.index + 1) of \(queue.tracks.count)" for BarDisplay's place): the
+  readout's BarDisplay test.
+- A face behind a transport glyph (`.background(DWPalette.buttonFace)` on Play/Pause's glyph): the flat test and the
+  transport's digest.
+- The grip off the cover (its `.highPriorityGesture(grip)` dropped): the cover test here, test_ios_cover_viewer's two
+  grip tests and test_ios_panels_look's drag-down test.
+- The scrubber's seek awaited (`Task { player.seek(to: seek) }` in the drag's end): the scrubber's seek test.
+- The flat rule, a face on Close (`.background(DWPalette.buttonFace)`): the flat test and the top's own test.
+
+R4b's review found five the first round let through, each failing now - with the review's own fixes held the same
+way:
+
+- The notice always in the middle (`noticeInMiddle` returning true): the notice's measurement test. Its words
+  uncapped: test_ios_nowplaying_row's notice test.
+- The turntable's byline purple, or its title tracked: the turntable's titles test (its digest).
+- The readout's place counted in its Text (`if place != nil { Text("\(queue.current?.track ?? 0) of 11") }`, the
+  `let place` line kept): the readout's test, now the whole view exact.
+- `.frame(width: 30).clipped()` on NamedLookButton: the top's test, now its whole code exact. `.background(DWPalette.card)`
+  after ScrubberClocks' `.accessibilityHidden(true)`: the clocks' test (exact) and the scrubber's flat test.
+- A face behind the scrubber's 44-pt target (after `.frame(height: Self.target)`): the scrubber's flat test.
+- `|| player.shownPosition < 0` in the cover titles' `under`, or `let _ = player.shownPosition` in the readout: the
+  no-position test (and the cover titles' or the readout's exact test).
+- An extra `.padding(.horizontal, -200)` between the notice's two paddings: test_ios_nowplaying_row's notice test.
+
+### Not verified - only a phone can say (checks 550-552, and the reworded P2, 251 and 536)
+
+- Anything on a screen: no Simulator, phone or Mac run. How the top reads with words where the chevron and the record
+  glyph were; whether "Turntable" and "Cover" are clear as the look button.
+- The readout's first line on the title's baseline in Courier Prime beside Libre Franklin Bold, and the title giving
+  way with its ellipsis beside a long readout; the readout under the title at the accessibility sizes.
+- The sunken scrubber's shade and line on the blurred backdrop (the meter was drawn for black), and whether its grey
+  fill reads as the part played over a bright cover's wash.
+- The cover's 327 pt on a 375-pt phone with the title, the scrubber, the transport and the bottom row under it (it
+  was 311 there): whether everything still fits on the smaller phone without the cover crowding the title.
+- The notice under the top at xxLarge and up: over the cover's top edge, readable over a bright cover (the notice's
+  own material face behind it); no jump as it appears (its word is measured as it comes, under the opacity's fade in);
+  at AX5 no bigger than at xxxLarge. The Large Content Viewers on Close, the look button and the •••.
+- The Mac: built for Mac Catalyst; Now Playing is never opened there; not looked at.
