@@ -37,6 +37,8 @@ struct MacRequestsPage: View {
     @Environment(ServerModel.self) private var server
     @Environment(Reachability.self) private var reachability
     @Environment(PlayerModel.self) private var player
+    /// (R7) Search's "Search Soulseek by hand…" asks for the Artist field (AppNavigation.manualSearch).
+    @Environment(AppNavigation.self) private var navigation
     /// (The Mac's Row Size) The rows' height and their cover, and the album's least - View > Row Size's.
     @Environment(\.macRowSize) private var rowSize
 
@@ -163,6 +165,13 @@ struct MacRequestsPage: View {
             .tabs($focused, in: Self.order)
             .focusEffectDisabled()
             .onSubmit { submitted(which) }
+            // (R7's review) Search's "Search Soulseek by hand…": the Artist field takes the cursor as it is drawn, or as
+            // it is asked while drawn - from the field's own change, no timer - and the ask is taken whatever happens
+            .onChange(of: navigation.manualSearchWanted, initial: true) { (_: Bool, wanted: Bool) -> Void in
+                guard wanted, which == .artist else { return }
+                defer { navigation.manualSearchTaken() }
+                focused = .artist
+            }
             // .in: padding 0 8px
             .padding(.horizontal, 8)
             .lookHeight(DWLook.here.fieldHeight)

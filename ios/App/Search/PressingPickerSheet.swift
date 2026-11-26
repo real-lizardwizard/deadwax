@@ -7,6 +7,9 @@ import SwiftUI
 /// whether you hold it; those with the usual tracklist folded under "N more pressings with the usual tracklist". The
 /// chosen one ticked. An album of more than `Pressings.filterMin` pressings has a filter ("JP, CD, a label or
 /// catalogue no."), what it leaves said as it narrows. A tap picks the pressing and closes the sheet.
+///
+/// (R7) Get's Pressing ▾ opens it, on the phone and the Mac alike: the look's colours, its fold's button the look's (flat
+/// accent words on the phone), its filter iOS's own `.searchable` as it was.
 struct PressingPickerSheet: View {
     let view: PressingsView
     let pick: (String) -> Void
@@ -41,10 +44,11 @@ struct PressingPickerSheet: View {
                     }
                     if filtering && rows.isEmpty {
                         Text(Pressings.filterWords(0, typed))
-                            .foregroundStyle(Palette.quiet)
+                            .foregroundStyle(DWPalette.t2)
                     }
                     if !view.more.isEmpty && !expanded && !filtering {
                         Button(Pressings.moreWords(view.more.count)) { expanded = true }
+                            .buttonStyle(DWButtonStyle())
                     }
                 }
             }
@@ -98,24 +102,24 @@ private struct PressingChoiceRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Image(systemName: "checkmark")
                 .font(Typeface.symbol(.footnote).weight(.bold))
-                .foregroundStyle(Palette.accent)
+                .foregroundStyle(DWPalette.acc)
                 .opacity(selected ? 1 : 0)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.label)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(DWPalette.text)
                 if !row.facts.isEmpty {
                     Text(row.facts)
                         .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .foregroundStyle(DWPalette.t2)
                 }
                 Text(row.note)
                     .font(Typeface.footnote)
-                    .foregroundStyle(row.kind == .differs ? Palette.amber : Palette.quiet)
+                    .foregroundStyle(row.kind == .differs ? DWPalette.amberText : DWPalette.t2)
                 if row.held {
                     Text(row.heldLabel)
                         .font(Typeface.caption.weight(.semibold))
-                        .foregroundStyle(Palette.held)
+                        .foregroundStyle(DWPalette.greenText)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)

@@ -356,8 +356,9 @@ menus and keys, and these differences.
   music plays - AirPlay's button and the output's name, the name left out in a window under 1000 points wide (hold the
   pointer over the button for it) - and **•••**, Now Playing's: Info, Add to a playlist…, Go to album, the song's
   download items, the EQ. With nothing queued the keys are dimmed and the display says **Nothing playing**.
-- **The side panel**: a strip of tabs along its top - **Queue**, **Lyrics**, **Info** and **EQ** - and the tab's page
-  under them, one at a time, 400 points wide. Open it from the bar's Queue, Lyrics, Info and EQ buttons (each lit
+- **The side panel**: a strip of tabs along its top - **Queue**, **Lyrics**, **Info** and **EQ**, and **Sources** first
+  while an album you don't have's Get is open (see [Getting an album](#getting-an-album)) - and the tab's page under
+  them, one at a time, 400 points wide. Open it from the bar's Queue, Lyrics, Info and EQ buttons (each lit
   while its tab shows), the •••'s Info and EQ, or **View > Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I and **EQ** ⌥⌘E, each ticked while its tab shows; or click a
   tab to move to it. A tab's key (or menu item) shows its tab - opening the panel if it's shut, switching to it if
   another tab shows - and closes the panel when its tab is the one showing; a tab's **Done** or Escape closes it too.
@@ -423,14 +424,15 @@ The rest of the differences:
   and stop at the ends: Make Bigger is dimmed at Large, Make Smaller at Small. ⌘+ (typed ⌘⇧= on a US keyboard) and ⌘−
   are the menu's keys, so they work wherever the menu does. ⌘= - the same key without Shift, as Finder takes it - works
   too while deadwax's main window is the one in front. All of them change together: Albums and Artists as a list, an
-  album's songs, Playlists, a playlist's songs and Requests (whose rows are 34 at Small, with room for a meter). Only
+  album's songs, Playlists, a playlist's songs, Requests (whose rows are 34 at Small, with room for a meter), Search's
+  table (34 too) and an album you don't have's tracklist. Only
   the rows and their covers grow: the words stay their size, in the middle of the row, and the column headings and a
   disc's heading row keep theirs. The row you've selected stays in view as the rows grow or shrink. A bigger cover
   leaves a playlist's or a request's name the room it had, so at Large Playlists still shows every column in the
   smallest window and beside the side panel, and Requests still fits a window as it first opens. In a short window an
   album's songs box gives way first, scrolling inside, so Properties stays on the page at Large too. Row Size is kept
   on this Mac, as Grid or List is, and is as you left it after you quit; the phone has no Row Size, and its rows don't
-  change. All songs and Search are still the phone's pages, so they don't follow it yet.
+  change. All songs is still the phone's page, so it doesn't follow it yet.
 - **Escape** closes the sheet in front - its Close, Cancel or Done, so where Close asks before throwing away what you
   typed (Edit album, Artist images, a playlist's Edit), Escape asks too. Where Close doesn't ask, Escape does nothing
   while you've typed something Close would throw away - Add a person's passwords, Reset password's, Which artist is
@@ -1626,7 +1628,22 @@ asks Navidrome, and shows **one list**, the web app's:
 - **The chips** under the field - **All**, **Artists**, **Albums**, **Songs** - show one kind in full: up
   to 50 artists or albums, or 100 songs, with **More from your library** ("More from the collection")
   when there are more. **Albums** lists the albums you don't have after yours. **All** puts the list
-  back as it was.
+  back as it was. A chip asks again for that kind (it doesn't hide rows of the list you had), and the one in
+  use is always shown.
+
+**How it looks.** On the phone the list is flat on the black page, as the Library is: the chips are words on a thin
+line, the one in use white over a short purple line; **Top results** and each section's name is a heading, its **See
+all** in purple at its end; each row is 60 points tall with a thin line under it - its cover (round for an artist),
+its title and line - and ends in what a tap on it does: a small grey **▶** for a song that plays, **Get** in purple
+for an album you don't have, and **›** for a page. On the Mac (see [The Mac app](#the-mac-app)) it is one table under
+a toolbar: "Results for “portishead”", the four kinds (folded into one pop-up named for the kind in use where the
+toolbar is narrow), and **Search Soulseek by hand…** (with Get albums), which opens Requests with the cursor in its
+toolbar's Artist field. The table's columns are **Name**, **Kind**, **Artist**, **Year** and **In your library**, then
+each row's buttons - **Play** (a song whose album is in), **Open** (one of yours) or **Get** (an album you don't have:
+its page, where Get the album is); Top results and each section are a heading row. In a narrow window, or beside the side panel, the year, then the kind,
+then the artist make room, so nothing scrolls sideways. Click a row to select it, double-click it (or press Return)
+for its first button, ↑ ↓ Home and End to move; a right-click is its •••. The status bar counts what's shown, and how
+much of it is in your library.
 
 **The list is drawn once for the words, and nothing moves under your finger.** Your library answers in a
 fraction of a second and MusicBrainz in a second or more, so the list comes in steps, as the web app's
@@ -1669,22 +1686,28 @@ MusicBrainz's rows, and rows that come after something was drawn go below it. Ne
 go.
 
 - **A song**: tap it to play it, with its album's songs after it in the Queue. The phone fetches the albums
-  of the first songs found as the list comes in, so a song with **▶** after it plays the moment you tap.
+  of the first songs found as the list comes in, so a song with the small **▶** at its end plays the moment you tap
+  (on the Mac, its **Play**).
   One without (its album not fetched yet) opens its album's page instead. Its **•••** is the song's own
   menu: Add to Queue, Add to a playlist… and Download. **Swipe it right** to add it to the queue (see [Adding
   to the queue](#adding-to-the-queue)) - on iOS 18 and later; on iOS 17 the ••• adds. A song you don't have
   (MusicBrainz's) has no ••• and no swipe.
 - **An album** opens its page; **an artist**, theirs. Back takes you to the list as you left it.
 - **An album you don't have** opens its page: its cover, its title and artist, "2008 · Album · not in your
-  library", then **Pressing** - tap it for every pressing MusicBrainz knows, the usual one ticked, each
+  library", then **Get the album** (the purple button) and **Pressing** with the chosen pressing's name and a ▾ - tap
+  it for every pressing MusicBrainz knows, the usual one ticked, each
   with its format, year, country and label, how it compares with the usual tracklist ("+1 bonus track: …"), and
   "In your library" for one you have; an album of more than 30 pressings has a filter ("JP, CD, a label or
-  catalogue no."). Under it the chosen pressing's facts (its catalogue number and barcode), then its
-  **tracklist**: what it is against the usual one ("The usual tracklist, shared by 9 of 10 pressings", or
-  "This pressing adds 3 tracks"), each track marked where it differs (**Bonus**, **Other version**,
-  **Renamed**), and **Not on this pressing** for what it leaves out. The artist is a link when one artist of
-  your library is theirs. **Get the album**, under the pressing's facts, gets the pressing chosen - see
-  [Getting an album](#getting-an-album).
+  catalogue no."). Under it, in small grey type, the chosen pressing's facts (its catalogue number and barcode) and
+  how many pressings there are ("7 pressings"), then its
+  **Tracklist**, headed with how many songs and how long ("11 songs · 49 min"): what it is against the usual one ("The
+  usual tracklist, shared by 9 of 10 pressings", or "This pressing adds 3 tracks"), each track marked where it differs
+  (**Bonus**, **Other version**, **Renamed**), and **Not on this pressing** for what it leaves out. The artist is a
+  link when one artist of your library is theirs. **Get the album** gets the pressing chosen - see
+  [Getting an album](#getting-an-album). On the Mac the page has a toolbar - **Get the album**, **Pressing** and its
+  pop-up, "7 pressings", **Open artist** - the cover and facts beside each other, and the tracklist a table: **#**,
+  **Title**, **Against the usual tracklist** ("the same", or what's different) and **Length**; the status bar says
+  "11 songs · 49 min" and the pressing.
 - **A song you don't have** opens under itself the albums it's on, the studio album first, each with its
   kind and year ("Live album · Bootleg · 2008") and "in your library" for one you have it on; compilations,
   live albums and soundtracks are folded behind **On 4 compilations and live albums** - tap it to show them.
@@ -1732,8 +1755,8 @@ go.
 ## Getting an album
 
 On an album you don't have's page (see [Search](#search)), once its pressings are in, **Get the album** stands under
-the chosen pressing's facts: the page's one big button, for the pressing chosen above it. To get another pressing,
-choose it first. Without **Get albums** (with logins on, an admin gives it) there's no button, and in its place
+the album's line, above **Pressing**: the page's one purple button, for the pressing chosen under it (the Mac's is at
+the start of its toolbar). To get another pressing, choose it first. Without **Get albums** (with logins on, an admin gives it) there's no button, and in its place
 "Getting albums is off for you - ask an admin."
 
 For an album MusicBrainz doesn't have, or one you'd rather find by name, **Search Soulseek…** at the top of
@@ -1777,21 +1800,26 @@ a minute. If no answer comes, the line asks again, and if it isn't yours yet: "d
 may have been added anyway. If it isn't in your library soon, add it again." Adding twice does no harm.
 
 **Choose a source.** Tap Get the album and a sheet opens, **Choose a source**, the album and pressing under its title
-("Dummy · CD · 1994 · GB · Go! Beat"). deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
+("Dummy · CD · 1994 · GB · Go! Beat"), **Close** at its left. On the Mac it opens in the side panel instead, as its
+**Sources** tab, beside the album's page: the page stays where it is while you choose, the chips and sort as you left
+them if you look at another tab and back, and the tab goes - its search stopped - when you leave the album's page
+(back, another page or another sidebar row), as the sheet does when it closes. deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
 Portishead…" and "This takes a few seconds." while it does - and each folder found is a card, as in the web app's
 sheet (see [Downloading](downloading.md#choosing-a-source)):
 
 - **The score** ("92%" - green from 75, amber under it), the folder's name and who it's from, and **Get**. The best
-  match through the chips is edged in purple and has the one solid Get, wherever the sort puts it.
-- **Speed** first, with its bar: what you got from that person before ("what you got from them"), their usual speed,
-  or "no speed reported yet". Then **Tracks** ("11 of 11", amber with some missing), **Quality** ("FLAC 16/44.1",
-  "MP3 VBR 245k"), **Size** and **Starts** ("now", "after 3 others"), and in amber what's missing ('Missing “Roads”
-  and 2 more').
+  match through the chips has the one purple Get (on the Mac its card is edged in purple too), wherever the sort puts
+  it.
+- **Speed** first - green when it's what you got from that person before ("what you got from them"), else their usual
+  speed, or "no speed reported yet" (it has no bar under it any more). Then **Tracks** ("11 of 11", amber with some
+  missing), **Quality** ("FLAC 16/44.1", "MP3 VBR 245k"), **Size** and **Starts** ("now", "after 3 others"), and in
+  amber what's missing ('Missing “Roads” and 2 more').
 - **Tap the score** for **Why it's a 92% match**: the edition words in the folder's name (DELUXE, REMASTER…), then
   the score's six parts, each with its percentage and what it measures - **Track names**, **Track count**, **Track
   lengths**, **Edition**, **Format** and **Availability**. Tap the score again to fold it away.
 - **The chips** - **Lossless**, **24-bit**, **Starts now** and **Complete albums only** (and **320 kbps** with that
-  quality floor) - narrow the list, and **the sort** orders it: **Best match**, **Highest quality**, **Largest first**
+  quality floor), on the phone words on a thin line, the ones on white over a purple line - narrow the list, and
+  **Sort** (its pop-up, with how many folders were found at the right: "14 found") orders it: **Best match**, **Highest quality**, **Largest first**
   or **Smallest first**. The chips start as your **quality floor**, the sort at Best match, and the search is scored
   by your **Format**, both chosen in [Settings](#settings) > Getting albums (or the web app's Settings) and kept for
   you on deadwax.
@@ -1830,7 +1858,7 @@ closes the sheet onto Requests, and an add that did says it's in your library, a
 **A card's Get** closes the sheet and shows Requests, the download already there from your tap, under Waiting,
 "starting…", until deadwax and slskd take it. If deadwax refuses it (someone got it meanwhile, say), it moves to
 Needs attention, "didn't start", with why ("It's already downloading.", "It's already in your library."). The Get
-also hands deadwax the next sources in the list as you had it, for **Another source** if this one fails. **Cancel**,
+also hands deadwax the next sources in the list as you had it, for **Another source** if this one fails. **Close**,
 or the sheet swiped down, stops the search, in slskd too, as soon as you let go of the swipe: a pick whose sources
 come in while the sheet slides away isn't got. A swipe pulled back leaves the search running. Get the album again
 searches afresh.
@@ -6713,6 +6741,61 @@ with Last.fm on.
   to Queue and Add to a playlist….)
 - **563 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 562, or "not done yet".
 
+#### Search, Get and Sources (564-569)
+
+**Not done yet.** On the Mac, Search is one table under a toolbar, an album you don't have's page has its own toolbar
+and tracklist table, and Choose a source opens in the side panel as its **Sources** tab. On the phone Search, an album
+you don't have's page and Choose a source are redrawn flat. Nothing is searched, played or got any differently. Have
+a search in mind that finds your music and albums you don't have ("portishead" does), and a pressing you could get.
+
+- **564 Search.** **Not done yet.** On the Mac the groups and the kinds are right; Play, Open and Get work on the rows.
+  (Under "Results for “…”" in the toolbar: All, Artists, Albums and Songs, and **Search Soulseek by hand…** at the
+  end. The table: Top results, then Artists, Albums and Songs as heading rows, each row its cover and name, its kind,
+  artist, year and where it is in your library - "in your library" a small green chip - and its button: **Play**
+  plays the song from its album, **Open** opens your album or artist, **Get** opens an album you don't have's page. A
+  kind narrows the search itself - Albums finds up to 50 albums and the albums you don't have - not just the rows
+  already shown, and the one chosen stays lit. Double-click or Return does a row's button - a double-click on a button
+  is that button's alone; ↑ and ↓ move; a right-click on a song or an album gives its menu. Every other row is striped,
+  starting again under each heading. Scroll down, then choose another kind or type other words: the list starts at
+  its top again. Make the window 880 wide, then open the side panel at 1280: the year, then the kind, then the artist
+  give way, nothing scrolls sideways, and the toolbar's kinds fold into one pop-up where they don't fit. View > Row Size
+  changes the rows. The status bar counts what's shown.)
+- **565 Get.** **Not done yet.** Sources opens beside the page; its chips, Sort and Get work; leaving the page closes
+  the tab. (An album you don't have's page: **Get the album**, **Pressing** and its pop-up, "7 pressings", **Open
+  artist** in the toolbar; the cover, title, artist and the pressing's facts; the tracklist's #, Title, Against the usual
+  tracklist and Length, a song you searched for in purple and selected. Get the album opens **Sources** first among the
+  side panel's tabs - the page stays put. Beside Sort is **Sample rate** ▾ (any, or at least 44.1, 48, 88.2 or 96 kHz:
+  a folder whose worst file is under it, or that says no rate, is hidden), and at the right how many were found - "14
+  found", or "3 of 14" while the filters hide some. Under the cards, "Speeds are each peer's own average." (or, where a
+  card shows what you got from that peer before, that it's that, else their own average). Switch to the Queue and
+  back: the chips, Sort and Sample rate are as you left them. Choose another pressing: the Sources tab goes, and Get the
+  album searches for the one chosen. Go back to Search, or to another page or sidebar row: the Sources tab is gone, and
+  Get the album again searches afresh. A card's Get closes the tab and shows Requests with the download in it. With
+  VoiceOver, a Search row reads as one, its buttons as its actions, and its own action is its first button's.)
+- **566 By hand.** **Not done yet.** On the Mac, Search's **Search Soulseek by hand…** opens Requests with the cursor
+  in its toolbar's Artist field; type an artist and album and Search: Choose a source opens as it does from Requests.
+  (Without Get albums, the button isn't there.)
+- **567 Search on the phone.** **Not done yet.** As drawn: each kind narrows the search; a song plays from its ▶. (The
+  chips are words on a thin line, the chosen one white over a short purple line, and choosing one asks for that kind
+  - Albums lists up to 50, with the albums you don't have after yours. Top results and each section have a heading,
+  **See all** in purple at its end. Each row is flat on the black page with a thin line under it, ending in a small grey
+  ▶ for a song that plays, **Get** in purple for an album you don't have, › for a page. Tap a song with ▶: it plays at
+  once from its album. A song's swipe right adds it to the queue; its ••• is as before. The field at the top is a square,
+  sunken box with a magnifying glass, its edge purple while you type - not iOS's rounded one - and stays put as the
+  list scrolls; type and the list follows as before, ✕ empties it, the keyboard's Search key puts the keyboard away.
+  At the largest text sizes a title takes up to three lines.)
+- **568 Get and Sources on the phone.** **Not done yet.** As drawn. Get, the pressing, the filters, Sort and a card's
+  Get work. (An album you don't have's page: the square cover, its title and artist, its line ("1997 · Album · not in
+  your library") in small grey type - only a "maybe in your library" in a dashed box - **Get the album** the purple
+  button across the page, then **Pressing** and the chosen pressing in purple with a ▾ - tap it for the picker - then
+  the facts in small grey type ("Cat. no. … · 7 pressings", at the largest sizes on as many lines as they take), what
+  deadwax already has as words on the page with no box, and **Tracklist** with "11 songs · 49 min" beside it, a song
+  you searched for in purple with a purple bar. Choose a source: **Close** at the top left, the filters as words on a
+  thin line, **Sort** and its pop-up, then **Sample rate** ▾, with "14 found" at the right ("3 of 14" while the filters
+  hide some - under the pop-ups where the text is large), and each source a card with no grey face and a thin line
+  under it; the best match's **Get** the purple one. Close, or a swipe down, stops the search as before.)
+- **569 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 567-568, or "not done yet".
+
 #### Requests (570-573)
 
 **Not done yet.** Requests in the new look: on the Mac a table of its own, with Search Soulseek in the toolbar and the
@@ -6796,13 +6879,14 @@ track, a picture and anywhere you type keep a face. Nothing works any differentl
 download or two on Requests and something queued.
 
 **Not flat yet**, each until the slice that redraws it: Settings and its pages, Sign in and the server address (R9);
-Search, an album's Get and Choose a source's cards (R7); Edit album's pages (R10 and R11); Needs a look (R12); Library
-care and the Event log (R13); People and Server settings (R14); and the EQ's own pages - Correction's search and a
-filter's editor - and an artist's Artist images and Move albums sheets, which no slice has taken yet. Those keep iOS's
-grouped lists and their grey rows for now: don't count them in 612.
+Edit album's pages (R10 and R11); Needs a look (R12); Library care and the Event log (R13); People and Server settings
+(R14); and the EQ's own pages - Correction's search and a filter's editor - and an artist's Artist images and Move
+albums sheets, which no slice has taken yet. Those keep iOS's grouped lists and their grey rows for now: don't count
+them in 612.
 
 - **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
-  Requests, an album, a playlist, an artist's page, Now Playing's sheet and Search Soulseek…'s sheet - not the screens
+  Requests, an album, a playlist, an artist's page, Now Playing's sheet, Search Soulseek…'s sheet, Search, an album
+  you don't have and Choose a source - not the screens
   above that aren't flat yet: is anything still a grey box laid on top? Is every button still plainly a button, and
   does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while
   your finger is on it - an album's Shuffle, **Same source again**, a card's ✕, the EQ's output, Downloaded's **Not

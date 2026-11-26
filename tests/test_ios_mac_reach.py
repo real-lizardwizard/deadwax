@@ -320,9 +320,10 @@ def test_the_frame_stacks_are_the_macs_with_its_own_routes():
                       ("requests", "MacRequests.root()"), ("you", "MacSettings.root()")):
         assert re.search(r"MacTabStack\(path: paths\." + tab + r"(, ownTop: true)?\) \{ " + re.escape(root) +
                          r" \}\s*\.tag\(AppTab\." + tab + r"\)", page), tab
-    # each root the phone's own, as MainTabs draws it - but Requests', since R8 the Mac's own table (MacRequestsPage), and
-    # (R2) the Library's, with the Mac's own Albums and Artists in it (asserted below)
-    for area, view in (("Search/MacSearch.swift", "SearchScreen()"),
+    # each root the phone's own, as MainTabs draws it - but Requests', since R8 the Mac's own table (MacRequestsPage),
+    # (R2) the Library's, with the Mac's own Albums and Artists in it (asserted below), and (R7) Search's, SearchScreen
+    # with the Mac's own table as its desk
+    for area, view in (("Search/MacSearch.swift", "SearchScreen { MacSearchPage() }"),
                        ("Requests/MacRequests.swift", "MacRequestsPage()"), ("Settings/MacSettings.swift", "YouView()")):
         assert re.search(r"static func root\(\) -> some View \{\s*" + re.escape(view) + r"\s*\}", bare(app["Mac/" + area]))
     assert re.search(r"static func root\(\) -> some View \{\s*LibraryView\(desk: \{ \(page: LibraryPage, scope: AlbumScope\) "
@@ -356,9 +357,10 @@ def test_mac_routes_says_every_route_once_each_to_its_area():
 #? route off this list.
 #? R5 took .album and .playlist: the phone's pages still, drawing the Mac's own in their List's place (their `desk`).
 #? R6 took .artist the same way (ArtistView's desk, MacArtistPage); .topSongs stays the phone's page.
+#? R7 took .group: GroupView still, drawing the Mac's Get page (MacGetPage) as its desk - asserted below.
 PHONES_PAGES = {"downloaded", "downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
                 "account", "thisPhone", "about", "downloadedPlaylists", "allSongs",
-                "group", "mbArtist", "topSongs", "chooseFolder", "needsALook", "libraryCare", "heldByNobody",
+                "mbArtist", "topSongs", "chooseFolder", "needsALook", "libraryCare", "heldByNobody",
                 "serverSettings", "serverSettingsGroup", "eventLog", "changePassword", "people", "person"}
 
 
@@ -397,3 +399,6 @@ def test_every_area_page_is_still_the_phones_own():
     assert set(drawn) == set(phone), set(drawn) ^ set(phone)
     for case in sorted(PHONES_PAGES):
         assert drawn[case] == phone[case], f".{case}: the Mac's {drawn[case]} is not the phone's {phone[case]}"
+    # (R7) the album you don't have: the phone's GroupView, its Mac half the Get page
+    assert phone["group"] == "GroupView(route: _).readableOnMac()"
+    assert drawn["group"] == "GroupView(route: _) { (desk: GroupDesk) in MacGetPage(desk: desk) }"

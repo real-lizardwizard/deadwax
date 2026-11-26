@@ -87,6 +87,24 @@ import Testing
         }
     }
 
+    /// (R7) The dock's Get lasts only while its page is the one in front: another page, another tab's, or none ends it.
+    @Test func theDocksGetLastsOnlyWhileItsPageIsInFront() {
+        #expect(MacDock.getLasts("group:a", front: "group:a"))
+        #expect(!MacDock.getLasts("group:a", front: "artist:b"))
+        #expect(!MacDock.getLasts("group:a", front: "group:b"))
+        #expect(!MacDock.getLasts("group:a", front: nil))
+        // and the tab goes with it: Sources isn't kept once no Get is open, whichever tab was showing
+        #expect(MacDock.kept(.sources, getOpen: false) == nil && MacDock.kept(.upNext, getOpen: false) == .upNext)
+    }
+
+    /// (R7's review) Another pressing chosen on its page ends the dock's Get: its Get is for the pressing it was asked for.
+    @Test func theDocksGetStandsOnlyForThePressingItWasAskedFor() {
+        #expect(MacDock.getStands(asked: "re-1997", chosen: "re-1997"))
+        #expect(!MacDock.getStands(asked: "re-1997", chosen: "re-2008"), "another pressing chosen")
+        #expect(!MacDock.getStands(asked: "re-1997", chosen: nil), "none chosen")
+        #expect(!MacDock.getStands(asked: nil, chosen: nil) && !MacDock.getStands(asked: nil, chosen: "re-1997"))
+    }
+
     @Test func escapeClosesThePanelAfterAFieldAndBeforeThePage() {
         for shown in Self.every {
             #expect(MacDock.escape(typing: true, shown: shown) == .field, "a field with the cursor first")

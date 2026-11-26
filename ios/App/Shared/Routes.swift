@@ -163,6 +163,15 @@ struct GroupRoute: Hashable {
     }
 }
 
+/// (R7) The Mac's Get in the dock (AppNavigation.macSources): the Get, the page it was asked from, and its chips and
+/// sort - the Get's, so they outlast the dock's tab switched away from and back to (SourcesPage's `kept`).
+@MainActor
+struct MacSourcesGet {
+    let page: GroupRoute
+    let request: GetRequest
+    let choices = SourcesChoices()
+}
+
 /// A MusicBrainz artist's page's address: their MusicBrainz id, and the name they were found by - drawn at once, while
 /// who they are loads. Only `mbid` decides which artist.
 struct MBArtistRoute: Hashable {
@@ -269,17 +278,18 @@ struct AlbumRoute: Hashable {
 @MainActor
 @Observable
 final class AppNavigation {
-    /// The tab shown.
-    private(set) var tab: AppTab = .library
+    /// The tab shown. (R7) Each of these five moving is the page in front moving: the dock's Get ends unless its page is
+    /// still the one in front (`frontMoved`).
+    private(set) var tab: AppTab = .library { didSet { frontMoved() } }
     /// The Library tab's pages, root first left out.
-    var library: [AppRoute] = []
+    var library: [AppRoute] = [] { didSet { frontMoved() } }
     /// (Phase 5) The Search tab's pages - an album, an artist, anything the Library pushes.
-    var search: [AppRoute] = []
+    var search: [AppRoute] = [] { didSet { frontMoved() } }
     /// (Phase 6) The Requests tab's pages - the album a Done row opens, and anything it pushes.
-    var requests: [AppRoute] = []
+    var requests: [AppRoute] = [] { didSet { frontMoved() } }
     /// The Settings tab's pages (16 Nov: its groups' pages - Getting albums, Playback, Downloads, Account, This phone,
     /// About - and what they push). Tapped again, it goes back to its root as every tab does, then to the top.
-    var you: [AppRoute] = []
+    var you: [AppRoute] = [] { didSet { frontMoved() } }
     /// Now Playing is open (a full-screen cover over the tabs).
     var nowPlayingShown = false
     /// One more each time a tab already at its root is tapped again: its root list scrolls to the top.
@@ -335,6 +345,9 @@ final class AppNavigation {
     /// (The Mac app, slice 2) Edit > Find (⌘F) asked for Search's field: Search takes it as it shows (FindFocus), and
     /// says so (`findTaken`). Never set on the iPhone.
     private(set) var findWanted = false
+    /// (R7) Search's Search Soulseek by hand… asked for Requests' manual search: its Artist field takes the cursor as
+    /// it shows (`manualSearchTaken`). Never set on the iPhone, whose manual search is Requests' own sheet.
+    private(set) var manualSearchWanted = false
     /// (The Mac app, slice 2) The Library switch's page as the Mac's window last showed it: a window closed and opened
     /// again from the Dock comes back on it, as the tab and its pages do (they are all the app's, not the window's).
     /// Only the Mac's window writes it (LibraryView) - and (slice 3) the sidebar's rows, which the Library's page follows.
@@ -346,10 +359,17 @@ final class AppNavigation {
     /// or Sources while a Get page is open, one at a time (MacDock.toggled); nil while it's closed. Always nil on the
     /// iPhone, where they are Now Playing's sheet and its face.
     private(set) var macPanel: MacDock.Tab?
-    /// (R3) A Get page is open, so the dock draws Sources (MacDock.tabs): said by the Get page's Sources (R7's) - false
-    /// until then. Its going takes Sources with it (MacDock.kept).
-    var macGetOpen = false {
+    /// (R3) A Get page is open, so the dock draws Sources (MacDock.tabs) - (R7) a Get asked for on it, in the dock
+    /// (`macSources`). Its going takes Sources with it (MacDock.kept).
+    private(set) var macGetOpen = false {
         didSet { macPanel = MacDock.kept(macPanel, getOpen: macGetOpen) }
+    }
+    /// (R7 - notes/ios.md "The redesign, slice R7: Search, Get and Sources (2026-11-25)") The Mac's Get: Get the album on
+    /// the album you don't have opens Sources in the dock, not the phone's sheet - this Get, and the page it was asked
+    /// from. One at a time; it lasts only while that page is the one in front (MacDock.getLasts), its search let go as it
+    /// ends (`endSources`). Always nil on the iPhone.
+    private(set) var macSources: MacSourcesGet? {
+        didSet { macGetOpen = macSources != nil }
     }
     /// (R3) A list on the page in front has a row selected (MacSelection, mirrored by DesktopFrame): Info is about it
     /// then, so View > Info opens with nothing queued, and it stays as the queue ends (MacDock.afterQueueEnds).
@@ -455,6 +475,58 @@ final class AppNavigation {
     /// (The Mac app, slice 3) A panel's Done (or Escape): put away.
     func closePanel() {
         macPanel = nil
+    }
+
+    /// (R7) Get the album, on the Mac: Sources in the dock for `request`, shown - a Get before it ended, its search let go.
+    func getSources(_ request: GetRequest, from page: GroupRoute) {
+        macSources?.request.search.close()
+        macSources = MacSourcesGet(page: page, request: request)
+        showPanel(.sources)
+    }
+
+    /// (R7) The dock's Get over - its page left, its Close, a person changing: its search let go, and Sources gone with
+    /// it (MacDock.kept).
+    func endSources() {
+        guard let ended = macSources else { return }
+        macSources = nil
+        ended.request.search.close()
+    }
+
+    /// (R7) A download asked for from the dock's Sources - only while the dock still shows that Get: the Get over and
+    /// Requests shown at its root, its new row already up, as the phone's sheet hands over (`showRequestsRoot`).
+    func sourcesQueued(_ id: Int) {
+        guard macSources?.request.id == id else { return }
+        endSources()
+        showRequestsRoot()
+    }
+
+    /// (R7's review) Another pressing chosen on a Get page: the dock's Get for that page ends unless it is for the pressing
+    /// now chosen (MacDock.getStands) - its search let go and Sources gone, so its cards' Get can never download a
+    /// pressing the page no longer shows. Get the album asks again, for the one chosen.
+    func pressingChosen(_ chosen: String?, on page: GroupRoute) {
+        guard let get = macSources, get.page == page,
+              !MacDock.getStands(asked: get.request.release.releaseMbid, chosen: chosen) else { return }
+        endSources()
+    }
+
+    /// (R7) The page in front moved: the dock's Get ends unless its own page is still the one in front.
+    private func frontMoved() {
+        guard let get = macSources, !MacDock.getLasts(AppRoute.group(get.page), front: shownStack.last) else { return }
+        endSources()
+    }
+
+    /// (R7) Search's "Search Soulseek by hand…" on the Mac: Requests at its root, Now Playing closed, and its toolbar's
+    /// Artist field to take the cursor as it shows (MacRequestsPage) - the way the manual search already opens there.
+    func manualSearch() {
+        nowPlayingShown = false
+        tab = .requests
+        backToRoot(&requests)
+        manualSearchWanted = true
+    }
+
+    /// (R7) Requests' Artist field has the cursor `manualSearch` asked for.
+    func manualSearchTaken() {
+        manualSearchWanted = false
     }
 
     /// (The Mac app, slice 3) Nothing queued any more: Up Next and Info go with the queue (their sheets did); Lyrics stays.
@@ -819,7 +891,10 @@ final class AppNavigation {
         importAnswered()
         tab = .library
         findWanted = false
+        manualSearchWanted = false
         macLibraryPage = nil
+        // (R7) the dock's Get over before the panel is put away: its search let go, nothing picked for the next person
+        endSources()
         macPanel = nil
         // (slice 6's review) Needs a look's session over - once the session has moved on, so nothing is noted, read or
         // asked for the next person

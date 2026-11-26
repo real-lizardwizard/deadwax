@@ -1,22 +1,27 @@
 import DeadwaxCore
 import SwiftUI
 
-/// One place an album can come from, in the Sources sheet (Phase 6, slice 2 - phase6-get-requests.md 2.10, 3.5; the
-/// web's app/SourceCard.tsx as a phone draws it, its words and rules Core's Sources):
+/// One place an album can come from, in Choose a source (Phase 6, slice 2 - phase6-get-requests.md 2.10, 3.5; the
+/// web's app/SourceCard.tsx as a phone draws it, its words and rules Core's Sources) - since the redesign's slice R7
+/// (notes/ios.md "The redesign, slice R7: Search, Get and Sources (2026-11-25)") as iSources.dc.html draws it on the
+/// phone and Get.dc.html in the Mac's dock:
 ///
-/// - The top line: the match score, "92%" - green from 75 (the band a pick needs), amber under it - the folder, "from
-///   <peer>" (and, for a set shared one folder per disc, "in 2 parts, one per disc"), and Get. The best match's Get is
-///   the sheet's one primary button, wherever the sort puts its card, its card edged in --dw-best; the rest are tinted.
-///   Each Get is named for its folder and its peer (one peer often shares a FLAC folder and an MP3 one of an album).
-/// - The speed leads, in its well with its bar (against 3 MB/s, capped), saying where its number comes from - measured
-///   (green), their usual speed, or none reported yet.
-/// - Then Tracks (amber when tracks are missing), Quality, Size and Starts (green "now", amber while it waits), side by
-///   side - two by two, or one over another, where the text is too large for that - and what it is missing, in amber.
+/// - The top line: the match score, "92%" - a green chip from 75 (the band a pick needs), amber under it - the folder,
+///   "from <peer>" (and, for a set shared one folder per disc, "in 2 parts, one per disc"), and Get. The best match's Get
+///   is the one primary button, wherever the sort puts its card; the rest are the look's own button (on the phone its
+///   words in the accent). Each Get is named for its folder and its peer (one peer often shares a FLAC folder and an MP3
+///   one of an album).
+/// - Its facts in three columns, each its label over its readout: Speed (green when measured - where the number comes
+///   from under it), Tracks (amber when tracks are missing), Quality, Size and Starts (green "now", amber while it
+///   waits) - two columns where the text is too large for three, one over another past that - and what it is missing,
+///   in amber.
 /// - While deadwax can't be reached (`gets` false), the card is dimmed - found before - and its Get is off (slice 2's
 ///   review, finding 1).
-/// - WHY IT SCORED WHAT IT DID, behind a tap on the score (a phone's, as the web's sheet has it): the edition words in
-///   the folder's name in their colours, and each signal's chip with what it measures beside it. Last on the card, so
-///   opening it moves nothing above; the chevron turns.
+/// - WHY IT SCORED WHAT IT DID, behind a tap on the score: the edition words in the folder's name in their colours, and
+///   each signal's chip with what it measures beside it. Last on the card, so opening it moves nothing above; the
+///   chevron turns.
+/// - On the phone the card is flat (PhoneCard: no face, a hairline under it); on the Mac a box on the panel, the best
+///   match's edged in the accent.
 struct SourceCardView: View {
     let candidate: Candidate
     let best: Bool
@@ -28,129 +33,84 @@ struct SourceCardView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
+        if Platform.mac {
+            card
+                .padding(SourceCardLook.macPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(DWPalette.card, in: DWCorners.boxShape)
+                .overlay(DWCorners.boxShape.strokeBorder(best ? DWPalette.acc : DWPalette.line, lineWidth: 1))
+                .opacity(gets ? 1 : DWPalette.off)
+        } else {
+            PhoneCard {
+                card
+            }
+            .opacity(gets ? 1 : DWPalette.off)
+        }
+    }
+
+    private var card: some View {
         let percent = Sources.percent(candidate)
-        VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: SourceCardLook.gap) {
             top(percent)
-            speed
             facts
             if let missing = Sources.missingLine(candidate) {
                 Text(missing)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.amber)
+                    .font(SourceCardLook.small)
+                    .foregroundStyle(DWPalette.amberText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if open {
                 reasons(percent)
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.card, in: Corners.cardShape)
-        .overlay(Corners.cardShape.strokeBorder(best ? Palette.best : Palette.border))
-        .opacity(gets ? 1 : Palette.dimmed)
     }
 
     // MARK: the top line
 
     private func top(_ percent: Double) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: SourceCardLook.topGap) {
             score(percent)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(candidate.directoryName)
-                    .font(Typeface.subheadline.weight(.semibold))
+                    .font(SourceCardLook.name)
+                    .foregroundStyle(DWPalette.text)
                     .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
                 Text(SourcesWords.from(candidate))
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.text2)
+                    .font(SourceCardLook.extraSmall)
+                    .foregroundStyle(DWPalette.t3)
                     .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            get
+            Button(SourcesWords.get, action: onGet)
+                .buttonStyle(DWButtonStyle(kind: best ? .pri : .normal, size: .small))
+                .fixedSize()
+                .disabled(!gets)
+                .accessibilityLabel(SourcesWords.getLabel(candidate))
         }
     }
 
-    /// The score, a button that opens why it is what it is - 44 points to a finger.
+    /// The score, a chip that opens why it is what it is - 44 points to a finger on the phone.
     private func score(_ percent: Double) -> some View {
         let good = Sources.band(percent) == .good
         return Button {
             open.toggle()
         } label: {
             HStack(spacing: 2) {
-                Text(SourcesWords.percent(percent))
-                    .font(Typeface.mono(.subheadline).weight(.bold))
+                DWChip(words: SourcesWords.percent(percent), tone: good ? .good : .caution)
                 Image(systemName: "chevron.down")
                     .font(Typeface.symbol(.caption2).weight(.semibold))
+                    .foregroundStyle(DWPalette.t3)
                     .rotationEffect(.degrees(open ? 180 : 0))
             }
-            .foregroundStyle(good ? Palette.held : Palette.amber)
-            .padding(.horizontal, 6)
-            .frame(minWidth: 38, minHeight: 32)
-            .background(Corners.controlShape.fill(good ? Palette.heldFill : Palette.amberFill))
-            .overlay(Corners.controlShape.strokeBorder(good ? Palette.heldEdge : Palette.amberEdge))
-            .frame(minHeight: 44)
+            .frame(minHeight: CGFloat(DWLook.here.target))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.2), value: open)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(SourcesWords.match(percent))
         .accessibilityValue(open ? SourcesWords.expanded : SourcesWords.collapsed)
-    }
-
-    /// Get: the best match's the primary, the rest tinted - in the tap, the download asked for.
-    @ViewBuilder private var get: some View {
-        if best {
-            Button(SourcesWords.get, action: onGet)
-                .buttonStyle(PrimaryFace())
-                .disabled(!gets)
-                .accessibilityLabel(SourcesWords.getLabel(candidate))
-        } else {
-            Button(SourcesWords.get, action: onGet)
-                .buttonStyle(TintedFace())
-                .disabled(!gets)
-                .accessibilityLabel(SourcesWords.getLabel(candidate))
-        }
-    }
-
-    // MARK: the speed
-
-    private var speed: some View {
-        let fact = Sources.speedFact(candidate)
-        return VStack(alignment: .leading, spacing: 7) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    speedValue(fact)
-                    Spacer(minLength: 0)
-                    speedNote(fact)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    speedValue(fact)
-                    speedNote(fact)
-                }
-            }
-            SpeedBar(percent: fact.percent, kind: fact.kind)
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(Palette.well, in: Corners.controlShape)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func speedValue(_ fact: Sources.SpeedFact) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(SourcesWords.speed)
-                .font(Typeface.caption)
-                .foregroundStyle(Palette.label)
-            Text(fact.text)
-                .font(Typeface.mono(.body).weight(.bold))
-                .foregroundStyle(fact.kind == .measured ? Palette.held
-                                 : fact.kind == .unknown ? Palette.textTertiary : Palette.onSecondary)
-        }
-    }
-
-    private func speedNote(_ fact: Sources.SpeedFact) -> some View {
-        Text(fact.note)
-            .font(Typeface.caption)
-            .foregroundStyle(Palette.text2)
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: the facts
@@ -159,41 +119,38 @@ struct SourceCardView: View {
         let missing = Sources.missingLine(candidate) != nil
         let starts = Sources.startsFact(candidate)
         let size = Sources.size(candidate.totalSize)
-        let tracks = Fact(label: SourcesWords.tracks, value: Sources.tracksText(candidate), mono: false,
-                          colour: missing ? Palette.amber : Color.primary)
-        let quality = Fact(label: SourcesWords.quality, value: Sources.qualityText(candidate), mono: true, colour: .primary)
-        let sized = Fact(label: SourcesWords.size, value: size.isEmpty ? SourcesWords.noSize : size, mono: true,
-                         colour: .primary)
-        let start = Fact(label: SourcesWords.starts, value: starts.text, mono: false,
-                         colour: starts.waits ? Palette.amber : Palette.held)
+        let speed = Sources.speedFact(candidate)
+        let all: [Fact] = [
+            Fact(label: SourcesWords.speed, value: speed.text, note: speed.note, bold: true,
+                 colour: speed.kind == .measured ? DWPalette.greenText : speed.kind == .unknown ? DWPalette.t3 : DWPalette.text),
+            Fact(label: SourcesWords.tracks, value: Sources.tracksText(candidate),
+                 colour: missing ? DWPalette.amberText : DWPalette.text),
+            Fact(label: SourcesWords.quality, value: Sources.qualityText(candidate), colour: DWPalette.text),
+            Fact(label: SourcesWords.size, value: size.isEmpty ? SourcesWords.noSize : size, colour: DWPalette.text),
+            Fact(label: SourcesWords.starts, value: starts.text,
+                 colour: starts.waits ? DWPalette.amberText : DWPalette.greenText),
+        ]
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 10) {
-                tracks
-                Spacer(minLength: 0)
-                quality
-                Spacer(minLength: 0)
-                sized
-                Spacer(minLength: 0)
-                start
-            }
-            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 7) {
-                GridRow {
-                    tracks
-                    quality
-                }
-                GridRow {
-                    sized
-                    start
-                }
-            }
-            VStack(alignment: .leading, spacing: 7) {
-                tracks
-                quality
-                sized
-                start
+            grid(all, columns: 3)
+            grid(all, columns: 2)
+            VStack(alignment: .leading, spacing: SourceCardLook.factRows) {
+                ForEach(all.indices, id: \.self) { (at: Int) in all[at] }
             }
         }
-        .padding(.horizontal, 2)
+    }
+
+    /// The facts in `columns` columns (iSources' grid: three of them, 8 between rows and 6 between columns).
+    private func grid(_ all: [Fact], columns: Int) -> some View {
+        Grid(alignment: .topLeading, horizontalSpacing: SourceCardLook.factColumns, verticalSpacing: SourceCardLook.factRows) {
+            ForEach(Array(stride(from: 0, to: all.count, by: columns)), id: \.self) { (start: Int) in
+                GridRow {
+                    ForEach(start..<min(start + columns, all.count), id: \.self) { (at: Int) in
+                        all[at]
+                            .frame(minWidth: SourceCardLook.factLeast, alignment: .leading)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: why
@@ -203,13 +160,13 @@ struct SourceCardView: View {
         let chips = Sources.signalChips(candidate)
         return VStack(alignment: .leading, spacing: 6) {
             Text(SourcesWords.reasons(percent))
-                .font(Typeface.caption.weight(.semibold))
-                .foregroundStyle(Palette.text2)
+                .font(SourceCardLook.small.weight(.semibold))
+                .foregroundStyle(DWPalette.t2)
                 .accessibilityAddTraits(.isHeader)
             if !tags.isEmpty {
                 Wrap(spacing: 6) {
                     ForEach(tags.indices, id: \.self) { (at: Int) in
-                        EditionTag(tag: tags[at].tag, tone: tags[at].tone)
+                        DWChip(words: tags[at].tag, tone: Self.tone(tags[at].tone))
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -218,155 +175,91 @@ struct SourceCardView: View {
             Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
                 ForEach(chips) { (chip: Sources.SignalChip) in
                     GridRow {
-                        SignalBadge(chip: chip)
+                        DWChip(words: "\(chip.label) \(SourcesWords.percent(chip.value))", tone: Self.tone(chip.band))
+                            .fixedSize()
                         Text(chip.meaning)
-                            .font(Typeface.caption)
-                            .foregroundStyle(Palette.text2)
+                            .font(SourceCardLook.extraSmall)
+                            .foregroundStyle(DWPalette.t2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                    .accessibilityElement(children: .combine)
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    /// A signal's band as a chip's tone: green from 75, amber from 40, red under.
+    private static func tone(_ band: Sources.Band) -> DWChip.Tone {
+        switch band {
+        case .good: return .good
+        case .mid: return .caution
+        case .bad: return .bad
+        }
+    }
+
+    /// An edition word's colour as the main page drew it, as a chip's tone.
+    private static func tone(_ tone: Sources.EditionTone) -> DWChip.Tone {
+        switch tone {
+        case .amber: return .caution
+        case .red: return .bad
+        case .purple: return .marked
+        case .green: return .good
+        case .plain: return .plain
+        }
+    }
 }
 
-/// One of a card's facts: its label over its value, read as one - the value on one line, as the folder's name is, and
+/// (R7) The card's numbers and type (iSources.dc.html, Get.dc.html - each line's `drawn:` comment says where).
+enum SourceCardLook {
+    static let gap: CGFloat = 9             // drawn: iSources .card gap
+    static let topGap: CGFloat = 8          // drawn: iSources top line gap
+    static let factRows: CGFloat = 8        // drawn: iSources facts grid row gap
+    static let factColumns: CGFloat = 6     // drawn: iSources facts grid column gap
+    static let factLeast: CGFloat = 72      // a fact's least width, so three columns never squeeze one to nothing
+    static let macPadding: CGFloat = 10     // drawn: Get .item padding
+
+    /// The folder's name (iSources: .b at 15), the small words (.s), the extra-small labels (.xs) - a fact's readout is
+    /// set where it is drawn (Fact). On the Mac Get.dc.html's 13, 12 and 11.5 - Typeface.Mac's .base, .small and .label,
+    /// reached through the look's roles of those very sizes (.field, .smallButton, .chip): a page both devices draw
+    /// names no Mac piece (test_ios_mac_reach).
+    static var name: Font { Platform.mac ? Typeface.Look.text(.field).weight(.semibold) : Typeface.subheadline.weight(.bold) }
+    static var small: Font { Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small) }
+    static var extraSmall: Font { Platform.mac ? Typeface.Look.text(.chip) : Typeface.Phone.text(.extraSmall) }
+}
+
+/// One of a card's facts: its label over its readout, read as one - the value on one line, as the folder's name is, and
 /// on up to three at the accessibility sizes (slice 2's review, finding 4: "FLAC, MP3 VBR 128-320k" in the one-over-
-/// another fallback). ViewThatFits measures a text's one-line width whatever its limit, so the side-by-side layouts are
-/// chosen as before.
+/// another fallback); the speed's note ("their usual speed") under it. ViewThatFits measures a text's one-line width
+/// whatever its limit, so the side-by-side layouts are chosen as before.
 private struct Fact: View {
     let label: String
     let value: String
-    let mono: Bool
+    var note = ""
+    var bold = false
     let colour: Color
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(Typeface.caption)
-                .foregroundStyle(Palette.label)
+                .font(SourceCardLook.extraSmall)
+                .foregroundStyle(DWPalette.t3)
+            // the readout (iSources .s mono; the Mac's small mono), a line of its own under its label
             Text(value)
-                .font(mono ? Typeface.mono(.footnote) : Typeface.footnote)
+                .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))
+                .fontWeight(bold ? .bold : nil)
                 .foregroundStyle(colour)
                 .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            if !note.isEmpty {
+                Text(note)
+                    .font(SourceCardLook.extraSmall)
+                    .foregroundStyle(DWPalette.t3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// The speed's bar: its sunken track, filled to the speed against 3 MB/s - green for one measured, grey for the peer's
-/// usual, none for none reported.
-private struct SpeedBar: View {
-    let percent: Double
-    let kind: Sources.SpeedFact.Kind
-
-    private static let height: CGFloat = 8
-
-    var body: some View {
-        GeometryReader { space in
-            ZStack(alignment: .leading) {
-                Corners.trackShape
-                    .fill(Palette.barTrack)
-                Group {
-                    switch kind {
-                    case .measured: Corners.fillShape.fill(Palette.barGreen)
-                    case .advertised: Corners.fillShape.fill(Palette.barGrey)
-                    case .unknown: Color.clear
-                    }
-                }
-                .frame(width: max(0, (space.size.width - 2) * min(max(percent, 0), 100) / 100))
-                .padding(1)
-            }
-            .overlay(Corners.trackShape.strokeBorder(Palette.barEdge, lineWidth: 1))
-        }
-        .frame(height: Self.height)
-        .accessibilityHidden(true)
-    }
-}
-
-/// A signal's chip: its word and its number, in its band's colour - green from 75, amber from 40, red under.
-private struct SignalBadge: View {
-    let chip: Sources.SignalChip
-
-    var body: some View {
-        let colours = self.colours
-        HStack(spacing: 4) {
-            Text(chip.label)
-            Text(SourcesWords.percent(chip.value))
-                .font(Typeface.mono(.caption))
-        }
-        .font(Typeface.caption)
-        .foregroundStyle(colours.text)
-        .lineLimit(1)
-        .padding(.horizontal, 7)
-        .frame(minHeight: 22)
-        .background(Corners.controlShape.fill(colours.fill))
-        .overlay(Corners.controlShape.strokeBorder(colours.edge))
-    }
-
-    private var colours: (text: Color, fill: Color, edge: Color) {
-        switch chip.band {
-        case .good: return (Palette.held, Palette.heldFill, Palette.heldEdge)
-        case .mid: return (Palette.amber, Palette.amberFill, Palette.amberEdge)
-        case .bad: return (Palette.danger, Palette.dangerFill, Palette.dangerEdge)
-        }
-    }
-}
-
-/// An edition word found in the folder's name, in its colour as the main page drew it.
-private struct EditionTag: View {
-    let tag: String
-    let tone: Sources.EditionTone
-
-    var body: some View {
-        let colours = self.colours
-        Text(tag)
-            .font(Typeface.caption.weight(.semibold))
-            .foregroundStyle(colours.text)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .background(Corners.controlShape.fill(colours.fill))
-            .overlay(Corners.controlShape.strokeBorder(colours.edge))
-    }
-
-    private var colours: (text: Color, fill: AnyShapeStyle, edge: Color) {
-        switch tone {
-        case .amber: return (Palette.amber, AnyShapeStyle(Palette.amberFill), Palette.amberEdge)
-        case .red: return (Palette.danger, AnyShapeStyle(Palette.dangerFill), Palette.dangerEdge)
-        case .purple: return (Palette.accentText, AnyShapeStyle(Palette.badgeFill), Palette.badgeEdge)
-        case .green: return (Palette.held, AnyShapeStyle(Palette.heldFill), Palette.heldEdge)
-        case .plain: return (Palette.onSecondary, AnyShapeStyle(Palette.secondaryFill), Palette.secondaryEdge)
-        }
-    }
-}
-
-/// A source's Get other than the best match's (.app-source-get.is-tinted): --dw-toggled-bg under --dw-accent-text, its
-/// edge --dw-toggled-border - the primary's size, so the two line up card to card.
-struct TintedFace: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        TintedFaceBody(configuration: configuration)
-    }
-}
-
-private struct TintedFaceBody: View {
-    let configuration: ButtonStyleConfiguration
-
-    @Environment(\.isEnabled) private var isEnabled
-
-    var body: some View {
-        configuration.label
-            .font(Typeface.body.weight(.semibold))
-            .foregroundStyle(Palette.accentText)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-            .frame(minHeight: 36)
-            .background(Corners.controlShape.fill(configuration.isPressed ? Palette.pressed : Palette.toggledFill))
-            .overlay(Corners.controlShape.strokeBorder(Palette.toggledEdge))
-            .opacity(isEnabled ? 1 : Palette.off)
-            .contentShape(Corners.controlShape)
     }
 }
 

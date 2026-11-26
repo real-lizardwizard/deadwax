@@ -1935,7 +1935,9 @@ def test_the_sources_sheet_runs_the_very_search_again_offline_and_lets_it_go_as_
     assert "== .offline { notPicked = Sources.notPickedOffline }" in search
     # (finding 4) let go as the sheet starts going - a swipe let go, Cancel, the page's binding - and nothing from it
     # after: no answer lands, no pick, no download
-    assert ".background(SheetGoing { model.close() })" in sheet and ".onDisappear { model.close() }" in sheet
+    # (R7) the Mac's dock holds the page while its Get is open, the tab switched away from and back: there the Get's end
+    # lets it go (closeDock, AppNavigation.endSources), never the page's going
+    assert ".background(SheetGoing { model.close() })" in sheet and ".onDisappear { if !docked { model.close() } }" in sheet
     assert "model.close()\n                        dismiss()" in sheet
     view = _code((app / "Search" / "GroupView.swift").read_text(encoding="utf-8"))
     assert "if next == nil { getting?.search.close() }" in view

@@ -23,46 +23,46 @@ import SwiftUI
 /// - While deadwax can't be reached (question 5) nothing is asked: a list drawn for the words stays without
 ///   MusicBrainz's part, songs not on this phone dimmed; for new words, "Search works once deadwax is back."
 /// - Navidrome known not to be there: the Library's gate words above the list, nothing asked of it.
-struct SearchScreen: View {
+///
+/// (The redesign, slice R7 - notes/ios.md "The redesign, slice R7: Search, Get and Sources (2026-11-25)")
+/// - On the phone, iSearch.dc.html: flat on the page's black under iOS's large title; (R7's review) the field the
+///   look's sunken square box (iSearch's `.well.sfield`, `field`) where iOS's rounded search field was, held under the
+///   bar as the list scrolls; the kinds a strip (PhoneStrip - each `search.choose`, the query narrowed, the kind in use
+///   always shown); a heading's row for Top results and each section (See all at its end, in the
+///   accent); each row 60 tall on a thin line - its cover 44, square (round for an artist), its title and line - ending
+///   in what its tap does: a quiet bare ▶ for a song that plays (in the tap, nothing awaited), **Get** in the accent for
+///   the album you don't have, › for a page.
+/// - On the Mac (`desk`, from MacSearch.root()), MacSearchPage draws the toolbar, the table's header and the status bar
+///   round this very list (SearchContent), each row and heading the table's (SearchTableDesk, which it hands down: a
+///   row says what it is and does as a SearchTableRow, the Mac's page draws it) - and every ask, stand-down and resume
+///   stays this screen's.
+struct SearchScreen<Desk: View>: View {
+    private let desk: (() -> Desk)?
+
     @Environment(SearchModel.self) private var search
-    @Environment(ArtistsModel.self) private var artists
     @Environment(LibraryModel.self) private var library
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.scenePhase) private var scenePhase
+    /// (R7's review) The phone's field has the cursor: its well's edge in the accent.
+    @FocusState private var fieldFocused: Bool
+
+    /// (R7) The Mac's: the page drawn by `desk` (MacSearchPage).
+    init(desk: @escaping () -> Desk) {
+        self.desk = desk
+    }
 
     var body: some View {
-        let state = search.state
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    Color.clear
-                        .frame(height: 0)
-                        .id(ShelfAnchor.top)
-                    if !state.query.isEmpty {
-                        chips
-                    }
-                    content
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 24)
+        Group {
+            if let desk, Platform.mac {
+                desk()
+            } else {
+                phone
             }
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: navigation.searchScrollToTop) { _, _ in
-                // the Search tab tapped at its root: to the top of the list
-                withAnimation { proxy.scrollTo(ShelfAnchor.top, anchor: .top) }
-            }
-            .onChange(of: state.view) { _, _ in jump(proxy) }
-            .onChange(of: state.drawn?.text) { _, _ in jump(proxy) }
         }
         .navigationTitle(SearchWords.title)
-        // the navigation bar's field, always drawn - (the Mac app, slice 3) on the Mac the sidebar's instead, these very
-        // words (MacSidebarView), and Edit > Find (⌘F) puts the cursor there
-        .searchField(text: Binding(get: { search.text }, set: { (typed: String) -> Void in search.type(typed) }),
-                     prompt: SearchWords.prompt)
-        .autocorrectionDisabled()
-        .textInputAutocapitalization(.never)
-        .onSubmit(of: .search) { search.submitted() }
+        // (R7's review) the phone's field is its page's own (`field`); (the Mac app, slice 3) on the Mac the sidebar's,
+        // these very words (MacSidebarView), and Edit > Find (⌘F) puts the cursor there
         .onAppear { search.shown() }
         .onChange(of: navigation.tab) { _, tab in
             // another tab: a held album's row asking the id bridge lets go, so its answer opens nothing there
@@ -93,6 +93,90 @@ struct SearchScreen: View {
         }
     }
 
+    /// The phone's list (iSearch.dc.html): the field held under the bar, the kinds' strip while there are words, then
+    /// what is drawn - on the page's black.
+    private var phone: some View {
+        let state = search.state
+        return ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    Color.clear
+                        .frame(height: 0)
+                        .id(ShelfAnchor.top)
+                    if !state.query.isEmpty {
+                        chips
+                    }
+                    SearchContent()
+                }
+                .padding(.horizontal, SearchLook.side)
+                .padding(.bottom, SearchLook.bottom)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: navigation.searchScrollToTop) { _, _ in
+                // the Search tab tapped at its root: to the top of the list
+                withAnimation { proxy.scrollTo(ShelfAnchor.top, anchor: .top) }
+            }
+            .onChange(of: state.view) { _, _ in jump(proxy) }
+            .onChange(of: state.drawn?.text) { _, _ in jump(proxy) }
+            // (R7's review) the field over the list's top, where iOS's drawer was: always drawn, never scrolled away,
+            // and the large title still folds into the bar as the list scrolls under it
+            .safeAreaInset(edge: .top, spacing: 0) {
+                field
+            }
+        }
+        .background(DWPalette.page)
+    }
+
+    /// (R7's review) Search's field on the phone (iSearch's `.well.sfield`): the look's sunken box, square, 40 tall -
+    /// the magnifying glass, the words, and ✕ while there are any - in place of iOS's rounded search field, every
+    /// behaviour of that field kept: each keystroke `search.type` as the drawer's binding gave it (the typing cadence
+    /// is the model's), the keyboard's Search key `search.submitted()` and the keyboard put away, no correcting and no
+    /// capitals; the cursor only where a finger puts it, as before; ✕ empties the words as the drawer's clear button
+    /// did. Its edge the accent's while it has the cursor (DWWell).
+    private var field: some View {
+        HStack(spacing: SearchLook.fieldGap) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(DWPalette.t3)
+                .accessibilityHidden(true)
+            TextField(SearchWords.prompt,
+                      text: Binding(get: { search.text }, set: { (typed: String) -> Void in search.type(typed) }),
+                      prompt: Text(SearchWords.prompt).foregroundStyle(DWPalette.t3))
+                .textFieldStyle(.plain)
+                .font(Typeface.Look.text(.field))
+                .foregroundStyle(DWPalette.fieldText)
+                .focused($fieldFocused)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .submitLabel(.search)
+                .onSubmit {
+                    search.submitted()
+                    fieldFocused = false
+                }
+                .accessibilityLabel(SearchWords.label)
+            if !search.text.isEmpty {
+                Button {
+                    search.type("")
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(Typeface.Phone.text(.small).weight(.semibold))
+                        .foregroundStyle(DWPalette.t3)
+                        .frame(minWidth: SearchLook.clear)
+                        .contentShape(DWTarget(face: Rectangle()))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(SearchWords.clear)
+            }
+        }
+        .padding(.horizontal, SearchLook.fieldInside)
+        .lookHeight(SearchLook.field)
+        .background {
+            DWWell(focused: fieldFocused)
+        }
+        .padding(.horizontal, SearchLook.side)
+        .padding(.bottom, SearchLook.fieldFoot)
+        .background(DWPalette.page)
+    }
+
     private func jump(_ proxy: ScrollViewProxy) {
         var instant = Transaction()
         instant.disablesAnimations = true
@@ -101,22 +185,30 @@ struct SearchScreen: View {
 
     // MARK: the chips
 
+    /// The kinds (iSearch's .chips): the strip, each `search.choose` - the query narrowed, never the results - its
+    /// sides the strip's own 16, so drawn out to the list's edges.
     private var chips: some View {
-        Picker(SearchWords.chipsLabel, selection: Binding(get: { search.state.view },
-                                                          set: { (view: SearchView) -> Void in search.choose(view) })) {
-            ForEach(SearchView.allCases) { (view: SearchView) in
-                Text(SearchWords.chip(view)).tag(view)
-            }
-        }
-        .pickerStyle(.segmented)
-        .accessibilityLabel(SearchWords.chipsLabel)
-        .padding(.top, 4)
-        .padding(.bottom, 8)
+        PhoneStrip(options: SearchView.allCases, words: SearchWords.chip,
+                   shown: Binding(get: { search.state.view }, set: { (view: SearchView) -> Void in search.choose(view) }),
+                   spoken: SearchWords.chipsLabel)
+            .padding(.horizontal, -SearchLook.side)
     }
+}
 
-    // MARK: what is drawn
+extension SearchScreen where Desk == EmptyView {
+    /// The iPhone's (and every one but the Mac's own): no desk.
+    init() {
+        desk = nil
+    }
+}
 
-    @ViewBuilder private var content: some View {
+/// (R7) Search's list as drawn for its words - the phone's under its strip, the Mac's inside its table (MacSearchPage):
+/// the hint with nothing typed; the gate words; the All view or a kind view.
+struct SearchContent: View {
+    @Environment(SearchModel.self) private var search
+    @Environment(Reachability.self) private var reachability
+
+    var body: some View {
         let state = search.state
         let personal = search.personal
         if state.query.isEmpty {
@@ -161,6 +253,33 @@ struct SearchScreen: View {
     }
 }
 
+/// (R7) The list's own numbers, each where its drawing gives it.
+enum SearchLook {
+    /// The list's sides: the phone's 16 (iSearch's rows' padding-left), the Mac's table's cells' 10 - the notes in by
+    /// that much, the rows and headings drawn out to the edges.
+    static var side: CGFloat { Platform.mac ? macSide : phoneSide }
+    static let phoneSide: CGFloat = 16          // drawn: iSearch .row padding-left
+    static let macSide: CGFloat = 10            // drawn: Search .row > div padding-left
+    /// A row's cover: 44, square (round for an artist), 12 from its words.
+    static let cover: CGFloat = 44              // drawn: iSearch .cover width
+    static let coverGap: CGFloat = 12           // drawn: iSearch .row gap (dw.ph .row > div padding 0 10px, less 0)
+    /// A song's albums, opened under it: their covers 36, in by a row's cover and its gap.
+    static let albumCover: CGFloat = 36         // own: as before R7
+    /// The bare ▶'s target and glyph (dw.ph's .key.bare).
+    static let play: CGFloat = 28               // drawn: dw.ph .key.bare width
+    static let bottom: CGFloat = 24             // own: the list's foot, as before R7
+    /// A heading's row: 6 under its words (dw.ph .row.grp padding-bottom), 12 above it past the row before (own).
+    static let headingFoot: CGFloat = 6         // drawn: dw.ph .row.grp padding-bottom
+    static let headingAbove: CGFloat = 12       // own: a section's room from the rows above it
+    /// (R7's review) The phone's field: 40 tall, 12 in, its glyph 8 from its words, 10 above the strip; its ✕ 24 wide
+    /// at least, its target the finger's 44 tall.
+    static let field: Double = 40               // drawn: dw .sfield height
+    static let fieldInside: CGFloat = 12        // drawn: dw .sfield padding-left
+    static let fieldGap: CGFloat = 8            // drawn: dw .sfield gap
+    static let fieldFoot: CGFloat = 10          // drawn: dw .sfield margin-bottom
+    static let clear: CGFloat = 24              // own: the ✕'s width, 44 wide with its gap and the field's inside
+}
+
 /// A kind view as Core's `kindView` says it stands.
 private struct KindViewDrawn: View {
     let shown: KindView
@@ -183,9 +302,7 @@ private struct KindViewDrawn: View {
         if shown.libraryFailed {
             FailureNote(failure: search.kindFailure) { search.tryKindAgain() }
         }
-        ForEach(SearchList.drawable(shown.libraryRows)) { (row: SearchRow) in
-            SearchRowView(row: row, marks: marks, top: false)
-        }
+        SearchRows(rows: shown.libraryRows, marks: marks)
         if let own = shown.own, own.state == .answered, own.full || own.more != .idle {
             MoreButton(own: own, personal: personal)
         }
@@ -194,6 +311,20 @@ private struct KindViewDrawn: View {
         }
         if shown.nothing {
             ShelfNote(SearchWords.nothing(SearchView(shown.kind), query))
+        }
+    }
+}
+
+/// (R7) A run of rows, each once - (R7's review) striped on the Mac's table by their place in it (SearchTable.striped,
+/// MacSearchPage), never by their place in the run.
+private struct SearchRows: View {
+    let rows: [SearchRow]
+    let marks: SearchMarks
+    var top = false
+
+    var body: some View {
+        ForEach(SearchList.drawable(rows)) { (row: SearchRow) in
+            SearchRowView(row: row, marks: marks, top: top)
         }
     }
 }
@@ -217,9 +348,7 @@ private struct KindMusicBrainz: View {
             ShelfNote(SongSearch.needATitle)
                 .padding(.top, 6)
         default:
-            ForEach(SearchList.drawable(shown.savedRows)) { (row: SearchRow) in
-                SearchRowView(row: row, marks: marks, top: false)
-            }
+            SearchRows(rows: shown.savedRows, marks: marks)
             switch shown.foot {
             case .searching?:
                 AskingLine(personal: search.personal, musicBrainz: true)
@@ -229,18 +358,14 @@ private struct KindMusicBrainz: View {
                     search.tryKindMusicBrainzAgain()
                 }
             case .rows(let rows)?:
-                ForEach(SearchList.drawable(rows)) { (row: SearchRow) in
-                    SearchRowView(row: row, marks: marks, top: false)
-                }
+                SearchRows(rows: rows, marks: marks)
             case .said(let words)?:
                 ShelfNote(words)
             default:
                 EmptyView()
             }
             //? what landed after the asking line or the failure was drawn: below it, never pushing it down
-            ForEach(SearchList.drawable(shown.below)) { (row: SearchRow) in
-                SearchRowView(row: row, marks: marks, top: false)
-            }
+            SearchRows(rows: shown.below, marks: marks)
             if let more = shown.more {
                 MusicBrainzMore(more: more)
             }
@@ -260,12 +385,12 @@ private struct MusicBrainzMore: View {
         VStack(alignment: .leading, spacing: 8) {
             if let note = more.note {
                 Text(note)
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let failure = more.failure {
                 Text(SearchWords.failure(failure))
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             switch more.pages {
@@ -275,11 +400,11 @@ private struct MusicBrainzMore: View {
                 } label: {
                     Text(more.label)
                 }
-                .buttonStyle(SecondaryPill())
+                .buttonStyle(DWButtonStyle())
                 .disabled(more.asking)
             case .far:
                 Text(SearchMore.far)
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
             case .end:
                 EmptyView()
@@ -314,15 +439,8 @@ private struct DrawnList: View {
             FailureNote(failure: search.failure) { search.tryAgain() }
         }
         if !top.isEmpty || (online && drawn.topPlace) {
-            Text(SearchWords.topResults)
-                .font(Typeface.title3.weight(.semibold))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 10)
-                .padding(.bottom, 2)
-                .accessibilityAddTraits(.isHeader)
-            ForEach(SearchList.drawable(top)) { (row: SearchRow) in
-                SearchRowView(row: row, marks: marks, top: true)
-            }
+            SearchHeading(title: SearchWords.topResults)
+            SearchRows(rows: top, marks: marks, top: true)
             if online && drawn.topPlace {
                 TopPlace()
             }
@@ -354,7 +472,7 @@ private struct DrawnList: View {
                     .font(Typeface.headline)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(SearchWords.checkSpelling)
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.top, 12)
@@ -380,16 +498,14 @@ private struct DrawnSection: View {
 
     var body: some View {
         SectionHead(kind: section.kind, seeAll: true)
-        ForEach(SearchList.drawable(section.rows)) { (row: SearchRow) in
-            SearchRowView(row: row, marks: marks, top: false)
-        }
+        SearchRows(rows: section.rows, marks: marks)
         if let slot = section.slot {
             SectionSlot(kind: section.kind, slot: slot, saved: section.holdsSaved)
         }
         if studio {
             Text(SearchWords.studioNote)
                 .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .foregroundStyle(DWPalette.t2)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 6)
         }
@@ -397,18 +513,15 @@ private struct DrawnSection: View {
 }
 
 /// Top results' place for the picks still to come (SearchRows.tsx `topPlace`): one row's height, empty - hidden from
-/// VoiceOver.
+/// VoiceOver. (R7) A row's height as drawn where it stands: the phone's 60, the Mac's table's row (its desk's).
 private struct TopPlace: View {
+    @Environment(\.searchTable) private var table
+
     var body: some View {
-        HStack(spacing: 12) {
-            Corners.artShape
-                .fill(Palette.coverEmpty)
-                .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-            Spacer()
-        }
-        .padding(.vertical, 8)
-        .opacity(0.6)
-        .accessibilityHidden(true)
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .lookHeight(table?.rowHeight ?? DWLook.here.tallRowHeight)
+            .accessibilityHidden(true)
     }
 }
 
@@ -446,7 +559,7 @@ private struct SlotAsking: View {
         HStack(spacing: 10) {
             ProgressView()
             Text(words)
-                .foregroundStyle(Palette.quiet)
+                .foregroundStyle(DWPalette.t2)
         }
         .accessibilityElement(children: .combine)
     }
@@ -464,7 +577,7 @@ private struct SlotFailure: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(words)
-                .foregroundStyle(Palette.quiet)
+                .foregroundStyle(DWPalette.t2)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if tryAgain {
                 Button(SearchWords.tryAgain) {
@@ -494,10 +607,10 @@ private struct SectionSlot: View {
                 SlotAsking(words: SearchWords.searching(personal: search.personal, musicBrainz: true))
             case .show(let rows):
                 Button(SearchWords.fold(kind, rows.count).button) { search.showFolded(kind) }
-                    .buttonStyle(SecondaryPill())
+                    .buttonStyle(DWButtonStyle())
             case .said(let words):
                 Text(words)
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t2)
             case .failed:
                 let failure = kindFailure
                 SlotFailure(words: saved ? SearchWords.savedAway(failure, short: true) : SearchWords.failure(failure, short: true),
@@ -537,13 +650,13 @@ private struct LibraryLateSlot: View {
                 SlotFailure(words: failureWords, tryAgain: true, retry: retry)
             case .skipped:
                 Text(SearchWords.librarySkipped(personal: personal))
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t2)
             case .show(let count):
                 Button(SearchWords.libraryLate([.artists: count], personal: personal, text: text).button ?? "", action: show)
-                    .buttonStyle(SecondaryPill())
+                    .buttonStyle(DWButtonStyle())
             case .nothing:
                 Text(SearchWords.libraryLate([:], personal: personal, text: text).line)
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t2)
             }
         }
     }
@@ -580,7 +693,7 @@ private struct MusicBrainzFailure: View {
         let words = saved ? SearchWords.savedAway(failure, short: short) : SearchWords.failure(failure, short: short)
         VStack(alignment: .leading, spacing: 8) {
             Text(above.isEmpty ? words : "\(words) \(above)")
-                .foregroundStyle(Palette.quiet)
+                .foregroundStyle(DWPalette.t2)
                 .fixedSize(horizontal: false, vertical: true)
             if !failure.refused {
                 Button(SearchWords.tryAgain) {
@@ -593,7 +706,7 @@ private struct MusicBrainzFailure: View {
     }
 }
 
-/// A section's heading, with See all (All's).
+/// A section's heading, with See all (All's) - on the Mac without it, the toolbar's kinds being the way to one.
 private struct SectionHead: View {
     let kind: SearchKind
     let seeAll: Bool
@@ -601,18 +714,64 @@ private struct SectionHead: View {
     @Environment(SearchModel.self) private var search
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(SearchWords.section(kind))
-                .font(Typeface.title3.weight(.semibold))
-                .accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 8)
-            if seeAll {
-                Button(SearchWords.seeAll) { search.choose(SearchView(kind)) }
-                    .accessibilityLabel(SearchWords.seeAllLabel(kind))
+        if seeAll {
+            SearchHeading(title: SearchWords.section(kind)) {
+                // (R7's review) its target a finger's 44, reaching past the heading's 38 rather than growing it
+                Button {
+                    search.choose(SearchView(kind))
+                } label: {
+                    Text(SearchWords.seeAll)
+                        .font(Typeface.Phone.text(.small).weight(.semibold))
+                        .foregroundStyle(DWPalette.acc)
+                        .contentShape(DWTarget(face: Rectangle()))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(SearchWords.seeAllLabel(kind))
             }
+        } else {
+            SearchHeading(title: SearchWords.section(kind))
         }
-        .padding(.top, 18)
-        .padding(.bottom, 2)
+    }
+}
+
+/// (R7) A heading's row: on the phone dw.ph's `.row.grp` - 38 tall, its words at its foot, semibold in the heading's
+/// colour, See all at its end - and on the Mac the table's group row (its desk's), See all left to the toolbar.
+private struct SearchHeading<Trailing: View>: View {
+    let title: String
+    private let trailing: Trailing
+
+    @Environment(\.searchTable) private var table
+
+    init(title: String, @ViewBuilder trailing: () -> Trailing) {
+        self.title = title
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        if let table, Platform.mac {
+            table.heading(title)
+        } else {
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
+                Text(title)
+                    .font(Typeface.subheadline.weight(.semibold))
+                    .foregroundStyle(DWPalette.head)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 8)
+                trailing
+            }
+            .padding(.top, SearchLook.headingAbove)
+            .padding(.bottom, SearchLook.headingFoot)
+            .lookHeight(DWLook.here.groupRowHeight)
+            .frame(maxWidth: .infinity, alignment: .bottomLeading)
+            // (R7's review) over the row under it, where See all's target reaches past the heading's foot
+            .zIndex(1)
+        }
+    }
+}
+
+extension SearchHeading where Trailing == EmptyView {
+    init(title: String) {
+        self.init(title: title) { EmptyView() }
     }
 }
 
@@ -625,7 +784,7 @@ private struct AskingLine: View {
         HStack(spacing: 10) {
             ProgressView()
             Text(SearchWords.searching(personal: personal, musicBrainz: musicBrainz))
-                .foregroundStyle(Palette.quiet)
+                .foregroundStyle(DWPalette.t2)
         }
         .accessibilityElement(children: .combine)
         .padding(.top, 12)
@@ -671,7 +830,7 @@ private struct SearchGateNote: View {
                 .accessibilityAddTraits(.isHeader)
             ForEach(closed.lines, id: \.self) { (line: String) in
                 Text(line)
-                    .foregroundStyle(Palette.quiet)
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if closed.tryAgain {
@@ -707,7 +866,7 @@ private struct MoreButton: View {
                 case .idle: Text(SearchWords.moreFromLibrary(personal: personal))
                 }
             }
-            .buttonStyle(SecondaryPill())
+            .buttonStyle(DWButtonStyle())
             .disabled(own.more == .asking)
         }
         .padding(.top, 14)
@@ -716,9 +875,57 @@ private struct MoreButton: View {
 
 // MARK: the rows
 
+/// (R7) A row of Search's list as the Mac's table draws it - what it is and what it does, in values and one closure, the
+/// Mac's page drawing it (SearchTableDesk), so this file names nothing of the Mac's own: its cells and buttons are
+/// Core's (SearchTable), each button carried out by `act` - the very calls the phone's tap makes.
+struct SearchTableRow {
+    /// The name cell's picture: a library cover (round for an artist), or the Cover Art Archive's front of a release
+    /// group.
+    enum Picture {
+        case cover(String?, round: Bool)
+        case archive(String)
+    }
+
+    let id: String
+    let title: String
+    let cells: SearchTable.Cells
+    let actions: [SearchTable.Action]
+    let spoken: String
+    let picture: Picture
+    /// (R7's review) The line whose place on the table sets its stripe: a song's album, opened under it, its song's - nil,
+    /// its own (`id`).
+    var stripedAs: String? = nil
+    var dimmed = false
+    var busy = false
+    var disabled = false
+    /// A song's album, opened under it: in by a cover's width.
+    var indented = false
+    /// A MusicBrainz song's disclosure onto the albums it is on: whether it is open, and its toggle.
+    var disclosure: (open: Bool, toggle: () -> Void)?
+    let act: (SearchTable.Action) -> Void
+}
+
+/// (R7) The Mac's table's drawing of Search's list, handed down by MacSearchPage round SearchContent: each row and each
+/// heading, a row's height (Top results' empty place) and a song's albums' indent. nil - the phone - draws the phone's.
+struct SearchTableDesk {
+    let row: (SearchTableRow) -> AnyView
+    let heading: (String) -> AnyView
+    let rowHeight: Double
+    let indent: CGFloat
+}
+
+extension EnvironmentValues {
+    /// (R7) The Mac's table, while Search's list is drawn inside it (MacSearchPage) - nil on the phone.
+    @Entry var searchTable: SearchTableDesk? = nil
+}
+
 /// One row - an artist, an album or a song - as the Library's rows: its cover (round for an artist), its title, and its
 /// line, the facts truncating and the place never (searchList.ts `rowLine`). Read as one: "Roads, Song · Portishead ·
 /// Dummy · in your library, plays it from its album".
+///
+/// (R7) On the phone iSearch's `.row.tall`, flat on a thin line, ending in what its tap does (SearchTable.actions' first):
+/// the quiet bare ▶, **Get** in the accent, or ›. On the Mac a row of the table (`table`, SearchTableDesk's): its cells
+/// and its buttons, each one of the very actions the phone's tap takes.
 struct SearchRowView: View {
     let row: SearchRow
     let marks: SearchMarks
@@ -730,6 +937,8 @@ struct SearchRowView: View {
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// (R7) The Mac's table, drawing the rows there.
+    @Environment(\.searchTable) private var table
 
     // Each part its own small function, every value's type spelled out: the one body this was type-checked in 366 ms
     // (7291225's review), and CI's older Swift is slower still.
@@ -740,16 +949,22 @@ struct SearchRowView: View {
             // being a stack (AddToQueueSwipe.swift); the list's own padding (SearchScreen), the purple running out to
             // the screen's edge
             stacked(line)
-                .addsToQueue(menu(song), in: .stack(inset: 16))
+                .addsToQueue(menu(song), in: .stack(inset: SearchLook.side))
         } else {
             stacked(line)
         }
     }
 
-    private func stacked(_ line: SearchList.Line) -> some View {
-        VStack(spacing: 0) {
+    @ViewBuilder private func stacked(_ line: SearchList.Line) -> some View {
+        if table != nil, Platform.mac {
             content(line)
-            Divider().padding(.leading, LibraryRow.textInset)
+        } else {
+            content(line)
+                // (R7) dw.ph's .row border-bottom: the thin line under the row, the list's width
+                .overlay(alignment: .bottom) {
+                    DWRule(colour: DWPalette.rowRule)
+                        .padding(.horizontal, -SearchLook.side)
+                }
         }
     }
 
@@ -787,59 +1002,86 @@ struct SearchRowView: View {
         song.albums.isEmpty ? nil : SongSearch.namedAlbum(song, marks.index, marks.evidence).album
     }
 
+    /// (R7) What the row's buttons are (SearchTable.actions), its first what its tap does.
+    private func actions(plays: Bool = false, opens: Bool = true) -> [SearchTable.Action] {
+        SearchTable.actions(row, plays: plays, held: SearchTable.cells(row, marks).held, opens: opens)
+    }
+
     /// A MusicBrainz album's row: the album you don't have - or, held, yours by the id bridge (busy while it asks).
-    private func groupRow(_ group: ReleaseGroup, _ line: SearchList.Line) -> some View {
+    @ViewBuilder private func groupRow(_ group: ReleaseGroup, _ line: SearchList.Line) -> some View {
         let busy: Bool = search.opening == group.id
-        return Button {
-            search.open(group)
-        } label: {
-            archiveFace(group.id, line, busy: busy)
+        if let table, Platform.mac {
+            table.row(tableRow(line, picture: .archive(group.id), busy: busy,
+                               disabled: busy || !reachability.online) { (_: SearchTable.Action) -> Void in
+                search.open(group)
+            })
+        } else {
+            Button {
+                search.open(group)
+            } label: {
+                archiveFace(group.id, line, busy: busy)
+            }
+            .buttonStyle(.plain)
+            .disabled(busy || !reachability.online)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(spoken(line))
+            .accessibilityValue(busy ? SearchWords.loading : "")
         }
-        .buttonStyle(.plain)
-        .disabled(busy || !reachability.online)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(spoken(line))
-        .accessibilityValue(busy ? SearchWords.loading : "")
     }
 
     /// A MusicBrainz artist's row: their page.
-    private func mbArtistRow(_ match: MBArtistMatch, _ line: SearchList.Line) -> some View {
-        Button {
-            search.openArtist(match)
-        } label: {
-            face(line, round: true, cover: nil, plays: false)
+    @ViewBuilder private func mbArtistRow(_ match: MBArtistMatch, _ line: SearchList.Line) -> some View {
+        if let table, Platform.mac {
+            table.row(tableRow(line, picture: .cover(nil, round: true),
+                               disabled: !reachability.online || match.mbid.isEmpty) { (_: SearchTable.Action) -> Void in
+                search.openArtist(match)
+            })
+        } else {
+            Button {
+                search.openArtist(match)
+            } label: {
+                face(line, round: true, cover: nil, plays: false)
+            }
+            .buttonStyle(.plain)
+            .disabled(!reachability.online || match.mbid.isEmpty)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(spoken(line))
         }
-        .buttonStyle(.plain)
-        .disabled(!reachability.online || match.mbid.isEmpty)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(spoken(line))
     }
 
     /// An album a MusicBrainz song is on, as a row (Top results' song, and its named album): yours when you hold the song
     /// on it, else the album you don't have with the song marked - busy while it asks.
-    private func songAlbumRow(_ song: FoundSong, _ album: SongAlbum, _ line: SearchList.Line) -> some View {
+    @ViewBuilder private func songAlbumRow(_ song: FoundSong, _ album: SongAlbum, _ line: SearchList.Line) -> some View {
         let busy: Bool = search.opening == SearchModel.songAlbumKey(song, album)
-        return Button {
-            search.openSongAlbum(song, album)
-        } label: {
-            archiveFace(album.id, line, busy: busy)
+        if let table, Platform.mac {
+            table.row(tableRow(line, picture: .archive(album.id), busy: busy,
+                               disabled: busy || !reachability.online) { (_: SearchTable.Action) -> Void in
+                search.openSongAlbum(song, album)
+            })
+        } else {
+            Button {
+                search.openSongAlbum(song, album)
+            } label: {
+                archiveFace(album.id, line, busy: busy)
+            }
+            .buttonStyle(.plain)
+            .disabled(busy || !reachability.online)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(spoken(line))
+            .accessibilityValue(busy ? SearchWords.loading : "")
         }
-        .buttonStyle(.plain)
-        .disabled(busy || !reachability.online)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(spoken(line))
-        .accessibilityValue(busy ? SearchWords.loading : "")
     }
 
     private func archiveFace(_ group: String, _ line: SearchList.Line, busy: Bool) -> some View {
         let large: Bool = typeSize.isAccessibilitySize
-        return HStack(spacing: 12) {
+        return HStack(spacing: SearchLook.coverGap) {
             ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: group), size: ArchiveCoverSize.row)
-                .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                .clipShape(Corners.artShape)
+                .frame(width: SearchLook.cover, height: SearchLook.cover)
+                .clipShape(Rectangle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
-                    .foregroundStyle(.primary)
+                    .font(Typeface.body)
+                    .foregroundStyle(DWPalette.text)
                     .lineLimit(large ? 3 : 1)
                 SearchLineText(line: line, large: large)
             }
@@ -847,26 +1089,36 @@ struct SearchRowView: View {
             if busy {
                 ProgressView()
                     .accessibilityHidden(true)
+            } else {
+                trailing(actions().first)
             }
         }
         .padding(.vertical, 8)
+        .lookHeight(DWLook.here.tallRowHeight)
         .contentShape(Rectangle())
     }
 
     /// An artist's or an album's row: its page pushed on Search's stack.
-    private func link(_ route: AppRoute, _ line: SearchList.Line, round: Bool, cover: String?,
-                      dimmed: Bool) -> some View {
-        let opacity: Double = dimmed ? Palette.off : 1
+    @ViewBuilder private func link(_ route: AppRoute, _ line: SearchList.Line, round: Bool, cover: String?,
+                                   dimmed: Bool) -> some View {
+        let opacity: Double = dimmed ? DWPalette.off : 1
         let value: String = dimmed ? DownloadWords.notOnDevice(Platform.device) : ""
-        return NavigationLink(value: route) {
-            face(line, round: round, cover: cover, plays: false)
-                .opacity(opacity)
+        if let table, Platform.mac {
+            table.row(tableRow(line, picture: .cover(cover, round: round), dimmed: dimmed,
+                               disabled: dimmed) { (_: SearchTable.Action) -> Void in
+                navigation.open(route)
+            })
+        } else {
+            NavigationLink(value: route) {
+                face(line, round: round, cover: cover, plays: false)
+                    .opacity(opacity)
+            }
+            .buttonStyle(.plain)
+            .disabled(dimmed)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(spoken(line))
+            .accessibilityValue(value)
         }
-        .buttonStyle(.plain)
-        .disabled(dimmed)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(spoken(line))
-        .accessibilityValue(value)
     }
 
     // MARK: offline
@@ -922,23 +1174,36 @@ struct SearchRowView: View {
         let plays: Bool = playable(song) != nil
         let dimmed: Bool = dims(song: song.id)
         let opens: Bool = !(song.albumId ?? "").isEmpty
-        let opacity: Double = dimmed ? Palette.off : 1
+        let opacity: Double = dimmed ? DWPalette.off : 1
         let said: String = spoken(line) + Self.tapSaid(plays: plays, opens: opens, dimmed: dimmed)
         let value: String = dimmed ? DownloadWords.notOnDevice(Platform.device) : ""
-        HStack(spacing: 4) {
-            Button {
-                tapped(song)
-            } label: {
-                face(line, round: false, cover: song.coverArt, plays: plays && !dimmed)
-                    .opacity(opacity)
-            }
-            .buttonStyle(.plain)
-            .disabled(dimmed || (!plays && !opens))
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(said)
-            .accessibilityValue(value)
+        if let table, Platform.mac {
+            // (R7) Play from its album, in the click with nothing awaited; Open its album's page
+            table.row(tableRow(line, actions: actions(plays: plays && !dimmed, opens: opens),
+                               picture: .cover(song.coverArt, round: false), dimmed: dimmed,
+                               disabled: dimmed) { (action: SearchTable.Action) -> Void in
+                switch action {
+                case .play: tapped(song)
+                default: openAlbum(of: song)
+                }
+            })
             .addToQueueAction(menu(song))
-            songMenu(song)
+        } else {
+            HStack(spacing: 4) {
+                Button {
+                    tapped(song)
+                } label: {
+                    face(line, round: false, cover: song.coverArt, plays: plays && !dimmed)
+                        .opacity(opacity)
+                }
+                .buttonStyle(.plain)
+                .disabled(dimmed || (!plays && !opens))
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(said)
+                .accessibilityValue(value)
+                .addToQueueAction(menu(song))
+                songMenu(song)
+            }
         }
     }
 
@@ -946,8 +1211,8 @@ struct SearchRowView: View {
         QueueMenu(request: menu(song)) {
             Image(systemName: "ellipsis")
                 .font(Typeface.symbol(.body).weight(.semibold))
-                .foregroundStyle(Palette.quiet)
-                .frame(minWidth: 44, minHeight: 44)
+                .foregroundStyle(DWPalette.t3)
+                .frame(minWidth: DWLook.here.target, minHeight: DWLook.here.target)
                 .contentShape(Rectangle())
         }
         .menuStyle(.button)
@@ -968,9 +1233,15 @@ struct SearchRowView: View {
     private func tapped(_ song: Song) {
         if let plays = playable(song) {
             player.play(songs: plays.songs, album: plays.album, at: plays.at)
-        } else if let id = song.albumId, !id.isEmpty {
-            navigation.open(.album(AlbumRoute(id: id, name: song.album, artist: song.artist, coverArt: song.coverArt)))
+        } else {
+            openAlbum(of: song)
         }
+    }
+
+    /// A song's album's page.
+    private func openAlbum(of song: Song) {
+        guard let id = song.albumId, !id.isEmpty else { return }
+        navigation.open(.album(AlbumRoute(id: id, name: song.album, artist: song.artist, coverArt: song.coverArt)))
     }
 
     // MARK: the face
@@ -982,45 +1253,66 @@ struct SearchRowView: View {
     private func face(_ line: SearchList.Line, round: Bool, cover: String?, plays: Bool) -> some View {
         let large: Bool = typeSize.isAccessibilitySize
         let titleLines: Int = large ? 3 : 1
-        return HStack(spacing: 12) {
+        return HStack(spacing: SearchLook.coverGap) {
             picture(round: round, cover: cover)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.title)
-                    .foregroundStyle(.primary)
+                    .font(Typeface.body)
+                    .foregroundStyle(DWPalette.text)
                     .lineLimit(titleLines)
                 SearchLineText(line: line, large: large)
             }
             Spacer(minLength: 8)
-            trailing(plays: plays)
+            trailing(actions(plays: plays).first)
         }
         .padding(.vertical, 8)
+        .lookHeight(DWLook.here.tallRowHeight)
         .contentShape(Rectangle())
     }
 
     @ViewBuilder private func picture(round: Bool, cover: String?) -> some View {
         if round {
-            ArtistPicture(id: cover, side: LibraryRow.cover, pixels: CoverSize.row)
+            ArtistPicture(id: cover, side: SearchLook.cover, pixels: CoverSize.row)
         } else {
             LibraryCover(id: cover, pixels: CoverSize.row)
-                .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                .clipShape(Corners.artShape)
+                .frame(width: SearchLook.cover, height: SearchLook.cover)
+                .clipShape(Rectangle())
                 .accessibilityHidden(true)
         }
     }
 
-    /// ▶ for a song that plays from its tap, › for an artist (the library's or MusicBrainz's).
-    @ViewBuilder private func trailing(plays: Bool) -> some View {
-        if plays {
+    /// (R7) What the row's tap does, at its end: the quiet bare ▶ for a song that plays (dw.ph's .key.bare), **Get** in
+    /// the accent for the album you don't have (a flat .btn.sm.on's words - the row's tap is the Get), › for a page.
+    @ViewBuilder private func trailing(_ action: SearchTable.Action?) -> some View {
+        switch action {
+        case .play?:
             SharpSymbol(.play)
-                .font(Typeface.symbol(.caption2))
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.symbol(.footnote))
+                .foregroundStyle(DWPalette.t3)
+                .frame(minWidth: SearchLook.play, minHeight: SearchLook.play)
                 .accessibilityHidden(true)
-        } else if row.kind == .artists {
-            Image(systemName: "chevron.right")
-                .font(Typeface.symbol(.footnote).weight(.semibold))
-                .foregroundStyle(.tertiary)
+        case .get?:
+            Text(SearchTable.Action.get.words)
+                .font(Typeface.Look.text(.smallButton).weight(.semibold))
+                .foregroundStyle(DWPalette.acc)
                 .accessibilityHidden(true)
+        case .open?:
+            PhoneChevron()
+        case nil:
+            EmptyView()
         }
+    }
+
+    // MARK: the Mac's row (R7)
+
+    /// The row as the Mac's table draws it (SearchTableDesk's): its cells (SearchTable.cells), its buttons (`actions`,
+    /// the row's own by default) - each carried out by `act`, the very calls the phone's tap makes.
+    private func tableRow(_ line: SearchList.Line, actions given: [SearchTable.Action]? = nil,
+                          picture: SearchTableRow.Picture, busy: Bool = false, dimmed: Bool = false,
+                          disabled: Bool = false, act: @escaping (SearchTable.Action) -> Void) -> SearchTableRow {
+        SearchTableRow(id: SearchTable.lineID(row, top: top), title: row.title, cells: SearchTable.cells(row, marks),
+                       actions: given ?? actions(), spoken: spoken(line), picture: picture,
+                       dimmed: dimmed, busy: busy, disabled: disabled, act: act)
     }
 }
 
@@ -1035,8 +1327,8 @@ struct SearchLineText: View {
             EmptyView()
         } else if large {
             Text(line.said)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .lineLimit(2)
         } else {
             let place: String = line.line.isEmpty ? line.place : " \u{00B7} " + line.place
@@ -1052,8 +1344,8 @@ struct SearchLineText: View {
                         .fixedSize()
                 }
             }
-            .font(Typeface.footnote)
-            .foregroundStyle(Palette.quiet)
+            .font(Typeface.Phone.text(.small))
+            .foregroundStyle(DWPalette.t2)
         }
     }
 }
@@ -1062,60 +1354,94 @@ struct SearchLineText: View {
 /// line, a chevron - a disclosure onto the albums it is on: Albums, EPs and Singles listed, the rest under one fold that
 /// opens ("2 live albums and 1 compilation"), or, with nothing else to list, the fold's words as its caption and its
 /// albums at once. Each album opens yours when you hold the song on it, else the album you don't have, the song marked.
+/// (R7) On the Mac a row of the table (SearchTableDesk's): its triangle opens it onto its albums, its button its named
+/// album's Get (or Open).
 private struct SongDisclosure: View {
     let song: FoundSong
     let line: SearchList.Line
     let marks: SearchMarks
 
     @Environment(SearchModel.self) private var search
+    @Environment(Reachability.self) private var reachability
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.searchTable) private var table
 
     var body: some View {
         let open: Bool = search.openSongs.contains(song.key)
         VStack(alignment: .leading, spacing: 0) {
             head(open: open)
             if open {
-                albums
-                    .padding(.leading, LibraryRow.textInset)
-                    .padding(.bottom, 6)
-            }
-        }
-    }
-
-    private func head(open: Bool) -> some View {
-        let large: Bool = typeSize.isAccessibilitySize
-        let said: String = [song.title, line.said].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", ")
-        let named: String = SearchRowView.named(song, marks)?.id ?? ""
-        return Button {
-            search.toggleSong(song.key)
-        } label: {
-            HStack(spacing: 12) {
-                ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: named), size: ArchiveCoverSize.row)
-                    .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                    .clipShape(Corners.artShape)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(song.title)
-                        .foregroundStyle(.primary)
-                        .lineLimit(large ? 3 : 1)
-                    SearchLineText(line: line, large: large)
+                if let table, Platform.mac {
+                    // the table's rows, each in by the table's own indent
+                    albums(indent: table.indent)
+                } else {
+                    albums(indent: 0)
+                        .padding(.leading, SearchLook.cover + SearchLook.coverGap)
+                        .padding(.bottom, 6)
                 }
-                Spacer(minLength: 8)
-                Image(systemName: "chevron.down")
-                    .font(Typeface.symbol(.footnote).weight(.semibold))
-                    .foregroundStyle(Palette.quiet)
-                    .rotationEffect(.degrees(open ? 180 : 0))
-                    .accessibilityHidden(true)
             }
-            .padding(.vertical, 8)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(said)
-        .accessibilityHint(SongSearch.disclosureHint(open: open))
     }
 
-    @ViewBuilder private var albums: some View {
+    @ViewBuilder private func head(open: Bool) -> some View {
+        let said: String = [song.title, line.said].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", ")
+        let named: SongAlbum? = SearchRowView.named(song, marks)
+        if let table, Platform.mac {
+            let row = SearchRow.mbSong(song)
+            let cells: SearchTable.Cells = SearchTable.cells(row, marks)
+            table.row(SearchTableRow(id: SearchTable.lineID(row, top: false), title: song.title, cells: cells,
+                                     actions: named == nil ? [] : SearchTable.actions(row, plays: false, held: cells.held),
+                                     spoken: said + ", " + SongSearch.disclosureHint(open: open),
+                                     picture: .archive(named?.id ?? ""),
+                                     disabled: !reachability.online,
+                                     disclosure: (open, { search.toggleSong(song.key) })) { (_: SearchTable.Action) in
+                if let named { search.openSongAlbum(song, named) }
+            })
+        } else {
+            Button {
+                search.toggleSong(song.key)
+            } label: {
+                phoneHead(named?.id ?? "", open: open)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(said)
+            .accessibilityHint(SongSearch.disclosureHint(open: open))
+        }
+    }
+
+    private func phoneHead(_ named: String, open: Bool) -> some View {
+        let large: Bool = typeSize.isAccessibilitySize
+        return HStack(spacing: SearchLook.coverGap) {
+            ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: named), size: ArchiveCoverSize.row)
+                .frame(width: SearchLook.cover, height: SearchLook.cover)
+                .clipShape(Rectangle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(song.title)
+                    .font(Typeface.body)
+                    .foregroundStyle(DWPalette.text)
+                    .lineLimit(large ? 3 : 1)
+                SearchLineText(line: line, large: large)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "chevron.down")
+                .font(Typeface.Phone.text(.small).weight(.semibold))
+                .foregroundStyle(DWPalette.t3)
+                .rotationEffect(.degrees(open ? 180 : 0))
+                .accessibilityHidden(true)
+        }
+        .padding(.vertical, 8)
+        .lookHeight(DWLook.here.tallRowHeight)
+        .contentShape(Rectangle())
+        .overlay(alignment: .bottom) {
+            DWRule(colour: DWPalette.rowRule)
+                .padding(.horizontal, -SearchLook.side)
+        }
+    }
+
+    /// The albums it is on - the fold's button and caption in by `indent` (the Mac's table's; the phone's list indents
+    /// them all).
+    @ViewBuilder private func albums(indent: CGFloat) -> some View {
         let bands: (listed: [SongAlbum], folded: [SongAlbum]) = SongSearch.bands(song)
         let foldOpen: Bool = bands.listed.isEmpty || search.openFolds.contains(song.key)
         ForEach(bands.listed) { (album: SongAlbum) in
@@ -1125,14 +1451,16 @@ private struct SongDisclosure: View {
             if bands.listed.isEmpty {
                 // nothing else to list: the fold's words as its caption, its albums listed at once
                 Text(SongSearch.foldLabel(bands.folded))
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 6)
+                    .padding(.leading, indent)
             } else {
                 Button(SongSearch.foldLabel(bands.folded)) { search.toggleFold(song.key) }
-                    .font(Typeface.footnote)
-                    .padding(.vertical, 8)
+                    .buttonStyle(DWButtonStyle(size: .small))
+                    .padding(.vertical, 6)
+                    .padding(.leading, indent)
                     .accessibilityHint(SongSearch.foldHint(open: foldOpen))
             }
             if foldOpen {
@@ -1145,7 +1473,8 @@ private struct SongDisclosure: View {
 }
 
 /// An album a MusicBrainz song is on, under the song (SearchRows.tsx `albumRow`): its cover, its title, and its line
-/// ("Live album · Bootleg · 2008 · 6:06 · in your library") - busy while it asks.
+/// ("Live album · Bootleg · 2008 · 6:06 · in your library") - busy while it asks. (R7) On the Mac a row of the table, in
+/// by a cover's width under its song (SearchTableRow's `indented`).
 private struct SongAlbumRow: View {
     let song: FoundSong
     let album: SongAlbum
@@ -1154,44 +1483,62 @@ private struct SongAlbumRow: View {
     @Environment(SearchModel.self) private var search
     @Environment(Reachability.self) private var reachability
     @Environment(\.dynamicTypeSize) private var typeSize
-
-    private static let cover: CGFloat = 36
+    @Environment(\.searchTable) private var table
 
     var body: some View {
         let busy: Bool = search.opening == SearchModel.songAlbumKey(song, album)
         let line: String = SongSearch.albumLine(album, song, marks.index, personal: marks.personal, marks.evidence)
+        let said: String = [album.title, line].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", ")
+        if let table, Platform.mac {
+            let row = SearchRow.songAlbum(song, album)
+            let cells: SearchTable.Cells = SearchTable.cells(row, marks)
+            table.row(SearchTableRow(id: SearchTable.lineID(row, top: false), title: album.title, cells: cells,
+                                     actions: SearchTable.actions(row, plays: false, held: cells.held), spoken: said,
+                                     picture: .archive(album.id),
+                                     stripedAs: SearchTable.lineID(.mbSong(song), top: false), busy: busy,
+                                     disabled: busy || !reachability.online,
+                                     indented: true) { (_: SearchTable.Action) -> Void in
+                search.openSongAlbum(song, album)
+            })
+        } else {
+            Button {
+                search.openSongAlbum(song, album)
+            } label: {
+                phoneFace(line, busy: busy)
+            }
+            .buttonStyle(.plain)
+            .disabled(busy || !reachability.online)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(said)
+            .accessibilityValue(busy ? SearchWords.loading : "")
+        }
+    }
+
+    private func phoneFace(_ line: String, busy: Bool) -> some View {
         let large: Bool = typeSize.isAccessibilitySize
-        Button {
-            search.openSongAlbum(song, album)
-        } label: {
-            HStack(spacing: 10) {
-                ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: album.id), size: ArchiveCoverSize.row)
-                    .frame(width: Self.cover, height: Self.cover)
-                    .clipShape(Corners.artShape)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(album.title)
-                        .foregroundStyle(.primary)
+        return HStack(spacing: SearchLook.coverGap) {
+            ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: album.id), size: ArchiveCoverSize.row)
+                .frame(width: SearchLook.albumCover, height: SearchLook.albumCover)
+                .clipShape(Rectangle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(album.title)
+                    .font(Typeface.body)
+                    .foregroundStyle(DWPalette.text)
+                    .lineLimit(large ? 3 : 1)
+                if !line.isEmpty {
+                    Text(line)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .lineLimit(large ? 3 : 1)
-                    if !line.isEmpty {
-                        Text(line)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
-                            .lineLimit(large ? 3 : 1)
-                    }
-                }
-                Spacer(minLength: 8)
-                if busy {
-                    ProgressView()
-                        .accessibilityHidden(true)
                 }
             }
-            .padding(.vertical, 6)
-            .contentShape(Rectangle())
+            Spacer(minLength: 8)
+            if busy {
+                ProgressView()
+                    .accessibilityHidden(true)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(busy || !reachability.online)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel([album.title, line].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", "))
-        .accessibilityValue(busy ? SearchWords.loading : "")
+        .padding(.vertical, 6)
+        .contentShape(Rectangle())
     }
 }

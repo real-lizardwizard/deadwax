@@ -16,6 +16,10 @@ import Foundation
 // - Info's subject is the selection on the page in front, or the song playing while nothing is selected (James, 24 Nov:
 //   "Selection, else playing"), and its heading says which (`infoSubject`, `Words.heading`).
 // - Sources is drawn only while a Get page is open (`tabs`): it never opens without one, and goes as the page does.
+//   (R7 - notes/ios.md "The redesign, slice R7: Search, Get and Sources (2026-11-25)") Its Get is the one Get the
+//   album asked for on the Mac, in the dock rather than a sheet: it lasts only while its own page is the one in front
+//   (`getLasts`) - a tab chosen, a page pushed over it, the page popped or the person changing ends it, its search let
+//   go and the tab gone with it (`kept`).
 // - (R3's review) A tab with nothing to be about says so in words, its page not drawn (`empty`): the Queue with nothing
 //   queued, Info with nothing selected and nothing playing - a folder tab clicked to either, or Info's selection gone.
 // - (R3's review) A file shared to deadwax, or chosen in File > Import EQ File…, shows its preview over the dock's EQ tab
@@ -72,6 +76,20 @@ public enum MacDock {
     /// other tab stays as it was.
     public static func kept(_ shown: Tab?, getOpen: Bool) -> Tab? {
         shown == .sources && !getOpen ? nil : shown
+    }
+
+    /// (R7) Whether the dock's Get lasts as the page in front moves: only while `front` - the page now in front of the tab
+    /// shown - is the page it was asked from. Anything else in front (another tab, a page over it, its page popped) ends
+    /// it, so a search never runs on, nor picks, for a page no longer there.
+    public static func getLasts<Page: Equatable>(_ page: Page, front: Page?) -> Bool {
+        front == page
+    }
+
+    /// (R7's review) Whether the dock's Get stands as its page's chosen pressing changes: only while the pressing it was
+    /// asked for (`asked`) is still the one chosen. Another chosen ends it - its cards and its Get are for the pressing
+    /// asked, so they can never download one the page no longer shows; a Get for no pressing never stands.
+    public static func getStands(asked: String?, chosen: String?) -> Bool {
+        asked != nil && asked == chosen
     }
 
     /// The tab showing once nothing is queued: Queue goes with the queue, as the web's panel does, and Info - unless a

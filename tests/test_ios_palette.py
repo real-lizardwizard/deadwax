@@ -381,12 +381,17 @@ def test_the_sources_sheet_is_drawn_in_the_webs_colours():
     assert token(THEME_CSS, "dw-badge-red-border") == "rgba(252, 165, 165, 0.3)"
     assert "static let dangerFill = Color(red: 248 / 255, green: 113 / 255, blue: 113 / 255).opacity(0.14)\n" in palette
     assert "static let dangerEdge = Color(red: 252 / 255, green: 165 / 255, blue: 165 / 255).opacity(0.3)\n" in palette
-    # and drawn where the web draws them
+    # and drawn where the web draws them - (the redesign, slice R7 - notes/ios.md "The redesign, slice R7: Search, Get
+    # and Sources (2026-11-25)") a card as iSources.dc.html and Get.dc.html draw it now, in the look's colours: on the
+    # Mac a box of the card's face on the line's edge, the best match's the accent's; on the phone a PhoneCard, flat;
+    # the speed green when measured, what's missing in amber - and no speed bar, which neither drawing has
     card = (APP / "Get" / "SourceCardView.swift").read_text(encoding="utf-8")
-    for drawn in ("Palette.card", "Palette.best", "Palette.border", "Palette.barGreen", "Palette.barGrey",
-                  "Palette.dangerFill", "Palette.dangerEdge", "Palette.label", "Palette.well", "Palette.toggledFill",
-                  "Palette.toggledEdge", "Palette.accentText", "PrimaryFace()"):
+    for drawn in (".background(DWPalette.card, in: DWCorners.boxShape)",
+                  ".overlay(DWCorners.boxShape.strokeBorder(best ? DWPalette.acc : DWPalette.line, lineWidth: 1))",
+                  "PhoneCard {", "DWPalette.greenText", "DWPalette.amberText",
+                  "DWButtonStyle(kind: best ? .pri : .normal, size: .small)"):
         assert drawn in card, drawn
+    assert "SpeedBar" not in card and not re.search(r"(?<![\w.])Palette\.", card)
     box = (APP / "Get" / "StoreLineView.swift").read_text(encoding="utf-8")
     assert "Palette.card" in box and "Palette.border" in box and "Palette.held" in box
     # (slice 3) Join and Add waiting on deadwax: faded to --app-job-busy, as app.css fades .app-store-join

@@ -247,7 +247,13 @@ def test_the_macs_tables_and_status_bar_are_set_on_one_baseline():
         encoding="utf-8") and path.name != "MacColumnList.swift")
     assert pages == ["Mac/Album/MacAlbumPage.swift", "Mac/Album/MacPlaylistPage.swift", "Mac/Artist/MacArtistPage.swift",
                      "Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift",
-                     "Mac/Library/MacPlaylistsPage.swift"]
+                     "Mac/Library/MacPlaylistsPage.swift",
+                     # (R7) Get's tracklist
+                     "Mac/Search/MacGetPage.swift"]
+    # (R7) Search's table draws its own row (MacSearchRow): its cells on one first text baseline too
+    search = code_only((APP / "Mac" / "Search" / "MacSearchPage.swift").read_text(encoding="utf-8"))
+    row = search[search.index("struct MacSearchRow<Name: View>: View {"):]
+    assert row[:row.index("ForEach(columns")].count("HStack(alignment: .firstTextBaseline, spacing: 0) {") == 1
 
 
 #? the covers a Mac table's cell draws (Row Size grows them: 20, 28, 40; Requests' 22, 28, 40)

@@ -12,9 +12,10 @@ import SwiftUI
 /// Each tab is today's page until R3b redraws it: Queue and Info the very pages their sheet is on the iPhone, their Done
 /// (and Escape) closing the panel (`inSidePanel`) rather than a sheet; Lyrics the lyrics Now Playing's face shows
 /// (LyricsPanel); Info about the row selected on the page in front, else the song playing (DockInfo); the EQ the EQ page
-/// of the output now on the dock's own stack (DockEQ), a shared file's preview over it. Sources is R7's: nothing draws
-/// it until then. (R3's review) A tab with nothing to be about - the Queue with nothing queued, Info with nothing
-/// selected and nothing playing - says "Nothing playing" in its page's place (MacDock.empty, DockEmpty).
+/// of the output now on the dock's own stack (DockEQ), a shared file's preview over it. Sources (R7's) is the Get the
+/// album you don't have asked for (MacSourcesTab). (R3's review) A tab with nothing to be about - the Queue with
+/// nothing queued, Info with nothing selected and nothing playing - says "Nothing playing" in its page's place
+/// (MacDock.empty, DockEmpty).
 struct MacPanel: View {
     let tab: MacDock.Tab
 
@@ -55,8 +56,8 @@ struct MacPanel: View {
         case .eq:
             DockEQ()
         case .sources:
-            //? R7's MacSourcesTab: never shown until then (MacDock.tabs - no Get page says it is open)
-            EmptyView()
+            //? (R7) the Get the album you don't have asked for on the Mac, beside its page
+            MacSourcesTab()
         }
     }
 }

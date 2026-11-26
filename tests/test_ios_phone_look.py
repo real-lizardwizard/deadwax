@@ -1328,8 +1328,8 @@ TEXT_INPUTS = {
     "Playlists/PlaylistView.swift": [WELL, WELL],
     "Root/ServerAddressView.swift": [SYSTEM], "Root/SignInView.swift": [OWN, OWN],
     "Search/PressingPickerSheet.swift": [SYSTEM],
-    # Search's field: Platform's searchField - on the phone .searchable's, held below
-    "Search/SearchScreen.swift": [SYSTEM],
+    # (R7's review) Search's field: its page's own, the look's well (iSearch's .well.sfield) where .searchable's was
+    "Search/SearchScreen.swift": [WELL],
     "You/ChangePasswordScreen.swift": [SYSTEM] * 3,
 }
 TYPING = re.compile(r"\b(?:TextField|SecureField|TextEditor)\(|\.searchable\(|\.searchField\(")
@@ -1520,7 +1520,8 @@ def test_every_place_you_type_on_the_phone_is_still_a_box():
     assert manual.count("prompt: Text(ManualSearch.") == 2 and manual.count(".foregroundStyle(DWPalette.t3)") == 2
     assert "Text(ManualSearch.footer) .font(Typeface.footnote) .foregroundStyle(DWPalette.t2)" in manual
     assert "Button(ManualSearch.search, action: search) .buttonStyle(PrimaryFace())" in manual
-    # Search's field on the phone is iOS's own search field in the navigation bar (Platform's phone half), as before
+    # Platform's phone half of searchField is still iOS's own search field in the navigation bar - (R7's review) though
+    # Search, its only caller, now draws the look's well of its own (tests/test_ios_search_look.py)
     platform = re.sub(r"\s+", " ", bare((APP / "Shared" / "Platform.swift").read_text(encoding="utf-8")))
     assert ("func searchField(text: Binding<String>, prompt: String) -> some View { searchable(text: text, "
             "placement: .navigationBarDrawer(displayMode: .always), prompt: Text(prompt)) }") in platform
@@ -1592,7 +1593,10 @@ def declared(folder: Path) -> set[str]:
 #? R5: an album's page and a playlist's on the phone (iAlbum, iPlaylist - their heroes, rows and ground), and the Add to
 #? a playlist sheet's shared buttons (PlaylistPicker's NewPlaylistFields, the Look's alone); (R1c's review) Requests'
 #? manual search sheet (its two wells, DWWellField, and the page's black); R6: an artist's page on the phone (iArtist -
-#? its top, the pair, the strip and its pushes, the rows on their hairlines) and Top Songs' section and rows
+#? its top, the pair, the strip and its pushes, the rows on their hairlines) and Top Songs' section and rows; R7: Search,
+#? the album you don't have's page and Choose a source on the phone (iSearch, iGet, iSources - the strip, the rows and
+#? headings, the hero, the cards), the pressing picker's colours and the store line flat (tests/test_ios_search_look.py
+#? holds what each draws)
 R2_LIBRARY = {"Library/LibraryTop.swift", "Library/LibraryView.swift", "Library/LibraryTiles.swift",
               "Library/AlbumsScreen.swift", "Library/ArtistsScreen.swift", "Library/SongsScreen.swift",
               "Playlists/PlaylistsScreen.swift", "Library/LibraryLine.swift"}
@@ -1603,7 +1607,9 @@ R5_PAGES = {"Album/AlbumHero.swift", "Album/TrackRow.swift", "Album/AlbumView.sw
 #? R4b: Now Playing's scrubber, sunken as the meter is (DWCorners' meter shapes, DWPalette's well and fill)
 R4B_FACE = {"Player/ScrubberView.swift"}
 R6_PAGES = {"Artist/ArtistView.swift", "Artist/TopSongsSection.swift"}
-SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES
+R7_PAGES = {"Search/SearchScreen.swift", "Search/GroupView.swift", "Search/PressingPickerSheet.swift",
+            "Get/SourcesSheet.swift", "Get/SourceCardView.swift", "Get/StoreLineView.swift"}
+SLICES = R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

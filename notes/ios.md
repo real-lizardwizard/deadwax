@@ -20293,3 +20293,343 @@ after, the same). All 17 caught:
   tall for it: not built here.
 - The Mac runs the same code; its row never stands above its window's edge in any layout read here, so nothing on the
   Mac should change. Not run on a Mac.
+
+## The redesign, slice R7: Search, Get and Sources (2026-11-25)
+
+The plan is ~/Desktop/Code/deadwax-plans/mac-redesign-build.md 3.4, "R7 - Search, Get and Sources", and the drawings
+Search, Get (the Mac), iSearch, iGet and iSources in ~/Desktop/Code/deadwax-plans/mac-redesign/. Built on 31cab12d (R1c,
+the phone flat), then - after its review - rebased onto 5f2f6065 (R6), whose MacListKeys.pressed, MacTable.opens and
+MacTable.stripes it now uses in place of its own. The app is still 0.13 (13); `__version__`, the word fixtures
+(iphone.json, mac.json), Core's DeadwaxClient and Routes, and the engine files untouched.
+
+### What each page became
+
+**Search** (SearchScreen.swift, Mac/Search/MacSearchPage.swift). SearchScreen keeps every ask, stand-down and resume
+it made (the field, `shown`, `standDown`, `resumed`, the tab's and the stack's and Now Playing's moves) and draws its
+list as `SearchContent` - the hint, the gate words, the All view or a kind view, as before. It is generic over a
+`desk` (AlbumView's way): MacSearch.root() hands it `MacSearchPage`, which draws the toolbar, the table's header and
+the status bar round that very SearchContent; the phone (and every caller without a desk) draws `phone`.
+- The phone, iSearch.dc.html: flat on the page's black (`DWPalette.page`) under iOS's large title. **The field** (R7's
+  review) is the look's, iSearch's `.well.sfield`, where `.searchable`'s rounded box was: a `safeAreaInset` at the
+  list's top (so it stays as the list scrolls, on the page's black), 40 tall, 12 in and 16 from the page's edges, 10
+  above the strip (`SearchLook.field`, `fieldInside`, `side`, `fieldFoot` - dw `.sfield`'s height, padding and margin),
+  square, DWWell under it (its edge the accent while it has the keyboard - `DWWell(focused:)`, R1c's typing rule's
+  WELL), the magnifying glass in t3 (`fieldGap` 8), the words Typeface.Look.text(.field) in `fieldText` with the prompt
+  in t3, and a ✕ (Clear text, `SearchWords.clear`) while there are words, its target 44 tall (DWTarget). It is a plain
+  TextField bound as `.searchable`'s was - get `search.text`, set `search.type(typed)` - so every typed character takes
+  the very path it took (the cadence, the stand-down, the resume and the asks untouched); ✕ is `search.type("")`, as
+  `.searchable`'s own clear sets the text to ""; the keyboard's key is Search (`.submitLabel(.search)`), and its
+  `.onSubmit` is `search.submitted()` - what `.onSubmit(of: .search)` called - then the keyboard put away
+  (`@FocusState`), as iOS's field does; a scroll still puts the keyboard away (`.scrollDismissesKeyboard
+  (.interactively)`, kept); autocorrection and capitals off, as before. What `.searchable` drew that this doesn't: its
+  Cancel beside the field while typing (✕ empties it, the Search key or a scroll puts the keyboard away) and its
+  tucking up under the title as the list scrolls (iSearch draws the field fixed). Scroll-to-top is the
+  ScrollViewReader's, as before. The Mac's field is unchanged (the sidebar's, slice 3), and PressingPickerSheet's
+  filter keeps iOS's `.searchable` (a sheet's own list, a filter not a search).
+  The kinds are a **PhoneStrip** (All, Artists, Albums, Songs), its binding `search.state.view` read and
+  `search.choose(view)` written - the query narrowed, never the results (CLAUDE.md's decision), the kind in use always
+  shown; drawn out to the list's edges (the strip pads its own 16). Top results and each section's heading are
+  `.row.grp` rows (SearchHeading: 38 tall, the words at the foot 6 up, 15 semibold - subheadline, as R8's - in the
+  heading's colour), a section's **See all** at its end in the accent, still `search.choose(SearchView(kind))` - its
+  target (R7's review) DWTarget's 44 reaching past the 38-tall heading, the heading drawn over the row under it
+  (`.zIndex(1)`) so the reach is See all's, never that row's. Every
+  row is `.row.tall` - 60, its cover 44 (square: `Rectangle()`; round for an artist), 12 from its title (body) and line
+  (Phone.text(.small) in t2) - on a `rowRule` hairline drawn out to the list's edges (an overlay, so a song's swipe
+  keeps its 16 inset), ending in what its tap does, from Core's `SearchTable.actions(row).first`: a song that plays,
+  the bare ▶ (`.key.bare`: 28, its glyph 14 - footnote's, t3); the album you don't have, **Get** in the accent (the
+  look's small button's words; the row's tap is the Get's page); a page, PhoneChevron. A song's ••• and its swipe are
+  as they were. The slots, asking lines, failures, Mores and notes are the old ones on the look's colours and buttons.
+- The Mac, Search.dc.html: MacPage's toolbar - "Results for “…”" (SearchTable.heading), the groove, the kinds as
+  DWSegmented (the same binding as the phone's strip) and, where the toolbar doesn't fit, one DWPopUp named for the
+  kind in use (ViewThatFits) - then **Search Soulseek by hand…** at its end for whoever may get albums. Under it one
+  grouped table: the columns' strip (Name, Kind, Artist, Year, In your library, the buttons - SearchTable.columns,
+  which drops the year, then the kind, then the artist where the page is narrow, the name keeping its least), then
+  SearchContent inside it, each row a **MacSearchRow** (its cells SearchTable.cells: the kind and the artist in t2,
+  the year in mono, the place a green chip when held, "not in your library" in t3 for what the library answered for and
+  holds none of; its buttons SearchTable.actions - **Play** (`.normal`), **Open** (`.normal`), **Get** (`.on`)), each
+  heading a **MacSearchGroupLine** (the table's `.row.grp`). A row's cells sit on one first text baseline, as
+  MacColumnList's and Requests' (the year's Courier Prime would sit high centred), the cover centred on its title in
+  the name cell. The rows are View > Row Size's (`requestRowHeight`,
+  `requestCover` - Requests' 34 at Small), striped (R7's review) as one table: `SearchTable.striped` runs
+  MacTable.stripes over the lines drawn - Top results' heading and rows, then each section's heading and rows - so the
+  stripes run on unbroken down the table and start again under each heading (Search.dc.html's `k = 0` at each
+  group, MacColumnList's way), a song's albums under its triangle taking the song's stripe (`stripedAs`); the
+  selection's colours; a click selecting and a double-click doing the first button's - R6's `SpatialTapGesture(count:
+  2)` kept off the buttons' column by `MacTable.opens(at:widths:controls:)`, so a double-click on Play is Play's alone -
+  and the keys R6's `MacListKeys.pressed` (↑ ↓ Home End through `SearchTable.order` - Top results' rows, then each
+  section's, each once, Top results' ids prefixed `top|`, so a row drawn twice is two lines - and Return opening the
+  selected). Back to the top (R7's review), as the phone: a zero-height `ShelfAnchor.top` above the table, scrolled to
+  on `searchScrollToTop` (Search chosen again, animated) and, at once, on another kind or other words drawn
+  (`state.view`, `state.drawn?.text`). A right-click is the row's ••• (a song's
+  QueueMenuItems, an album's albumRightClick - still one of each in the file). The status bar is SearchTable.status:
+  the rows drawn by kind, and how many are in your library. The table is the page's width whenever that is at least
+  its least (`.scrollDisabled(width <= total)`), so nothing scrolls sideways at 1280, at 880 or beside the panel.
+- Each row's actions are the very calls the phone's tap makes, written once in SearchRowView: a song's Play is
+  `tapped(song)` (`player.play(songs:album:at:)`, nothing awaited), its Open its album's page; an album's or an
+  artist's `navigation.open(route)`; the album you don't have `search.open(group)`; a MusicBrainz artist
+  `search.openArtist`; a song's album `search.openSongAlbum`. A MusicBrainz song in a section is a row whose name cell
+  has the disclosure's triangle (its albums open under it, by `MacSearchLook.indent`), its button its named album's;
+  the triangle's toggle is VoiceOver's action on the row too, and (R7's review) the row's default action - VoiceOver's
+  double-tap - is `main()`, its first button's, as the double-click.
+- **How the Mac draws SearchScreen's rows without SearchScreen naming the Mac** (test_ios_mac_reach's zones: a shared
+  file names nothing declared under App/Mac, nor Typeface.Mac, MacPalette or the Mac's row size). SearchScreen.swift
+  declares **SearchTableRow** - a row as values (its id, title, SearchTable.Cells, actions, VoiceOver's words, its
+  picture: a library cover, round or not, or the Archive's front; striped, dimmed, busy, disabled, indented, the
+  disclosure's state and toggle) and one closure, `act`, carrying out each action - and **SearchTableDesk** (`row`,
+  `heading`, the row's height for Top results' empty place, a song's albums' indent), handed down as
+  `EnvironmentValues.searchTable`. MacSearchPage sets it round SearchContent: each row a **MacSearchTableRow** (the
+  name cell - the row size's cover on a chip's corners and 1 pt edge, the triangle, the indent - inside MacSearchRow),
+  each heading a MacSearchGroupLine. Every row, heading and Top results' place reads `table` and draws the phone's when
+  it is nil, so the phone, and the Mac anywhere outside that table, are unchanged.
+- Left out: the drawing's **Yours first | Only yours** (the list has no such choice - your library's rows lead each
+  section already, and there is no filter to only yours); See all on the Mac (the toolbar's kinds are it); and Get.dc's
+  and iSources' pieces listed under Sources below.
+
+**Search Soulseek by hand…** (the Mac): `AppNavigation.manualSearch()` - Now Playing closed, Requests at its root,
+`manualSearchWanted` set - and MacRequestsPage takes it as it shows (R7's review: no timer): its Artist field's own
+`.onChange(of: navigation.manualSearchWanted, initial: true)` - so a field drawn after the ask still sees it, and one
+already drawn sees it change - puts the cursor there and, in a `defer`, `manualSearchTaken()`, so the ask is taken
+whatever happens: "the way it already opens there", Requests' toolbar fields. The phone's is Requests' own **Search
+Soulseek…** row, untouched.
+
+**Get** (GroupView.swift, Mac/Search/MacGetPage.swift). GroupView is generic over a desk too: its model, every task,
+the picker's sheet, the phone's Sources sheet and the store line stay its own, and on the Mac it hands MacGetPage a
+**GroupDesk** - the page, the pressings' count, whether Get can be asked and is allowed, online, whether there is a
+usual tracklist, and `get`, `pick`, the artist's page, GET_OFF and the store line (`GroupStoreLine`).
+- The phone, iGet.dc.html: the hero - the cover 184, square; the title; the artist in the accent when they are a link;
+  the meta line plain in small t2 type ("1997 · Album · not in your library" - iGet's `.meta`), only a "maybe in your
+  library" in a dashed square edge (a mark, not a face); then **Get the album** (the primary button, large, across the
+  page, no chevron) and **Pressing** in t2 with the chosen pressing's label and DWCaret in the accent (iGet's flat
+  `.btn` row: a flat button's words are the accent, dw.css; 44 tall on its hairline: today's PressingPickerSheet as it
+  opens; its VoiceOver hint the facts line, the pressings' count in it), the facts line in mono
+  (`GetPageWords.factsLine`: the pressing's facts and "7 pressings" - two lines held whatever it says, so another
+  pressing chosen moves nothing under it; at the accessibility sizes, `lineLimit(2...)` - at least two lines' room, as
+  many as the words take), GET_OFF,
+  the store line (StoreLineView, flat), and the maybe note; then the **Tracklist** heading (`.row.grp`, the count beside
+  it - GetPageWords.songsLine, "11 songs · 49 min" when every track has a length) and its rows: the number in mono, the
+  title (a song searched for in the accent, semibold, a 3 pt bar in the accent at its left edge, "the song you searched
+  for" to VoiceOver), the mark's note and its caution chip, the length - 48 tall on a hairline. The disc headings and
+  Not on this pressing as before.
+- The Mac, Get.dc.html: the toolbar - **Get the album** (`.pri`), the groove and "Pressing", the chosen pressing as a
+  pop-up button (today's picker as a sheet - Pressing ▾), "N pressings" as a chip, **Open artist** at its end - folded
+  to Get, the pressing and Open artist where it doesn't fit; the hero (the cover 132 beside the title at h1, the
+  artist, the meta line, the facts); the store line at most 520 wide; and the tracklist as a **MacColumnList** - #,
+  Title, Against the usual tracklist (the mark's caution chip and note, or "the same" where there is a usual tracklist
+  to compare with - `GetPageWords.against`), Length - its disc headings and Not on this pressing group rows, its box
+  added up from the row size (`boxHeight`, `boxLeast`), the song searched for selected as the page draws. The status
+  bar: the songs line and the pressing (`GetPageWords.status`).
+- `get(page)`: on the Mac `navigation.getSources(request, from: route)`, on the phone `getting = request` (the sheet,
+  as it was). The request's id is `GetRequest.numbered()` (R7's review): one count for the whole app, so two pages'
+  Gets never share an id (each page had counted its own from 1, and the sheet and the dock key on it). ManualSearchSheet
+  and MacRequestsPage still count their own: theirs are sheets of their own, never the dock.
+- **Another pressing chosen while the dock's Get is open** (R7's review): the Get ends - `.onChange(of:
+  page.chosenId)` calls `AppNavigation.pressingChosen(_:on:)`, which ends the dock's Get (its search let go, the tab
+  gone) when it was asked from this page and `MacDock.getStands(asked:chosen:)` says it was asked for another pressing
+  than the one now chosen. Ending it rather than asking again can never enqueue the pressing no longer chosen (a card
+  from the old search could otherwise be tapped as the new one began); Get the album then asks for the one chosen.
+
+**Sources** (SourcesSheet.swift's SourcesPage, SourceCardView.swift, Mac/Search/MacSourcesTab.swift, Routes.swift,
+Player/MacPanels.swift, Core's MacDock.getLasts).
+- The phone, iSources.dc.html: **Close** where it said Cancel (SourcesLook.close), the subtitle at the left, the chips
+  as a strip of words (FilterStrip - each its own toggle, the pressed ones white over the accent's line, on the strip's
+  hairline), **Sort** and its pop-up with how many were found at the right ("14 found" - SourcesLook.found, once
+  something was), and the cards on the page's black: each a **PhoneCard** (no face, a hairline under it), its top line
+  the score chip, the folder and its peer and Get (the best match's the primary, the rest the look's flat button), its
+  facts three columns of a label over a mono readout, its missing line in amber, its Why behind the score. The query's
+  field keeps its own box (R1c's typing rule, pinned inside its block). No speed bar: neither drawing has one.
+- (R7's review) **Sample rate ▾**, beside Sort on both: any, or 44.1, 48, 88.2 or 96 kHz or more (`SourcesLook
+  .sampleRates`, the web's floors) - `CandidateFilters.quality.minSampleRate`, judged by Core's QualityFilters (a
+  folder's worst file; a folder saying no rate never passes a floor). It is kept in SourcesChoices with the chips, so
+  the dock's tab finds it as left; `chosenFilters` (`SourcesLook.filters(chips, minSampleRate:)`) is what the cards
+  are judged by and what the next peer's search picks with; it counts as a pressed filter, and Clear filters clears it.
+- (R7's review) **"N found"**: "14 found" when every card is shown, "3 of 14" while the filters hide some
+  (`SourcesLook.found(_:shown:)`, the shown count the cards passing). The sort line is capped at xxxLarge, and where
+  Sort, Sample rate and the count don't fit on one line the count folds under the pop-ups (ViewThatFits). The phone's
+  strip, scrolled at the largest sizes, pads its row by the 44 target's reach inside the scroll and takes it back
+  outside, so a chip's target isn't clipped (PhoneStrip's way).
+- (R7's review) **The speeds**, the Mac's panel foot under the cards (Get.dc.html's; iSources has none): "Speeds are
+  each peer's own average." as drawn - but a card shows deadwax's own measured speed for a peer it has downloaded from
+  (Sources.speedFact `.measured`), and then the drawing's words would be untrue, so it says "Speeds are what you got
+  from a peer before, else its own average." (`SourcesLook.speeds(shown)`).
+- Left out of Get.dc's and iSources' drawings, each for its reason: **Pin** (the app has no pins client, and Core's
+  DeadwaxClient is not this slice's); **Show all 14** (what it does isn't drawn, and Clear filters shows them all);
+  **the signal chips on every card** (each card's Why behind the score lists every signal already, scored); **the
+  speed bar** (neither drawing has one - R7 removed SpeedBar, so Core's SpeedFact.percent has no reader on the
+  cards).
+- Both files are shared, so their Mac sizes come through the look's roles, never Typeface.Mac (test_ios_mac_reach):
+  `Typeface.Look.text(.smallButton)` is the Mac's `.small`, `.field` its `.base`, `.chip` its `.label`, and
+  `Typeface.Look.mono(.smallButton)` its small mono - each beside the phone's own size in one ternary.
+- The Mac: Get the album opens the side panel's **Sources** tab (MacDock.tabs puts it first while a Get is open), never
+  the sheet. `AppNavigation.macSources` is a **MacSourcesGet** - the page it was asked from, the GetRequest, and its
+  own **SourcesChoices** (the chips, whether one was tapped, the sort) - and MacSourcesTab draws SourcesPage over it
+  with `kept: get.choices`, so the tab switched away from and back finds it as it was. Docked, the page begins its
+  search once and never lets it go itself (`.onDisappear { if !docked { model.close() } }`); its Close is
+  `closeDock()` - the Get over (`endSources`, its search let go) and the panel put away. A download asked for from it
+  is `sourcesQueued` - the Get ended, Requests at its root, as the sheet's.
+- The tab goes when its Get page is left: every move of the front - `tab`, and each tab's stack - calls `frontMoved`,
+  which ends the Get unless `MacDock.getLasts(.group(page), front: shownStack.last)` (the page it was asked from is
+  still the one in front). Back, another page pushed over it, another sidebar row, the person changing (`reset`) all
+  end it, its search let go before the panel goes (MacDock.kept closes the panel on Sources).
+
+**The pressing picker** (PressingPickerSheet.swift): the look's colours, its fold's button the look's (flat accent words
+on the phone); its filter iOS's own `.searchable`, as the brief says.
+
+**The store line** (StoreLineView.swift - another slice's in name, edited because every page it stands on is R7's):
+flat on the phone - its title (green when held), lines and notes in the look's colours on the page's black, no box,
+Join and Add the look's flat buttons. The Mac's box (Palette.card, Corners.cardShape, Palette.border) and SecondaryPill
+are as they were, behind `if Platform.mac` (test_ios_palette.py's pins kept).
+
+R1c's **Not flat yet** (above, and docs/ios.md over checks 612-614) named "Search's rows, the pressing picker, an
+album's Get and Choose a source's cards (R7)": docs/ios.md's list no longer does, and 612 names Search, an album you
+don't have and Choose a source among the pages to look at.
+
+### Core
+
+- **SearchTable.swift** (new): the Mac table's columns and their widths by the page and the row size, the cells of a
+  row, its actions (play, open, get - and their words and VoiceOver names), the line ids and the order ↑ ↓ move
+  through (All's and a kind's), the stripes (`striped`, MacTable.stripes over the lines drawn), the status bar, the
+  toolbar's heading and "Search Soulseek by hand…", `SearchWords.clear`; **GetPageWords** (the pressings' count, the
+  facts line, the songs line, the Mac's columns and their widths, `against`, the status); **SourcesLook** (Close,
+  "14 found" and "3 of 14", Sort, the sample-rate floors, `filters` and `pressed` with the floor, the speeds' words).
+  SearchTableTests holds each - `theTablesLinesAreInTheOrderDrawn` the order, `theStripesRunOnUnderEachHeading`,
+  `theSampleRateFloor`, `theSpeedsNoteSaysWhatTheSpeedsAre`.
+- **MacDock.getLasts** and **MacDock.getStands** (and their tests): the dock's Get lasts while its page is the one in
+  front, and stands only for the pressing it was asked for.
+
+### Tests
+
+- **tests/test_ios_search_look.py** (new, 22 since the review): the kinds narrow the query on both devices (the strip's
+  and the segments' binding, the pop-up's, See all's; nothing else writes the view); a song's play in the tap; Get's
+  `if Platform.mac` route, the dock's tab and MacSourcesGet, its id `GetRequest.numbered()`; another pressing chosen
+  ending the dock's Get (the onChange, pressingChosen, getStands); the tab going with its page (each didSet,
+  frontMoved, getLasts, sourcesQueued, closeDock, the docked onDisappear and the docked page's one search, reset()
+  ending the Get before the panel goes); the chips reaching `chosenFilters`, a pressed one white; the sort and the
+  sample rate setting what they say, and Clear filters clearing the floor; the Mac's speeds foot (Mac-only, its words
+  Core's); by hand (the button, manualSearch, MacRequestsPage's field's onChange and its defer, no Task.sleep); the
+  facts line's lines and the strips' caps and reach at the largest sizes; the phone flat - what each of the six phone files draws on the phone's path, exactly (FLAT; a Mac half is
+  `if Platform.mac {`, `if let desk, Platform.mac {` or `if table != nil, Platform.mac {`), SearchScreen's one Mac
+  part (`tableRow`) cut and shown never called on the phone's path; the phone's numbers from dw.css (.row.tall 60,
+  .row's #1c1b22, .key.bare 28 and its 14 glyph - footnote's, .row.grp 38, 6 and 15 - subheadline's, .chips' 16);
+  every `static let` in the three looks saying `// drawn:` or `// own:`; the search field (R7's review: no
+  `.searchable` or `.searchField` on Search, one TextField in the phone's half bound to `search.text`/`search.type`,
+  the Search key's `search.submitted()` and the keyboard put away, DWWell(focused:), the glass, ✕ while there are words
+  as `search.type("")`, its 40 and the drawing's insets, the safeAreaInset; the picker's one `.searchable`; Sources'
+  query's box); the Mac's tables and Row Size (the one name cell's cover, Top results' place, SearchScreen naming no
+  row size); a row one element for VoiceOver, a song's disclosure its action, `main()` its default action; the Mac
+  table's keys (MacListKeys.pressed's moved, open and ignored), its double-click (MacTable.opens, `clicked(count: 2)`),
+  `.focusable()`, its stripes (SearchTable.striped, read by each row) and its top anchor and three onChanges; the desk (SearchContent handed `searchTable`, its seven `table.row(`, the
+  heading's, each action the phone's call); Get's toolbar; tokens only (no colour, radius, opacity or font of their
+  own; the old palette only where kept; the phone's fonts the phone's, the Mac pages' the Mac's; no
+  `.monospacedDigit()`); "Queue"; the router.
+- Moved with the code, each a pin of a file R7 changed: test_ios_contract.py and test_ios_manual_search.py (the page
+  lets its search go as it goes but docked - `.onDisappear { if !docked { model.close() } }`; MacSourcesTab builds the
+  one more SourcesPage); test_ios_mac.py (SourcesSheet's Escape guard, now `!model.edited && (!docked ||
+  MacFrame.escape(...) == .panel)`); test_ios_mac_rows.py (SearchTable.swift among Core's files naming MacRowSize);
+  test_ios_readout_rows.py (MacGetPage among MacColumnList's pages, and MacSearchRow's cells on one first text
+  baseline - the year's Courier Prime would sit high centred); test_ios_palette.py (SourceCardView's pins: the Mac's
+  box, the phone's PhoneCard, the look's colours and buttons); test_ios_phone_look.py (R7_PAGES in SLICES);
+  test_ios_mac_reach.py (Search's root `SearchScreen { MacSearchPage() }`, and `.group` off PHONES_PAGES, its Mac
+  half the Get page asserted). After the review: test_ios_mac.py's Find test (Search's field the phone half's own,
+  no `.searchField`), and test_ios_phone_look.py's typing walk (Search/SearchScreen.swift now WELL, not SYSTEM;
+  Platform's phone half of searchField still pinned as iOS's, though Search no longer calls it).
+
+### Mutations
+
+Each applied alone, the look tests run, the file put back byte for byte (sha256 checked); all thirteen caught. After
+the review the twelve still standing were run again on the rebased code (the thirteenth, Search's field taken from the
+phone, has no field of iOS's left to take - the field's own mutations below replace it), then one or more for each of
+the review's fixes (MUTATIONS_REVIEW below).
+
+| mutation | caught by |
+| --- | --- |
+| Get on the Mac shows the sheet (GroupView's `get` always `getting = request`) | search_look's test_get_opens_the_side_panels_sources_on_the_mac_and_the_sheet_on_the_phone |
+| the tab outlives its Get page (frontMoved never ends it) | search_look's test_the_tab_goes_when_its_get_page_is_left |
+| a Sources chip that doesn't reach its filter | search_look's test_each_sources_chip_reaches_its_filter_and_the_cards |
+| the phone's strip not narrowing the query (its set not `search.choose`) | search_look's test_each_kind_narrows_the_query_and_the_kind_in_use_is_shown |
+| the Mac's segments not narrowing the query | the same |
+| a song's play awaited (`Task { player.play(...) }`) | search_look's test_a_songs_play_is_in_the_tap |
+| a grey box on a phone card (`.background(DWPalette.card)` after PhoneCard) | search_look's test_the_phone_is_flat_in_search_get_and_sources |
+| a grey box behind a search row | the same |
+| Sources' query losing its box | phone_look's test_every_place_you_type_on_the_phone_is_still_a_box; search_look's field, flat and tokens tests |
+| Search's field replaced by a TextField of its own (retired by the review: the field is now the look's own - its mutations are fix 8's below) | phone_look's test_every_place_you_type_on_the_phone_is_still_a_box; search_look's test_the_search_field_stays_the_looks_box (now test_the_search_field_is_the_looks_box) |
+| the Mac's table not handed down (its rows the phone's) | search_look's test_the_macs_table_draws_search_screens_own_rows |
+| a song's disclosure not VoiceOver's action | search_look's test_a_row_is_one_element_for_voiceover_its_buttons_its_actions |
+| a Mac row's cells centred (its year off the words' baseline) | readout_rows' test_every_readout_beside_words_sits_on_their_baseline and test_the_macs_tables_and_status_bar_are_set_on_one_baseline |
+
+**MUTATIONS_REVIEW** - one or more for each of the review's fixes, its number first; "search_look" is
+tests/test_ios_search_look.py, "Swift" DeadwaxKit's SearchTableTests and MacDockTests. All 51 caught.
+
+| mutation | caught by |
+| --- | --- |
+| 1 a pressing chosen leaves the dock's Get (GroupView's onChange gone) | search_look's test_another_pressing_chosen_ends_the_docks_get |
+| 1 pressingChosen never ending the Get | the same |
+| 1 MacDock.getStands always true | the same; Swift's theDocksGetStandsOnlyForThePressingItWasAskedFor |
+| 2 the Mac's Search not to the top as Search is chosen again | search_look's test_the_macs_table_keys_clicks_stripes_and_top |
+| 2 nor as the kind changes | the same |
+| 2 the Mac's top anchor gone | the same |
+| 3 the count every candidate, never how many are shown | search_look's test_the_sort_and_the_sample_rate_set_what_they_say |
+| 3 the shown count the whole answer's | the same |
+| 3 "N found" off by one (`shown + 1 < count`) | Swift's sourcesWords |
+| 4 the facts line two lines at every size | search_look's test_the_facts_line_and_the_strips_at_the_largest_sizes |
+| 4 its lines not held at the accessibility sizes (`lineLimit(nil)`) | the same |
+| 4 the pressing row's hint without the pressings' count | search_look's test_the_phone_is_flat_in_search_get_and_sources |
+| 4 the facts line losing its pressings count | the same |
+| 5 the sort line uncapped | search_look's test_the_sort_and_the_sample_rate_set_what_they_say |
+| 6 FilterStrip's scroll clipping its targets (no reach) | search_look's test_the_facts_line_and_the_strips_at_the_largest_sizes |
+| 7 the Mac row with no default action | search_look's test_a_row_is_one_element_for_voiceover_its_buttons_its_actions |
+| 8 the field's words not the model's (its set ignored) | search_look's test_the_search_field_is_the_looks_box |
+| 8 the Search key not searching | the same |
+| 8 the Search key leaving the keyboard up | the same |
+| 8 the field without its well | the same; phone_look's test_every_place_you_type_on_the_phone_is_still_a_box; search_look's flat test |
+| 8 ✕ not emptying it | the same field test |
+| 8 the field gone from the phone's page (no safeAreaInset) | the same |
+| 8 iOS's rounded field back (`.searchField`) | the same; mac's test_find_puts_the_cursor_in_the_sidebars_field |
+| 9 the page's own count back (`id: 1`) | search_look's test_get_opens_the_side_panels_sources_on_the_mac_and_the_sheet_on_the_phone |
+| 9 the numbers never moving | the same |
+| 10 the ask never taken (no defer) | search_look's test_search_soulseek_by_hand_is_requests_toolbar |
+| 10 the focus left to a 150 ms timer | the same |
+| 12 Sample rate ▾ not setting the floor | search_look's test_the_sort_and_the_sample_rate_set_what_they_say |
+| 12 the floor not reaching the cards | search_look's test_each_sources_chip_reaches_its_filter_and_the_cards |
+| 12 Clear filters leaving the floor | search_look's sort and sample rate test |
+| 12 the speeds foot on the phone | search_look's test_the_macs_foot_says_what_the_speeds_are and test_the_macs_parts_cut_are_run_only_from_its_halves |
+| 12 the speeds note the drawing's words whatever the cards show | Swift's theSpeedsNoteSaysWhatTheSpeedsAre |
+| 13 the dock's page searching afresh on every appear | search_look's test_the_tab_goes_when_its_get_page_is_left |
+| 13 reset() leaving the dock's Get open | the same |
+| 13 the sort pop-up not setting the sort | search_look's sort and sample rate test |
+| 13 the Mac row's double-click a single click | search_look's test_the_macs_table_keys_clicks_stripes_and_top |
+| 13 Return never opening | the same |
+| 13 the arrow keys not moving | the same |
+| 13 the table not focusable | the same |
+| 13 the phone's Get the album not primary | search_look's flat test |
+| 13 a pressed filter not white | search_look's chips test |
+| 13 FilterStrip's xxxLarge cap removed | search_look's facts line and strips test |
+| 13 a chevron beside a row's Get | search_look's flat test |
+| 13 a chevron beside Get the album | the same |
+| 14 See all growing the heading again (`minHeight: target`) | search_look's facts line and strips test |
+| 14 See all's reach under the row below (no `.zIndex(1)`) | the same |
+| 14 the Mac's rows unstriped | search_look's test_the_macs_table_keys_clicks_stripes_and_top |
+| 14 the stripes never starting again under a heading (Core) | Swift's theStripesRunOnUnderEachHeading |
+| 14 SearchRows striping by its own index again | search_look's keys, clicks, stripes and top test |
+| 14 the pressing row's words white | search_look's flat test |
+| 14 the pressing row's caret grey | the same |
+
+Fix 11 is words (docs/ios.md's and these notes' meta line), and has no mutation.
+
+### Not verified - only a device can say (checks 564-569)
+
+- Anything on a screen: no Simulator, phone or Mac run (James's Mac app was running, so no smoke run either).
+- The table's columns giving way at 1280 beside the panel and at 880 as Core's numbers say, the toolbar folding where
+  ViewThatFits decides, and a heading row spanning the table (it is drawn out by `-SearchLook.side`).
+- Focus: a click giving the table the keyboard, ↑ ↓ reaching the rows, Return doing the first button's, a double-click
+  on a button being only the button's; Requests' Artist field taking the cursor after Search's by hand (its onChange,
+  `initial: true`); VoiceOver's double-tap on a row doing its first button's.
+- The phone's field: its look beside iSearch (the well, the glass, the ✕), the keyboard's Search key and its putting
+  the keyboard away, the cursor's colour, the list scrolling under it, and typing feeling exactly as `.searchable` did.
+- Sample rate ▾ hiding what it says against real folders (Core's QualityFilters is tested; real slskd answers with
+  rates aren't), "3 of 14" folding under the pop-ups at the largest sizes, the strip's targets reaching past its
+  scroll, the speeds foot's words beside real measured speeds, and another pressing chosen closing the Sources tab.
+- The dock: Sources opening beside the page, its chips and sort surviving a tab switch, and closing as the page goes -
+  including an album pushed from Search onto Search's own stack and another tab chosen.
+- The phone: the rows' hairlines out to the edges with the swipe still inset, the ▶'s and Get's words at the row's
+  end, the strip at the largest sizes, the plain meta line (only the maybe dashed), the pressing in the accent and the
+  facts line's lines at the accessibility sizes, and the song's bar on iGet, the cards flat on iSources.

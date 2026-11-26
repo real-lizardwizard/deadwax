@@ -12,6 +12,16 @@ struct GetRequest: Identifiable {
     /// (Slice 3's review, finding 4) This Get's search - held by the Get rather than the sheet, so the page that opened
     /// it can let it go the moment the sheet is let go (GroupView's binding), not once the slide away has ended.
     let search: SourcesSearch
+
+    /// (R7's review) A number no Get has had in this run of the app - the album page's Gets' `id`: a page's own count
+    /// started again on every page, so a Get from another album's page could carry the number of the Get before it, and
+    /// the Mac's dock (its tab keyed on the Get's number) could keep that Get's page, the new Get's search never begun.
+    @MainActor static func numbered() -> Int {
+        issued += 1
+        return issued
+    }
+
+    @MainActor private static var issued = 0
 }
 
 /// Choose a source (Phase 6, slices 2 and 3 - phase6-get-requests.md 2.10, 2.11, 3.5; the web's app/Sources.tsx as a
@@ -77,10 +87,21 @@ struct GetRequest: Identifiable {
 ///   have no Complete albums only (no tracklist to judge by), nothing is picked (Sources.autoPick), and a server that
 ///   didn't echo the question (before deadwax 2.1.38, which would file it by the typed words) has every Get off, with
 ///   why above the cards (ManualSearch.tooOldLine) - said to VoiceOver with the outcome.
+///
+/// - (The redesign, slice R7 - notes/ios.md "The redesign, slice R7: Search, Get and Sources (2026-11-25)") As
+///   iSources.dc.html draws it on the phone, flat: Close (where it said Cancel), the subtitle at the left, the chips a
+///   strip of words (FilterStrip - each its own toggle, the pressed ones white over the accent's line), "Sort" with its
+///   pop-up and how many were found, and the cards (SourceCardView) on the page's ground. On the Mac it is the dock's
+///   Sources tab (MacSourcesTab, `kept`): the Get's own chips and sort, so they outlast its tab switched away from and
+///   back, its search begun once and let go only as the Get ends (AppNavigation.endSources) - its Close the Get over and
+///   the panel put away.
 struct SourcesPage: View {
     let request: GetRequest
     /// Pushed from Search Soulseek's form: no Cancel - Back is there.
     let pushed: Bool
+    /// (R7) The Mac's dock's Get's own chips and sort (MacSourcesGet): drawn in the dock, the page begins its search once
+    /// and never lets it go itself. nil: a sheet's page, its chips its own.
+    var kept: SourcesChoices? = nil
     /// A download asked for: the sheet goes, and Requests shows.
     let onQueued: () -> Void
 
@@ -91,12 +112,36 @@ struct SourcesPage: View {
     @Environment(Reachability.self) private var reachability
     @Environment(LibraryModel.self) private var library
     @Environment(SearchModel.self) private var searchModel
+    @Environment(AppNavigation.self) private var navigation
     /// This Get's search (GetRequest.search).
     private var model: SourcesSearch { request.search }
-    @State private var filters = SourceFilters.none
+    /// The chips, the sort and whether one was tapped: the page's own, or the dock's Get's (`kept`).
+    @State private var own = SourcesChoices()
+    private var choices: SourcesChoices { kept ?? own }
+    /// (R7) Drawn in the Mac's dock.
+    private var docked: Bool { kept != nil }
+    private var filters: SourceFilters {
+        get { choices.filters }
+        nonmutating set { choices.filters = newValue }
+    }
     /// A chip was tapped since this Get began: the floor landing late doesn't re-make them then.
-    @State private var touched = false
-    @State private var sort = CandidateSort.score
+    private var touched: Bool {
+        get { choices.touched }
+        nonmutating set { choices.touched = newValue }
+    }
+    private var sort: CandidateSort {
+        get { choices.sort }
+        nonmutating set { choices.sort = newValue }
+    }
+    /// (R7's review) Sample rate ▾: the least a folder's worst file may be, in Hz - 0 for any.
+    private var minSampleRate: Double {
+        get { choices.minSampleRate }
+        nonmutating set { choices.minSampleRate = newValue }
+    }
+    /// The chips and the sample-rate floor as the candidates' filters: what the cards, the best match and a pick go by.
+    private var chosenFilters: CandidateFilters {
+        SourcesLook.filters(filters, minSampleRate: minSampleRate)
+    }
     /// Search again, opened from the bar (above the chips) or under folders found - one at a time, nil closed.
     @State private var again: AgainPlace?
     /// The bar's Search again in words up to the default text size, a magnifying glass above it.
@@ -111,34 +156,44 @@ struct SourcesPage: View {
     private var online: Bool { reachability.online }
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 0) {
             if !request.subtitle.isEmpty {
+                // iSources: .s.q, at the left, 2 above and 10 under
                 Text(request.subtitle)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.text2)
-                    .multilineTextAlignment(.center)
+                    .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, SourcesPageLook.side)
+                    .padding(.top, SourcesPageLook.subtitleAbove)
+                    .padding(.bottom, SourcesPageLook.subtitleBelow)
             }
             if again == .top && foundFolders {
                 // the bar's Search again: the words to change above the chips, where no scroll takes them away
                 queryForm(focus: true) {
                     EmptyView()
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, SourcesPageLook.side)
+                .padding(.bottom, SourcesPageLook.subtitleBelow)
             }
             chips
+            sortLine
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 10) {
+                LazyVStack(alignment: .leading, spacing: SourcesPageLook.cardGap) {
                     content
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, SourcesPageLook.side)
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.interactively)
+            if Platform.mac {
+                // (R7's review) Get.dc.html's panel foot, while there are cards: what their speeds are
+                if let shown = shownCards {
+                    speedsFoot(shown)
+                }
+            }
         }
-        .padding(.top, 4)
+        .background(Platform.mac ? DWPalette.panel : DWPalette.page)
         // the sheet going for good - a swipe let go, not one pulled back: the search goes with it, there and then
         .background(SheetGoing { model.close() })
         .navigationTitle(SourcesWords.title)
@@ -147,14 +202,17 @@ struct SourcesPage: View {
             // (manual search) pushed from Search Soulseek's form, Back is there in its place
             if !pushed {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(SourcesWords.cancel) {
+                    Button(SourcesLook.close) {
+                        // (R7) in the Mac's dock: the Get over, its search let go, and the panel put away
+                        guard !docked else { return closeDock() }
                         // the search let go in the tap, then the sheet closes
                         model.close()
                         dismiss()
                     }
-                    // (the Mac app, slice 2) Escape is Cancel only with the search's words as searched: Cancel throws
-                    // edited words away without asking
-                    .escapeCloses(!model.edited)
+                    // (the Mac app, slice 2) Escape is Close only with the search's words as searched: Close throws
+                    // edited words away without asking - (R7) and in the dock only as Escape's owner says the panel's
+                    .escapeCloses(!model.edited && (!docked || MacFrame.escape(typing: TextEditing.shared.typing,
+                                                                               panel: navigation.macPanel) == .panel))
                 }
             }
             if foundFolders {
@@ -165,12 +223,15 @@ struct SourcesPage: View {
             }
         }
         .onAppear {
+            // (R7) the dock's page drawn again as its tab comes back: its Get as it was, never searched afresh
+            guard !docked || model.search == nil else { return }
             // a Get: its chips the quality floor, the sort Best match, searched afresh
             filters = GetSettings.floorFilters(floor)
             begin(request.release)
         }
-        // the backstop: however the sheet went (swiped away, a Get handing over), the search goes with it
-        .onDisappear { model.close() }
+        // the backstop: however the sheet went (swiped away, a Get handing over), the search goes with it - (R7) never
+        // the dock's, whose tab switched away comes back to it: its Get's end lets it go (AppNavigation.endSources)
+        .onDisappear { if !docked { model.close() } }
         // the floor's word landing after the sheet opened: the chips become it, unless already tapped
         .onChange(of: settings.settings?.floor) { _, landed in
             guard let landed, !touched else { return }
@@ -200,7 +261,7 @@ struct SourcesPage: View {
     private func begin(_ release: GetRelease) {
         again = nil
         let picking = SourcesSearch.Picking(
-            filters: { GetSettings.candidateFilters(filters) },
+            filters: { chosenFilters },
             picked: { (candidate: Candidate, release: GetRelease, list: [Candidate]) -> SourcesSearch.Sent in
                 // out of reach as it landed: not asked - and not later either (the search says why)
                 guard online else { return .offline }
@@ -216,9 +277,9 @@ struct SourcesPage: View {
         model.requery(client: server.client, settings: settings)
     }
 
-    /// The folders through the chips, in the server's order (best match first).
+    /// The folders through the chips and the sample-rate floor, in the server's order (best match first).
     private func passing(_ answer: FindCandidatesAnswer?) -> [Candidate] {
-        let chosen = GetSettings.candidateFilters(filters)
+        let chosen = chosenFilters
         return (answer?.candidates ?? []).filter { Sources.passes($0, chosen) }
     }
 
@@ -248,42 +309,120 @@ struct SourcesPage: View {
         return StoreLine.addedStatus(found)
     }
 
+    /// (R7) The dock's Close: the Get over (its search let go, Sources gone) and the panel put away.
+    private func closeDock() {
+        navigation.endSources()
+        navigation.closePanel()
+    }
+
     // MARK: the chips
 
+    /// The filters (iSources' .chips, Get.dc.html's small buttons): each its own toggle - a strip of words on the phone,
+    /// the look's small buttons on the Mac, the pressed ones `.on`.
     private var chips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(GetSettings.chips(floor, filters, manual: request.release.manual)) { (chip: GetSettings.Chip) in
-                    Button(chip.label) {
-                        touched = true
-                        filters[chip.key].toggle()
-                    }
-                    .buttonStyle(ChipFace(on: chip.on))
-                    .accessibilityAddTraits(chip.on ? .isSelected : [])
-                }
-                Menu {
-                    Picker(SourcesWords.sortLabel, selection: $sort) {
-                        ForEach(CandidateSort.allCases) { (order: CandidateSort) in
-                            Text(order.label).tag(order)
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(sort.label)
-                        Image(systemName: "chevron.down")
-                            .font(Typeface.symbol(.caption2).weight(.semibold))
-                            .accessibilityHidden(true)
-                    }
-                }
-                .menuStyle(.button)
-                .buttonStyle(ChipFace(on: false))
-                .accessibilityLabel(SourcesWords.sortLabel)
-                .accessibilityValue(sort.label)
-            }
-            .padding(.horizontal, 16)
+        FilterStrip(chips: GetSettings.chips(floor, filters, manual: request.release.manual)) { (key: SourceFilters.Key) in
+            touched = true
+            filters[key].toggle()
         }
-        .accessibilityElement(children: .contain)
         .accessibilityLabel(SourcesWords.chipsLabel)
+    }
+
+    /// "Sort" and its pop-up (Best match ▾), (R7's review) Sample rate ▾, and how many folders Soulseek gave - once it
+    /// has answered with some, and how many of them the filters let through while they hide some ("3 of 14"). Where
+    /// they don't fit one line, the count under the pop-ups; capped at xxxLarge, as the filters' strip is.
+    private var sortLine: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: SourcesPageLook.sortGap) {
+                sortChoices
+                Spacer(minLength: SourcesPageLook.sortGap)
+                if let found = foundCount {
+                    Text(SourcesLook.found(found.all, shown: found.shown))
+                        .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.extraSmall))
+                        .foregroundStyle(DWPalette.t3)
+                        .lineLimit(1)
+                }
+            }
+            VStack(alignment: .leading, spacing: SourcesPageLook.sortFold) {
+                HStack(alignment: .firstTextBaseline, spacing: SourcesPageLook.sortGap) {
+                    sortChoices
+                }
+                if let found = foundCount {
+                    Text(SourcesLook.found(found.all, shown: found.shown))
+                        .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.extraSmall))
+                        .foregroundStyle(DWPalette.t3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, SourcesPageLook.side)
+        .padding(.bottom, SourcesPageLook.subtitleBelow)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+
+    /// "Sort", its pop-up, and Sample rate ▾ - each pop-up a menu of the very choices, said with what is chosen.
+    @ViewBuilder private var sortChoices: some View {
+        Text(SourcesLook.sort)
+            .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+            .foregroundStyle(DWPalette.t2)
+            .accessibilityHidden(true)
+        DWPopUp(words: sort.label, size: .small) {
+            Picker(SourcesWords.sortLabel, selection: Binding(get: { sort }, set: { (order: CandidateSort) in
+                sort = order
+            })) {
+                ForEach(CandidateSort.allCases) { (order: CandidateSort) in
+                    Text(order.label).tag(order)
+                }
+            }
+            .pickerStyle(.inline)
+        }
+        .fixedSize()
+        .accessibilityLabel(SourcesWords.sortLabel)
+        .accessibilityValue(sort.label)
+        DWPopUp(words: SourcesLook.sampleRate(minSampleRate).chip, size: .small) {
+            Picker(SourcesLook.sampleRateLabel, selection: Binding(get: { minSampleRate }, set: { (rate: Double) in
+                minSampleRate = rate
+            })) {
+                ForEach(SourcesLook.sampleRates) { (floor: SourcesLook.SampleRate) in
+                    Text(floor.label).tag(floor.value)
+                }
+            }
+            .pickerStyle(.inline)
+        }
+        .fixedSize()
+        .accessibilityLabel(SourcesLook.sampleRateLabel)
+        .accessibilityValue(SourcesLook.sampleRate(minSampleRate).label)
+    }
+
+    /// How many folders Soulseek gave for the search shown, and how many of them pass the filters - nil while none has
+    /// answered with any.
+    private var foundCount: (all: Int, shown: Int)? {
+        guard let search = model.search, !search.pending, let answer = search.answer, !answer.candidates.isEmpty,
+              storeBox(answer) == nil else { return nil }
+        return (answer.candidates.count, passing(answer).count)
+    }
+
+    /// The cards shown for the search shown - nil while there are none (searching, the store's box, none found or none
+    /// through the filters).
+    private var shownCards: [Candidate]? {
+        guard let search = model.search, !search.pending, search.error == nil, let answer = search.answer,
+              storeBox(answer) == nil else { return nil }
+        let shown = passing(answer)
+        return shown.isEmpty ? nil : shown
+    }
+
+    /// (R7's review) The Mac's foot under the cards (Get.dc.html's panel foot, 34 tall over the line): what their speeds
+    /// are (SourcesLook.speeds).
+    private func speedsFoot(_ shown: [Candidate]) -> some View {
+        Text(SourcesLook.speeds(shown))
+            .font(Typeface.Look.text(.smallButton))
+            .foregroundStyle(DWPalette.t3)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .help(SourcesLook.speeds(shown))
+            .padding(.horizontal, SourcesPageLook.footSide)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .lookHeight(SourcesPageLook.foot)
+            .overlay(alignment: .top) { DWRule(colour: DWPalette.line) }
     }
 
     // MARK: what the list shows
@@ -307,7 +446,7 @@ struct SourcesPage: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Text(Sources.searchTakes)
                         .font(Typeface.footnote)
-                        .foregroundStyle(Palette.text2)
+                        .foregroundStyle(DWPalette.t2)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
@@ -316,7 +455,7 @@ struct SourcesPage: View {
                 VStack(spacing: 12) {
                     ErrorNote(error, service: .downloads, failed: ErrorWords.down[.downloads], retry: true)
                     Button(SourcesWords.tryAgain) { begin(search.release) }
-                        .buttonStyle(SecondaryPill())
+                        .buttonStyle(DWButtonStyle())
                         .disabled(!online)
                 }
                 .frame(maxWidth: .infinity)
@@ -344,7 +483,7 @@ struct SourcesPage: View {
                 // every Get is off
                 Text(notPicked)
                     .font(Typeface.footnote)
-                    .foregroundStyle(Palette.text2)
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -359,7 +498,7 @@ struct SourcesPage: View {
                         stateText(Sources.nothingLosslessLine(answer))
                         Text(Sources.nothingLosslessNote)
                             .font(Typeface.footnote)
-                            .foregroundStyle(Palette.text2)
+                            .foregroundStyle(DWPalette.t2)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -371,12 +510,13 @@ struct SourcesPage: View {
             } else if shown.isEmpty {
                 VStack(spacing: 12) {
                     stateText(Sources.noneMatchLine(answer.candidates.count))
-                    if GetSettings.pressedCount(filters) > 0 {
+                    if SourcesLook.pressed(filters, minSampleRate: minSampleRate) > 0 {
                         Button(SourcesWords.clearFilters) {
                             touched = true
                             filters = .none
+                            minSampleRate = 0
                         }
-                        .buttonStyle(SecondaryPill())
+                        .buttonStyle(DWButtonStyle())
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -391,7 +531,7 @@ struct SourcesPage: View {
                 }
                 Text(Sources.searchedLine(answer, shown: shown.count))
                     .font(Typeface.footnote)
-                    .foregroundStyle(Palette.text2)
+                    .foregroundStyle(DWPalette.t2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity)
@@ -524,7 +664,7 @@ struct SourcesPage: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(SourcesWords.searchFor)
                     .font(Typeface.caption)
-                    .foregroundStyle(Palette.label)
+                    .foregroundStyle(DWPalette.label)
                     .accessibilityHidden(true)
                 TextField(SourcesWords.searchFor, text: $model.query)
                     .focused($againFocused)
@@ -545,7 +685,7 @@ struct SourcesPage: View {
                     }
             }
             Button(SourcesWords.search, action: requery)
-                .buttonStyle(SecondaryPill())
+                .buttonStyle(DWButtonStyle())
                 .disabled(!online)
         }
         .frame(maxWidth: .infinity)
@@ -568,40 +708,117 @@ struct SourcesSheet: View {
     }
 }
 
-/// A filter chip, and the sort's (app.css .app-chip): the secondary face, 30 points tall in a 44-point target - pressed,
-/// --dw-toggled-bg under --dw-accent-text in semibold, its edge --dw-toggled-border.
-struct ChipFace: ButtonStyle {
-    let on: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        ChipFaceBody(configuration: configuration, on: on)
-    }
+/// (R7) A Get's chips, its sort and whether a chip was tapped since it began - the page's own in a sheet, the dock's
+/// Get's on the Mac (MacSourcesGet), so they outlast its tab switched away from and back.
+@MainActor
+@Observable
+final class SourcesChoices {
+    var filters = SourceFilters.none
+    var touched = false
+    var sort = CandidateSort.score
+    /// (R7's review) Sample rate ▾'s floor, in Hz - 0 for any.
+    var minSampleRate: Double = 0
 }
 
-private struct ChipFaceBody: View {
-    let configuration: ButtonStyleConfiguration
-    let on: Bool
+/// (R7) The numbers iSources.dc.html draws (each line's `drawn:` comment says where).
+enum SourcesPageLook {
+    static let side: CGFloat = 16           // drawn: iSources subtitle padding-left
+    static let subtitleAbove: CGFloat = 2   // drawn: iSources subtitle padding-top
+    static let subtitleBelow: CGFloat = 10  // drawn: iSources subtitle padding-bottom
+    static let sortGap: CGFloat = 8         // drawn: iSources sort line gap
+    static let sortFold: CGFloat = 4        // own: the count folded under the pop-ups
+    static let cardGap: CGFloat = 10        // drawn: iSources cards gap
+    /// (R7's review) The Mac's foot under the cards: 34 tall, its words 12 in.
+    static let foot: Double = 34            // drawn: Get panel foot height
+    static let footSide: CGFloat = 12       // drawn: Get panel foot padding-left
+}
 
-    private static let height: CGFloat = 30
-    private static let target: CGFloat = 44
+/// (R7) The filters, each its own toggle (iSources' .chips, Get.dc.html's small buttons). On the phone a strip of words
+/// with no face, as PhoneStrip draws a choice of parts - at 15 in the second colour, 22 apart over the strip's hairline,
+/// a pressed one white and semibold over the accent's 2 pt line, as wide as its words - but any of them pressed at once,
+/// each said as selected; scrolling sideways where they don't fit, a finger's target 44 round each. On the Mac the
+/// look's small buttons, a pressed one `.on`, in a row that scrolls sideways where the dock is too narrow for them.
+private struct FilterStrip: View {
+    let chips: [GetSettings.Chip]
+    let toggle: (SourceFilters.Key) -> Void
 
     var body: some View {
-        let pressed = configuration.isPressed
-        configuration.label
-            .font(on ? Typeface.footnote.weight(.semibold) : Typeface.footnote)
-            .foregroundStyle(on ? Palette.accentText : Palette.onSecondary)
-            .lineLimit(1)
-            .padding(.horizontal, 12)
-            .frame(minHeight: Self.height)
-            .background {
-                if on {
-                    Corners.controlShape.fill(Palette.toggledFill)
-                } else {
-                    Corners.controlShape.fill(pressed ? Palette.secondaryFillPressed : Palette.secondaryFill)
+        ViewThatFits(in: .horizontal) {
+            row
+            ScrollView(.horizontal, showsIndicators: false) {
+                // (R7's review) room for each word's whole target inside the scroll view, which takes no touch
+                // outside itself - PhoneStrip's way
+                row
+                    .padding(.vertical, reach)
+            }
+            // drawn as tall as its words again: the targets' reach laid over what is above and below it
+            .padding(.vertical, -reach)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(alignment: .bottom) {
+            if !Platform.mac { DWRule(colour: DWPalette.stripRule) }
+        }
+        .padding(.bottom, Platform.mac ? SourcesPageLook.subtitleBelow : CGFloat(PhoneLook.stripFoot))
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private var row: some View {
+        if Platform.mac {
+            HStack(spacing: 6) {
+                ForEach(chips) { (chip: GetSettings.Chip) in
+                    Button(chip.label) { toggle(chip.key) }
+                        .buttonStyle(DWButtonStyle(kind: chip.on ? .on : .normal, size: .small))
+                        .fixedSize()
+                        .accessibilityAddTraits(chip.on ? .isSelected : [])
                 }
             }
-            .overlay(Corners.controlShape.strokeBorder(on ? Palette.toggledEdge : Palette.secondaryEdge))
-            .frame(minHeight: Self.target)
-            .contentShape(Rectangle())
+            .padding(.horizontal, SourcesPageLook.side)
+        } else {
+            HStack(spacing: 0) {
+                ForEach(chips) { (chip: GetSettings.Chip) in
+                    word(chip)
+                }
+            }
+            .padding(.horizontal, CGFloat(PhoneLook.stripSide) - room)
+        }
+    }
+
+    /// A button's room either side of its words: half the strip's gap.
+    private var room: CGFloat {
+        CGFloat(PhoneLook.stripGap) / 2
+    }
+
+    /// (R7's review) How far a word's target reaches above and below its 40 pt height (PhoneStrip's `reach`): 2 on the
+    /// phone, none on the Mac.
+    private var reach: CGFloat {
+        CGFloat(DWLook.here.reach(PhoneLook.strip))
+    }
+
+    private func word(_ chip: GetSettings.Chip) -> some View {
+        Button {
+            toggle(chip.key)
+        } label: {
+            Text(chip.label)
+                .font(Typeface.Phone.text(.strip).weight(chip.on ? .semibold : .medium))
+                .foregroundStyle(chip.on ? DWPalette.text : DWPalette.t2)
+                .lineLimit(1)
+                .fixedSize()
+                .padding(.horizontal, CGFloat(PhoneLook.stripPadding))
+                .lookHeight(PhoneLook.strip)
+                .overlay(alignment: .bottom) {
+                    if chip.on {
+                        Rectangle()
+                            .fill(DWPalette.acc)
+                            .frame(height: CGFloat(DWFlat.chosenLine))
+                            .accessibilityHidden(true)
+                    }
+                }
+                .padding(.horizontal, room)
+                .frame(minWidth: CGFloat(DWLook.here.target))
+                .contentShape(DWTarget(face: DWCorners.buttonShape))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(chip.on ? .isSelected : [])
     }
 }

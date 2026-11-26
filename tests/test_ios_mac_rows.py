@@ -419,10 +419,11 @@ def test_the_frame_hands_the_one_choice_down():
     for name, code in sources.items():
         if re.search(r"\b(MacRowSize|macRowSize|MacRowSizeStore|RowSizeAlternateKey)\b", code):
             assert name.startswith("Mac/") or name in (FRAME, COMMANDS), name
-    # and in Core, the Mac's own files and Requests' columns
+    # and in Core, the Mac's own files and Requests' columns - and (R7) Search's table and Get's tracklist
     for path in sorted(CORE.glob("*.swift")):
         if re.search(r"\bMacRowSize\b", bare(path.read_text(encoding="utf-8"))):
-            assert path.name in ("MacRowSize.swift", "MacMenu.swift", "MacAlbumFacts.swift", "RequestFilter.swift"), path
+            assert path.name in ("MacRowSize.swift", "MacMenu.swift", "MacAlbumFacts.swift", "RequestFilter.swift",
+                                 "SearchTable.swift"), path
 
 
 # ----------------------------------------------------------------------------- the menu and the keys

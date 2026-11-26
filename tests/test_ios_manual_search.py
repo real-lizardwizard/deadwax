@@ -68,9 +68,11 @@ def test_the_sources_sheet_is_the_page_in_a_stack_of_its_own():
     builds = {name: (code.count("SourcesSheet("), code.count("SourcesPage(")) for name, code in app.items()
               if "SourcesSheet(" in code or "SourcesPage(" in code}
     #? (the redesign, R8) the Mac's Requests searches from its toolbar: Choose a source as a sheet of its own, as the album's
-    #? Get opens it
+    #? Get opens it; (R7) the Mac's album Get draws the page in the side panel's Sources tab, not over the page
     assert builds == {"Get/SourcesSheet.swift": (0, 1), "Search/GroupView.swift": (1, 0),
-                      "Get/ManualSearchSheet.swift": (0, 1), "Mac/Requests/MacRequestsPage.swift": (1, 0)}, builds
+                      "Get/ManualSearchSheet.swift": (0, 1), "Mac/Requests/MacRequestsPage.swift": (1, 0),
+                      "Mac/Search/MacSourcesTab.swift": (0, 1)}, builds
+    assert "SourcesPage(request: get.request, pushed: false, kept: get.choices) {" in app["Mac/Search/MacSourcesTab.swift"]
     assert "SourcesSheet(request: request) {" in app["Search/GroupView.swift"]
     assert "SourcesPage(request: results, pushed: true) {" in app["Get/ManualSearchSheet.swift"]
 
@@ -123,7 +125,9 @@ def test_return_in_search_soulseek_moves_on_or_searches_and_nothing_else():
     # the results up with their search shut)
     assert "onChange(of: showing)" not in sheet
     assert sheet.count("results?.search.close()") == 4, "the sheet going, Cancel, the sheet gone and a new Search"
-    assert ".onDisappear { model.close() }" in _body(_app()["Get/SourcesSheet.swift"], "struct SourcesPage: View {")
+    #? (R7) the page lets its search go as it goes - but in the Mac's dock, as its Get ends (AppNavigation.endSources)
+    assert ".onDisappear { if !docked { model.close() } }" in _body(_app()["Get/SourcesSheet.swift"],
+                                                                      "struct SourcesPage: View {")
     assert ".background(SheetGoing { results?.search.close() })" in sheet
     assert ".onDisappear { results?.search.close() }" in sheet
 

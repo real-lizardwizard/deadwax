@@ -385,13 +385,15 @@ def test_a_text_field_keeps_its_keys():
 
 def test_find_puts_the_cursor_in_the_sidebars_field():
     """(Slice 3) Search's field on the Mac is the desktop frame's sidebar's: Find shows the sidebar and puts the cursor
-    there, the page left as it is. Search's page draws its navigation-bar field on the iPhone alone (Platform's
-    searchField), and the iPhone's Find path is the slice-2 one, never reached there."""
+    there, the page left as it is. Search's page draws its field on the iPhone alone - (R7's review) its own, the look's
+    box (tests/test_ios_search_look.py holds it), in the phone's half - and the iPhone's Find path is the slice-2 one,
+    never reached there."""
     app = app_sources()
     search = bare(app["Search/SearchScreen.swift"])
-    assert ".findField(" not in search and ".searchable(" not in search
-    assert search.index(".searchField(text: Binding(get: { search.text }, set: { (typed: String) -> Void in search.type(typed) }),") \
-        < search.index(".onSubmit(of: .search) { search.submitted() }")
+    assert ".findField(" not in search and ".searchable(" not in search and ".searchField(" not in search
+    assert search.count("TextField(") == 1
+    assert re.search(r"if let desk, Platform\.mac \{\s*desk\(\)\s*\} else \{\s*phone\s*\}", search)
+    assert re.search(r"\.safeAreaInset\(edge: \.top, spacing: 0\) \{\s*field\s*\}", search)
     sidebar = bare(app["Root/MacSidebarView.swift"])
     assert sidebar.count(".findField($focused)") == 1
     field = sidebar[sidebar.index("private struct SidebarSearchField"):]
@@ -541,7 +543,8 @@ GUARDED_ESCAPES = {
                                   "flow.resetPasswords.password.isEmpty && flow.resetPasswords.again.isEmpty)"],
     "Artist/ArtistMoveSheet.swift": ["model.map { (model: ArtistWhoModel) -> Bool in model.query == name } ?? true)"],
     "Artist/ArtistImagesSheet.swift": ["model.map { (model: ArtistImagesModel) -> Bool in"],
-    "Get/SourcesSheet.swift": ["!model.edited)"],
+    #? (R7) and in the Mac's dock only as the main window's Escape owner says it is the panel's
+    "Get/SourcesSheet.swift": ["!model.edited && (!docked || MacFrame.escape(typing: TextEditing.shared.typing,"],
     #? (manual search, slice A1) Search Soulseek's Cancel throws the typed artist and album away
     "Get/ManualSearchSheet.swift": ["artist.isEmpty && album.isEmpty)"],
     "Playlists/PlaylistPicker.swift": ["!(model.making && nameTyped))", "escapes && blank)"],
