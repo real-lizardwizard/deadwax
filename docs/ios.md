@@ -1682,7 +1682,8 @@ a page among your own albums and artists.
 
 ## Search
 
-**Search** is the tab between Library and Requests. Its field is always there at the top - tap it to type -
+**Search** is the tab between Library and Requests. Its field is always there at the top, under the page's title -
+tap it to type -
 with "Search your library and albums you don't have yet." under it while it's empty ("Search your
 library, the collection, and albums nobody has yet." with a library of your own). It searches what
 deadwax has, as the web app's Search does, and the artists, albums and songs you don't have yet from
@@ -6943,7 +6944,9 @@ a search in mind that finds your music and albums you don't have ("portishead" d
   once from its album. A song's swipe right adds it to the queue; its ••• is as before. The field at the top is a square,
   sunken box with a magnifying glass, its edge purple while you type - not iOS's rounded one - and stays put as the
   list scrolls; type and the list follows as before, ✕ empties it, the keyboard's Search key puts the keyboard away.
-  At the largest text sizes a title takes up to three lines.)
+  (26 Nov) The big **Search** title is in the top bar's own row, at its left, with the field straight under it - no
+  empty row above the title - and stays as the list scrolls; nothing is under the Dynamic Island, before and after
+  opening Now Playing and coming back. At the largest text sizes a title takes up to three lines.)
 - **568 Get and Sources on the phone.** **Not done yet.** As drawn. Get, the pressing, the filters, Sort and a card's
   Get work. (An album you don't have's page: the square cover, its title and artist, its line ("1997 · Album · not in
   your library") in small grey type - only a "maybe in your library" in a dashed box - **Get the album** the purple

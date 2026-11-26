@@ -118,13 +118,19 @@ struct SearchScreen<Desk: View>: View {
             }
             .onChange(of: state.view) { _, _ in jump(proxy) }
             .onChange(of: state.drawn?.text) { _, _ in jump(proxy) }
-            // (R7's review) the field over the list's top, where iOS's drawer was: always drawn, never scrolled away,
-            // and the large title still folds into the bar as the list scrolls under it
+            // (R7's review) the field over the list's top, where iOS's drawer was: always drawn, never scrolled away
             .safeAreaInset(edge: .top, spacing: 0) {
                 field
             }
         }
         .background(DWPalette.page)
+        // (26 Nov, James: "the search bar is a bit low on mobile") iOS's large title stood under an empty 44 pt row of
+        // its bar, so the field sat that much under where iSearch draws it (.big straight under the status bar, the
+        // field 10 under that). Inline large puts the large title - Libre Franklin, 34, bold, the bar's appearance's
+        // (Typeface) - in that row itself, at its left, so the field comes up by the row. iOS's bar stays, and with it
+        // the safe area UIKit keeps: the Library's own top, the one page that hides the bar, took three fixes to clear
+        // the Dynamic Island. The title no longer folds as the list scrolls; it was already that small row's height.
+        .toolbarTitleDisplayMode(.inlineLarge)
     }
 
     /// (R7's review) Search's field on the phone (iSearch's `.well.sfield`): the look's sunken box, square, 40 tall -

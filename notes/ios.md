@@ -20634,6 +20634,29 @@ Fix 11 is words (docs/ios.md's and these notes' meta line), and has no mutation.
   end, the strip at the largest sizes, the plain meta line (only the maybe dashed), the pressing in the accent and the
   facts line's lines at the accessibility sizes, and the song's bar on iGet, the cards flat on iSources.
 
+### After James's look: the field raised (26 Nov)
+
+James, on the phone: "the search bar is a bit low on mobile". iOS's large title stands under an empty 44 pt row of its
+bar (the row a pushed page's Back would use), and the field's `safeAreaInset` sat under the large title, so the field
+was that row lower than iSearch draws it: `.big` "Search" 10 under the status bar, the field 10 under the title.
+
+- **What changed:** the phone's page takes `.toolbarTitleDisplayMode(.inlineLarge)` (iOS 17, the app's floor): the
+  large title - still the bar appearance's Libre Franklin 34 bold (Typeface) - drawn in the bar's own row at its left,
+  so the field comes up by the row. The field, its inset, its 10 over the strip and everything it does are as they were.
+  The title no longer folds as the list scrolls; the row it would have folded into is the one it's drawn in.
+- **Not the Library's way, on purpose.** The first try hid iOS's bar and drew PhoneBigTitle and the field in a VStack
+  over the list, as LibraryView's pager does - matching iSearch to the point. It was taken back before it was
+  committed: the Library is the one page that hides the bar (test_ios_palette's
+  `test_the_librarys_top_sits_under_the_status_bar` holds that), and its top took three fixes and a UIKit probe to keep
+  clear of the Dynamic Island on James's iPhone, the last after a return from Now Playing. With iOS's bar kept, UIKit
+  keeps the safe area.
+- **Tests:** test_ios_search_look's `test_the_search_field_is_the_looks_box` pins the mode at the page's end, once, and
+  the bar not hidden; test_ios_palette's one-page rule stands.
+- **Not verified - only the phone can say** (check 567): that iOS 27 draws an inline large title in the bar's row as
+  iOS 17 does (with Libre Franklin, from `largeTitleTextAttributes`), how far up the field comes, and that nothing
+  reaches under the Dynamic Island after Now Playing opens and closes. On the Mac the page is MacSearchPage's
+  (the desk), and the mode is on the phone's page alone.
+
 ## The redesign, slice R9: Downloaded, Settings and Sign in (2026-11-25)
 
 The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R9, with 3.8's answer 5 -

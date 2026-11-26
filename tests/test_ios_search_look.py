@@ -492,6 +492,10 @@ def test_the_search_field_is_the_looks_box():
     assert code.count("TextField(") == 1 and ".onSubmit(of: .search)" not in code
     phone = body(screen, "private var phone: some View {")
     assert ".safeAreaInset(edge: .top, spacing: 0) { field }" in phone
+    # (26 Nov, "the search bar is a bit low on mobile") the large title in the bar's own row, not under an empty one, so
+    # the field stands where iSearch draws it - iOS's bar kept (the Library, the one page hiding it, is the island's)
+    assert phone.endswith(".background(DWPalette.page) .toolbarTitleDisplayMode(.inlineLarge) }")
+    assert screen.count("toolbarTitleDisplayMode") == 1 and ".toolbar(.hidden, for: .navigationBar)" not in screen
     assert "if let desk, Platform.mac { desk() } else { phone }" in screen
     field = body(flat(kept(source(SCREEN))), "private var field: some View {")
     # the glyph, the words - each keystroke the model's, as the drawer's binding was - the prompt in the third colour
