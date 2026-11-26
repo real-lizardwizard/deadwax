@@ -21717,6 +21717,241 @@ of 25 in 2 suites that built and failed - never a compile error). Logs: scratch 
   every tag… in the actions rotor; TagsFoot stacking at xxxLarge (ViewThatFits' choice, measured by nothing here);
   the CD art at 112 across; TagsFoot's and Delete's foot under the keyboard, Get lyrics' new count.
 
+## The redesign, slice R12: Needs a look (2026-11-26)
+
+The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R12, checks 590-593 - the
+last slice of wave E. The drawings are NeedsALook.dc.html (the Mac's) and iNeedsALook.dc.html (the phone's, flat).
+Built on d18c45a2 (R10, R11, R13 and R14 in). The app is still 0.13 (13); `__version__` untouched; no server data new
+(no diff to Core's DeadwaxClient or its endpoints); no engine file touched. Nothing that is sent changed: It's fine
+posts the album's own folder and its outstanding issues (EditAlbumModel.markFine, as before), an apply is planned
+again on the server, the queue stores only what was ignored. There is still no bulk apply.
+
+### The phone (iNeedsALook)
+
+- **NeedsLookScreen** is a ScrollView of a LazyVStack, no List: the large title (`NeedsLook.title`), **Marked fine ·
+  N** at the top's right (a toolbar button while any album has every issue marked fine - its count the facet's, bold
+  while it shows, All again when pressed then: `NeedsLookPage.markedFineTapped`), the notes, the web's ladder (the
+  library's problem, Reading the library, a first read failed with Try again), then **the strip** (PhoneStrip over
+  `NeedsLookPage.strip` - every facet but Marked fine, each "All 3", All's count summaryTotal's), the status line, the
+  cards and what takes an album off the list. The old `listRowBackground: Palette.accent` (the shaded open row R10's
+  `drawn()` found) is gone with the List; the one open is said to VoiceOver ("Open"), never shaded.
+- **A card** (NeedsLookCard): a PhoneCard - the cover at 48 (`Corners.artShape`), the album, its artist and edition,
+  its folder in the readout face cut in its middle, PhoneChevron - and its chips under them, each DWChip's flat dot and
+  words in its tone (issue amber, New purple, Fixed green, Marked fine and Deleted plain), wrapping onto more lines
+  (NeedsLookChipRows, a Layout). At the accessibility sizes each chip is a line of its words in the colour DWChip gives
+  that tone (`ChipKind.colour`, pinned equal to DWChip's private mapping). Faded once the session has said what became
+  of it. One VoiceOver element, the phone's words as before.
+- **Queue mode's bar** (EditQueueBar, EditAlbumSheet.swift) is no longer the system's bottom toolbar: ‹, "2 of 9" in
+  the readout face and Skip › (Next album › once a write was told of the album), the accent's flat words, a finger's
+  target tall, on one text baseline - drawn **in the foot's own layer**, over each tab's actions (`EditQueueBar.above`:
+  Release's Revert and Apply, Tags', Delete's), and as the foot alone where a tab has none (Artwork, Lyrics) or no
+  album is drawn (`barred`). PhoneFoot is App/Phone's and untouched, so the bar is inside its content, the actions'
+  row (PhoneLook.foot, 68) under it; the foot stays at the screen's foot under the keyboard, as before.
+- **Apply moves on.** ReleaseFoot takes the bar: once a release was applied (`RetagModel.applied`, cleared by any
+  field changed or pressing picked), in queue mode and not on the last album (`NeedsLookPage.movesOn`), the purple
+  button is **Next album** - the bar's `take(1)`, so through the gate and "Discard changes?" like Skip.
+
+### The Mac (NeedsALook.dc.html)
+
+- **MacNeedsALook**, the sidebar's Needs a look (MacManage, `MacNeedsALook()` - off test_ios_mac_reach's PHONES_PAGES):
+  the queue at the left (`EditAlbumPage.Layout`'s list width, R10's), DWRule, and at the right **the one editor** -
+  MacAlbumEditor, R10's and R11's, with MacEditQueueBar in its `bar` slot and the queue handed to its foot - or "Choose
+  an album at the left to look at it here." The model, its life and its rules are the phone's: NeedsLookLife (the
+  reads, the count, reach, the scene, the sign-in, the permission) is one modifier both pages wear.
+- **The list** (MacNeedsLookList): its bar - Show, the facets as a pop-up with how many albums each has ("Every issue ·
+  3 albums"), Marked fine · N lit while it shows - folding four ways as the column narrows (Show's word first, then
+  Marked fine into the pop-up, then the pop-up's words). Then the ladder, the failed status with Try again, and a
+  MacColumnList: **Album** (the cover at View > Row Size's, the title and its chips inline - every chip, else the first
+  and "+2", else the title alone, `ViewThatFits`), **Artist** (from a page of 1000, R10's `artistColumn`), **Issues**
+  (how many each still has, in the readout face). Each row one VoiceOver element in the card's words (`voice:` - the
+  folded chips would say too little), the path and every chip under the pointer. Under it, the drawing's "The count in
+  the sidebar and this list always agree…". Rows off while a session's rows are held after it, out of reach, and while
+  a write runs.
+- **A pick rests 200 ms** (R2's), then begins the session on it (NeedsLookModel.open, as the phone's card); while it
+  lasts, a row picked is a step to it (`NeedsLookModel.step(to:)`, Core's `NeedsLookPage.step`), as ‹ and Skip are.
+- **The foot in queue mode** (MacEditFooter's `queue`): It's fine as it is at its left on every tab (with Edit albums
+  and Look after the library - R12's review - while the album has outstanding issues: exactly those, by its folder),
+  under Release the line "After Apply,
+  Next album takes its place." while an album follows, and once applied the purple button is Next album (the same
+  `movesOn`). The Release tab's own It's fine is hidden in queue mode, so there is one. The bar sits under the
+  header's chip (MacEditHeader's `bar`, on one baseline: `‹` is words, `NeedsLookPage.back`, so the readout rule holds).
+- **The status bar**: how many need a look - the sidebar's own count, `NeedsLook.summaryTotal` over the same scan - and
+  how many are marked fine, then the checking line or Navidrome's note. ⌘R reads the library again (`.pullToRefresh`).
+
+### One editor, one page: macEditHost
+
+R10's Mac Edit album had one page, Edit an album's (`.chooseFolder`). AppNavigation now says which page draws it,
+`macEditHost`: Needs a look's for a row of its queue opened with it in front (`macEditHost(queue:front:)`), else Edit an
+album's (an album page's Edit, a folder picked, and R10's case of a queue's opening asked for over another page's work).
+`macEdit(on:)` gives each page only its own opening, so the editor is never drawn twice; everything R10 does for its
+page is the host's - the work it holds kept (`kept`), the page brought back to ask "Discard changes?" (`backTo`),
+the opening over once the page is on no stack (`editPageGone`), Needs a look's sidebar row going back to it
+(`macMove`'s `.manage(.queue)`), reset. MacEditHolding is shared and says nothing while its page draws no editor, so
+one page never says "no work" over the other's.
+
+**R10's note, fixed.** R10 read queue mode's end from `queue.nav` going nil on its page. The end is said now where the
+Run decides it: NeedsLookModel.closeEditor ends the Mac's opening (`macEditEnded`) as it closes the phone's sheet,
+whichever page draws the editor.
+
+### Typed work, on both devices
+
+Every step weighs it first - ‹, Skip ›, Next album (the bar's or Apply's), a row picked, a facet chosen (Show or Marked
+fine, which ends the session; refused outright mid-apply and while the folder is read after it), an opening asked for
+from elsewhere (asked here only when this page is the host). Over typed work, "Discard changes?" (Discard through the
+gate as it is then; Keep editing leaves the album open selected). The phone's sheet's `take` is R10's, unchanged; the
+bar and ReleaseFoot's Next album are that `take`. The Mac page's body reads no typed work - `holdsWork` is read only in
+its three actions and MacEditHolding.
+
+### Decisions and departures
+
+- **Inline chips under Row Size.** The drawing's rows are two lines, 56 tall; MacColumnList's rows are View > Row
+  Size's height, so the chips sit beside the title, folding (`NeedsLookPage.more`), the whole in the help.
+- **The phone's lead line** ("Albums whose tags, folder or cover need fixing…") is left out, as iNeedsALook has it; the
+  Edit albums note stays.
+- **The AX chips' colours** duplicate DWChip's private mapping (App/Look, not this slice's to open), pinned equal by
+  test_ios_needs_look_look; NeedsLookChipRows duplicates SourceCardView's private Wrap for the same reason.
+- **"Library read N ago"** in the Mac's status bar: the model keeps no time of its read.
+- **‹ as words** (`NeedsLookPage.back`, U+2039) on both bars, not a chevron image, so the three sit on one text
+  baseline with the readout (test_ios_readout_rows).
+- **The bar inside the foot's content**, not a layer of its own: PhoneFoot is App/Phone's and gains only new files.
+
+### Tests
+
+tests/test_ios_needs_look_look.py (new): the phone's page flat and drawn as iNeedsALook (no List, R1c's `drawn()` empty
+on its path, one scroll, a ZStack, Marked fine's toolbar button), the card (sizes 48/12/10/5, chips' tones, the AX
+lines, faded, one element), a chip's AX colour DWChip's own, the strip's and the badge's one count (All's count, the
+Mac's status bar, Settings' row and the sidebar), the sheet's bar above the foot (no bottom toolbar, the three flat
+words, each gate, every foot), stepping in the sheet, the Mac page hosting the one editor, the Mac's list as drawn,
+stepping on the Mac, Apply moving on and It's fine marking this album alone, the host, and tokens and words. Core:
+NeedsLookPageTests (new) - the strip and the badge, Marked fine's tap, a row's chips, the Mac's fold and help, a step
+to a row, `movesOn`, It's fine's count. Updated: test_ios_phone_look (R12_PAGES among SLICES), test_ios_mac_reach
+(needsALook to MACS_OWN), test_ios_mac (the page's pull), test_ios_artist_look (the list's `voice:`, with its reason),
+test_ios_readout_rows (the queue among the Mac's tables), and R10's and R11's pins in test_ios_edit_look,
+test_ios_edit_parts, test_ios_edit_parts_look and test_ios_needs_look for the host, the shared MacEditHolding, the
+editor's `queue`, the bar above each foot and NeedsLookLife.
+No words fixture changed (iphone.json, mac.json): the new words are NeedsLookPage's, pinned by its tests.
+
+### Mutations
+
+Each applied alone to the worktree, the named checks run (test_ios_needs_look_look unless named; Core's under `swift
+test --filter NeedsLookPageTests`), the file put back. All 16 caught:
+- **Apply not moving on**: Core's `movesOn` never true (`applyMovesOnToTheNextAlbumButTheLast`,
+  `test_apply_moves_on_and_its_fine_marks_this_album_alone_on_the_mac`); ReleaseFoot never told of the apply
+  (`applied: false` - `test_stepping_in_the_sheet_never_loses_typed_work`); the Mac's Next album applying again in place
+  of stepping (`test_apply_moves_on_and_its_fine_marks_this_album_alone_on_the_mac`).
+- **It's fine clearing other albums' issues**: markFine posting the scan's first album's folder
+  (`test_apply_moves_on_and_its_fine_marks_this_album_alone_on_the_mac`); a mark told of one album marking every row of
+  the session (Core's `rowChanged` - `itsFineMarksOnlyTheAlbumItIsFor`).
+- **The strip's count and the tab badge counting different things**: All counting every album scanned (Core's
+  `facets` - `theStripAndTheBadgeCountTheSameAlbums`, `test_the_strip_and_the_badge_count_the_same_albums`); the Mac's
+  status bar counting `albums.count` (the same two, and `itsFineMarksOnlyTheAlbumItIsFor`).
+- **The flat rule**: a card given a face (`.background(DWPalette.card)`) and the open row shaded again
+  (`listRowBackground(Palette.accent)`) - `test_the_phones_page_is_flat_and_drawn_as_iNeedsALook` (R1c's `drawn()`
+  over the page's phone path; test_ios_phone_look's own flat test reads only App/Look and App/Phone, so R10's table row
+  for this file - "none yet" - is held now).
+- **The holding rules**: the Mac's step over typed work unasked, a facet over typed work unasked, a facet mid-apply
+  (`test_stepping_on_the_mac_never_loses_typed_work`); the sheet's step over typed work unasked
+  (`test_stepping_in_the_sheet_never_loses_typed_work`); the phone's Skip past the gate
+  (`test_the_sheets_queue_bar_is_above_the_foot`).
+- **The host**: both pages drawing the editor (`macEdit(on:)` ignoring its host), and the Mac's opening outliving the
+  Run (closeEditor's `macEditEnded` dropped) - `test_the_mac_edit_is_drawn_on_one_page_its_host`.
+- **The typing rule**: none - this slice draws no field.
+
+### After review
+
+The review's findings, each fixed in this one commit with its test and the mutation that undoes it (each applied alone
+to the worktree, the named check run, the file put back - every one caught; test_ios_needs_look_look unless named, Core's
+under `swift test --filter`):
+
+1. **⌘R stranded the editor.** The page's ⌘R (`pulled()`) read the library whenever it was online, so a read of the
+   page's begun while the editor's was out - its first, just after a row was picked, or the one after an Apply - took
+   over: the editor's came back `.dropped`, its look-up did nothing and it waited for good (Apply off, the steps dimmed,
+   no Look again). Two parts, both in Core so `swift test` drives them. **⌘R asks nothing while a session lasts or a
+   read is out** (`NeedsLookPage.pullReads`, as Try again and a sign-in again were already held): the editor reads the
+   queue's scan and says its own Look again, and the list is read again as the run ends. And **a look-up carries its read
+   to an answer** (`ScanReads`, the scan's tickets now - LibraryScanModel's `reads`; `readShared` is the editor's
+   look-up's read, EditAlbumModel.lookUp): a read a newer one took over waits for that one's end, and one that came to
+   nothing (a read cancelled with its page) is asked again, once (`ScanReads.tries`); a look-up called off with its own
+   page stays dropped, as before, and `reopen()` asks as the page comes back. The page's own reads and rescans take
+   their tickets from the same ScanReads, so only the newest lands, as before. ScanReadsTests drives ⌘R mid-read and
+   ⌘R just after a row is picked over a network whose every answer the test gives; NeedsLookPageTests'
+   `aPullIsHeldWhileAReadIsOutOrASessionLasts` the rule; `test_a_refresh_never_strands_the_editor` the wiring.
+   Mutations: pullReads' `!session` dropped (`aPullIsHeld…`, `aRefreshJustAfterPickingARowNeverStrandsTheEditor`)
+   and its `!reading` dropped (`aPullIsHeld…`, `aRefreshMidReadNeverStrandsTheEditor`); the model's pull passing
+   either as false (the source test); `answer` not waiting - returning its own `.dropped` (three of ScanReadsTests) -
+   and the ask-again removed (`aRefreshJustAfterPicking…`); `end(after:)` answering nil for an ended newer read in place
+   of its end (`aReadThatTookOverAndLandedFirstIsTheEditorsAnswer`); lookUp back on `scan.read()` (the source test).
+2. **It's fine needs Edit albums too**, on the Mac as on the phone: the phone offers it in the Release tab's Needs a
+   look section, drawn only with Edit albums (`edit.editors`), and with Look after the library (`AlbumEdit.marksFine`);
+   the Mac's foot asked marksFine alone, so a person with Look after the library and not Edit albums had It's fine on
+   every tab. Now both read `NeedsLookPage.offersFine` (`Managing.albumEdit(...).editors && AlbumEdit.marksFine(...)`),
+   NeedsLookPageTests' `itsFineNeedsEditAlbumsToo` over every set of permissions. Mutation: offersFine's `.editors`
+   dropped (that test); the foot asking marksFine alone again
+   (`test_its_fine_needs_edit_albums_on_the_mac_as_on_the_phone`).
+3. **A refused mark was said only on the Release tab** - and never for a person without Edit albums, who has no Release
+   tab. In queue mode the foot says `markFailure` over its buttons, on every tab; the Release tab's own says it only
+   outside queue mode (the one note drawn, never two). Mutation: the foot's failure removed
+   (`test_a_refused_mark_is_said_on_every_tab_in_queue_mode`).
+4. **The window's counts disagreed after It's fine.** The status bar read the live scan; the pop-up's counts and Marked
+   fine · N were the session's, held as it began - so after It's fine the status bar said one more marked fine and the
+   pop-up and Marked fine did not, until the run ended. `NeedsLookPage.counted` keeps the facets the session draws
+   (its albums stay its own) and gives each the live scan's count, Marked fine last, a facet whose albums have all gone
+   dropped unless it is All or the pressed one. The model's `chips` and `pressedChip` are those, so the phone's strip
+   and Marked fine follow the same way. NeedsLookPageTests' `afterItsFineTheStatusBarThePopUpAndMarkedFineAgree` and
+   `theFacetsDrawnAreTheSessionsCountedLive`; mutations: `counted` returning what the session holds (both), the model's
+   `chips` the session's again (`test_every_count_the_window_shows_reads_the_live_scan`).
+5. **The queue foot was cut at the narrowest editors.** One HStack of It's fine, the line and the tab's actions did not
+   fit an editor of 378 (1280 with the side panel open) - the line went first. The foot now takes the first of three
+   ways that fits (`ViewThatFits`, MacEditFooter's `queued`): the line whole beside It's fine and the actions; the line
+   over It's fine and the actions; the line, It's fine and the actions each a line of their own. The line is never
+   given a line limit: whole on one line in the first way (`fixedSize()`), wrapping in the others (measured as nothing
+   wide - `idealWidth: 0` - so the way chosen is the one whose buttons fit), its whole on the pointer (`.help`) and to
+   VoiceOver. The widths are worked out with the bundled faces (tests/ios_fonts.py) in
+   `test_the_queue_foot_fits_every_editor`: the editor 661 at the window's opening, 379 at its smallest, 378 with the
+   panel open; It's fine 116 (Marking it fine… no wider), Revert 62, Next album › 96, Apply to all 1,234 tracks 165,
+   Delete permanently 140; Release on one line needs 566 (so the opening's 661 draws it as before), the line over the
+   buttons 339, every tab's last way 275 at most. The foot is 48 with one line of buttons (11 over and under the 26),
+   taller only when it wraps. Mutations: the last way removed, and the line given `lineLimit(1)` (that test).
+6. **EditAlbumSheet's docs**: EditQueueBar's and ReadAgainFailed's back on their own structs, the long line wrapped
+   (`test_each_struct_keeps_its_own_doc`).
+7. **R10's `.onChange(of: navigation.macEdit?.queue?.nav == nil)` in MacEditWindow is removed**: closeEditor covers
+   every path. Every session end with the editor up - a step to an album gone, a facet chosen - goes through `carry`
+   with `close`, and closeEditor ends the Mac's opening whenever it is this queue's, whichever page hosts it (a queue
+   opening asked over another page's work included); every other end (macEditEnded, another opening, a sign-out's
+   reset) lets the opening go before it tells the page (`editorClosed`), so the handler's own guard could never hold -
+   it was dead. `test_the_queues_end_is_said_where_the_run_decides_it` and test_ios_edit_look's pin read it gone, and
+   closeEditor's call; R10's mutation (closeEditor's `macEditEnded` dropped) is still caught by
+   `test_the_mac_edit_is_drawn_on_one_page_its_host`.
+8. **Mutations that survived, now caught**: the status bar's marked-fine count counting any album with an ignore (the
+   fixture gains an album with one issue ignored and one not - NeedsLookPageTests' `theStripAndTheBadgeCountTheSame
+   Albums`, `itsFineMarksOnlyTheAlbumItIsFor` and `afterItsFine…`); `step(to:)` cut to its sign (steps of 2, 3 and -3
+   now - `aRowPickedDuringASessionIsAStepToIt`); the Mac bar's ‹ and Skip
+   › no longer dimmed by `canStep` (`test_the_macs_queue_bar_waits_for_the_step_gate`); the selection not cleared as
+   the session ends, nor after an open refused, nor following a step (`test_the_macs_page_keeps_its_selection_on_the_
+   session`); the rows not off during a write (the same); and Needs a look's album cell now among the Mac's tables'
+   covers in test_ios_readout_rows (FolderCover in its COVERS, the page's `cell(` in its CELL_BUILDERS) - a cover moved
+   out of its title's HStack is caught there.
+
+Older pins moved with the code: test_ios_edit's cancellation (a read's is `fetch`'s now, both readers through it),
+test_ios_library_care's rescan (ticketed by the one ScanReads) and test_ios_needs_look's pull (its guard Core's
+`pullReads`). The words: no fixture changed; docs/ios.md's 590 and 591 say ⌘R with an album open, the foot at the
+narrowest window, the counts agreeing at once and It's fine needing Edit albums.
+
+### Not verified (only the devices can tell)
+
+- The Mac page at the window's sizes and each Row Size: the list's width beside the editor, the chips folding to
+  "+2" and to the title alone, the Issues column, the pop-up's four ways, Marked fine lit; the 200 ms rest before a
+  pick opens; arrow keys through the list; VoiceOver reading a row once.
+- Stepping on the Mac with typed work (Discard changes? from a row picked, a facet, Marked fine), the selection kept on
+  Keep editing, Next album after an apply, It's fine on each tab and the row saying Marked fine; the sidebar's
+  Needs a look going back to the page with its editor; the window held open while typed work is held.
+- The phone: the cards' chips wrapping and at the AX sizes, the strip scrolling, Marked fine in the toolbar, the
+  bar over each foot (and alone on Artwork and Lyrics) staying put under the keyboard, `‹` and Skip › on one baseline
+  with "2 of 9", Apply becoming Next album; Ethan's phone (593).
+- The Mac smoke run: not done (James's app running).
+- (R12's review) ⌘R pressed while the editor reads on a real network; the queue foot's three ways at the window's
+  real sizes and each tab (worked out from the faces' widths, never drawn); a refused mark said in the foot.
+
 ## The redesign, slice R13: Library care and the Event log (2026-11-25)
 
 The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R13: Library care and the

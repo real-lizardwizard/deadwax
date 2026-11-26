@@ -2622,7 +2622,8 @@ Each opens in your browser (Safari unless you've changed it), beside the app; th
 **Needs a look** (Settings > Manage > Needs a look, for someone with **Look after the library** - an admin, or
 everyone while logins are off) is the web app's review queue on the phone: the albums whose tags, folder or cover need
 fixing, the albums Navidrome doesn't list, and the new downloads nobody has looked at yet. It's a page pushed on
-Settings, and each album on it opens [Edit album](#edit-album).
+Settings, and each album on it opens [Edit album](#edit-album). On the Mac it's a page of its own, the list beside the
+album's editor ([below](#needs-a-look-on-the-mac)).
 
 **Its count** - how many albums it lists - is at the right of its row in Settings > Manage ("99+" past 99; nothing
 when there are none, or before deadwax has said), never on a tab. It's asked only while Settings or Needs a look is
@@ -2632,35 +2633,40 @@ mark, an album noted as looked at, Save, Move. It isn't asked as the app starts 
 it. deadwax answers it from its saved scan, without reading the disk. A count that can't be had leaves the last one.
 Someone without Look after the library has no row, so no count.
 
-**At the top**, what the page is for: "Albums whose tags, folder or cover need fixing, albums Navidrome doesn't list,
-and new downloads nobody has looked at yet. Open one to fix it, or to mark it fine as it is." Without Edit albums it
-ends "Open one to see what it has, or to delete it.", and "Fixing it needs Edit albums, which an admin hasn't given
-you." follows. When deadwax can't save to its database, an amber line warns that an album you mark "It's fine as it
-is" will come back (check `DB_PATH`).
+**At the top**, the page's large title, and at its right **Marked fine · N** while any album has every issue marked
+fine ([below](#the-strip-and-marked-fine)). Without Edit albums, "Fixing it needs Edit albums, which an admin hasn't
+given you." is said over the list. When deadwax can't save to its database, an amber line warns that an album you mark
+"It's fine as it is" will come back (check `DB_PATH`).
 
 **The list.** "Reading the library" while deadwax reads the library (the first time on a big library, a minute or
-more); if that fails, "Couldn't read the library." with **Try again**. Then a section headed by what it shows and how
-many ("All · 12"), and a line under that heading, there even when empty so nothing jumps: "Checking the library…"
-while it's read again, "Couldn't check the library just now." with **Try again** when that failed, or why some albums
-may not have been checked against Navidrome ("Navidrome isn't set up, so no album is checked against what it lists.
-…"). Each row is the album's cover, its name, its artist and edition, and what's wrong, in amber: **New** for a
-download nobody has looked at, then each issue as Edit album names it ("No cover art", "Not matched to MusicBrainz"…).
-"Nothing needs a look." when nothing does. When deadwax has no library to read (`LIBRARY_PATH` unset or missing), it
+more); if that fails, "Couldn't read the library." with **Try again**. Then the strip (below), and a line under it,
+there even when empty so nothing jumps: "Checking the library…" while it's read again, "Couldn't check the library
+just now." with **Try again** when that failed, or why some albums may not have been checked against Navidrome
+("Navidrome isn't set up, so no album is checked against what it lists. …"). Each album is a card on a thin line: its
+cover, its name, its artist and edition, its folder in the typewriter face, a ›, and under them what's wrong, each a
+dot and its words - **New** in purple for a download nobody has looked at, then each issue in amber as Edit album
+names it ("No cover art", "Not matched to MusicBrainz"…) - running onto more lines as it needs; at the accessibility
+text sizes each is a line of its own. "Nothing needs a look." when nothing does. Under the cards: "An album leaves
+this list once its issues are fixed or marked fine." When deadwax has no library to read (`LIBRARY_PATH` unset or missing), it
 says so in the list's place. Pull down to read the library again; it's read again too each time the page shows anew,
 and when deadwax comes back into reach. These words are the page's own: a read Edit album makes that fails says
 "Couldn't read the library." in Edit album, and "Couldn't check the library just now." here.
 
-**Show**, the menu at the top right (filled while it narrows the list), picks what the list shows, as the web app's
-chips do, each with how many: **All**, **Newly added** (when there are any), one per kind of issue (the most albums
-first), and **Marked fine** (when there are any) - the albums whose every issue you marked fine, the one way back to
-such an album's Edit album when Navidrome doesn't list it, each with "Marked fine" in its row. A choice that empties
-goes back to All.
+<a id="the-strip-and-marked-fine"></a>**The strip** under the title picks what the list shows, as the web app's chips
+do, each with how many: **All** - the number Settings' row says - **Newly added** (when there are any), and one per
+kind of issue (the most albums first); the one showing is white over a short purple line, and the strip scrolls
+sideways when they don't all fit. **Marked fine · N**, at the top right, shows the albums whose every issue you marked
+fine - the one way back to such an album's Edit album when Navidrome doesn't list it - each with "Marked fine" on its
+card; it's bold while they show, and tapping it again goes back to All. A choice that empties goes back to All.
 
-**Working through it.** Tap an album: Edit album opens on its folder, with ‹, where you are ("2 of 9") and **Skip ›**
-along its foot. Do whatever the album needs - apply a release, edit its tags, get its cover, mark it fine, delete it -
-and **Skip** becomes **Next album ›**; ‹ goes back one. Each step opens that album in the same Edit album. Underneath,
-the list holds still while you work: an album you fixed, marked fine or deleted keeps its row, saying **Fixed**,
-**Marked fine** or **Deleted** in green, followed through a rename, and the one open is shaded. Stepping away from an
+**Working through it.** Tap an album: Edit album opens on its folder, with ‹, where you are ("2 of 9", in the
+typewriter face) and **Skip ›** in a row over its foot - over Revert and Apply, over Tags' and Delete's buttons, and at
+the foot alone on Artwork and Lyrics - purple words, staying put under the keyboard with the foot. Do whatever the
+album needs - apply a release, edit its tags, get its cover, mark it fine, delete it - and **Skip** becomes **Next
+album ›**; once a release has been applied, **Apply** itself becomes **Next album** (on the last album it stays Apply),
+and changing a field brings Apply back. ‹ goes back one. Each step opens that album in the same Edit album.
+Underneath, the list holds still while you work: an album you fixed, marked fine or deleted keeps its card, saying
+**Fixed** in green, **Marked fine** or **Deleted**, faded, followed through a rename. Stepping away from an
 album - ‹, Skip, Next album, or closing Edit album - notes it as looked at, which is what stops a new download being
 New (its issues stay), and the count follows. Deleting an album leaves Edit album up, saying "Deleted …", with **Next
 album** to go on. If the album you step to has gone from the library since the list was read (deleted or moved
@@ -2681,11 +2687,29 @@ admin took Look after the library away, it says "This page needs a permission an
 you need it.", and asks nothing. When your session ends, nothing is read, noted or counted under the sign-in; sign in
 again and the page reads the library again, and the count follows.
 
-VoiceOver reads each row once - its album, artist and edition, and what's wrong with it or what became of it ("The
-Slow Rush, Tame Impala, New, No cover art"), with "Open" on the one Edit album has open - and the Show menu as "Show,
-All". Edit album's foot reads as "Previous album", "2 of 9" and "Skip" (with "Leave this one for now and move on") or
-"Next album", and each step is said: "3 of 9: The Slow Rush". With Reduce Motion on, rows don't slide as the list
-changes. Every line grows with the text size.
+VoiceOver reads each card once - its album, artist and edition, and what's wrong with it or what became of it ("The
+Slow Rush, Tame Impala, New, No cover art"), with "Open" on the one Edit album has open - the strip as tabs ("All, 12
+albums", selected), and Marked fine · N as "Marked fine, 2 albums". Edit album's bar reads as "Previous album", "2 of
+9" and "Skip" (with "Leave this one for now and move on") or "Next album", and each step is said: "3 of 9: The Slow
+Rush". With Reduce Motion on, cards don't slide as the list changes. Every line grows with the text size.
+
+<a id="needs-a-look-on-the-mac"></a>**On the Mac**, the sidebar's Needs a look is one page: the list at the left and
+the album's editor at the right - the very editor Edit an album has, its tabs and its foot. Over the list, **Show** and
+its pop-up ("Every issue · 3 albums", and each kind of issue with how many albums), then **Marked fine · 2**, lit while
+it shows; in a narrow window Show's word goes first, then Marked fine moves into the pop-up, then the pop-up says just
+Show. The list: Album with its cover and its issues - the first one and "+2" when they don't all fit, every one under
+the pointer with the folder - then Artist and Issues, how many each still has. Under it: "The count in the sidebar and
+this list always agree: an album leaves once its issues are fixed or marked fine." Click an album (or reach it with
+the arrow keys and let it rest a moment): its editor opens beside the list in the same run as the phone's, with ‹, "1
+of 3" and **Skip ›** under its chip. Clicking another album while the run lasts steps to it, as Skip does; with
+something typed it asks **Discard changes?** first (Keep editing leaves the album open selected), and so does a choice
+in Show or Marked fine, which ends the run - never while an apply is still going or the folder is being read again
+after it. The foot has **It's fine as it is** at its left on every tab - it marks fine this album's issues, no other's
+- and under Release says "After Apply, Next album takes its place." while an album follows; once a release is
+applied, the purple **Apply** is **Next album**. The status bar says how many albums need a look - the number beside
+Needs a look in the sidebar - and how many are marked fine, then Navidrome's note. ⌘R reads the library again. While
+the editor holds something typed, the window can't be closed and the page stays under anything opened over it, as
+Edit an album's does.
 
 ### Library care
 
@@ -7028,7 +7052,8 @@ through them. Have an album whose tags you don't mind changing and changing back
   is Return's.)
 - **582 From an album.** **Not done yet.** An album page's **Edit** opens this page on that folder. (The Edit album
   page comes to the front with the album's folder picked in the list. **Open album** goes back to the album's page,
-  with the Edit page under it. A Needs a look row opens it too, with ‹ and Skip over the header for now. Open it from
+  with the Edit page under it. (A Needs a look row opens the editor on Needs a look's own page, beside the list - 590.)
+  Open it from
   an album and, while it's still finding the folder, click another tab and come back: it finds it - it never stays
   finding it for good. An album you don't mind losing: its **Delete** tab, **Delete permanently**, delete it - is its
   album page gone from the Library too, not left behind?)
@@ -7094,6 +7119,45 @@ to a release with no cover, no CD art and some tracks without lyrics, and one yo
   their names, In a library and Folder, the warning in red, **Delete permanently** red at the foot - its question
   the phone's action sheet; Cancel it. No grey boxes on any of the four, and the ticks grow with the text.)
 - **589 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 588, or "not done yet".
+
+#### Needs a look (590-593)
+
+**Not done yet.** Needs a look in the new look: on the Mac one page, the queue at its left and the album's editor at
+its right; on the phone a flat page of cards, the steps over Edit album's foot. What it lists, how it counts and what
+each step does are as they were (349-354). Have three or four albums in Needs a look you don't mind fixing - one
+needing a release, one you can mark fine - and a test album filed from a download.
+
+- **590 The queue.** **Not done yet.** On the Mac, step through it; Apply moves on. (The sidebar's **Needs a look**: the
+  list at the left - Show and its pop-up, "Every issue · 4 albums", **Marked fine · N** when any are; Album with its
+  cover and its issues in amber, Artist, Issues - and "Choose an album at the left to look at it here." at the right.
+  Click the first album: its editor opens beside the list with ‹ (dimmed), "1 of 4" and **Skip ›** under its chip,
+  and the row stays selected. Skip: "2 of 4" and the second row selected; ‹ goes back. Click the fourth row: "4 of 4".
+  Type in a Release field and click another row: **Discard changes?** - Keep editing keeps the field and the row you
+  were on; Discard steps. On the album needing a release, pick one and **Apply**: once it's written and the folder read
+  again, the purple button says **Next album** and the foot's line says "After Apply, Next album takes its place.";
+  click it - the next album, Apply back. On the last album, Apply stays Apply. Pick another kind in Show with
+  something typed: it asks first, and Discard ends the run - the editor gone, the list read again. The status bar
+  says "4 need a look" - the sidebar's number - and "N marked fine". Press ⌘R with an album open, as it opens and
+  while it reads: nothing is read over it, and Apply and the steps come back as they would have. Make the window as
+  narrow as it goes, then open the side panel: the foot's line, It's fine and the buttons are all whole - the line over
+  the buttons, or each on a line of its own - on every tab.)
+- **591 It's fine.** **Not done yet.** The album leaves the queue; Marked fine counts it. (On the Mac, with an album
+  open, the foot's **It's fine as it is** - on any tab - marks that album's issues fine, and no other album's: its row
+  says **Marked fine**, the rows round it keep theirs. At once **Marked fine · N** is one more, the pop-up's numbers
+  and the status bar say the same, and the sidebar's number is one less. Step on, or end the run: once the library has
+  been read again the album is gone from the list. Click Marked fine · N: it lights, and the list is the albums marked
+  fine; click it again, every issue. Signed in as someone who can look after the library but not edit albums, there is
+  no It's fine, as on the phone. On the phone the same: Release's **It's fine as it is**, then back on the page.)
+- **592 Needs a look on the phone.** **Not done yet.** The strip filters the cards; stepping and Apply work in the
+  sheet. (Settings > Manage > **Needs a look**: the large title, **Marked fine · N** at the top right when any are,
+  then **All 4 | No cover art 1 | …** - All's number the one at Settings' row - and the cards: cover, album, artist,
+  folder in the typewriter face, a ›, and the issues under them as amber dots and words, running onto a second line
+  when long; no grey boxes. Tap a kind in the strip: only those cards. Tap a card: Edit album, with ‹, "1 of N" and
+  **Skip ›** in purple over Revert and Apply - on Artwork and Lyrics, alone at the foot. Skip and ‹ step; with
+  something typed, **Discard changes?** first. Apply a release: **Apply** becomes **Next album**, which steps. Delete
+  a test album from its Delete tab: the sheet stays, saying so, the steps still in reach. At the largest text sizes
+  each issue is a line of its own and nothing is cut off; with VoiceOver a card is read once, the strip as tabs.)
+- **593 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 592, or "not done yet".
 
 #### Library care and the Event log (594-597)
 
@@ -7243,8 +7307,7 @@ and glyphs on the page, thin lines between things. Only the purple button (and t
 track, a picture and anywhere you type keep a face. Nothing works any differently, and the Mac doesn't change. Have a
 download or two on Requests and something queued.
 
-**Not flat yet**, each until the slice that redraws it: Settings' Debug page;
-Needs a look (R12); and the EQ's own pages -
+**Not flat yet**, each until the slice that redraws it: Settings' Debug page; and the EQ's own pages -
 Correction's search and a filter's editor - an artist's Artist images and Move albums sheets, and the pages Edit
 album's Release opens (Choose a release, Changes, Compare covers), which no slice has taken yet. Those keep iOS's
 grouped lists and their grey rows for now: don't count
@@ -7254,7 +7317,8 @@ them in 612.
   Requests, an album, a playlist, an artist's page, Now Playing's sheet, Search Soulseek…'s sheet, Search, an album
   you don't have, Choose a source, Settings and its pages (Debug aside), Settings > Downloads, Library care, In
   nobody's library, the Event log, the sign-in, Edit album's tabs (Release, Tags, Artwork, Lyrics, Delete), a track's
-  page and Edit tags, and People and Server settings (598-602) - not the screens above that aren't flat yet: is
+  page and Edit tags, People and Server settings (598-602), and Needs a look (590-593) - not the screens above that
+  aren't flat yet: is
   anything still a grey box laid on top? Is every button still plainly a button, and
   does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while
   your finger is on it - an album's Shuffle, **Same source again**, a card's ✕, the EQ's output, Downloaded's **Not

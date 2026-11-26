@@ -216,7 +216,7 @@ def test_the_app_is_wired_to_platform():
 
 # ----------------------------------------------------------------------------- pull to refresh, the iPhone's alone
 
-#? every page with a pull to refresh (17 pulls in 15 files): each through the one helper
+#? every page with a pull to refresh (19 pulls in 17 files): each through the one helper
 PULLS = {
     "Artist/ArtistView.swift": 1, "Downloads/DownloadsScreen.swift": 1, "Edit/ChooseFolderView.swift": 1,
     "Edit/ReleasePage.swift": 1, "Library/AlbumsScreen.swift": 1, "Library/ArtistsScreen.swift": 1,
@@ -225,6 +225,8 @@ PULLS = {
     "You/AccountSection.swift": 1, "You/GettingAlbumsSection.swift": 1, "You/YouView.swift": 2,
     #? (the redesign, R14) the Mac's People: its View > Refresh (⌘R), as the phone's two pages' pulls
     "Mac/Manage/MacPeoplePage.swift": 1,
+    #? (R12) the Mac's Needs a look: ⌘R, as the phone's page's pull
+    "Mac/Manage/MacNeedsALook.swift": 1,
 }
 
 

@@ -275,6 +275,11 @@ final class EditAlbumModel {
 
     /// Look again (and back in reach): the bridge and the scan asked afresh; the album held followed to the fresh scan
     /// - or let go, its folder gone, to be found again from what the scan says.
+    ///
+    /// (R12's review - notes/ios.md "The redesign, slice R12: Needs a look", "After review") The scan is shared - Needs a
+    /// look's in queue mode, the Mac's folder list's on Edit an album - so its read is carried to an answer
+    /// (`readShared`): one the other reader's read took over from (Needs a look's ⌘R) ends in that read's answer, never
+    /// `.dropped` with nothing to show for it - the editor waiting on it for good, Apply off and the steps dimmed.
     func lookUp() async {
         // only a read that landed moves anything: the scan in hand from before says nothing of what a write did
         var read = LibraryScanModel.Read.dropped
@@ -283,7 +288,7 @@ final class EditAlbumModel {
                 await self.askBridge()
                 return nil
             }
-            group.addTask { await self.scan.read(client: self.client, admin: self.admin) }
+            group.addTask { await self.scan.readShared(client: self.client, admin: self.admin) }
             for await ended in group {
                 if let ended { read = ended }
             }

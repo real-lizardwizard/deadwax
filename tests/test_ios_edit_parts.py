@@ -323,7 +323,8 @@ def test_delete_album_is_a_page_of_the_phones_own():
         root, "private func albumPage(")
     flat_root = re.sub(r"\s+", " ", root)
     assert "case .delete: DeletePage(model: model, album: album)" in flat_root
-    assert "case .delete: page.phoneFoot { DeleteButton(model: model, album: album)" in flat_root
+    # (R12) under queue mode's bar, when the sheet is Needs a look's (EditQueueBar.above)
+    assert "case .delete: page.phoneFoot { EditQueueBar.above(queue) { DeleteButton(model: model, album: album)" in flat_root
     assert "case delete" not in sheet and "path.append(.delete)" not in sheet
     assert "webURL" not in sheet and "inWebAppLine" not in sheet
 

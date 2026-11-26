@@ -235,9 +235,12 @@ def test_a_cancellation_is_neither_failure_nor_answer():
     assert "guard !APIFailure.isCancellation(error) else { return }" in preview
     assert preview.index("isCancellation") < preview.index("self.flow.failed(edit)")
     scan = code(SCAN)
-    read = block(scan, scan.index("{", scan.index("func read(")))
-    assert "guard !APIFailure.isCancellation(error) else { return .dropped }" in read
+    # (R12's review) every read - the page's (`read`) and a shared one's (`readShared`) - is `fetch`'s, its end told
+    read = block(scan, scan.index("{", scan.index("private func fetch(")))
+    assert "guard !APIFailure.isCancellation(error) else { return reads.ended(ticket, .dropped) }" in read
     assert read.index("isCancellation") < read.index("failed = (error, admin)")
+    for reader in ("func read(", "func readShared("):
+        assert "fetch(client, admin: admin, ticket: " in block(scan, scan.index("{", scan.index(reader))), reader
 
 
 def test_back_in_reach_the_search_and_the_pressing_are_asked_again():

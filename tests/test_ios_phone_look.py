@@ -1724,11 +1724,14 @@ R13_PAGES = {"Manage/LibraryCareScreen.swift", "Manage/HeldByNobodyScreen.swift"
 #? page and the sheets drawn on the Mac too, in the look's own pieces (tests/test_ios_manage_look.py)
 R14_PAGES = {"Manage/PeopleScreen.swift", "Manage/PeopleSheets.swift", "Manage/ServerSettingsScreen.swift",
              "Manage/ServerSettingsGroupScreen.swift"}
+#? R12: Needs a look on the phone, flat (iNeedsALook - the large title, Marked fine · N, the facets' strip, a card per
+#? album with its chips; tests/test_ios_needs_look_look.py holds what it draws). Edit album's queue bar is R10's file's
+R12_PAGES = {"Manage/NeedsLookScreen.swift"}
 #? (Last.fm, slice A2) the albums' order menu, Similar Artists' section and tiles, and its See All page: the look's
 #? buttons and colours, flat on the phone (tests/test_ios_lastfm_a2.py holds what each draws)
 A2_PAGES = {"Artist/AlbumOrderMenu.swift", "Artist/SimilarArtistsSection.swift", "Artist/SimilarArtistsScreen.swift"}
 SLICES = (R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES
-          | R11_PAGES | R13_PAGES | R14_PAGES | A2_PAGES)
+          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES)
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

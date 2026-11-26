@@ -113,10 +113,12 @@ def test_every_part_is_a_tab_on_both_devices():
 def test_each_tabs_action_is_in_its_foot():
     root = flat(body(bare(source(SHEET)), "struct EditAlbumRoot: View {"))
     # the phone: Release's, Tags' and Delete's feet - Delete's the red one; Artwork's and Lyrics' Gets inline
-    assert ".phoneFoot { TagsFoot(model: model, tags: tags, path: $path) }" in root
-    assert (".phoneFoot { DeleteButton(model: model, album: album) "
-            ".buttonStyle(DWButtonStyle(kind: .danger, size: .large, fills: true)) }") in root
-    assert "case .artwork, .lyrics: page" in root
+    # (R12) each under queue mode's bar when the sheet is Needs a look's (EditQueueBar.above)
+    assert ".phoneFoot { EditQueueBar.above(queue) { TagsFoot(model: model, tags: tags, path: $path) } }" in root
+    assert (".phoneFoot { EditQueueBar.above(queue) { DeleteButton(model: model, album: album) "
+            ".buttonStyle(DWButtonStyle(kind: .danger, size: .large, fills: true)) } }") in root
+    # (R12) with queue mode's bar as their foot when the sheet is Needs a look's (`barred`)
+    assert "case .artwork, .lyrics: barred(page)" in root
     foot = flat(body(bare(source(TAGS)), "struct TagsFoot: View {"))
     assert ".buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))" in foot
     # the Mac: the foot's actions by the tab shown - Tags' Revert and Apply, Delete's Delete permanently

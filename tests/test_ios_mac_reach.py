@@ -375,14 +375,16 @@ def test_mac_routes_says_every_route_once_each_to_its_area():
 #? R10 took .chooseFolder: the Mac's Edit album (MacEditWindow), the folders beside the editor - asserted below.
 #? R14 took .people and .person (MacPeoplePage, the list and a person side by side) and .serverSettings and
 #? .serverSettingsGroup (MacServerSettingsPage, opened at the group's tab) - asserted below.
+#? R12 took .needsALook: the Mac's Needs a look (MacNeedsALook), the queue beside the editor - asserted below.
 #? (Last.fm, slice A2) .similarArtists came as the phone's page: Similar Artists' See All grid (SimilarArtistsScreen), in
 #? the text styles and the look's pieces alone, so a mouse reaches every tile - as .topSongs is.
 PHONES_PAGES = {"downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
                 "account", "thisPhone", "about", "allSongs",
-                "mbArtist", "topSongs", "similarArtists", "needsALook",
+                "mbArtist", "topSongs", "similarArtists",
                 "changePassword"}
-#? (R13) the routes each slice gave a Mac page of its own in place of the phone's, and the page
-MACS_OWN = {"libraryCare": "MacLibraryCarePage()", "heldByNobody": "MacLibraryCarePage()", "eventLog": "MacEventLogPage()"}
+#? (R13) the routes each slice gave a Mac page of its own in place of the phone's, and the page - (R12) Needs a look's
+MACS_OWN = {"libraryCare": "MacLibraryCarePage()", "heldByNobody": "MacLibraryCarePage()", "eventLog": "MacEventLogPage()",
+            "needsALook": "MacNeedsALook()"}
 
 
 def normalised(line: str) -> tuple[str, str]:
@@ -430,6 +432,7 @@ def test_every_area_page_is_still_the_phones_own():
     assert phone["libraryCare"] == "LibraryCareScreen().readableOnMac()"
     assert phone["heldByNobody"] == "HeldByNobodyScreen().readableOnMac()"
     assert phone["eventLog"] == "EventLogScreen().readableOnMac()"
+    assert phone["needsALook"] == "NeedsLookScreen().readableOnMac()"
     # (R10) Edit an album: the phone's Choose the folder, the Mac's one page of folders and editor
     assert phone["chooseFolder"] == "ChooseFolderScreen().readableOnMac()" and drawn["chooseFolder"] == "MacEditWindow()"
     # (R14) People and a person: the Mac's one page, the person chosen; Server settings, at a group's tab

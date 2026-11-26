@@ -81,19 +81,20 @@ final class NeedsLookModel {
     /// The facet the list is narrowed by (a facet emptied shows All).
     var showing: String? { NeedsLook.showing(session: session, live: liveChips, facet: facet) }
 
-    /// The facets drawn in the Show menu: as the session began, the ending's, else the live ones - All always, the rest
-    /// with an album.
+    /// The facets drawn - the strip's, the Show pop-up's and Marked fine's: which ones as the session began, the
+    /// ending's, else the live ones; (R12's review) each counted from the scan as it is now, as the status bar and the
+    /// sidebar count (NeedsLookPage.counted) - All always, the one pressed, the rest with an album.
     var chips: [NeedsLook.Facet] {
-        NeedsLook.drawn(NeedsLook.chips(session: session, held: run.held, ending: ending, live: liveChips))
+        NeedsLookPage.counted(NeedsLook.chips(session: session, held: run.held, ending: ending, live: liveChips),
+                              live: liveChips, pressed: pressed)
     }
 
     /// The facet drawn chosen.
     var pressed: String? { NeedsLook.pressed(session: session, ending: ending, showing: showing) }
 
-    /// The facet drawn chosen, as a chip - All's for none.
+    /// The facet drawn chosen, as a chip - All's for none - counted as `chips` are.
     var pressedChip: NeedsLook.Facet? {
-        NeedsLook.chip(NeedsLook.chips(session: session, held: run.held, ending: ending, live: liveChips),
-                       pressed: pressed)
+        NeedsLook.chip(chips, pressed: pressed)
     }
 
     /// The rows drawn: the session's, the ending's held, else the facet's albums.
@@ -133,11 +134,6 @@ final class NeedsLookModel {
 
     /// The folder the editor opens: the session's current album's, followed through a rename.
     var folder: String? { session.flatMap(NeedsLook.folder) }
-
-    /// A row's words after its lines.
-    func chipWords(_ row: NeedsLook.DrawnRow) -> [String] {
-        NeedsLook.chipWords(row, pressed: pressed, issueTypes: issueTypes)
-    }
 
     // MARK: reading
 
@@ -191,9 +187,12 @@ final class NeedsLookModel {
         await read()
     }
 
-    /// A pull: the count asked and the library read again - never out of reach (the line at the top says so).
+    /// A pull: the count asked and the library read again - never out of reach (the line at the top says so). (R12's
+    /// review) Held as Try again and a sign-in again are (NeedsLookPage.pullReads): never while a read is out, nor while
+    /// a session lasts - the Mac's ⌘R beside the editor would take over from the editor's own read of this scan.
     func pulled() async {
-        guard online, samePerson, page.allowed else { return }
+        guard NeedsLookPage.pullReads(online: online, samePerson: samePerson, allowed: page.allowed,
+                                      session: session != nil, reading: scan.reading) else { return }
         count?.pulled()
         await read()
     }
@@ -231,6 +230,12 @@ final class NeedsLookModel {
         guard run.begin(NeedsLook.facetAlbums(scan.albums, shown), path: row.album.path, facet: shown,
                         live: liveChips) else { return }
         navigation?.editAlbum(AlbumEditRequest(target: .folder(row.album.path), queue: self))
+    }
+
+    /// (R12) A row picked in the Mac's list while the session lasts: the step to it from the album open (0 for that one,
+    /// or none of the session's) - taken as ‹ and Skip are, through the editor's gate (`go`).
+    func step(to row: NeedsLook.DrawnRow) -> Int {
+        session.map { (now: NeedsLook.Session) -> Int in NeedsLookPage.step(to: row.key, in: now) } ?? 0
     }
 
     /// What the editor says became of an album of the session: its row brought up to date, in place.
@@ -290,9 +295,17 @@ final class NeedsLookModel {
         }
     }
 
-    /// The editor closed, when it is this page's.
+    /// The editor closed, when it is this page's: the phone's sheet put away - and (R12) the Mac's opening ended, its
+    /// editor beside the queue (or on Edit an album's page) showing nothing, as the sheet would close. R10 read that end
+    /// from `nav` going nil on its page alone; it is said here now, where the Run decides it, whichever page draws the
+    /// editor (macEditEnded tells this page again - the Run has ended already, so nothing more is done).
     private func closeEditor() {
-        guard let navigation, navigation.albumEdit?.queue === self else { return }
-        navigation.albumEdit = nil
+        guard let navigation else { return }
+        if navigation.albumEdit?.queue === self {
+            navigation.albumEdit = nil
+        }
+        if navigation.macEdit?.queue === self {
+            navigation.macEditEnded()
+        }
     }
 }

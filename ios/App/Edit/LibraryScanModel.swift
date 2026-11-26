@@ -11,15 +11,9 @@ import UIKit
 @MainActor
 @Observable
 final class LibraryScanModel {
-    /// How a read ended.
-    enum Read: Sendable {
-        /// It landed: fresh, or the one in hand still the answer.
-        case landed
-        /// It failed - said in `failure`.
-        case failed
-        /// A newer read took over, or it was cancelled: nothing changed.
-        case dropped
-    }
+    /// How a read ended (Core's ScanRead): it landed, it failed (said in `failure`), or a newer read took over or it was
+    /// cancelled - nothing changed.
+    typealias Read = ScanRead
 
     /// The scan in hand - nil until one lands.
     private(set) var answer: ScanAnswer?
@@ -29,7 +23,9 @@ final class LibraryScanModel {
     /// the error, so each place that draws it says it its own way (`failure(saying:)` - slice 6's review).
     private(set) var failed: (error: any Error, admin: Bool)?
     @ObservationIgnored private var etag: String?
-    @ObservationIgnored private var reads = 0
+    /// (R12's review) The reads by ticket - the newest's answer is the one that lands, and a read shared with another
+    /// reader is carried to an answer (`readShared`).
+    private let reads = ScanReads()
 
     /// The scan has answered at least once.
     var loaded: Bool { answer != nil }
@@ -51,26 +47,41 @@ final class LibraryScanModel {
     @discardableResult
     func read(client: DeadwaxClient?, admin: Bool) async -> Read {
         guard let client else { return .dropped }
-        reads += 1
-        let ticket = reads
+        return await fetch(client, admin: admin, ticket: reads.begin())
+    }
+
+    /// (R12's review - notes/ios.md "The redesign, slice R12: Needs a look", "After review") The scan read again for a
+    /// reader that shares it - Edit album's look-up, over Needs a look's scan in queue mode or the Mac's folder list's:
+    /// carried to an answer (ScanReads.answer). A read of the other reader's that takes over from this one (Needs a
+    /// look's ⌘R) is waited for and its end is this one's, so the look-up never waits on a read that came to nothing;
+    /// one called off with its task (the page left) is dropped, as `read`'s is.
+    func readShared(client: DeadwaxClient?, admin: Bool) async -> Read {
+        guard let client else { return .dropped }
+        return await reads.answer(cancelled: { Task.isCancelled }) { (ticket: Int) -> Read in
+            await self.fetch(client, admin: admin, ticket: ticket)
+        }
+    }
+
+    /// The read `ticket` is: only the newest lands, and its end is told to whoever waits on it (ScanReads.ended).
+    private func fetch(_ client: DeadwaxClient, admin: Bool, ticket: Int) async -> Read {
         reading = true
         do {
             let got = try await client.libraryScan(ifNoneMatch: answer == nil ? nil : etag)
-            guard ticket == reads else { return .dropped }
+            guard reads.isNewest(ticket) else { return .dropped }
             if case .fresh(let fresh, let tag) = got {
                 answer = fresh
                 etag = tag
             }
             failed = nil
             reading = false
-            return .landed
+            return reads.ended(ticket, .landed)
         } catch {
-            guard ticket == reads else { return .dropped }
+            guard reads.isNewest(ticket) else { return .dropped }
             reading = false
             // a cancellation (the page gone) is neither a failure nor an answer: what was there stays
-            guard !APIFailure.isCancellation(error) else { return .dropped }
+            guard !APIFailure.isCancellation(error) else { return reads.ended(ticket, .dropped) }
             failed = (error, admin)
-            return .failed
+            return reads.ended(ticket, .failed)
         }
     }
 
@@ -80,22 +91,26 @@ final class LibraryScanModel {
     /// read's failure is; a cancellation, or a newer read, changes nothing.
     func rescan(client: DeadwaxClient?, admin: Bool) async -> CareRuns.Rescanned {
         guard let client else { return .dropped }
-        reads += 1
-        let ticket = reads
+        let ticket = reads.begin()
         reading = true
         do {
             let (fresh, tag) = try await client.rescan()
-            guard ticket == reads else { return .dropped }
+            guard reads.isNewest(ticket) else { return .dropped }
             answer = fresh
             etag = tag
             failed = nil
             reading = false
+            reads.ended(ticket, .landed)
             return .landed(albums: fresh.albums.count)
         } catch {
-            guard ticket == reads else { return .dropped }
+            guard reads.isNewest(ticket) else { return .dropped }
             reading = false
-            guard !APIFailure.isCancellation(error) else { return .dropped }
+            guard !APIFailure.isCancellation(error) else {
+                reads.ended(ticket, .dropped)
+                return .dropped
+            }
             failed = (error, admin)
+            reads.ended(ticket, .failed)
             return RetagFlow.outcome(of: error) == .refused ? .refused : .unanswered
         }
     }

@@ -7,11 +7,23 @@ import SwiftUI
 /// be selected) - and, beside the words from an editor of 560 (under them below that), the chip saying whether the
 /// folder is matched to MusicBrainz and Open album, the album's page, when the editor was opened from it. With several
 /// folders found for the album, the Folder menu under it all, as the sheet's root has it.
-struct MacEditHeader: View {
+///
+/// (R12 - notes/ios.md "The redesign, slice R12: Needs a look") `bar`, its host's: queue mode's ‹, "1 of 3" and Skip ›
+/// under the chip, at the column's trailing edge beside the words (NeedsALook.dc.html), at its leading edge under them.
+struct MacEditHeader<Bar: View>: View {
     let model: EditAlbumModel
     let album: ScanAlbum
     /// The chip and Open album beside the words (EditAlbumPage.Layout.headerBeside), else under them.
     let beside: Bool
+    /// (R12) Queue mode's bar, or nothing.
+    let bar: Bar
+
+    init(model: EditAlbumModel, album: ScanAlbum, beside: Bool, @ViewBuilder bar: () -> Bar) {
+        self.model = model
+        self.album = album
+        self.beside = beside
+        self.bar = bar()
+    }
 
     @Environment(AppNavigation.self) private var navigation
 
@@ -86,6 +98,7 @@ struct MacEditHeader: View {
                 }
                 .buttonStyle(DWButtonStyle(size: .small))
             }
+            bar
         }
         .fixedSize()
     }

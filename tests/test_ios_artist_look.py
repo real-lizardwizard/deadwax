@@ -585,6 +585,12 @@ def test_every_other_list_draws_as_before():
             if name == "Mac/Edit/MacTagsTab.swift":
                 assert "controls: [0], voice:" in call and "flow:" not in call, name
                 continue
+            #? (R12) Needs a look's queue asks one: the row read as one, in the phone's card's words ("The Slow Rush,
+            #? Tame Impala, New, No cover art", Open on the album open) - `.combine` would read the chips the row
+            #? folds to fit ("No release id, +2") and the Issues count, never every issue
+            if name == "Mac/Manage/MacNeedsALook.swift":
+                assert "voice:" in call and "controls:" not in call and "flow:" not in call, name
+                continue
             assert "voice:" not in call and "flow:" not in call, name
             assert "controls:" not in call or name == "Mac/Album/MacAlbumPage.swift", name
 

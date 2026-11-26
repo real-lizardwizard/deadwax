@@ -382,6 +382,10 @@ private struct ReleaseYearFace: ViewModifier {
 struct ReleaseFoot: View {
     let model: EditAlbumModel
     let retag: RetagModel
+    /// (R12 - notes/ios.md "The redesign, slice R12: Needs a look") Queue mode's bar, the sheet's: once a release was
+    /// applied and an album follows, the purple button is Next album, a step through the sheet's `take` as Skip › is
+    /// (NeedsLookPage.movesOn - the web's Apply becoming Next album); the last album keeps Apply.
+    var queue: EditQueueBar? = nil
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -394,16 +398,27 @@ struct ReleaseFoot: View {
         }
         .buttonStyle(DWButtonStyle(size: .large))
         .disabled(!model.canRevertRelease)
-        Button {
-            Task { await model.apply() }
-        } label: {
-            HStack(spacing: 10) {
-                if retag.flow.applying { ProgressView() }
-                words(retag.flow.applying ? RetagWords.applying(plan ?? retag.plan) : RetagWords.apply)
+        if let queue, NeedsLookPage.movesOn(queue.nav, applied: retag.applied != nil) {
+            Button {
+                queue.take(1)
+            } label: {
+                words(NeedsLookWords.nextAlbum)
             }
+            .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
+            .accessibilityLabel(NeedsLookWords.nextAlbumSpoken)
+            .disabled(!model.canStep)
+        } else {
+            Button {
+                Task { await model.apply() }
+            } label: {
+                HStack(spacing: 10) {
+                    if retag.flow.applying { ProgressView() }
+                    words(retag.flow.applying ? RetagWords.applying(plan ?? retag.plan) : RetagWords.apply)
+                }
+            }
+            .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
+            .disabled(!retag.canApply || model.tagsApplying || model.getting || model.deleting)
         }
-        .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
-        .disabled(!retag.canApply || model.tagsApplying || model.getting || model.deleting)
     }
 
     private func words(_ said: String) -> some View {

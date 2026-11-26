@@ -32,8 +32,8 @@ enum EditPage: Hashable {
 /// to the front.
 ///
 /// (Phase 8, slice 6) Opened from Needs a look it is in queue mode (phase8-managing.md 3.2, 5; MetadataEditor.tsx's
-/// queue nav): a bottom toolbar on its root holds ‹, "2 of 9" and Skip › - Next album › once a write was told of the
-/// album (the web's Apply becoming Next) - stepping through the session (NeedsLookModel.go), each album opened afresh in
+/// queue nav): a bar on its root holds ‹, "2 of 9" and Skip › - Next album › once a write was told of the album (the
+/// web's Apply becoming Next) - stepping through the session (NeedsLookModel.go), each album opened afresh in
 /// the same sheet with the page's scan. A step goes only through the editor's gate (EditAlbumModel.stepGate - shut out
 /// of reach and until everything done to this album has settled: a write or a mark and the read after it, a read of the
 /// scan, a read Release or Tags waits for, a delete waiting to be found gone), checked again as Discard steps, and asks
@@ -46,6 +46,11 @@ enum EditPage: Hashable {
 /// every Edit album opens its page beside the library's folders (MacEditWindow, AppNavigation.editAlbum), never this
 /// sheet. Its top is iEdit's - Close, "Edit album", the Matched chip - and its root the header, the strip and Release
 /// (EditAlbumRoot); Discard, the swipe held over typed work and Close off while an apply runs are as they were.
+///
+/// (R12 - notes/ios.md "The redesign, slice R12: Needs a look") Queue mode's bar is drawn flat above the root's foot
+/// (EditQueueBar, in the foot's own layer - the system's bottom toolbar went with the grey), and once a release was
+/// applied Release's foot moves on: Apply is Next album (ReleaseFoot). Every step is still this sheet's `take` - the
+/// editor's gate, and "Discard changes?" over typed work.
 struct EditAlbumSheet: View {
     let request: AlbumEditRequest
 
@@ -67,14 +72,11 @@ struct EditAlbumSheet: View {
         NavigationStack(path: $path) {
             Group {
                 if let model {
-                    EditAlbumRoot(model: model, path: $path)
-                        .toolbar {
-                            if let queue = request.queue, let nav = queue.nav {
-                                ToolbarItemGroup(placement: .bottomBar) {
-                                    queueBar(nav, model: model)
-                                }
-                            }
-                        }
+                    // (R12) queue mode's bar above the root's foot, every step through this sheet's `take`
+                    let queue = request.queue?.nav.map { (nav: NeedsLook.Nav) -> EditQueueBar in
+                        EditQueueBar(nav: nav, model: model) { (delta: Int) -> Void in take(delta, model: model) }
+                    }
+                    EditAlbumRoot(model: model, path: $path, queue: queue)
                 } else {
                     Color.clear
                 }
@@ -163,29 +165,6 @@ struct EditAlbumSheet: View {
         dismiss()
     }
 
-    /// (slice 6) Queue mode's bar: ‹ (Previous album), where it is ("2 of 9"), and Skip › - or Next album ›, once a
-    /// write was told of the album and it isn't the last.
-    @ViewBuilder private func queueBar(_ nav: NeedsLook.Nav, model: EditAlbumModel) -> some View {
-        Button {
-            take(-1, model: model)
-        } label: {
-            Image(systemName: "chevron.left")
-        }
-        .accessibilityLabel(NeedsLookWords.previous)
-        .disabled(!nav.back || !model.canStep)
-        Spacer()
-        Text(nav.place)
-            .font(Typeface.footnote)
-            .foregroundStyle(Palette.quiet)
-        Spacer()
-        Button(nav.forward) {
-            take(1, model: model)
-        }
-        .accessibilityLabel(nav.forwardSpoken)
-        .accessibilityHint(nav.nextAlbum ? "" : NeedsLookWords.skipHint)
-        .disabled(!nav.on || !model.canStep)
-    }
-
     /// A step through the queue, through the editor's gate: typed work asks first, as Close does.
     private func take(_ delta: Int, model: EditAlbumModel) {
         guard let queue = request.queue, model.canStep else { return }
@@ -245,9 +224,15 @@ struct EditPageView: View {
 /// foot is that tab's: Release's Revert and Apply, Tags' Select all and Edit N tracks…, Delete's Delete permanently (the
 /// red one, through today's question). Artwork's and Lyrics' Gets are inline, as their drawings have them: no foot. The
 /// tab is the root's own state: changing it never touches typed work, and a tab no longer offered shows the first.
+///
+/// (R12) `queue`, queue mode's bar: above the tab's foot, in the foot's own layer (EditQueueBar's `above`) - the foot
+/// alone on a tab with none (Artwork, Lyrics) and with no album drawn (deleted, or still being found), so a step is
+/// always in reach.
 struct EditAlbumRoot: View {
     let model: EditAlbumModel
     @Binding var path: [EditPage]
+    /// (R12) Queue mode's bar, the sheet's - nil from anywhere but Needs a look.
+    var queue: EditQueueBar? = nil
 
     @Environment(ServerModel.self) private var server
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -260,15 +245,15 @@ struct EditAlbumRoot: View {
         Group {
             if !model.online && !model.scan.loaded {
                 // opened out of reach: nothing asked, nothing drawn as if live
-                ContentUnavailableView {
+                barred(ContentUnavailableView {
                     Label(EditWords.title, systemImage: "wifi.slash")
                 } description: {
                     Text(EditWords.needsDeadwax)
-                }
+                })
             } else if let album = model.album {
                 albumPage(album)
             } else {
-                ScrollView {
+                barred(ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         if model.choosing, let folders = model.folders {
                             PhoneGroup(legend: EditWords.whichFolder) {
@@ -280,10 +265,19 @@ struct EditAlbumRoot: View {
                     }
                     .padding(.horizontal, side)
                 }
-                .background(DWPalette.page)
+                .background(DWPalette.page))
             }
         }
         .editOutOfReach(!model.online && model.scan.loaded)
+    }
+
+    /// (R12) A page with no foot of its own: queue mode's bar its foot, alone.
+    @ViewBuilder private func barred<Page: View>(_ page: Page) -> some View {
+        if let queue {
+            page.phoneFoot { queue }
+        } else {
+            page
+        }
     }
 
     // MARK: no album
@@ -335,23 +329,25 @@ struct EditAlbumRoot: View {
         switch shown {
         case .release:
             if edit.editors, let retag = model.retag {
-                page.phoneFoot { ReleaseFoot(model: model, retag: retag) }
+                page.phoneFoot { EditQueueBar.above(queue) { ReleaseFoot(model: model, retag: retag, queue: queue) } }
             } else {
-                page
+                barred(page)
             }
         case .tags:
             if let tags = model.tags {
-                page.phoneFoot { TagsFoot(model: model, tags: tags, path: $path) }
+                page.phoneFoot { EditQueueBar.above(queue) { TagsFoot(model: model, tags: tags, path: $path) } }
             } else {
-                page
+                barred(page)
             }
         case .delete:
             page.phoneFoot {
-                DeleteButton(model: model, album: album)
-                    .buttonStyle(DWButtonStyle(kind: .danger, size: .large, fills: true))
+                EditQueueBar.above(queue) {
+                    DeleteButton(model: model, album: album)
+                        .buttonStyle(DWButtonStyle(kind: .danger, size: .large, fills: true))
+                }
             }
         case .artwork, .lyrics:
-            page
+            barred(page)
         }
     }
 
@@ -534,6 +530,62 @@ struct EditAlbumRoot: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/// (R12 - notes/ios.md "The redesign, slice R12: Needs a look") Queue mode's bar on the phone, flat: ‹ (Previous album)
+/// at its leading edge, where it is ("2 of 9") in the readout face between, and Skip › - Next album › once a write was
+/// told of the album - at its trailing edge, the three on one text baseline (the readout's): the accent's words with no
+/// face (DWButtonStyle), a finger's target tall at least. Above the tab's foot in the foot's own layer (`above`), so it
+/// stays where the foot is, under the keyboard. A view of its own, so the step gate is read here; every step is the
+/// sheet's `take`.
+struct EditQueueBar: View {
+    let nav: NeedsLook.Nav
+    let model: EditAlbumModel
+    let take: (Int) -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 0) {
+            Button(NeedsLookPage.back) {
+                take(-1)
+            }
+            .buttonStyle(DWButtonStyle())
+            .accessibilityLabel(NeedsLookWords.previous)
+            .disabled(!nav.back || !model.canStep)
+            Spacer(minLength: CGFloat(PhoneLook.footGap))
+            Text(nav.place)
+                .font(Typeface.Phone.mono(.small))
+                .foregroundStyle(DWPalette.t2)
+                .lineLimit(1)
+                .fixedSize()
+            Spacer(minLength: CGFloat(PhoneLook.footGap))
+            Button(nav.forward) {
+                take(1)
+            }
+            .buttonStyle(DWButtonStyle())
+            .accessibilityLabel(nav.forwardSpoken)
+            .accessibilityHint(nav.nextAlbum ? "" : NeedsLookWords.skipHint)
+            .disabled(!nav.on || !model.canStep)
+        }
+        .frame(maxWidth: .infinity)
+        .lookHeight(DWLook.here.target)
+    }
+
+    /// A tab's foot, with queue mode's bar over its actions when there is one: the two in the foot's layer, the actions
+    /// at the foot's own height and gap.
+    @ViewBuilder static func above<Actions: View>(_ bar: EditQueueBar?,
+                                                  @ViewBuilder actions: () -> Actions) -> some View {
+        if let bar {
+            VStack(spacing: 0) {
+                bar
+                HStack(spacing: CGFloat(PhoneLook.footGap)) {
+                    actions()
+                }
+                .lookHeight(PhoneLook.foot)
+            }
+        } else {
+            actions()
         }
     }
 }

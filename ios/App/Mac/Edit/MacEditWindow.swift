@@ -19,8 +19,13 @@ import SwiftUI
 /// - (R10's review) What typed work holds (the window kept open, no Back, the stacks told) is read in a modifier of its
 ///   own (MacEditHolding): holdsWork reads Release's fields, and this page's body - the list's rows filtered, sorted
 ///   and diffed over every folder of the library - never re-runs for a keystroke.
-/// - Opened from Needs a look (queue mode): the queue's own scan, and an interim bar over the header - ‹, where it is,
-///   Skip › - each step through the editor's gate as the sheet's (R12 draws MacNeedsALook and restyles it).
+/// - Opened from Needs a look (queue mode): the queue's own scan, and the queue's bar under the header's chip - ‹, where it
+///   is, Skip › - each step through the editor's gate as the sheet's. (R12 - notes/ios.md "The redesign, slice R12:
+///   Needs a look") A row of the queue is edited on Needs a look's own page, beside it (MacNeedsALook,
+///   AppNavigation.macEditHost); this page edits a queue's album only when its opening was asked for over this page's
+///   work - Discard then opens it here - and never draws an opening edited there (`macEdit(on:)`). Either page's queue
+///   opening ends where the Run decides it (NeedsLookModel.closeEditor: a step to an album gone, a facet chosen), never
+///   read here from the session going (R12's review took R10's handler of that out).
 struct MacEditWindow: View {
     @Environment(AppNavigation.self) private var navigation
     @Environment(ServerModel.self) private var server
@@ -72,10 +77,11 @@ struct MacEditWindow: View {
             DWRule(colour: DWPalette.frame, vertical: true)
             Group {
                 if let model {
-                    MacAlbumEditor(model: model, layout: layout) {
-                        if let queue = navigation.macEdit?.queue, let nav = queue.nav {
-                            MacEditQueueBar(nav: nav, model: model) { (delta: Int) -> Void in take(delta, model: model) }
-                        }
+                    let queue = navigation.macEdit?.queue?.nav.map { (nav: NeedsLook.Nav) -> MacEditQueue in
+                        MacEditQueue(nav: nav) { (delta: Int) -> Void in take(delta, model: model) }
+                    }
+                    MacAlbumEditor(model: model, layout: layout, queue: queue) {
+                        if let queue { MacEditQueueBar(queue: queue, model: model) }
                     }
                 } else {
                     MacEditNote(words: EditAlbumPage.Words.pickAFolder)
@@ -94,7 +100,8 @@ struct MacEditWindow: View {
         .modifier(MacEditHolding(model: model))
         .task(id: Opening(id: navigation.macEdit?.id, step: navigation.macEdit?.queue?.steps ?? 0,
                           online: reachability.online)) {
-            await open(navigation.macEdit)
+            // (R12) an opening edited beside Needs a look's queue is that page's: none here
+            await open(navigation.macEdit(on: .chooseFolder))
         }
         .task(id: selected) {
             guard let path = selected, path != model?.album?.path else { return }
@@ -119,11 +126,6 @@ struct MacEditWindow: View {
             } else {
                 Task { await readList() }
             }
-        }
-        // the queue's session over (a step to an album gone): the opening ends, as the sheet would close
-        .onChange(of: navigation.macEdit?.queue?.nav == nil) { (_: Bool, over: Bool) -> Void in
-            guard over, navigation.macEdit?.queue != nil else { return }
-            navigation.macEditEnded()
         }
         .onChange(of: reachability.online) { (_: Bool, now: Bool) -> Void in
             Task { await model?.reach(now) }
@@ -198,6 +200,8 @@ struct MacEditWindow: View {
     /// folder as it was, so Discard would be asked of work the apply wrote), nor over another question: asked once
     /// those end.
     private func askAboutOpening() {
+        // (R12) asked by the page the editor is on - Needs a look's, beside its queue, asks there
+        guard navigation.macEditHost == .chooseFolder else { return }
         guard navigation.macEditAsked != nil, model?.applying != true, (model?.following ?? 0) == 0,
               !askingDiscard else { return }
         if model?.holdsWork == true {
@@ -239,7 +243,7 @@ struct MacEditWindow: View {
         }
     }
 
-    // MARK: the queue (R12's to redraw)
+    // MARK: the queue
 
     /// A step through the queue, through the editor's gate: typed work asks first, as a pick does.
     private func take(_ delta: Int, model: EditAlbumModel) {
@@ -256,7 +260,9 @@ struct MacEditWindow: View {
 /// (R10's review) What the page's typed work holds, read here alone (EditAlbumModel.holdsWork reads Release's fields):
 /// the window kept open, Back not drawn, and the stacks told (AppNavigation.macEditHolding) - a keystroke re-runs this
 /// modifier, never MacEditWindow's body, so the folder list isn't filtered, sorted and diffed again for each letter.
-private struct MacEditHolding: ViewModifier {
+/// (R12) Needs a look's page holds its editor's work with it too (MacNeedsALook); a page drawing no editor (`model`
+/// nil - the other page has the opening) says nothing, so it never says "no work" over the page that has some.
+struct MacEditHolding: ViewModifier {
     let model: EditAlbumModel?
     @Environment(AppNavigation.self) private var navigation
 
@@ -266,41 +272,51 @@ private struct MacEditHolding: ViewModifier {
             .keepsWindowOpen(holds)
             .navigationBarBackButtonHidden(holds)
             .onChange(of: holds, initial: true) { (_: Bool, now: Bool) -> Void in
+                guard model != nil else { return }
                 navigation.macEditHolding(now)
             }
     }
 }
 
-/// Queue mode's bar, the sheet's (R12's to redraw - MacAlbumEditor's `bar`): ‹ (Previous album), where it is ("2 of
-/// 9"), and Skip › - or Next album ›. A view of its own, so the step gate is read here, not in the page's body.
-private struct MacEditQueueBar: View {
+/// (R12) Queue mode as the Mac's editor needs it: where the session is, and a step - taken through its host's gate and
+/// "Discard changes?" (MacEditWindow's `take`, MacNeedsALook's) - for the bar's ‹ and Skip › and the foot's Next album.
+struct MacEditQueue {
     let nav: NeedsLook.Nav
-    let model: EditAlbumModel
     let take: (Int) -> Void
+}
+
+/// Queue mode's bar (R12 - notes/ios.md "The redesign, slice R12: Needs a look"; NeedsALook.dc.html): ‹ (Previous
+/// album), where it is ("1 of 3", in the readout face as drawn), and Skip › - or Next album › once a write was told of
+/// the album - small buttons 6 apart on one text baseline (the readout's), under the header's chip (MacEditHeader's
+/// `bar`). A view of its own, so the step gate is read here, never in a host's body.
+struct MacEditQueueBar: View {
+    let queue: MacEditQueue
+    let model: EditAlbumModel
 
     var body: some View {
-        HStack(spacing: 8) {
-            Button {
-                take(-1)
-            } label: {
-                Image(systemName: "chevron.left")
+        let nav = queue.nav
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Button(NeedsLookPage.back) {
+                queue.take(-1)
             }
             .buttonStyle(DWButtonStyle(size: .small))
             .accessibilityLabel(NeedsLookWords.previous)
+            .help(NeedsLookWords.previous)
             .disabled(!nav.back || !model.canStep)
             Text(nav.place)
-                .font(Typeface.Mac.text(.small))
+                .font(Typeface.Mac.mono(.small))
                 .foregroundStyle(DWPalette.t2)
-            Spacer(minLength: 8)
+                .lineLimit(1)
+                .fixedSize()
             Button(nav.forward) {
-                take(1)
+                queue.take(1)
             }
             .buttonStyle(DWButtonStyle(size: .small))
             .accessibilityLabel(nav.forwardSpoken)
             .accessibilityHint(nav.nextAlbum ? "" : NeedsLookWords.skipHint)
+            .help(nav.nextAlbum ? nav.forwardSpoken : NeedsLookWords.skipHint)
             .disabled(!nav.on || !model.canStep)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
+        .fixedSize()
     }
 }

@@ -155,10 +155,11 @@ def test_the_macs_page_is_never_left_mid_apply_nor_with_typed_work():
     assert "var writing: Bool { applying || retag?.flow.savingCover == true }" in model
     # no Back, the window kept open, and the stacks told - (R10's review) in a modifier of its own, the page's body
     # never reading holdsWork (test_a_keystroke_never_runs_the_pages_body)
-    holding = flat(body(window, "private struct MacEditHolding: ViewModifier {"))
+    # (R12) Needs a look's page wears it too: a page drawing no editor says nothing, never "no work" over the other's
+    holding = flat(body(window, "struct MacEditHolding: ViewModifier {"))
     assert ("let holds = model?.holdsWork == true content .keepsWindowOpen(holds) .navigationBarBackButtonHidden(holds) "
-            ".onChange(of: holds, initial: true) { (_: Bool, now: Bool) -> Void in navigation.macEditHolding(now) }"
-            ) in holding
+            ".onChange(of: holds, initial: true) { (_: Bool, now: Bool) -> Void in guard model != nil else { return } "
+            "navigation.macEditHolding(now) }") in holding
     assert window.count(".modifier(MacEditHolding(model: model))") == 1
     # a folder picked: never while an apply runs, nor (R10's review) until the folder has been read again after it
     # (the list's selection put back), asked first over work
@@ -182,7 +183,8 @@ def test_the_macs_page_is_never_left_mid_apply_nor_with_typed_work():
     routes = flat(bare(source(ROUTES)))
     # the page kept under anything opened over it while it holds work - a tab's button, a sidebar row
     kept_pages = flat(body(bare(source(ROUTES)), "private func kept(_ stack: [AppRoute]) -> Int {"))
-    assert ("let editing = macEditHolds ? (stack.lastIndex(of: .chooseFolder).map { (at: Int) -> Int in at + 1 } ?? 0)"
+    # (R12) the page the editor is on: Edit an album's, or Needs a look's beside its queue (AppNavigation.macEditHost)
+    assert ("let editing = macEditHolds ? (stack.lastIndex(of: macEditHost).map { (at: Int) -> Int in at + 1 } ?? 0)"
             " : 0") in kept_pages
     assert "People.pagesKept(people, writing: writingPeople), editing)" in kept_pages
     # an opening asked for over work: the page brought to the front, nothing let go, the question asked there
@@ -191,8 +193,9 @@ def test_the_macs_page_is_never_left_mid_apply_nor_with_typed_work():
     holding = holding[:holding.index("return }") + len("return }")]
     assert "macEditAsked = request backToEditPage() tab = .you return }" in holding
     assert "macEdit = request" not in holding
-    back = flat(body(bare(source(ROUTES)), "private func backToEditPage() {"))
-    assert "let keep = max(at + 1, kept(you))" in back
+    assert "private func backToEditPage() { backTo(macEditHost) }" in routes
+    back = flat(body(bare(source(ROUTES)), "private func backTo(_ page: AppRoute) {"))
+    assert "guard let at = you.lastIndex(of: page) else { return } let keep = max(at + 1, kept(you))" in back
     # only Discard lets the work go
     answered = flat(body(bare(source(ROUTES)), "func macEditAnswered(discard: Bool) {"))
     assert "if discard { macEditHolds = false macEditPage(asked) }" in answered
@@ -262,7 +265,8 @@ def test_the_phones_sheet_keeps_its_rules():
     assert "ToolbarItem(placement: .cancellationAction) {" in sheet
     assert ".interactiveDismissDisabled(model?.holdsWork == true)" in sheet
     assert ".keepsWindowOpen(model?.holdsWork == true)" in sheet
-    assert "EditAlbumRoot(model: model, path: $path)" in sheet
+    # (R12) queue mode's bar handed to the root, drawn above its foot
+    assert "EditAlbumRoot(model: model, path: $path, queue: queue)" in sheet
     # the Matched chip in the top, its glass off on iOS 26
     assert ".matchedChip(model?.album)" in sheet
     assert "toolbar { MatchedChip(album: album).sharedBackgroundVisibility(.hidden) }" in flat(bare(source(SHEET)))
@@ -273,10 +277,14 @@ def test_the_phones_foot_never_rides_up_on_a_field():
     # (R11) the page R10 kept for Artwork's pointer gone: Release's foot the root's alone - and each tab's foot its own
     assert "struct ReleasePage" not in bare(source(RELEASE))
     for name, code in ((SHEET, root),):
-        assert code.count(".phoneFoot { ReleaseFoot(model: model, retag: retag) }") == 1, name
-        assert code.count(".phoneFoot { TagsFoot(model: model, tags: tags, path: $path) }") == 1, name
-        assert code.count(".phoneFoot { DeleteButton(model: model, album: album)") == 1, name
-        assert code.count(".phoneFoot") == 3, name
+        # (R12) each tab's foot with queue mode's bar over it, when there is one - and the bar alone as a page's foot
+        assert code.count(".phoneFoot { EditQueueBar.above(queue) { ReleaseFoot(model: model, retag: retag, "
+                          "queue: queue) } }") == 1, name
+        assert code.count(".phoneFoot { EditQueueBar.above(queue) { TagsFoot(model: model, tags: tags, "
+                          "path: $path) } }") == 1, name
+        assert code.count(".phoneFoot { EditQueueBar.above(queue) { DeleteButton(model: model, album: album)") == 1, name
+        assert code.count("page.phoneFoot { queue }") == 1, name
+        assert code.count(".phoneFoot") == 4, name
         assert "safeAreaInset" not in code and ".toolbar(" not in code.replace(".toolbar {", ""), name
         assert ".scrollDismissesKeyboard(.interactively)" in code, name
     # PhoneFoot's layer takes the keyboard's room, so the foot stays at the screen's foot under the keyboard, and the
@@ -284,11 +292,12 @@ def test_the_phones_foot_never_rides_up_on_a_field():
     placing = flat(bare(source("Phone/PhoneFoot.swift")))
     assert ".ignoresSafeArea(.keyboard, edges: .bottom)" in placing
     assert ".frame(height: keyboardUp ? 0 : height)" in placing
-    # Revert and Apply its two, the purple the one that fills
+    # Revert and Apply its two, the purple the one that fills - (R12) Apply Next album in its place in queue mode once
+    # a write was told of the album (NeedsLookPage.movesOn), the same purple
     foot = flat(body(bare(source(RELEASE)), "struct ReleaseFoot: View {"))
-    assert foot.count(".buttonStyle(DWButtonStyle(") == 2
+    assert foot.count(".buttonStyle(DWButtonStyle(") == 3
     assert ".buttonStyle(DWButtonStyle(size: .large))" in foot
-    assert ".buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))" in foot
+    assert foot.count(".buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))") == 2
     # the words take three lines at the accessibility sizes, never cut to one
     assert ".lineLimit(typeSize.isAccessibilitySize ? 3 : 1)" in foot
 
@@ -430,13 +439,15 @@ def test_a_keystroke_never_runs_the_pages_body():
     for word in ("holdsWork", "unsaved", "fields", "retag", "EditAlbumPage.folders(", "needingALook", "macStatus"):
         assert word not in page, word
     # what reads holdsWork in the page's file: the modifier, and the three actions (a pick, an opening, a step)
-    readers = [name for name in ("private struct MacEditHolding: ViewModifier {", "private func pick(_ path: String) {",
+    readers = [name for name in ("struct MacEditHolding: ViewModifier {", "private func pick(_ path: String) {",
                                  "private func askAboutOpening() {", "private func take(_ delta: Int,")
                if "holdsWork" in body(window, name)]
     assert len(readers) == 4 and window.count("holdsWork") == 4, readers
     # the queue's bar a view of its own: its step gate read there
-    assert "MacEditQueueBar(nav: nav, model: model) { (delta: Int) -> Void in take(delta, model: model) }" in page
-    assert ".disabled(!nav.back || !model.canStep)" in flat(body(window, "private struct MacEditQueueBar: View {"))
+    # (R12) its step the host's `take`, handed to the foot's Next album too (MacEditQueue)
+    assert "MacEditQueue(nav: nav) { (delta: Int) -> Void in take(delta, model: model) }" in page
+    assert "if let queue { MacEditQueueBar(queue: queue, model: model) }" in page
+    assert ".disabled(!nav.back || !model.canStep)" in flat(body(window, "struct MacEditQueueBar: View {"))
     # the list: its rows and the status bar's counts from the scan, what was typed and the switch
     listing = flat(body(bare(source(LIST)), "    var body: some View {"))
     assert listing.strip().startswith("var body: some View { let rows = EditAlbumPage.folders(scan.albums, typed: typed, shown: shown)")
@@ -452,17 +463,20 @@ def test_the_editor_is_one_view_its_hosts_share():
     # its host's queue bar an optional slot: MacEditWindow hosts it, and R12's MacNeedsALook
     editor = flat(bare(source(EDITOR)))
     assert "struct MacAlbumEditor<Bar: View>: View { let model: EditAlbumModel let layout: EditAlbumPage.Layout let bar: Bar" in editor
-    assert ("init(model: EditAlbumModel, layout: EditAlbumPage.Layout, @ViewBuilder bar: () -> Bar) { self.model = model "
-            "self.layout = layout self.bar = bar() }") in editor
+    # (R12) and queue mode, for the foot: It's fine as it is and Apply moving on
+    assert ("init(model: EditAlbumModel, layout: EditAlbumPage.Layout, queue: MacEditQueue? = nil, "
+            "@ViewBuilder bar: () -> Bar) { self.model = model self.layout = layout self.queue = queue "
+            "self.bar = bar() }") in editor
     assert ("extension MacAlbumEditor where Bar == EmptyView { init(model: EditAlbumModel, layout: EditAlbumPage.Layout) "
             "{ self.init(model: model, layout: layout) { EmptyView() } } }") in editor
-    for part in ("bar MacEditHeader(model: model, album: album, beside: layout.headerBeside) waits", "MacFolderTabs(",
+    # (R12) the bar under the header's chip, as NeedsALook.dc.html draws it
+    for part in ("MacEditHeader(model: model, album: album, beside: layout.headerBeside) { bar } waits", "MacFolderTabs(",
                  "MacReleaseTab(model: model, retag: retag, twoColumns: layout.twoColumns)", "MacEditFooter(model: model,",
                  ".appSheet(item: $sheet,", "@State private var sheet: MacEditSheet?", "@State private var sheetPath"):
         assert part in editor, part
     # the host owns the model and its opening; none of the editor's parts drawn there
     window = flat(bare(source(WINDOW)))
-    assert "MacAlbumEditor(model: model, layout: layout) {" in window
+    assert "MacAlbumEditor(model: model, layout: layout, queue: queue) {" in window
     for part in ("MacEditHeader(", "MacFolderTabs(", "MacReleaseTab(", "MacEditFooter(", "appSheet(", "partCard("):
         assert part not in window, part
     # another opening (the host's next model): a part's sheet put away, the tab kept
@@ -477,10 +491,12 @@ def test_the_macs_foot_is_the_persons_permissions():
     editor = flat(bare(source(EDITOR)))
     assert "case .release: if editors, let retag = model.retag { MacReleaseTab(" in editor
     assert "tabContent(showing, album: album, editors: edit.editors)" in editor
-    assert "if showing != .release || edit.editors { MacEditFooter(model: model, album: album, part: showing) }" in editor
+    assert ("if showing != .release || edit.editors { MacEditFooter(model: model, album: album, part: showing, "
+            "queue: queue) }") in editor
     assert editor.count("MacEditFooter(") == 1
     root = flat(body(bare(source(SHEET)), "struct EditAlbumRoot: View {"))
-    assert "if edit.editors, let retag = model.retag { page.phoneFoot { ReleaseFoot(model: model, retag: retag) } }" in root
+    assert ("if edit.editors, let retag = model.retag { page.phoneFoot { EditQueueBar.above(queue) { "
+            "ReleaseFoot(model: model, retag: retag, queue: queue) } } }") in root
 
 
 def test_the_macs_holding_rules_are_each_pinned():
@@ -493,7 +509,8 @@ def test_the_macs_holding_rules_are_each_pinned():
             "try? await Task.sleep(nanoseconds: Self.rest) guard !Task.isCancelled else { return } pick(path) }") in window
     # the page gone only once Edit an album is on no stack
     gone = flat(body(routes, "private func editPageGone() {"))
-    assert ("guard macEdit != nil || macEditAsked != nil, !(library + search + requests + you).contains(.chooseFolder) "
+    # (R12) the page the editor is on - Needs a look's, beside its queue, gone takes the queue's opening with it
+    assert ("guard macEdit != nil || macEditAsked != nil, !(library + search + requests + you).contains(macEditHost) "
             "else { return }") in gone
     # every stack's move asks it: frontMoved first thing, and each stack's didSet calls frontMoved
     assert flat(body(routes, "private func frontMoved() {")).startswith("private func frontMoved() { editPageGone()")
@@ -501,7 +518,7 @@ def test_the_macs_holding_rules_are_each_pinned():
         assert f"var {stack}: [AppRoute] = [] {{ didSet {{ frontMoved() }} }}" in routes, stack
     # the sidebar's Edit an album goes back to the page while it is on the stack, before the Manage row's own move
     move = flat(body(routes, "func macMove(_ move: MacSidebar.Move) {"))
-    edit = move.index("case .manage(.edit, _) where you.contains(.chooseFolder): tab = .you backToEditPage()")
+    edit = move.index("case .manage(.edit, _) where you.contains(.chooseFolder): tab = .you backTo(.chooseFolder)")
     assert edit < move.index("case .manage(let tool, let how):")
     # Discard on a folder pick lets the hold go before it opens the folder (else the page is kept and asks again)
     discarded = flat(body(window, "private func discarded() {"))
@@ -519,14 +536,18 @@ def test_the_macs_holding_rules_are_each_pinned():
     assert ("onChange(of: model?.deleted == true) { (_: Bool, gone: Bool) -> Void in guard gone else { return } "
             "if navigation.macEdit?.queue == nil { navigation.macEditEnded() } else { Task { await readList() } } }"
             ) in window
-    # the queue's session over ends the opening - only an opening of the queue's
-    assert ("onChange(of: navigation.macEdit?.queue?.nav == nil) { (_: Bool, over: Bool) -> Void in "
-            "guard over, navigation.macEdit?.queue != nil else { return } navigation.macEditEnded() }") in window
+    # the queue's session over ends the opening - only an opening of the queue's. (R12's review) Where the Run decides
+    # it, whichever page draws the editor (NeedsLookModel.closeEditor: a step to an album gone, a facet chosen) - R10's
+    # handler of the session going, here, is gone
+    assert "queue?.nav == nil" not in window
+    close = flat(body(bare(source("Manage/NeedsLookModel.swift")), "private func closeEditor() {"))
+    assert "if navigation.macEdit?.queue === self { navigation.macEditEnded() }" in close
     # a sign-out lets the opening go first - the next person's Edit an album never opens on the last one's folder -
     # and ends its sessions once the session has moved on
     reset = flat(body(routes, "func reset() {"))
+    # (R12) and the editor's page back to Edit an album's, Needs a look's opening gone with the rest
     assert reset.startswith("func reset() { let asked = macEditAsked macEditAsked = nil macEdit = nil "
-                            "macEditHolds = false library.removeAll()")
+                            "macEditHolds = false macEditHost = .chooseFolder library.removeAll()")
     assert reset.index("session += 1") < reset.index("asked?.queue?.editorClosed()")
     # the list off while a write runs, so the folder can't change under it
     listing = flat(body(bare(source(LIST)), "    var body: some View {"))

@@ -292,6 +292,8 @@ def test_the_macs_tables_and_status_bar_are_set_on_one_baseline():
                      "Mac/Edit/MacTagsTab.swift",
                      "Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift",
                      "Mac/Library/MacPlaylistsPage.swift",
+                     # (R12) Needs a look's queue
+                     "Mac/Manage/MacNeedsALook.swift",
                      # (R14) People's list
                      "Mac/Manage/MacPeoplePage.swift",
                      # (R7) Get's tracklist
@@ -305,14 +307,16 @@ def test_the_macs_tables_and_status_bar_are_set_on_one_baseline():
 
 
 #? the covers a Mac table's cell draws (Row Size grows them: 20, 28, 40; Requests' 22, 28, 40)
-COVERS = re.compile(r"\b(?:LibraryCover|ArtistPicture|PlaylistCover|ArchiveCover|CoverImage)\(")
+COVERS = re.compile(r"\b(?:LibraryCover|ArtistPicture|PlaylistCover|ArchiveCover|CoverImage|FolderCover)\(")
 #? where each page builds its cells
 CELL_BUILDERS = {"Mac/Library/MacAlbumsPage.swift": "private func cell(", "Mac/Library/MacArtistsPage.swift":
                  "private func cell(", "Mac/Library/MacPlaylistsPage.swift": "private func cell(",
                  "Mac/Album/MacAlbumPage.swift": "private func cell(", "Mac/Album/MacPlaylistPage.swift":
                  "private func cell(", "Mac/Requests/MacRequestsPage.swift": "private func albumCell(",
                  # (R9) Downloaded's album cell (its playlist cell, the same, is test_ios_settings_look's)
-                 "Mac/Settings/MacDownloadedPage.swift": "private func cell(_ row: AlbumRow"}
+                 "Mac/Settings/MacDownloadedPage.swift": "private func cell(_ row: AlbumRow",
+                 # (R12's review) Needs a look's album cell: the folder's cover beside the title and its chips
+                 "Mac/Manage/MacNeedsALook.swift": "private func cell("}
 
 
 def test_a_tables_cover_rides_on_its_title():
@@ -332,14 +336,15 @@ def test_a_tables_cover_rides_on_its_title():
         for found in COVERS.finditer(cells):
             covers += 1
             head, opened, closed = blocks_around(cells, found.start())[0]
-            assert re.match(r"HStack\(spacing: \d+\)$", head), (name, head)
+            # its spacing a number or a look's constant (Needs a look's MacNeedsLookLook.gap)
+            assert re.match(r"HStack\(spacing: (?:\d+|\w+\.\w+)\)$", head), (name, head)
             assert "Text(" in cells[opened:closed], (name, "a cover with no title beside it")
         if "MacAlbumPage" in name or "MacPlaylistPage" in name:
             assert "SharpSymbol(.play)" in cells, name
         if "MacAlbumPage" in name:
             assert 'Image(systemName: "ellipsis")' in (APP / name).read_text(encoding="utf-8")
             assert "QueueMenu(request: desk.row(song, album)) { Image(systemName: " in re.sub(r"\s+", " ", cells)
-    assert covers == 5, covers  # (R9) Downloaded's album cover the fifth
+    assert covers == 6, covers  # (R9) Downloaded's album cover the fifth, (R12) Needs a look's the sixth
     # the rehearsal: a cover alone in its cell, and a cover in a stack on the foot, are each seen
     alone = "func cell() -> some View { switch column { case 0: LibraryCover(id: x) default: Text(y) } }"
     head = blocks_around(alone, alone.index("LibraryCover("))[0][0]

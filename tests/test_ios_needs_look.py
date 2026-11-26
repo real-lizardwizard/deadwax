@@ -228,10 +228,12 @@ def test_the_count_is_asked_only_while_a_page_that_uses_it_shows():
             continue
         text = path.read_text(encoding="utf-8")
         assert "queueCount.ask()" not in text and "count?.ask()" not in text and "count.ask()" not in text, path.name
-    # Needs a look's own pull: never out of reach, the count then the list
+    # Needs a look's own pull: never out of reach, the count then the list - (R12's review) and never while a session
+    # lasts or a read is out (Core's NeedsLookPage.pullReads, test_ios_needs_look_look's pin)
     page = app_file("Manage", "NeedsLookModel.swift")
     pulled = swift_like(page, "pulled")
-    assert "guard online, samePerson, page.allowed else { return }" in pulled
+    assert ("guard NeedsLookPage.pullReads(online: online, samePerson: samePerson, allowed: page.allowed,"
+            in pulled and "session: session != nil, reading: scan.reading) else { return }" in pulled)
     assert pulled.index("count?.pulled()") < pulled.index("await read()")
     assert ".pullToRefresh {\n            await model.pulled()\n        }" in screen
     # (slice 7's review) nothing read or noted under the sign-in over the app: every read of the page's goes through
@@ -243,8 +245,10 @@ def test_the_count_is_asked_only_while_a_page_that_uses_it_shows():
     assert page.count("scan.read(client:") == 1 and page.count("client.markReviewed(") == 1
     again = swift_like(page, "signedInAgain")
     assert "guard shown, online, session == nil else { return }" in again and "await read()" in again
-    assert ".onChange(of: server.signInOver == nil) { _, clear in\n            guard clear, visible else { return }\n" \
-           "            Task { await model.signedInAgain() }" in screen
+    # (R12) in NeedsLookLife, the page's life the Mac's Needs a look wears too
+    assert ".onChange(of: server.signInOver == nil) { _, clear in\n                guard clear, visible else { return }\n" \
+           "                Task { await model.signedInAgain() }" in screen
+    assert "struct NeedsLookLife: ViewModifier {" in screen and screen.count(".modifier(NeedsLookLife(model: model))") == 1
 
 
 def test_every_write_asks_the_count_again_and_tells_the_page():
@@ -309,7 +313,8 @@ def test_the_editor_steps_through_the_queue_as_the_web_does():
     assert ".task(id: request.queue?.steps ?? 0)" in sheet
     assert "scan: request.queue?.scan" in sheet
     # ‹, where it is, Skip or Next album - each through the editor's gate, typed work asked about first
-    assert "ToolbarItemGroup(placement: .bottomBar)" in sheet
+    # (R12) the bar above the root's foot (EditQueueBar), the system's bottom toolbar gone with the grey
+    assert "bottomBar" not in sheet and "EditAlbumRoot(model: model, path: $path, queue: queue)" in sheet
     assert ".disabled(!nav.back || !model.canStep)" in sheet and ".disabled(!nav.on || !model.canStep)" in sheet
     assert "pendingStep = delta" in sheet and "askingDiscard = true" in sheet
     assert "queue.go(by: delta, gate: model.stepGate)" in swift_like(sheet, "take")

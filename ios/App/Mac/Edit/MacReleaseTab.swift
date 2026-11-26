@@ -58,7 +58,9 @@ struct MacReleaseTab: View {
     // MARK: Needs a look
 
     /// The issues the album still has and what was marked fine - It's fine as it is and Ask about it again with Look
-    /// after the library too (AlbumEdit.marksFine), as the phone's root has them.
+    /// after the library too (AlbumEdit.marksFine), as the phone's root has them. (R12) In queue mode It's fine as it is
+    /// is the foot's (MacEditFooter, NeedsALook.dc.html), on every tab: here, Ask about it again alone - and (R12's
+    /// review) a mark refused is said in the foot too, so on whichever tab is open.
     @ViewBuilder private var needsALook: some View {
         let album = retag.album
         let outstanding = MetadataQueue.outstanding(album)
@@ -91,7 +93,7 @@ struct MacReleaseTab: View {
                     }
                     if marks {
                         HStack(spacing: 8) {
-                            if !outstanding.isEmpty {
+                            if !outstanding.isEmpty && model.queue == nil {
                                 Button(model.marking ? RetagWords.markingFine : RetagWords.fine) {
                                     Task { await model.markFine() }
                                 }
@@ -107,7 +109,8 @@ struct MacReleaseTab: View {
                             }
                         }
                     }
-                    if let failure = model.markFailure {
+                    // (R12's review) in queue mode a mark refused is the foot's to say, on every tab (MacEditFooter)
+                    if model.queue == nil, let failure = model.markFailure {
                         ErrorNote(text: failure)
                     }
                 }

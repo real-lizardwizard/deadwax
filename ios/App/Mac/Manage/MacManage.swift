@@ -7,7 +7,7 @@ import SwiftUI
 /// exactly as appRoutes draws it. (R13) Library care and the event log are the Mac's own pages; In nobody's library is
 /// drawn in Library care's boxes, so its route opens Library care. (R14) People and a person are MacPeoplePage - the
 /// list and the person chosen side by side; Server settings and a group of them MacServerSettingsPage, opened at the
-/// group's tab.
+/// group's tab. (R12) Needs a look is MacNeedsALook - the queue and the album's editor beside it.
 @MainActor
 enum MacManage {
     enum Page: Hashable {
@@ -23,7 +23,7 @@ enum MacManage {
 
     @ViewBuilder static func page(for page: Page) -> some View {
         switch page {
-        case .needsALook: NeedsLookScreen().readableOnMac()
+        case .needsALook: MacNeedsALook()
         case .libraryCare: MacLibraryCarePage()
         case .heldByNobody: MacLibraryCarePage()
         case .eventLog: MacEventLogPage()

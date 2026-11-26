@@ -8,7 +8,9 @@ import SwiftUI
 /// several folders, the status with Look again.
 ///
 /// Its hosts own the model and its opening, and draw what is round it: MacEditWindow (Settings' Edit an album, beside
-/// the folder list) and R12's MacNeedsALook. `bar` is the host's slot over the header - queue mode's bar.
+/// the folder list) and R12's MacNeedsALook (beside the queue). `bar` is the host's slot - queue mode's bar, drawn (R12 -
+/// notes/ios.md "The redesign, slice R12: Needs a look") under the header's chip, as NeedsALook.dc.html has it; `queue`
+/// is queue mode as the foot needs it - It's fine as it is, and Apply moving on (MacEditFooter).
 ///
 /// (R11 - notes/ios.md "The redesign, slice R11: Tags, Artwork, Lyrics and Delete") Every part a tab of its own, as
 /// Main.dc.html draws them: Release's MacReleaseTab, Tags' MacTagsTab, Artwork's MacArtworkTab, Lyrics' MacLyricsTab,
@@ -22,17 +24,20 @@ import SwiftUI
 struct MacAlbumEditor<Bar: View>: View {
     let model: EditAlbumModel
     let layout: EditAlbumPage.Layout
-    /// The host's, over the header: queue mode's bar (R12's), or nothing.
+    /// The host's, under the header's chip: queue mode's bar (R12's), or nothing.
     let bar: Bar
+    /// (R12) Queue mode, the host's: where the session is, and its step - nil from anywhere but Needs a look.
+    let queue: MacEditQueue?
 
     @Environment(ServerModel.self) private var server
     @State private var tab: AlbumEdit.Part = .release
     @State private var sheet: MacEditSheet?
     @State private var sheetPath: [EditPage] = []
 
-    init(model: EditAlbumModel, layout: EditAlbumPage.Layout, @ViewBuilder bar: () -> Bar) {
+    init(model: EditAlbumModel, layout: EditAlbumPage.Layout, queue: MacEditQueue? = nil, @ViewBuilder bar: () -> Bar) {
         self.model = model
         self.layout = layout
+        self.queue = queue
         self.bar = bar()
     }
 
@@ -81,8 +86,7 @@ struct MacAlbumEditor<Bar: View>: View {
         let tabs = EditAlbumPage.tabs(editors: edit.editors, delete: edit.delete)
         let showing = EditAlbumPage.shown(tab, in: tabs)
         VStack(alignment: .leading, spacing: 0) {
-            bar
-            MacEditHeader(model: model, album: album, beside: layout.headerBeside)
+            MacEditHeader(model: model, album: album, beside: layout.headerBeside) { bar }
             waits
             if !tabs.isEmpty {
                 MacFolderTabs(tabs: tabs, words: { (part: AlbumEdit.Part) -> String in part.label },
@@ -98,7 +102,7 @@ struct MacAlbumEditor<Bar: View>: View {
             // phone's foot are gated - (R11) Tags' Revert and Apply, Delete's Delete permanently (with Look after the
             // library), Artwork's and Lyrics' line alone
             if showing != .release || edit.editors {
-                MacEditFooter(model: model, album: album, part: showing)
+                MacEditFooter(model: model, album: album, part: showing, queue: queue)
             }
         }
     }

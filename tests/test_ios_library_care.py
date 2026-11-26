@@ -270,9 +270,11 @@ def test_the_runs_are_the_apps_and_only_carry_out_what_core_decides():
     assert "generation += 1" in reset and "runs = CareRuns()" in reset and "scan = LibraryScanModel()" in reset
     for polling in ("Task.sleep", "Timer.publish", "Timer.scheduled", "TimelineView"):
         assert polling not in model, f"nothing polled: {polling}"
-    # the rescan is the scan model's, ticketed as a read is
+    # the rescan is the scan model's, ticketed as a read is (R12's review: by the one ScanReads, its end told)
     scan = swift_like(app_file("Edit", "LibraryScanModel.swift"), "rescan")
-    assert "let (fresh, tag) = try await client.rescan()" in scan and "guard ticket == reads else { return .dropped }" in scan
+    assert "let ticket = reads.begin()" in scan and "let (fresh, tag) = try await client.rescan()" in scan
+    assert scan.count("guard reads.isNewest(ticket) else { return .dropped }") == 2
+    assert "reads.ended(ticket, .landed)" in scan and "reads.ended(ticket, .failed)" in scan
     assert "return RetagFlow.outcome(of: error) == .refused ? .refused : .unanswered" in scan
 
 
