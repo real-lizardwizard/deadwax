@@ -72,10 +72,11 @@ def number(text: str, name: str) -> float:
 #? everything the artist's page draws on the phone that has a fill or an edge (test_ios_phone_look.py's reading): the
 #? rows' hairlines alone - Get's, under it as under the rest of its row, and the song rows' (ArtistRowRule, the phone's
 #? row rule). The pair's purple is AlbumPlayPair's (R5's, the primary button), the strip PhoneStrip's (R2's) - each
-#? held where it is drawn. James, 25 Nov: "get rid of all the grey boxes".
+#? held where it is drawn. James, 25 Nov: "get rid of all the grey boxes". (R10's wider reading) A song you don't
+#? have's blank cover, NoteCover's ZStack ground - a picture's place, which keeps its face.
 PHONE_DRAWS = {
     VIEW: ["DWRule: DWPalette.rowRule"],
-    SECTION: ["DWRule: DWPalette.rowRule"],
+    SECTION: ["DWRule: DWPalette.rowRule", "ZStack: Palette.coverEmpty"],
 }
 
 

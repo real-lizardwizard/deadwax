@@ -125,12 +125,12 @@ def _phone_look():
 
 #? everything R9's phone files draw on the phone's path that has a fill, a face, an edge or a rule (R1c's DRAWS): the
 #? hairlines - under a group's rows on Settings' root, under Settings > Downloads' legends and its rows - and the
-#? sign-in's fields' well with its edge (FieldLook: anywhere you type is a box). No grey box: a card or a row is its
-#? words on the page
+#? sign-in's fields' well with its edge (FieldLook: anywhere you type is a box); (R10's wider reading) the account
+#? card's round letter, a picture's place. No grey box: a card or a row is its words on the page
 R9_DRAWS = {
     "Downloads/DownloadsScreen.swift": ["DWRule: DWPalette.groupRule"] * 5 + ["DWRule: DWPalette.rowRule"] * 3,
     "Root/SignInView.swift": ["background: DWPalette.well", "strokeBorder: DWPalette.acc, DWPalette.line"],
-    "You/YouView.swift": ["DWRule: DWPalette.groupRule"],
+    "You/YouView.swift": ["background: Palette.avatar", "DWRule: DWPalette.groupRule"],
 }
 
 

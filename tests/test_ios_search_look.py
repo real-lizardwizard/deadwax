@@ -359,9 +359,9 @@ FLAT = {
     # bar in the accent and the line under each track
     GROUP: ["background: DWPalette.page", "strokeBorder: DWPalette.t2", "DWRule: DWPalette.rowRule",
             "fill: DWPalette.acc", "DWRule: DWPalette.rowRule"],
-    # the page's black, the query's own box (R1c's typing rule - its field keeps a face), the filters' strip's hairline
-    # and the chosen filter's line in the accent
-    SHEET: ["background: DWPalette.page", "strokeBorder: Palette.border", "DWRule: DWPalette.stripRule",
+    # the page's black, the query's own box (R1c's typing rule - its field keeps a face: its well, which R10's wider
+    # reading sees, and its edge), the filters' strip's hairline and the chosen filter's line in the accent
+    SHEET: ["background: DWPalette.page", "background: Palette.well", "strokeBorder: Palette.border", "DWRule: DWPalette.stripRule",
             "fill: DWPalette.acc"],
     # the cards: PhoneCard's line under each, nothing of their own; the picker iOS's list; the store line words alone
     CARD: [], PICKER: [], STORE: [],
