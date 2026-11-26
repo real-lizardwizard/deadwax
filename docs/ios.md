@@ -490,9 +490,13 @@ The rest of the differences:
   - **Edit album** is a page, not a sheet: Settings' **Edit an album**, every album folder down its left (**Find**,
     and **All | Needs a look**) and the folder you pick at its right - its header, **Release | Tags | Artwork | Lyrics
     | Delete** as tabs, and Release's boxes, with **Revert** and **Apply** at its foot. An album page's **Edit** and a
-    Needs a look row open this page on that folder. Tags, Artwork, Lyrics and Delete album… are still today's pages:
-    their tab's **Open…** opens each in a sheet over the page. While it has changes, or an Apply runs, there's no Back,
-    and another folder or another album's Edit asks **Discard changes?** first.
+    Needs a look row open this page on that folder. **Tags** is the folder's tracks with a checkbox each beside the
+    fields for the ones ticked (**Edit 3 tracks**, or all of them with none ticked), **Apply to 3 tracks** at the foot,
+    and **See a file's every tag…** (or a row's double-click) for everything in one file; **Artwork** the Cover box
+    (**Get cover**, **Compare with this pressing…**) and the CD art box (**Get CD art**); **Lyrics** the count and **Get
+    lyrics**; **Delete** what goes, with **Delete permanently** at the foot and the same question as on the phone.
+    While it has changes, or an Apply runs, there's no Back, and another folder, another album's Edit or a tick that
+    changes which tracks Tags edits asks **Discard changes?** first.
   - **Manage's pages** - Needs a look, Server settings and each of its groups,
     People and a person's page - sit in the middle of the page at the same readable width as an album's, scrolling
     with the pointer anywhere across the page. **Library care** (In nobody's library with it) and the **event log** are
@@ -557,9 +561,10 @@ The rest of the differences:
   as on the phone: running it again carries on. A download still lets the Mac sleep when it's left alone, as it would anyway (a MacBook downloading a whole library
   on battery isn't kept awake for hours); a run or an apply keeps it awake until it ends.
 - **Clicks, not taps**: where the phone's words say tap, the Mac's say click - "Couldn't open it - click to try
-  again." in Requests, "Click a track's name…" in Edit album, Settings > Getting albums' **When I click Get**, the
-  Library's downloaded playlists, Debug's test sounds. After People's permissions are saved: "Saved - Sam has them
-  from the next thing they do in deadwax." The note after a force quit says "force quit", not the app switcher.
+  again." in Requests, "Click the cover to see it full size." in Edit album, Settings > Getting albums' **When I click
+  Get**, the Library's downloaded playlists, Debug's test sounds. After People's permissions are saved: "Saved - Sam
+  has them from the next thing they do in deadwax." The note after a force quit says "force quit", not the app
+  switcher.
 - **Still the phone's words**: in Debug (an admin's), some of the audio engine's rarer errors, which say "phone" or
   "iOS".
 
@@ -1023,7 +1028,8 @@ and folder put right to match. It opens from an album page's top **•••** (
 Refresh), from Settings > Manage > **Edit an album**, or from a row of [Needs a look](#needs-a-look) - with ‹, Skip and
 Next album at its foot to work through the list - for someone who may edit albums - Edit albums or Look after the
 library: an admin, or everyone with logins off. It's a sheet over the tabs, titled Edit album, drawn flat on the
-page's black: a header, a strip of the editor's parts, then Release, with **Revert** and **Apply** at its foot.
+page's black: a header, a strip of the editor's parts, then the part chosen - Release first, with **Revert** and
+**Apply** at its foot.
 **Close** is at its top left, and at its top right **Matched** (green) when the folder is tagged with a MusicBrainz
 release, **Not matched** when it isn't. (On the Mac, Edit album is a page of its own - see [The Mac app](#the-mac-app).)
 
@@ -1048,8 +1054,8 @@ doesn't list. Pull down to read the library again.
   ("FLAC · 12 tracks · 2 discs"), and the folder's path under them in the typewriter face, which you can select.
 - **Folder**, a menu, when the album is in more than one folder.
 - **The strip**: **Release**, **Tags**, **Artwork** and **Lyrics** with Edit albums, **Delete** with Look after the
-  library. Release is drawn on this page, under the strip (below); the others each open their page, as the rows did
-  (all below).
+  library. Each is drawn on this page, under the strip, its button at the page's foot where it has one - Release's
+  Revert and Apply, Tags' Select all and Edit tracks…, Delete's Delete permanently (all below).
 - **Needs a look**, with Edit albums, when something's wrong with the album: each issue, with what it means ("Not
   matched to MusicBrainz", "No cover art"...), as Needs a look in the web app says them. With **Look after the
   library** too, **It's fine as it is** under them takes the album out of Needs a look for those issues; after it,
@@ -1103,11 +1109,14 @@ cover.png." It's off until the release's cover has shown, so you never save one 
 runs, or the folder is still being read again after one. If its answer never comes, it's said as an Apply's is (below).
 
 **Tags** is the album's files as deadwax reads them from the disk when it opens ("Reading the files…"), in running
-order - a section for each disc on a set ("Disc 1", "Disc 2"). Each row is the track's number (its disc first on a
-set: "2-04") and its title, with its artist under it when it isn't the album's. Tap a track for its page. **Select**
-(top right) lets you tick tracks, with **Select every track** at the bottom; **Edit 3 tracks…** at the bottom (or
-**Edit all tracks…** with none ticked) opens Edit tags for them, and **Done** ends Select. Choosing other tracks while
-Edit tags holds changes you haven't applied asks "Discard changes?" first.
+order - a heading for each disc on a set ("Disc 1", "Disc 2"). Each row is a tick, the track's number (its disc first
+on a set: "2-04"), its title - with its artist under it when it isn't the album's - its length, and a ›. Tap the row to
+tick it; its › opens the track's page. VoiceOver reads each row as one ("Track 3, Shoot to Thrill", its length, and
+whether it's ticked): double-tap to tick it, and **See a file's every tag…** is among its actions. At the foot,
+**Select all** (**Deselect all** once every track is ticked) and **Edit 3 tracks…** - **Edit all tracks…** with none
+ticked - which opens Edit tags for them, off while something is being written; at the largest text sizes the two sit
+one over the other. Choosing other tracks while Edit tags holds changes you haven't applied asks "Discard changes?"
+first.
 
 **A track's page** is everything in its file, as the web app's track view shows it: its title (or its file's name, with
 "No title tag - this is the file's name."), where it sits ("Track 3, disc 2 of 2 · 4:07 · FLAC"), **Edit this
@@ -1134,26 +1143,28 @@ page under the sheet shows the album as it is now. A big album takes longer to w
 whole - so the phone waits two minutes and more by how much the files hold. An Apply whose answer never comes is said
 as Release's is (below), and the files read again before Apply comes back on.
 
-**Artwork** is the web app's Artwork tab. **Cover**: the folder's cover - tap it to see it full screen - and where it
-is ("A cover is saved beside the tracks.", "The cover is inside the files, with none beside them.", or "No cover is
-saved with the album."). With none, and the album matched to a release, **Get cover** saves the release's front from
-the Cover Art Archive beside the tracks - "Getting the cover…" while it does - and once the folder has been read
-again the cover shows, here and on the album page. When the Archive has none for that release it says so ("The Cover
-Art Archive has no front cover for that release.") and the button becomes **Look again**. With no release, "To get a
-cover, first match the album to a release on the Release page." opens Release; with a cover, "To replace it, compare
-it with the release's on the Release page (Compare covers…)." opens Compare covers. **CD art**: the pictures of the
-disc beside the tracks, in a grid with their names ("Beside the tracks - what players show for a song with a disc
-number:") - tap one to see it full screen - or "No picture of the disc beside the tracks." With the album matched to a
-release and no CD art deadwax saved itself (a `disc` picture), **Get CD art** saves a picture of each disc - the
-Cover Art Archive's, else fanart.tv's when deadwax has its key - and after it "deadwax never replaces CD art it
-saved.": a second Get is never offered.
+**Artwork** is the web app's Artwork tab, its Gets on the page rather than at its foot. **Cover**: the folder's
+cover - tap it to see it full screen - and where it is ("A cover is saved beside the tracks.", "The cover is inside
+the files, with none beside them.", or "No cover is saved with the album."). With none, and the album matched to a
+release, **Get cover** saves the release's front from the Cover Art Archive beside the tracks - "Getting the cover…"
+while it does - and once the folder has been read again the cover shows, here and on the album page. When the Archive
+has none for that release it says so ("The Cover Art Archive has no front cover for that release.") and the button
+becomes **Look again**. With a cover and a release's cover to compare it with, **Compare covers…** opens them side by
+side (Compare covers, below). With no release, "To get a cover, first match the album to a release in the Release
+tab." with **Go to Release**, which shows the Release tab. **CD art**: the pictures of the disc beside the tracks,
+each round, with its name, and "What players show for a song with a disc number." under them - tap one to see it full
+screen - or an empty disc and "No picture of the disc beside the tracks." With the album matched to a release and no
+CD art deadwax saved itself (a `disc` picture), **Get CD art** saves a picture of each disc - the Cover Art Archive's,
+else fanart.tv's when deadwax has its key - and after it "deadwax never replaces CD art it saved.": a second Get is
+never offered.
 
 **Lyrics** is the web app's Lyrics tab: "8 of 12 tracks have lyrics saved beside them, as a .lrc.", then **Get
-lyrics** while any track has none. It asks LRCLIB for each track without a .lrc - never replacing one that's there -
-"Getting lyrics…" while it does, and then says what it came to ("Saved lyrics for 3 tracks (2 synced), 8 already had
-them, 1 not on LRCLIB."), the button now "Lyrics · 11 of 12" to ask again. With every track done, "Every track has
-lyrics." Lyrics saved show on Now Playing once Navidrome has scanned the folder. Under it, where to re-time synced
-lyrics - Lyrics in [Server settings](#server-settings), whose **Re-time saved lyrics** moves them to a new lead.
+lyrics** while any track has none, beside "Nothing saved is replaced." It asks LRCLIB for each track without a .lrc -
+never replacing one that's there - "Getting lyrics…" while it does, and then says what it came to ("Saved lyrics for 3
+tracks (2 synced), 8 already had them, 1 not on LRCLIB."), the button now "Lyrics · 11 of 12" to ask again. With every
+track done, "Every track has lyrics." Lyrics saved show on Now Playing once Navidrome has scanned the folder. Under
+it, where to re-time synced lyrics - Lyrics in [Server settings](#server-settings), whose **Re-time saved lyrics**
+moves them to a new lead.
 
 **The Gets are writes**, like Apply: one at a time, never while Release or Edit tags applies (and those are dimmed
 while a Get runs), and off until the folder has been read again after any of them. Each says what went wrong under
@@ -1162,29 +1173,31 @@ waits as long as that album could take at worst: for lyrics at least ten minutes
 (23 for twelve), and for CD art at least seven, more for each disc. If its answer never comes, it's said as an
 Apply's is (below): the folder is read again, so whatever deadwax saved meanwhile shows.
 
-**Delete album** is the web app's Delete tab: it removes the album's folder from deadwax's library, with everything
-in it, for good. As it opens, deadwax reads the folder as it is now ("Checking what's in there…"): how many tracks
-and how big ("12 tracks · 412 MB"), then any other files in it by name, in amber, since one might be the only copy
-("and 2 other files:" over "rip.log, album.cue" - pictures and each track's own .lrc aren't counted), and, with logins
-on, whose libraries it's in, in amber: "In ana and bo's libraries: deleting it takes it out, and they'll see it was
+**Delete** is the web app's Delete tab: it removes the album's folder from deadwax's library, with everything in
+it, for good. Each time it shows, deadwax reads the folder as it is now ("Checking what's in there…"). Under **Delete
+this album?**: **Tracks**, how many and how big ("12 · 412 MB"); then, in amber, how many other files go with them
+("and 2 other files:") over their names, since one might be the only copy ("rip.log, album.cue" - the first twelve
+named, ", …" after them; pictures and each track's own .lrc aren't counted); with logins on, **In a library** ("Yours
+only", "Nobody's", "Yours, ana's and bo's"); and **Folder**, its path. Under them,
+whose libraries it's in, in amber: "In ana and bo's libraries: deleting it takes it out, and they'll see it was
 removed by an admin.", "In your library: deleting it takes it out.", or "Nobody has it in their library." When deadwax
 couldn't read who has it, it says so - never "nobody". If the folder can't be read, "Couldn't read that folder." and
 why, with **Look again**. Then, in red, "This deletes the folder and everything in it, permanently. There is no
-undo." over **Delete permanently**, which is off until all that has been read - and, when the library couldn't be read
-again after a write, says so ("Couldn't read the library.", with **Look again**) rather than staying dimmed with no
-reason. Tap it and the phone asks once more - "Delete Dummy?", "There is no undo." - **Delete** in red, or
-**Cancel**, the one a stray tap lands on. The question is about that folder as it was just read: if the page moves to
-another folder while it's up (the library read again found the album moved), it goes away, and if what's in the
-folder has changed meanwhile, nothing is deleted. "Deleting…";
-then the sheet closes (VoiceOver says "Deleted Portishead/Dummy (1994).") and the Library asks for its albums again,
-now and once Navidrome has scanned. When that folder was all the album had, its page goes back as well; an album in
-several folders keeps its page, which shows the rest once Navidrome has scanned. Songs of it downloaded to the phone
-still play from there, its page saying "This album isn't in the collection any more - the songs on this phone still
-play." Deleting is a write, as an Apply is: never beside one, or a Get, and off until the folder has been read again
-after one; nothing on the sheet can close it while it runs. If its answer never comes - or comes as a server error -
-it says "deadwax may have finished this - looking again" and reads the library again: the folder gone, it went, and
-the sheet closes; still there, "Couldn't delete it." under the button, and what's in it read again. A refusal says
-why, as deadwax put it ("That folder is not there any more.").
+undo.", and **Delete permanently** red at the page's foot, off until all that has been read - and, when the library
+couldn't be read again after a write, says so ("Couldn't read the library.", with **Look again**) rather than staying
+dimmed with no reason. Tap it and the phone asks once more - "Delete Dummy?", "There is no undo." - **Delete** in red,
+or **Cancel**, the one a stray tap lands on. The question is about that folder as it was just read: if the page moves
+to another folder while it's up (the library read again found the album moved), it goes away, and if what's in the
+folder has changed meanwhile, nothing is deleted. "Deleting…"; then the sheet closes (VoiceOver says "Deleted
+Portishead/Dummy (1994).") and the Library asks for its albums again, now and once Navidrome has scanned. When that
+folder was all the album had, its page goes back as well; an album in several folders keeps its page, which shows the
+rest once Navidrome has scanned. Songs of it downloaded to the phone still play from there, its page saying "This
+album isn't in the collection any more - the songs on this phone still play." Deleting is a write, as an Apply is:
+never beside one, or a Get, and off until the folder has been read again after one; nothing on the sheet can close it
+while it runs. If its answer never comes - or comes as a server error - it says "deadwax may have finished this -
+looking again" and reads the library again: the folder gone, it went, and the sheet closes; still there, "Couldn't
+delete it." under the button, and what's in it read again. A refusal says why, as deadwax put it ("That folder is not
+there any more.").
 
 **Typed work isn't lost by a swipe.** With something typed or chosen and not applied, the sheet can't be swiped away,
 and Close asks "Discard changes?" - **Discard**, or **Keep editing**.
@@ -1196,7 +1209,7 @@ long, WireGuard dropped) - or comes as a server error, from deadwax or from a re
 the wait - the sheet says "deadwax may have finished this - looking again", reads the folder again and works What Apply
 does out afresh: never the same Apply again on the old answer. Only a refusal (deadwax saying no before it wrote
 anything) keeps What Apply does as it was. If the library can't be read then, the sheet says "Couldn't read the
-library." with **Look again** - on every page waiting for it, Delete album's too - and nothing can be applied until it
+library." with **Look again** - on every page waiting for it, Delete's too - and nothing can be applied until it
 has been read. Only one write runs at a time: while
 Release applies or saves a cover, Edit tags' Apply, the Gets and Delete permanently are dimmed, and the other way round
 - and after any of them, the others' previews are worked out again once the folder has been read.
@@ -6925,8 +6938,8 @@ first, and start one more so something is coming.
 
 **Not done yet.** Edit album in the new look: on the Mac one page, Settings' **Edit an album** - every album folder at
 the left, the one you pick at the right; on the phone the sheet's first page drawn flat, with a strip across it and
-**Revert** and **Apply** at its foot. Tags, Artwork, Lyrics and Delete are still the pages they are today. Have an
-album whose tags you don't mind changing and changing back, and one or two in Needs a look.
+**Revert** and **Apply** at its foot. Tags, Artwork, Lyrics and Delete are tabs beside Release - 585-589 go
+through them. Have an album whose tags you don't mind changing and changing back, and one or two in Needs a look.
 
 - **580 Edit an album.** **Not done yet.** On the Mac pick a folder: the header and Release fit one screen, with Apply
   in view. (Settings' **Edit an album** opens the page: the folders down its left in the Library's order - by artist,
@@ -6938,8 +6951,7 @@ album whose tags you don't mind changing and changing back, and one or two in Ne
   **Not matched**, and **Open album**; then **Release | Tags | Artwork | Lyrics | Delete** as tabs, and Release's
   boxes - Pressing (search and Find releases, the pressings to click), Fields, Cover and What Apply does - two columns
   in a wide window, one in a narrow one. **Revert** and **Apply** are at the foot whatever the window's size. Tab goes
-  through the search and the five fields in order. Tags, Artwork, Lyrics and Delete each say what they hold, and
-  their **Open…** at the foot opens today's page over this one; Done closes it.)
+  through the search and the five fields in order. Tags, Artwork, Lyrics and Delete: 585-587.)
 - **581 Apply.** **Not done yet.** What Apply does shows the change; after Apply, the album and Navidrome show it;
   Revert undoes it. (Change the edition, say: What Apply does says what will change - **Show every change** lists
   each file's. **Apply** says what it's waiting for while it runs; while it does, the window can't be closed, there's
@@ -6951,13 +6963,13 @@ album whose tags you don't mind changing and changing back, and one or two in Ne
   page comes to the front with the album's folder picked in the list. **Open album** goes back to the album's page,
   with the Edit page under it. A Needs a look row opens it too, with ‹ and Skip over the header for now. Open it from
   an album and, while it's still finding the folder, click another tab and come back: it finds it - it never stays
-  finding it for good. An album you don't mind losing: its **Delete** tab, **Open Delete album…**, delete it - is its
+  finding it for good. An album you don't mind losing: its **Delete** tab, **Delete permanently**, delete it - is its
   album page gone from the Library too, not left behind?)
-- **583 Edit album on the phone.** **Not done yet.** As drawn; Release is the strip's one tab, the rest open their
-  pages; Apply at the foot works; Close with typed work asks first. (The top has **Close**, Edit album and a green
+- **583 Edit album on the phone.** **Not done yet.** As drawn; Release is the strip's first tab (the rest: 588);
+  Apply at the foot works; Close with typed work asks first. (The top has **Close**, Edit album and a green
   **Matched** - or **Not matched**. Under the header - its byline and its path, in the typewriter face, a line each,
-  cut short with … when long - is the strip: **Release** is this page; Tags, Artwork, Lyrics and Delete each open
-  their page as the rows did. Release is four groups with a heading each and no grey boxes: Release (**Choose a
+  cut short with … when long - is the strip: **Release** is this page; Tags, Artwork, Lyrics and Delete are
+  tabs of it too (588). Release is four groups with a heading each and no grey boxes: Release (**Choose a
   release** or **Change…**), Fields (Artist, Album, Year and Original on one line - the years in the typewriter face -
   Edition, each a box you type in), Cover (the two covers, the purple switch, **Compare**) and What Apply does, its
   line to every change an easy tap. **Revert** and **Apply** sit at the foot and stay there under the keyboard -
@@ -6965,6 +6977,56 @@ album whose tags you don't mind changing and changing back, and one or two in Ne
   it. At the largest text sizes each field's label sits over its box, and the two buttons' words take more than one
   line.)
 - **584 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 583, or "not done yet".
+
+#### Tags, Artwork, Lyrics and Delete (585-589)
+
+**Not done yet.** Edit album's other four tabs in the new look: on the Mac each is a tab of the Edit an album page,
+its button in the foot under it; on the phone each is a tab of the sheet's strip, drawn flat, nothing pushed. What
+each writes is what it wrote before. Have an album whose tags you don't mind changing and changing back, one matched
+to a release with no cover, no CD art and some tracks without lyrics, and one you don't mind losing.
+
+- **585 Tags.** **Not done yet.** On the Mac tick three tracks, change a field, and **Apply to 3 tracks** writes
+  those three alone. (Tags is the folder's tracks in a list - a checkbox, #, Title, Length, a heading per disc on a
+  set - with "Select tracks to edit only those." under it. The box beside it - under it in a narrow window - is
+  headed **Edit all tracks**, then **Edit 3 tracks** once three are ticked; its fields start at what those tracks
+  share, Tab goes through them in order (Title, Artist, Album, Album artist, Track, Disc, Disc title, Year, Original,
+  Genre, Composer), each changed one says so with **Undo**, and what Apply would write shows under them. The foot
+  says "A field left as it is isn't written." beside **Revert** and **Apply to 3 tracks** - **Apply to all 10
+  tracks** with none ticked. With something typed, tick another track: it asks **Discard changes?** first, **Keep
+  editing** Return's. Click a row and **See a file's every tag…** - or double-click the row - shows everything in
+  that file, the pictures inside it too; Done or Escape closes it. With something typed for other tracks, its **Edit
+  this track…** closes the sheet and then asks **Discard changes?**. After Apply the album shows the new tags and no
+  file is renamed. With VoiceOver a row is one item - "Track 3, Shoot to Thrill, 5:17, checked" when ticked - its
+  actions Select or Deselect and See a file's every tag….)
+- **586 Artwork.** **Not done yet.** On the album with no cover or CD art: **Get cover**, then **Get CD art** - each
+  box shows what came. (The Cover box: the folder's cover - click it to see it full size - and where it is; **Get
+  cover** while there is none; **Compare with this pressing…** opens the folder's cover beside the pressing's - until
+  the pressing's cover has been found, "To replace it, compare it with the release's in the Release tab." instead. The
+  CD art box: each picture round (an empty disc, with its hole, while it loads), or an empty disc and "No picture of
+  the disc beside the tracks.";
+  **Get CD art** beside "deadwax never replaces CD art it saved." The two boxes sit side by side in a wide window.
+  The foot says "Pictures are saved into the album folder." Getting a cover changes no tag and picks no release. On
+  an album matched to no release, each box says so and **Go to Release** shows the Release tab. Lyrics: "8 of 12
+  tracks have lyrics saved beside them, as a .lrc." with **Get lyrics** - after it, the line says the new count.)
+- **587 Delete.** **Not done yet.** The Delete tab: the question and its guards are as they were; Cancel it.
+  (The box says what goes - the cover, the album, its folder, then "10 tracks · 290 MB" and, in amber, "and 3 other
+  files:" over their names - who has the album in their library, the whole sentence in amber, and "This deletes the
+  folder and everything in it, permanently. There is no undo." in red. The foot says who has it short ("In a
+  library: Yours only") and **Delete permanently**, red, which stays off until the folder has been read. Click it:
+  **Delete <album>?** / "There is no undo.", **Cancel** the default - Return cancels. Cancel: nothing is deleted,
+  and the tab still says what would go. Deleting a folder picked in Edit an album's list closes the album's page
+  wherever it was open, as deleting from the album's own Edit does.)
+- **588 The four on the phone.** **Not done yet.** 585-587 on the phone, and Get lyrics. (Tags is a row per track
+  run to the screen's edges: a tap on the row ticks it, its › shows everything in that track's file; VoiceOver reads
+  the row as one, a double-tap ticking it, See a file's every tag… among its actions. The foot has **Select all** -
+  **Deselect all** once every track is ticked - and **Edit 3 tracks…** (every track with none ticked), which opens
+  Edit tags: each field a box you type in, **Apply** at its foot, staying under the keyboard; at the largest text
+  size the foot's two sit one over the other, nothing cut off. Artwork: the cover beside what it is, **Get cover**,
+  **Compare covers…**, CD art round, each 112 across. Lyrics: the line and **Get lyrics** beside "Nothing saved is
+  replaced." - after it runs, the line says the new count. Delete: Tracks, then "and 3 other files:" in amber over
+  their names, In a library and Folder, the warning in red, **Delete permanently** red at the foot - its question
+  the phone's action sheet; Cancel it. No grey boxes on any of the four, and the ticks grow with the text.)
+- **589 Both phones.** **Not done yet.** Green Anole: the rest as before. Ethan's: 588, or "not done yet".
 
 #### Library care and the Event log (594-597)
 
@@ -7115,7 +7177,7 @@ track, a picture and anywhere you type keep a face. Nothing works any differentl
 download or two on Requests and something queued.
 
 **Not flat yet**, each until the slice that redraws it: Settings' Debug page;
-Edit album's Tags, Artwork, Lyrics and Delete pages (R11); Needs a look (R12); and the EQ's own pages -
+Needs a look (R12); and the EQ's own pages -
 Correction's search and a filter's editor - an artist's Artist images and Move albums sheets, and the pages Edit
 album's Release opens (Choose a release, Changes, Compare covers), which no slice has taken yet. Those keep iOS's
 grouped lists and their grey rows for now: don't count
@@ -7124,9 +7186,9 @@ them in 612.
 - **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
   Requests, an album, a playlist, an artist's page, Now Playing's sheet, Search Soulseek…'s sheet, Search, an album
   you don't have, Choose a source, Settings and its pages (Debug aside), Settings > Downloads, Library care, In
-  nobody's library, the Event log, the sign-in, Edit album's first page, and People and Server settings
-  (598-602) - not the screens
-  above that aren't flat yet: is anything still a grey box laid on top? Is every button still plainly a button, and
+  nobody's library, the Event log, the sign-in, Edit album's tabs (Release, Tags, Artwork, Lyrics, Delete), a track's
+  page and Edit tags, and People and Server settings (598-602) - not the screens above that aren't flat yet: is
+  anything still a grey box laid on top? Is every button still plainly a button, and
   does a tap show? (Any button that isn't purple is its words or its glyph in purple, as tall as before, faded while
   your finger is on it - an album's Shuffle, **Same source again**, a card's ✕, the EQ's output, Downloaded's **Not
   Now**, an empty library's **See All music**. A group - Info's This song, the EQ's Correction - is a grey heading

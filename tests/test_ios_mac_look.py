@@ -549,8 +549,8 @@ MAC_FONT = re.compile(r"Typeface\.(Mac\.(text|mono)|Look\.(text|mono)|symbol)\("
 
 def test_nothing_in_the_macs_views_draws_a_value_of_its_own():
     files = drawn_in_the_look()
-    # (R1c's review) eleven with DWWellField
-    assert len(files) > 30 and len([name for name in files if name.startswith("Look/")]) == 11, "App/Mac and App/Look"
+    # (R1c's review) eleven with DWWellField - (R11) twelve with DWCheckbox
+    assert len(files) > 30 and len([name for name in files if name.startswith("Look/")]) == 12, "App/Mac and App/Look"
     left = []
     for name, text in files.items():
         code = bare(text)

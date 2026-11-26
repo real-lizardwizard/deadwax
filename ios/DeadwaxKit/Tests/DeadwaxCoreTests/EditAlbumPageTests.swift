@@ -4,7 +4,7 @@ import Testing
 
 /// Edit album redrawn (notes/ios.md "The redesign, slice R10: Edit album, the folder list and Release"): the Mac's folder
 /// list and its switch, the header's chip, the strip's and the tabs' parts by permission, Revert's gate, and the Mac's
-/// page at each width. tests/test_ios_edit_look.py holds where the app draws each.
+/// page at each width - and (R11) the tags' ticks, the feet's words and what a delete takes, said in rows. tests/test_ios_edit_look.py holds where the app draws each.
 @Suite struct EditAlbumPageTests {
     // (R10's review) as deadwax sends them: an album with an issue outstanding needs attention (the queue's own word,
     // `needs_attention`); one whose every issue was marked fine doesn't
@@ -86,17 +86,22 @@ import Testing
     }
 
     @Test func theStripAndTheTabsAreThePermissions() {
-        // Edit albums and Look after the library: Release drawn on the root, the rest pushed as the rows pushed them
+        // (R11) Edit albums and Look after the library: every part a tab of the root's, none pushed
         let both = EditAlbumPage.strip(editors: true, delete: true)
-        #expect(both.tabs == [.release] && both.pushes == [.tags, .artwork, .lyrics, .delete])
+        #expect(both.tabs == [.release, .tags, .artwork, .lyrics, .delete])
         // Edit albums alone: no Delete
         let editors = EditAlbumPage.strip(editors: true, delete: false)
-        #expect(editors.tabs == [.release] && editors.pushes == [.tags, .artwork, .lyrics])
-        // Look after the library alone: Delete only, as the root had Delete album… alone
+        #expect(editors.tabs == [.release, .tags, .artwork, .lyrics])
+        // Look after the library alone: Delete only, as the root had Delete album… alone - shown, the one tab offered
         let delete = EditAlbumPage.strip(editors: false, delete: true)
-        #expect(delete.tabs.isEmpty && delete.pushes == [.delete])
+        #expect(delete.tabs == [.delete] && EditAlbumPage.shown(.release, in: delete.tabs) == .delete)
         let neither = EditAlbumPage.strip(editors: false, delete: false)
-        #expect(neither.tabs.isEmpty && neither.pushes.isEmpty)
+        #expect(neither.tabs.isEmpty)
+        // the phone's strip and the Mac's tabs are one list
+        for (editors, delete) in [(true, true), (true, false), (false, true), (false, false)] {
+            #expect(EditAlbumPage.strip(editors: editors, delete: delete).tabs
+                    == EditAlbumPage.tabs(editors: editors, delete: delete))
+        }
         // the Mac's tabs: every part offered, in the web's order
         #expect(EditAlbumPage.tabs(editors: true, delete: true) == [.release, .tags, .artwork, .lyrics, .delete])
         #expect(EditAlbumPage.tabs(editors: false, delete: true) == [.delete])
@@ -162,6 +167,241 @@ import Testing
         #expect(EditAlbumPage.Words.folderRow(albums[2]) == "Arrival, ABBA, 1976")
         #expect(EditAlbumPage.Words.folderRow(ScanAlbum(path: "A/B")) == "A/B")
         #expect(EditAlbumPage.Words.mark(.issues(1)) == "1 issue to look at" && EditAlbumPage.Words.mark(nil).isEmpty)
-        #expect(EditAlbumPage.Words.openPart(.tags) == "Open Tags…")
+        // (R11) the Mac's foot under each tab - Delete's its summary's, drawn by the foot
+        #expect(EditAlbumPage.Words.foot(.release) == "Apply writes the tags and files the folder. There is no undo.")
+        #expect(EditAlbumPage.Words.foot(.tags) == "A field left as it is isn\u{2019}t written.")
+        #expect(EditAlbumPage.Words.foot(.artwork) == "Pictures are saved into the album folder.")
+        #expect(EditAlbumPage.Words.foot(.lyrics) == "Lyrics come from LRCLIB, one .lrc beside each track.")
+        #expect(EditAlbumPage.Words.foot(.delete).isEmpty)
+    }
+
+    // MARK: Tags (R11)
+
+    private let files = ["01 Hells Bells.flac", "02 Shoot to Thrill.flac", "03 What Do You Do for Money Honey.flac",
+                         "04 Givin the Dog a Bone.flac"]
+
+    @Test func onlyTheTickedRowsAreEdited() {
+        // none ticked: every track, in running order
+        #expect(EditAlbumPage.tagTargets(files, ticked: []) == files)
+        #expect(EditAlbumPage.ticked(files, []) == 0)
+        // three ticked, out of order: those three, in running order - and counted three, not four
+        let three: Set<String> = [files[3], files[0], files[2]]
+        #expect(EditAlbumPage.tagTargets(files, ticked: three) == [files[0], files[2], files[3]])
+        #expect(EditAlbumPage.ticked(files, three) == 3)
+        #expect(!EditAlbumPage.allTicked(files, three))
+        // one ticked: one
+        #expect(EditAlbumPage.tagTargets(files, ticked: [files[1]]) == [files[1]])
+        #expect(EditAlbumPage.ticked(files, [files[1]]) == 1)
+        // a tick left on a file gone since (a release renames them) is no track: never counted, never edited
+        let gone: Set<String> = [files[1], "02 Shoot To Thrill (old name).flac"]
+        #expect(EditAlbumPage.ticked(files, gone) == 1)
+        #expect(EditAlbumPage.tagTargets(files, ticked: gone) == [files[1]])
+        #expect(EditAlbumPage.tagTargets(files, ticked: ["gone.flac"]) == files, "only gone ticks: every track")
+        #expect(EditAlbumPage.ticked(files, ["gone.flac"]) == 0)
+        // every track ticked: Deselect all
+        #expect(EditAlbumPage.allTicked(files, Set(files)))
+        #expect(EditAlbumPage.allTicked(files, Set(files + ["gone.flac"])))
+        #expect(!EditAlbumPage.allTicked([], []))
+    }
+
+    /// (R11's review) Select all ticks every track; once every track is ticked it is Deselect all, and ticks none.
+    @Test func selectAllAndDeselectAll() {
+        #expect(EditAlbumPage.selectAll(files, []) == Set(files))
+        #expect(EditAlbumPage.selectAll(files, [files[1]]) == Set(files))
+        #expect(EditAlbumPage.selectAll(files, Set(files)) == [], "every track ticked: Deselect all ticks none")
+        #expect(EditAlbumPage.selectAll(files, Set(files + ["gone.flac"])) == [])
+        #expect(EditAlbumPage.selectAll([], []) == [])
+        // twice is back where it began
+        #expect(EditAlbumPage.selectAll(files, EditAlbumPage.selectAll(files, [])) == [])
+    }
+
+    /// (R11's review) A tick over typed work for another set of tracks asks "Discard changes?" first; the same tracks,
+    /// or nothing typed, never.
+    @Test func aTickOverTypedWorkAsksFirst() {
+        let two = [files[0], files[2]]
+        #expect(EditAlbumPage.asksFirst(files, ticked: [files[0]], editing: two, typed: true))
+        #expect(!EditAlbumPage.asksFirst(files, ticked: [files[0]], editing: two, typed: false))
+        #expect(!EditAlbumPage.asksFirst(files, ticked: Set(two), editing: two, typed: true), "the same tracks")
+        // none ticked is every track: editing every track already, nothing to ask
+        #expect(!EditAlbumPage.asksFirst(files, ticked: [], editing: files, typed: true))
+        #expect(EditAlbumPage.asksFirst(files, ticked: [], editing: two, typed: true))
+        // Edit this track…: only that one
+        #expect(EditAlbumPage.asksFirst(files, ticked: [files[3]], editing: files, typed: true))
+        #expect(!EditAlbumPage.asksFirst(files, ticked: [files[3]], editing: [files[3]], typed: true))
+    }
+
+    /// (R11's review) After a read: nothing typed, the editor takes the ticks; typed over, a release's renames tick the
+    /// tracks still edited (Apply then says what it writes to); none of them left, stranded - never put away unasked.
+    @Test func theEditorFollowsAReadWithoutLosingTypedWork() {
+        // as it was: the same tracks
+        #expect(EditAlbumPage.afterRead(files, ticked: [], editing: files, typed: true) == .keep)
+        #expect(EditAlbumPage.afterRead(files, ticked: [files[1]], editing: [files[1]], typed: false) == .keep)
+        #expect(EditAlbumPage.afterRead([], ticked: [], editing: [], typed: true) == .keep, "nothing read yet")
+        // the first read, nothing typed: every track
+        #expect(EditAlbumPage.afterRead(files, ticked: [], editing: [], typed: false) == .edit(files))
+        // a rename under no typed work: the editor takes the ticks as they are
+        let renamed = [files[0], files[1], files[2], "04 Givin' the Dog a Bone.flac"]
+        #expect(EditAlbumPage.afterRead(renamed, ticked: [], editing: Array(files.prefix(3)), typed: false)
+                == .edit(renamed))
+        // every track edited, one renamed, typed over: the three still there ticked - "Apply to 3 tracks", and Apply
+        // writes to those three, never "all 4" over three
+        let three = Array(files.prefix(3))
+        guard case .tick(let ticks) = EditAlbumPage.afterRead(renamed, ticked: [], editing: three, typed: true) else {
+            Issue.record("a partial rename under typed work ticks the tracks still edited")
+            return
+        }
+        #expect(ticks == Set(three))
+        #expect(EditAlbumPage.tagTargets(renamed, ticked: ticks) == three, "the targets are the tracks edited")
+        #expect(EditAlbumPage.ticked(renamed, ticks) == 3)
+        #expect(EditAlbumPage.afterRead(renamed, ticked: ticks, editing: three, typed: true) == .keep, "and it settles")
+        // every track edited renamed, typed over: stranded
+        let moved = ["1 Hells Bells.flac", "2 Shoot to Thrill.flac", "3 Money Honey.flac", "4 Dog a Bone.flac"]
+        #expect(EditAlbumPage.afterRead(moved, ticked: [], editing: [], typed: true) == .stranded)
+        // stranded, the typed work put back: the editor takes the ticks again
+        #expect(EditAlbumPage.afterRead(moved, ticked: [], editing: [], typed: false) == .edit(moved))
+    }
+
+    @Test func tagsWords() {
+        // the counts the buttons say are the ticked rows'
+        #expect(TagEditWords.editTracks(EditAlbumPage.ticked(files, [files[0], files[2], files[3]])) == "Edit 3 tracks\u{2026}")
+        #expect(TagEditWords.editTracks(EditAlbumPage.ticked(files, [])) == "Edit all tracks\u{2026}")
+        #expect(EditAlbumPage.Words.editLegend(3) == "Edit 3 tracks" && EditAlbumPage.Words.editLegend(1) == "Edit 1 track")
+        #expect(EditAlbumPage.Words.editLegend(0) == "Edit all tracks")
+        #expect(EditAlbumPage.Words.applyTo(ticked: 3, of: 10) == "Apply to 3 tracks")
+        #expect(EditAlbumPage.Words.applyTo(ticked: 1, of: 10) == "Apply to 1 track")
+        #expect(EditAlbumPage.Words.applyTo(ticked: 0, of: 10) == "Apply to all 10 tracks")
+        #expect(EditAlbumPage.Words.applyTo(ticked: 0, of: 1) == "Apply to all 1 track")
+        #expect(EditAlbumPage.Words.applyTo(ticked: 0, of: 1406) == "Apply to all 1,406 tracks")
+        // the app's verb, never the drawings' Tick
+        for device in Device.allCases {
+            #expect(EditAlbumPage.Words.tagsNote(device).hasPrefix("Select tracks to edit only those."))
+            #expect(!EditAlbumPage.Words.tagsNote(device).contains("Tick"))
+        }
+        #expect(EditAlbumPage.Words.tagsNote(.iPhone).hasSuffix("Tap \u{203a} to see everything in a track's file."))
+        #expect(EditAlbumPage.Words.selectAll == "Select all" && EditAlbumPage.Words.deselectAll == "Deselect all")
+        #expect(EditAlbumPage.Words.seeEveryTag == "See a file's every tag\u{2026}")
+        // (R11's review) a ticked row says so once, a checkbox's word: "selected" is VoiceOver's own, for the row the
+        // list has selected
+        #expect(EditAlbumPage.Words.tagRow("Track 3, Shoot to Thrill", length: "5:17", ticked: true)
+                == "Track 3, Shoot to Thrill, 5:17, checked")
+        #expect(EditAlbumPage.Words.tagRow("Track 3, Shoot to Thrill", length: "5:17", ticked: false)
+                == "Track 3, Shoot to Thrill, 5:17")
+        for ticked in [true, false] {
+            #expect(!EditAlbumPage.Words.tagRow("Track 3, Shoot to Thrill", length: "5:17", ticked: ticked)
+                .lowercased().contains("select"))
+        }
+        #expect(EditAlbumPage.Words.compareWithPressing == "Compare with this pressing\u{2026}")
+    }
+
+    // MARK: Artwork, Lyrics, Delete (R11)
+
+    @Test func artworkAndLyricsWords() {
+        #expect(EditAlbumPage.Words.seeFullSize(.iPhone) == "Tap the cover to see it full size.")
+        #expect(EditAlbumPage.Words.seeFullSize(.mac) == "Click the cover to see it full size.")
+        #expect(EditAlbumPage.Words.nothingReplaced == "Nothing saved is replaced.")
+        // the pointers say the Release tab, on both devices now: it is a tab of each
+        let unmatched = ScanAlbum(path: "A/B", art: "file")
+        #expect(GetResults.webCoverPointer(unmatched)?.contains("in the Release tab") == true)
+        #expect(GetResults.webDiscArtPointer(unmatched)?.contains("in the Release tab") == true)
+        // (R11's review) the button Release shows named only while it shows it: the phone's Compare, the Mac's Compare
+        // full size… - with none shown, the words alone
+        let tagged = ScanAlbum(path: "A", releaseMbid: "x", art: "file")
+        #expect(EditAlbumPage.coverPointer(tagged, compare: EditAlbumPage.Words.compare)
+                == "To replace it, compare it with the release's in the Release tab (Compare).")
+        #expect(EditAlbumPage.coverPointer(tagged, compare: EditAlbumPage.Words.compareFullSize)
+                == GetResults.webCoverPointer(tagged))
+        #expect(GetResults.webCoverPointer(tagged)
+                == "To replace it, compare it with the release's in the Release tab (Compare full size\u{2026}).")
+        #expect(EditAlbumPage.coverPointer(tagged, compare: nil)
+                == "To replace it, compare it with the release's in the Release tab.")
+        for compare in [EditAlbumPage.Words.compare, nil] {
+            #expect(EditAlbumPage.coverPointer(unmatched, compare: compare) == GetResults.webCoverPointer(unmatched))
+            #expect(EditAlbumPage.coverPointer(ScanAlbum(path: "A", releaseMbid: "x"), compare: compare) == nil)
+        }
+        #expect(EditAlbumPage.coverPointer(tagged, compare: nil)?.contains("Compare") == false)
+    }
+
+    @Test func whatADeleteTakesIsSaidInRows() {
+        let summary = DeletionSummary(audioFiles: 12, totalBytes: 314_572_800, otherFiles: ["rip.log", "album.cue"],
+                                      otherFileCount: 2, holders: ["ana"], yours: true)
+        #expect(EditAlbumPage.deleteTracks(summary) == "12 \u{b7} 300 MB")
+        #expect(EditAlbumPage.deleteTracks(DeletionSummary(audioFiles: 3)) == "3", "no size for nothing")
+        // (R11's review) what else goes, in deadwax's words on both devices: the lead counts every file, the names
+        // are the twelve the summary lists - the drawing's "10 .lrc" never said how many
+        #expect(DeleteWords.others(summary)?.lead == "and 2 other files:")
+        #expect(DeleteWords.others(summary)?.names == "rip.log, album.cue")
+        let twelve = (1...12).map { (n: Int) -> String in "\(n).lrc" }
+        let many = DeletionSummary(audioFiles: 10, otherFiles: twelve, otherFileCount: 40)
+        #expect(many.otherFileCount > many.otherFiles.count)
+        #expect(DeleteWords.others(many)?.lead == "and 40 other files:")
+        #expect(DeleteWords.others(many)?.names == twelve.joined(separator: ", ") + ", \u{2026}")
+        #expect(DeleteWords.others(DeletionSummary(audioFiles: 2)) == nil)
+        #expect(DeleteWords.counts(summary) == "12 tracks \u{b7} 300 MB")
+        // the Mac's foot, short - the whole sentence is the tab's row
+        #expect(EditAlbumPage.deleteFoot(summary) == "In a library: Yours and ana's")
+        #expect(EditAlbumPage.deleteFoot(DeletionSummary(audioFiles: 1, holders: [], yours: false))
+                == "In a library: Nobody's")
+        #expect(EditAlbumPage.deleteFoot(DeletionSummary(audioFiles: 1)) == "", "logins off: nothing")
+        #expect(EditAlbumPage.deleteFoot(nil) == "")
+        #expect(DeleteWords.holders(summary)?.hasPrefix("In your library and ana's: deleting it takes it out") == true)
+        // who holds it, short - unread is said as unread, never as nobody's; logins off, nothing
+        #expect(EditAlbumPage.held(summary) == "Yours and ana's")
+        #expect(EditAlbumPage.held(DeletionSummary(audioFiles: 1, holders: [], yours: true)) == "Yours only")
+        #expect(EditAlbumPage.held(DeletionSummary(audioFiles: 1, holders: [], yours: false)) == "Nobody's")
+        #expect(EditAlbumPage.held(DeletionSummary(audioFiles: 1, holders: ["ana", "bo"], yours: false)) == "ana's and bo's")
+        #expect(EditAlbumPage.held(DeletionSummary(audioFiles: 1, holders: ["ana", "bo"], yours: true))
+                == "Yours, ana's and bo's")
+        #expect(EditAlbumPage.held(DeletionSummary(audioFiles: 1, holdersUnknown: true)) == "Couldn't tell")
+        #expect(EditAlbumPage.held(DeletionSummary(audioFiles: 1)) == nil)
+        #expect(EditAlbumPage.held(nil) == nil)
+    }
+
+    /// (R11's review) A delete from a folder opening closes the album's pages by the album the folder holds: by the
+    /// release the page knew, by its name for an untagged folder, by the id bridge's album for the folder's release -
+    /// gone when the folder was all of it, asked again when folders are left; a page of another album untouched.
+    @Test func aFolderDeleteClosesTheAlbumsPagesByWhatTheFolderHolds() {
+        let tagged = ScanAlbum(path: "AC_DC/Back in Black (1980)", artist: "AC/DC", album: "Back in Black",
+                               releaseMbid: "a4f2c0de", trackCount: 10)
+        let untagged = ScanAlbum(path: "Abba/Arrival (1976)", artist: "ABBA", album: "Arrival", trackCount: 10)
+        let other = ScanAlbum(path: "Sigur Rós/( ) (2002)", artist: "Sigur Rós", album: "( )", trackCount: 8)
+        let scan = [tagged, untagged, other]
+        let sigur = AlbumEdit.Subject(id: "nd-sigur", name: "( )", artist: "Sigur Rós")
+        // untagged: the page opened by its name and artist goes - the folder was all of it; another album's stays
+        let arrival = AlbumEdit.Subject(id: "nd-arrival", name: "Arrival", artist: "ABBA")
+        #expect(EditAlbumPage.folderPages(untagged.path, tracks: 10, bridge: nil, scan: scan, pages: [arrival, sigur])
+                == EditAlbumPage.FolderPages(leave: ["nd-arrival"]))
+        // tagged, the page opened knowing its release: found by it
+        let known = AlbumEdit.Subject(id: "nd-bib", name: "Back in Black", artist: "AC/DC", musicBrainzId: "a4f2c0de")
+        #expect(EditAlbumPage.folderPages(tagged.path, tracks: 10, bridge: nil, scan: scan, pages: [known])
+                == EditAlbumPage.FolderPages(leave: ["nd-bib"]))
+        // tagged, the page opened without it (a tagged folder is never found by name): the id bridge names it
+        let unknown = AlbumEdit.Subject(id: "nd-bib", name: "Back in Black", artist: "AC/DC")
+        #expect(EditAlbumPage.folderPages(tagged.path, tracks: 10, bridge: nil, scan: scan, pages: [unknown])
+                == EditAlbumPage.FolderPages())
+        let bridge = StoreAlbum(releaseMbid: "a4f2c0de", navidromeId: "nd-bib",
+                                present: [StoreRow(id: 1, path: tagged.path)])
+        #expect(EditAlbumPage.folderPages(tagged.path, tracks: 10, bridge: bridge, scan: scan, pages: [unknown, sigur])
+                == EditAlbumPage.FolderPages(leave: ["nd-bib"]))
+        // one folder of two (a set kept a folder per disc): asked again, not gone - each page once
+        let disc2 = ScanAlbum(path: "AC_DC/Back in Black (1980)/Disc 2", artist: "AC/DC", album: "Back in Black",
+                              releaseMbid: "a4f2c0de", trackCount: 4)
+        let two = StoreAlbum(releaseMbid: "a4f2c0de", navidromeId: "nd-bib",
+                             present: [StoreRow(id: 1, path: tagged.path), StoreRow(id: 2, path: disc2.path)])
+        #expect(EditAlbumPage.folderPages(tagged.path, tracks: 10, bridge: two, scan: scan + [disc2],
+                                          pages: [unknown, unknown, known])
+                == EditAlbumPage.FolderPages(ask: ["nd-bib"]))
+        #expect(EditAlbumPage.folderPages(tagged.path, tracks: 10, bridge: nil, scan: scan + [disc2], pages: [known])
+                == EditAlbumPage.FolderPages(ask: ["nd-bib"]))
+        // the bridge's album for another page's id names nothing of this one
+        #expect(EditAlbumPage.folderPages(tagged.path, tracks: 10, bridge: bridge, scan: scan, pages: [arrival])
+                == EditAlbumPage.FolderPages())
+        // nothing open: nothing to close
+        #expect(EditAlbumPage.folderPages(untagged.path, tracks: 10, bridge: nil, scan: scan, pages: [])
+                == EditAlbumPage.FolderPages())
+        // what the bridge is asked by: the folder's release, trimmed - none for an untagged folder
+        #expect(EditAlbumPage.bridgeRelease(tagged) == "a4f2c0de")
+        #expect(EditAlbumPage.bridgeRelease(ScanAlbum(path: "A", releaseMbid: "  b1 ")) == "b1")
+        #expect(EditAlbumPage.bridgeRelease(untagged) == nil)
+        #expect(EditAlbumPage.bridgeRelease(ScanAlbum(path: "A", releaseMbid: "  ")) == nil)
     }
 }

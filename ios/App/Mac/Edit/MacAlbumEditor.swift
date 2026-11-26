@@ -3,16 +3,20 @@ import SwiftUI
 
 /// The Mac's album editor (the redesign, slice R10 - notes/ios.md "The redesign, slice R10: Edit album, the folder list
 /// and Release", its "After review"): one EditAlbumModel's editor - the header (MacEditHeader), the waits, the folder
-/// tabs (MacFolderTabs over EditAlbumPage.tabs), the tab's own content in its scroll (Release's MacReleaseTab), the foot
-/// (MacEditFooter) and the sheet a part still today's page opens in - and, in place of an album, what the editor says:
-/// deadwax out of reach, which of several folders, the status with Look again.
+/// tabs (MacFolderTabs over EditAlbumPage.tabs), the tab's own content in its scroll, the foot (MacEditFooter) and the
+/// sheet Compare covers opens in - and, in place of an album, what the editor says: deadwax out of reach, which of
+/// several folders, the status with Look again.
 ///
 /// Its hosts own the model and its opening, and draw what is round it: MacEditWindow (Settings' Edit an album, beside
-/// the folder list) and R12's MacNeedsALook. `bar` is the host's slot over the header - queue mode's bar. R11 adds Tags,
-/// Artwork, Lyrics and Delete here as tabs, in place of `partCard` and the part's sheet.
+/// the folder list) and R12's MacNeedsALook. `bar` is the host's slot over the header - queue mode's bar.
+///
+/// (R11 - notes/ios.md "The redesign, slice R11: Tags, Artwork, Lyrics and Delete") Every part a tab of its own, as
+/// Main.dc.html draws them: Release's MacReleaseTab, Tags' MacTagsTab, Artwork's MacArtworkTab, Lyrics' MacLyricsTab,
+/// Delete's MacDeleteTab - in place of R10's card for a part still the phone's page, and its sheet. The foot is the
+/// tab's: Release's and Tags' Revert and Apply, Delete's Delete permanently.
 ///
 /// - The tab is this view's own state, above the model: changing it never touches typed work. A new model (the host's
-///   next opening) keeps the tab and puts a part's sheet away.
+///   next opening) keeps the tab and puts Compare covers away.
 /// - Its reads of the model are its own, and none of them a field's: a keystroke re-draws the tab and the foot, never
 ///   this view, nor its host (the folder list's rows).
 struct MacAlbumEditor<Bar: View>: View {
@@ -45,19 +49,19 @@ struct MacAlbumEditor<Bar: View>: View {
             }
         }
         .editOutOfReach(!model.online && model.scan.loaded)
-        // another opening: the last one's part sheet put away
+        // another opening: the last one's sheet put away
         .onChange(of: ObjectIdentifier(model)) { (_: ObjectIdentifier, _: ObjectIdentifier) -> Void in
             sheet = nil
         }
-        // the folder deleted: nothing left for a part's page to show
+        // the folder deleted: nothing left for a sheet to show
         .onChange(of: model.deleted) { (_: Bool, gone: Bool) -> Void in
             if gone { sheet = nil }
         }
         .appSheet(item: $sheet, onDismiss: { sheetPath.removeAll() }) { (shown: MacEditSheet) in
-            NavigationStack(path: partPath) {
+            NavigationStack(path: $sheetPath) {
                 sheetRoot(shown)
                     .navigationDestination(for: EditPage.self) { (page: EditPage) in
-                        EditPageView(page: page, model: model, path: partPath)
+                        EditPageView(page: page, model: model, path: $sheetPath)
                     }
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
@@ -86,33 +90,50 @@ struct MacAlbumEditor<Bar: View>: View {
                               spoken: EditAlbumPage.Words.parts)
             }
             ScrollView {
-                if showing == .release, edit.editors, let retag = model.retag {
-                    MacReleaseTab(model: model, retag: retag, twoColumns: layout.twoColumns) {
-                        sheet = .compareCovers
-                    }
-                } else if showing != .release {
-                    partCard(showing, album: album)
-                }
+                tabContent(showing, album: album, editors: edit.editors)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(DWPalette.panel)
             // (R10's review) the foot is the tab's: Release's Revert and Apply only with Edit albums, as the tab and the
-            // phone's foot are gated - a part still today's page its Open… (Delete's, with Look after the library)
+            // phone's foot are gated - (R11) Tags' Revert and Apply, Delete's Delete permanently (with Look after the
+            // library), Artwork's and Lyrics' line alone
             if showing != .release || edit.editors {
-                MacEditFooter(model: model, part: showing) { (part: AlbumEdit.Part) -> Void in
-                    sheet = .part(part)
-                }
+                MacEditFooter(model: model, album: album, part: showing)
             }
         }
     }
 
-    /// The waits said over the tabs, as the sheet's root says them: an apply that never answered, the library that
-    /// couldn't be read again - with Look again.
+    /// (R11) The tab shown, drawn: each part's own.
+    @ViewBuilder private func tabContent(_ showing: AlbumEdit.Part, album: ScanAlbum, editors: Bool) -> some View {
+        switch showing {
+        case .release:
+            if editors, let retag = model.retag {
+                MacReleaseTab(model: model, retag: retag, twoColumns: layout.twoColumns) {
+                    sheet = .compareCovers
+                }
+            }
+        case .tags:
+            if let tags = model.tags {
+                MacTagsTab(model: model, tags: tags, twoColumns: layout.twoColumns)
+            }
+        case .artwork:
+            MacArtworkTab(model: model, album: album, twoColumns: layout.twoColumns,
+                          compare: { sheet = .compareCovers }, showRelease: { tab = .release })
+        case .lyrics:
+            MacLyricsTab(model: model, album: album)
+        case .delete:
+            MacDeleteTab(model: model, album: album)
+        }
+    }
+
+    /// The waits said over the tabs, as the sheet's root says them: an apply that never answered - (R11) or a Get, on
+    /// any tab - the library that couldn't be read again, with Look again.
     @ViewBuilder private var waits: some View {
         let failed = model.scan.failure != nil || model.retag?.flow.readFailed == true
-        if model.retag?.flow.mayHaveFinished == true || failed {
+        let unanswered = model.retag?.flow.mayHaveFinished == true || model.unansweredGet != nil
+        if unanswered || failed {
             VStack(alignment: .leading, spacing: 6) {
-                if model.retag?.flow.mayHaveFinished == true {
+                if unanswered {
                     MayHaveFinished(reading: model.scan.reading)
                 }
                 if failed {
@@ -128,52 +149,12 @@ struct MacAlbumEditor<Bar: View>: View {
         }
     }
 
-    /// (R10) A part still today's page: what it holds, and its foot's Open… - R11 draws each as its tab instead.
-    private func partCard(_ part: AlbumEdit.Part, album: ScanAlbum) -> some View {
-        MacGroupBox(legend: part.label) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(partSummary(part, album: album))
-                    .font(Typeface.Mac.text(.base))
-                    .foregroundStyle(part == .delete ? DWPalette.redText : DWPalette.text)
-                Text(EditAlbumPage.Words.partFoot)
-                    .font(Typeface.Mac.text(.small))
-                    .foregroundStyle(DWPalette.t2)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(EdgeInsets(top: 22, leading: 16, bottom: 16, trailing: 16))
-    }
-
-    private func partSummary(_ part: AlbumEdit.Part, album: ScanAlbum) -> String {
-        switch part {
-        case .release: return EditWords.releaseValue(album, pressing: nil)
-        case .tags: return EditWords.tracks(album.trackCount)
-        case .artwork: return EditWords.artworkValue(album)
-        case .lyrics: return EditWords.lyricsValue(album)
-        case .delete: return EditWords.deleteAlbum
-        }
-    }
-
-    /// The sheet's first page: the part's own (as the phone pushes it), or Compare covers.
+    /// The sheet's first page: Compare covers - Release's Compare full size…, Artwork's Compare with this pressing….
     @ViewBuilder private func sheetRoot(_ shown: MacEditSheet) -> some View {
         switch shown {
-        case .part(let part):
-            if let page = MacEditSheet.page(part) { EditPageView(page: page, model: model, path: partPath) }
         case .compareCovers:
-            EditPageView(page: .compareCovers, model: model, path: partPath)
+            EditPageView(page: .compareCovers, model: model, path: $sheetPath)
         }
-    }
-
-    /// The sheet's stack - where Artwork's pointer to the Release tab pushes Release, the tab is shown instead.
-    private var partPath: Binding<[EditPage]> {
-        Binding(get: { sheetPath }, set: { (now: [EditPage]) -> Void in
-            if now.last == .release {
-                sheet = nil
-                tab = .release
-            } else {
-                sheetPath = now
-            }
-        })
     }
 
     // MARK: no album
@@ -239,26 +220,14 @@ struct MacEditNote: View {
     }
 }
 
-/// What the Mac's editor opens over itself: a part still today's page (R11 draws each as its tab), or Compare covers.
+/// What the Mac's editor opens over itself: Compare covers. (R11) The parts R10 opened here as the phone's pages are
+/// tabs now; a file's every tag is the Tags tab's own sheet.
 enum MacEditSheet: Identifiable, Hashable {
-    case part(AlbumEdit.Part)
     case compareCovers
 
     var id: String {
         switch self {
-        case .part(let part): return part.rawValue
         case .compareCovers: return "compareCovers"
-        }
-    }
-
-    /// A part's page, as the phone pushes it.
-    static func page(_ part: AlbumEdit.Part) -> EditPage? {
-        switch part {
-        case .release: return nil
-        case .tags: return .tags
-        case .artwork: return .artwork
-        case .lyrics: return .lyrics
-        case .delete: return .delete
         }
     }
 }

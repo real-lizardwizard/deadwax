@@ -163,8 +163,11 @@ def mac_halves() -> dict[str, str]:
 #? drawn only for them. And its three shared reads pinned as R6 left them.
 #? (R9's review) The first ask takes `macRoom`, the room round it on the Mac's own Downloaded page - EdgeInsets() for
 #? every other caller, so what the Mac drew there is unchanged (its digest before, f7d6bf161c90975f).
+#? (R11) DWCheckbox new, pinned as R11 left it: its Mac half MacCheckbox's (13, the tick's 8 heavy on checkFill, unticked
+#? sunk in the well with the line's edge, the words at the field's size beside it) - MacCheckbox kept for Settings.
 PINNED = {
     "Look/DWButtonStyle.swift": "05ac2b1f28675581",
+    "Look/DWCheckbox.swift": "fde34df0a439b8bb",
     "Look/DWChip.swift": "cf86e3708a29bfc1",
     "Look/DWCorners.swift": "d27587b71394da17",
     "Look/DWField.swift": "b35a4a6a9fa784b8",

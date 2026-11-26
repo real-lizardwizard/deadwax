@@ -261,16 +261,21 @@ def test_each_part_of_the_root_is_its_permissions():
     assert "needsALook(album)" in block(sections, sections.index("{", gate))
     assert sections.count("needsALook(album)") == 1
     assert "if edit.editors, let retag = model.retag {" in sections
-    # (R10) Tags, Artwork, Lyrics and Delete the strip's pushes, by the same permissions (EditAlbumPage.strip - Swift's
-    # EditAlbumPageTests): Delete with Look after the library, the rest with Edit albums - Release's cards under it
-    assert "let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)" in sections
-    assert "PhoneStrip(options: strip.tabs," in sections and "pushes: strip.pushes)" in sections
+    # (R10) the strip's parts by the same permissions (EditAlbumPage.strip - Swift's EditAlbumPageTests): Delete with
+    # Look after the library, the rest with Edit albums - Release's cards under it. (R11) Every part a tab of the
+    # strip's, drawn under it: the strip made once, by the page, for the sections and the foot alike
+    page = block(root, root.index("{", root.index("private func albumPage(")))
+    assert "let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)" in page
+    assert "let shown = EditAlbumPage.shown(tab, in: strip.tabs)" in page
+    assert "albumSections(album, strip: strip, shown: shown)" in page
+    assert "EditAlbumPage.strip(" not in sections
+    assert "PhoneStrip(options: strip.tabs," in sections and "pushes:" not in sections
     assert "ReleaseCards(model: model, retag: retag)" in block(
         sections, sections.index("{", sections.index("if edit.editors, let retag = model.retag {")))
-    pushed = block(root, root.index("{", root.index("private func open(_ part: AlbumEdit.Part)")))
-    for part in ("tags", "artwork", "lyrics", "delete"):
-        assert f"case .{part}: path.append(.{part})" in pushed, part
-    assert "case .release: break" in pushed
+    for part in ("TagsListView(model: model, tags: tags, path: $path)", "ArtworkPage(model: model, album: album)",
+                 "LyricsPage(model: model, album: album)", "DeletePage(model: model, album: album)"):
+        assert part in sections, part
+    assert "private func open(_ part" not in root
     marks = block(root, root.index("{", root.index("private func needsALook(")))
     assert "let marks = AlbumEdit.marksFine(server.access.permissions)" in marks
     assert "if marks, !outstanding.isEmpty {" in marks and "if marks {" in marks

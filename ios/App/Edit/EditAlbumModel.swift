@@ -97,6 +97,11 @@ final class EditAlbumModel {
     /// A delete whose answer never came (or came as a 5xx): the folder it was for, and whether it was all the album had
     /// - settled by the next read that lands (gone from the scan: it went). Watched: queue mode's steps wait for it.
     private var unansweredDelete: (before: ScanAlbum, all: Bool)?
+    /// (R11's review) Opened by its folder (Choose the folder, the Mac's folder list, Needs a look): the id bridge's
+    /// answer for the folder's release, asked as Delete's summary is read and kept with the folder it was for - and the
+    /// album pages a delete of it closes or asks again (EditAlbumPage.folderPages), decided as the delete starts.
+    @ObservationIgnored private var folderBridge: (path: String, answer: StoreAlbum)?
+    @ObservationIgnored private var folderPages: EditAlbumPage.FolderPages?
     /// (slice 6's review) Writes and marks under way, each until everything after it is done - the folder read again,
     /// then Needs a look told: queue mode's steps wait for them all.
     private(set) var following = 0
@@ -576,6 +581,7 @@ final class EditAlbumModel {
         do {
             let summary = try await client.deletionSummary(path: album.path)
             deletion.read(ticket, summary)
+            await askFolderBridge(album)
         } catch {
             if APIFailure.isCancellation(error) {
                 deletion.readCancelled(ticket)
@@ -583,6 +589,33 @@ final class EditAlbumModel {
                 deletion.readFailed(ticket, said: EditWords.said(error, failed: DeleteWords.readFailed, admin: admin))
             }
         }
+    }
+
+    /// (R11's review) Opened by its folder: the id bridge asked by the folder's release (EditAlbumPage.bridgeRelease) -
+    /// Navidrome's album for it, and the store's folders of it - kept with the folder. A folder tagged with none, or no
+    /// answer, keeps nothing: its pages are found by their names (EditAlbumPage.folderPages).
+    private func askFolderBridge(_ album: ScanAlbum) async {
+        guard subject == nil, let client else { return }
+        guard let release = EditAlbumPage.bridgeRelease(album) else {
+            folderBridge = nil
+            return
+        }
+        guard let found = try? await client.storeAlbum(releaseMbid: release) else { return }
+        // the folder held still the one asked for: a follow to another folder meanwhile asks again
+        guard self.album?.path == album.path else { return }
+        folderBridge = (album.path, found)
+    }
+
+    /// (R11's review) The album pages open on every stack, as each was opened - what a folder opening's delete finds
+    /// the folder's album among.
+    private var openAlbums: [AlbumEdit.Subject] {
+        guard let navigation else { return [] }
+        return (navigation.library + navigation.search + navigation.requests + navigation.you)
+            .compactMap { (route: AppRoute) -> AlbumEdit.Subject? in
+                guard case .album(let shown) = route else { return nil }
+                return AlbumEdit.Subject(id: shown.id, name: shown.name ?? "", artist: shown.artist,
+                                         musicBrainzId: shown.musicBrainzId)
+            }
     }
 
     /// Delete permanently, confirmed (DeleteAlbumDialog's `remove`, EditPanel's `albumDeleted`): the folder and
@@ -601,6 +634,11 @@ final class EditAlbumModel {
         // decided now, from the folders as they are - as the web's dialog is given it: once the folder is gone the
         // scan can't say what the album had
         let all = AlbumEdit.deletesAll(folders, tracks: before.trackCount, subject)
+        // (R11's review) opened by its folder, the album's pages are found by the folder - decided now too
+        folderPages = subject != nil ? nil : EditAlbumPage.folderPages(
+            before.path, tracks: before.trackCount,
+            bridge: folderBridge?.path == before.path ? folderBridge?.answer : nil,
+            scan: scan.albums, pages: openAlbums)
         let hold = BackgroundHold(named: "Edit album: \(DeleteWords.page)")
         defer { hold.end() }
         let outcome: RetagFlow.Outcome
@@ -631,7 +669,10 @@ final class EditAlbumModel {
     /// The folder is gone (EditPanel's `albumDeleted`, App.tsx's 'deleted'): said, the sheet closes (`deleted`), the
     /// Library's lists asked again now and once Navidrome has scanned (AlbumEdit.settleMs) - and the album page beneath,
     /// with nothing of the album left in Navidrome (`all`), goes back while it is what shows; a folder of several, the
-    /// page is asked again now and once Navidrome has scanned instead. A folder opened from Choose the folder has no page.
+    /// page is asked again now and once Navidrome has scanned instead. (R11's review) A folder opening - Choose the
+    /// folder, the Mac's folder list, Needs a look - closes the album's pages by the album the folder holds
+    /// (EditAlbumPage.folderPages, decided as the delete started): each it was all of goes, each with folders left is
+    /// asked again.
     ///
     /// (slice 6) In queue mode the sheet stays, saying "Deleted …" where the album was, and Needs a look's row says
     /// Deleted: the queue goes on from here (EditPanel's `albumDeleted` for a folder request, its Next album).
@@ -651,11 +692,30 @@ final class EditAlbumModel {
             guard self.samePerson else { return }
             self.library?.albumDeleted()
         }
-        guard let id = pageId else { return }
+        guard let id = pageId else {
+            leaveFolderPages()
+            return
+        }
         if all {
             navigation?.leaveAlbum(id)
         } else {
             wrote(before: before)
+        }
+    }
+
+    /// (R11's review) A folder opening's delete: the album's pages it was all of gone (AppNavigation.leaveAlbum - every
+    /// stack's on the Mac, the tab shown's top on the phone), those with folders left asked again now and once Navidrome
+    /// has scanned (AlbumEdit.settleMs).
+    private func leaveFolderPages() {
+        guard let pages = folderPages else { return }
+        folderPages = nil
+        for id in pages.leave { navigation?.leaveAlbum(id) }
+        guard !pages.ask.isEmpty else { return }
+        for id in pages.ask { navigation?.albumWritten(id) }
+        Task {
+            try? await Task.sleep(for: .milliseconds(AlbumEdit.settleMs))
+            guard self.samePerson else { return }
+            for id in pages.ask { self.navigation?.albumWritten(id) }
         }
     }
 

@@ -21366,6 +21366,357 @@ them; the widened one sees all five.
 - The list's order and its New chips, the foot's helps, Find folders in the narrow list, the delete leaving no album
   page behind: by eye on the Mac only.
 
+## The redesign, slice R11: Tags, Artwork, Lyrics and Delete (2026-11-26)
+
+The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R11, with
+wave-e-common.md: Edit album's other four parts as tabs on both devices - the Mac's inside R10's MacAlbumEditor, the
+phone's under the root's strip - each tab's action in its foot. The drawings are Main.dc.html (the Mac's) and
+iEditTags, iEditArtwork, iEditLyrics and iEditDelete (the phone's), in ~/Desktop/Code/deadwax-plans/mac-redesign/.
+Built on b017851a (R10 and its tests), rebased onto R14 (0eda8964) before the last checks. The app is still 0.13
+(13); `__version__` untouched; no server data new (no diff to Core's DeadwaxClient or Routes); no engine file touched.
+Every write is the one it was: TagsModel has no diff, and EditAlbumModel's only one is the review's - which album
+pages a delete from a folder opening closes ("After review", finding 11); every write's call, guard and plan as R10
+left them.
+
+### Both devices
+
+- **Every part a tab** (`EditAlbumPage.strip` - `Strip { tabs }`, `pushes` gone): Release, Tags, Artwork and Lyrics
+  with Edit albums, Delete with Look after the library, as before. Nothing pushes a part any more; EditPage keeps only
+  what the tabs push (Choose a release, Compare covers, Changes, Choose the folder, a track's page, Edit tags).
+- **Tags edits the tracks ticked, every track with none ticked** (`EditAlbumPage.tagTargets`, `ticked`, `allTicked`):
+  a tick left on a file gone since (a release applied renames them) counts for nothing. The editor is TagsModel as it
+  was: `edit(_:)` starts a new set from what its files say, so a tick that would change the set while typed work waits
+  asks **Discard changes?** first - the phone's Edit N tracks…, the Mac's checkbox. Apply is `EditAlbumModel.applyTags()`:
+  the fields typed over, for the server to plan again - no plan sent. The preview and the write share TagsModel's one
+  computation, as they did.
+- **Artwork**: Get cover and Get CD art are GetButton and `EditAlbumModel.get` as they were - getting a cover saves
+  what the Cover Art Archive has for the release the folder is tagged with, applies no release and chooses nothing.
+  Compare covers (the folder's beside the pressing's) is Release's own page or sheet. With no release, each box's
+  pointer and **Go to Release** (`EditAlbumPage.Words.openRelease`), which shows the Release tab - a tab now on both
+  devices, so the web's "in the Release tab" is both devices' words.
+- **Lyrics**: "8 of 12 tracks have lyrics saved beside them, as a .lrc." (GetResults.lyricsLine), Get lyrics beside
+  "Nothing saved is replaced." while any track has none. The count is the album's as the editor holds it
+  (`EditAlbumModel.album`, handed down each draw, never kept by the view): Get lyrics reads the folder again once it has
+  written (`get`'s `lookUp()`, after `guard run.wrote`), and the line says the new count. **No Each track group**: which
+  track has lyrics is no fact the app can have - the scan counts them, and a list would need a route.
+- **Delete**: read live each time the tab shows (`.task(id: "\(album.path)|\(model.online)") { await
+  model.readDeletion() }`); **Delete permanently** is DeleteButton on both devices, off until this folder's summary is
+  in hand (`canDelete`), asking once more in the device's own question ("Delete Dummy?" / "There is no undo.", Cancel
+  the default and Return's), the question tied to the folder and summary it was asked over, put away if the page is
+  followed to another folder, refused by `DeleteFlow.beginDelete` if either has changed. Only the question's Delete
+  deletes. After a delete on the Mac, R10's `leaveAlbum` takes every page of the album off every stack, unchanged.
+- **DWCheckbox** (App/Look/DWCheckbox.swift, new - R1's MacCheckbox made for both; MacCheckbox stays, as its users -
+  MacSettingsRoot, and R14's MacPeoplePage - aren't R11's): dw.css's `input[type=checkbox]`, the Mac's 13 in a well, the phone's square 20 that
+  grows with the text (`@ScaledMetric`), flat - its edge alone while off, the purple with a white tick while on - in a
+  finger's target of 44 (DWTarget). One element to VoiceOver, a toggle. `showsWords: false` where the row says what it
+  ticks. MacReleaseTab's cover switch is one now, in place of the system's Toggle.
+
+### The Mac (ios/App/Mac/Edit/)
+
+- **MacAlbumEditor** draws the five tabs (`tabContent`): MacReleaseTab, MacTagsTab, MacArtworkTab, MacLyricsTab,
+  MacDeleteTab. `partCard`, `partSummary`, `partPath` and `MacEditSheet.part` are gone; the editor's sheet is Compare
+  covers alone (`MacEditSheet { case compareCovers }`), opened by Release's Compare full size… and Artwork's Compare
+  with this pressing…. The foot is drawn under every tab but Release without Edit albums. The waits count
+  `model.unansweredGet` too. The `bar` slot is R10's, untouched (R12's).
+- **MacTagsTab**: the phone's Tags and Edit tags on one tab. The tracks are MacColumnList (box mode, given its rows'
+  height and `.scrollBounceBehavior(.basedOnSize)` inside the editor's scroll) - the checkbox (DWCheckbox, no words), #,
+  Title (the track's artist under it when it isn't the album's) and Length, a heading per disc on a set; under them
+  "Select tracks to edit only those." and **See a file's every tag…**. A click selects a row; its checkbox ticks it; a
+  double-click (or Return) opens the file's every tag in a sheet (MacTrackTags: the inspector's groups, the pictures
+  inside it, every raw tag in the readout face; Edit this track ticks that track alone, once the sheet has gone).
+  VoiceOver: a row is "Track 3, Shoot to Thrill, 5:17, checked" (`EditAlbumPage.Words.tagRow` - "selected" is
+  VoiceOver's for the row the list has selected), its actions Select or Deselect and See a file's every tag…. Beside it
+  (under it in one column - the Release tab's 620) the editor in a box whose legend says
+  which tracks ("Edit 3 tracks", "Edit all tracks"): the eleven fields on the look's wells in TagEdit.fields' order -
+  Title, Artist, Album, Album artist, Track beside Disc, Disc title, Year beside Original, Genre, Composer - Tab's order
+  too (`.tabs`), each field's line and Undo under it; what Apply would write in a well (TagFileChanges in the Mac's
+  faces). The checkboxes are off while a write runs, the fields while Apply runs.
+- **MacEditFooter** (`part:`): the foot's line is the tab's (`EditAlbumPage.Words.foot`, Main.dc.html's `foots`), and
+  Delete's is who holds the album, short ("In a library: Ann's", `EditAlbumPage.deleteFoot` - the whole sentence is
+  MacDeleteTab's own row since the review). Under
+  Tags, **Revert** (each typed field put back, nothing written) and **Apply to 3 tracks** - "Apply to all 10 tracks"
+  with none ticked - the purple one, off while `canApply` is false or a write or a mark runs. Under Delete, **Delete
+  permanently** in the danger style. Artwork and Lyrics have no action in the foot: their Gets are their boxes', as the
+  drawing has them.
+- **MacArtworkTab**: the Cover box - the folder's cover at 150 (a click shows it full size), where it is, Get cover
+  when there is none and the album names a release, **Compare with this pressing…** while there is a pressing to compare
+  (ArtworkLooks.compares) - and the CD art box: each picture round and 150 across (on the empty disc, its hole a third
+  across, while it comes), or the empty disc; Get CD art beside "deadwax never replaces CD art it saved." Side by side
+  from 620, one under the other below it.
+- **MacLyricsTab**: the Lyrics box and the pointer to re-timing in Server settings. No ForEach, no track, no state.
+- **MacDeleteTab**: the cover at 48, the album, its byline and folder; what goes in a well in the readout face -
+  "10 tracks · 290 MB" (DeleteWords.counts), then "and 40 other files:" in the caution's colour over their names
+  (DeleteWords.others; the review put the count back); who holds it, the whole sentence, in the caution's colour; the
+  read's failure with Look again; and the warning in the red words (`DWPalette.redChipText`, dw.css's `.red`).
+
+### The phone (ios/App/Edit/), flat
+
+- **EditAlbumRoot**: the strip's five are the root's own tabs (`@State tab`, above the model, as the Mac's), each drawn
+  under the strip, with its foot: Release's ReleaseFoot as R10 had it; Tags' **TagsFoot** - **Select all** (**Deselect
+  all** with every track ticked; VoiceOver hears "Select every track") and **Edit 3 tracks…** (every track with none
+  ticked), the purple one, pushing Edit tags; Delete's **Delete permanently**, red, filling. Artwork and Lyrics have no
+  foot: their Gets are inline, as the drawings have them.
+- **Tags** (TagsListView): a row per track run to the screen's edges, 48 tall at least, its tick at its start - a tap
+  anywhere on the row ticks it (the drawing's `<label class="row">`) - its number, title (artist under it when it isn't
+  the album's), length, and its › pushing the track's page - the number and the length on the title's first text
+  baseline, the tick centred on its words' line (`centredOnWords`, the title's scaled size). VoiceOver reads the whole
+  row as one toggle - a double-tap ticks it, See a file's every tag… its named action, the › no element of its own (the
+  review). The line under them: "Select tracks to edit only those. Tap › to see everything in a track's file."
+- **A track's page** (TrackPageView) and **Edit tags** (EditTagsView) flat: PhoneGroups of rows on the page's black;
+  Edit tags' fields each on the look's well (DWWellField) beside its label, stacked at the accessibility sizes, Apply
+  in `.phoneFoot` - under the keyboard, never riding up on a field.
+- **Artwork** (ArtworkPage): the Cover group - the cover at 112 beside what it is, Get cover, Compare covers… (pushing
+  Compare covers, as Release's Compare does) - and the CD art group, each picture round and 112 across, its cell no
+  wider (on the empty disc, its hole a third across, while it comes and when it couldn't).
+- **Lyrics** (LyricsPage): the Lyrics group and the pointer.
+- **Delete** (DeletePage): the "Delete this album?" group - Tracks ("10 · 290 MB"), then what else is in there in
+  deadwax's words ("and 40 other files:" in the caution's colour over their names - the drawing's "Also in there" row,
+  "10 .lrc", lost the count: the review), In a library ("Yours only", "Nobody's", "Yours, Ann's and Bo's", "Couldn't
+  tell" - never "Nobody's" when deadwax couldn't read it; `EditAlbumPage.held`) and Folder, each a row - who holds it
+  in the caution's words, and the warning in the red words.
+- GetWait's and TagsReadState's lines are cards on the page's black. GetButton's line is in its caller's face
+  (`saidFont`: the phone's extra-small, the Mac's small).
+
+### Core (pure, tested on Linux)
+
+EditAlbumPage: the strip (every part a tab), Tags' targets and counts, Delete's rows, and the words - the Mac's foots,
+Select all and Deselect all, the Tags line and the editor's legend, Apply to N tracks, See a file's every tag…, a Tags
+row's VoiceOver words, the table's columns, Artwork's lines and Compare with this pressing…, Go to Release, Nothing
+saved is replaced, Delete's rows and who holds it - and, since the review, `selectAll`, `asksFirst`, `afterRead`,
+`deleteFoot`, `folderPages`, `bridgeRelease` and `coverPointer` ("After review"). EditAlbumPageTests: the strip's case
+and the new `onlyTheTickedRowsAreEdited`, `tagsWords`, `artworkAndLyricsWords` and `whatADeleteTakesIsSaidInRows` (and
+the review's four). The app's verb is **Select** (TagEditWords.select): the drawings' "Tick" is in no word.
+
+**The words fixtures** (by hand, never DEADWAX_WORDS_WRITE): iphone.json and mac.json gain
+`EditAlbumPage.Words.tagsNote` and `EditAlbumPage.Words.seeFullSize` (new words, device-aware from birth - added as the
+fixture's rule says), and DeviceWordsTests lists them; tagsNote is in `theMacsWordsDiffer`'s own words (the phone's
+names its ›, which the Mac's rows haven't), seeFullSize swaps Tap for Click. **One phone word changed on purpose:** the
+Tags line was `TagEditWords.selectNote` ("…Tap a track's name to see everything in its file.") and is now
+`EditAlbumPage.Words.tagsNote` ("…Tap › to see everything in a track's file."): a tap on the row ticks it now, and the
+› opens the file. `TagEditWords.selectNote` (TagEdit.swift, not R11's) is drawn by nothing now; its fixture keys are
+as they were.
+
+**The phone's Artwork pointers changed on purpose** (no fixture holds them: they aren't device-aware): the phone said
+GetResults.coverPointer and discArtPointer, the web's words with "in the Release tab" made "on the Release page" -
+Release was a page of its own. It is a tab now, so the phone says the web's words (`webCoverPointer`,
+`webDiscArtPointer`), but for the button. (After review) The replace pointer shows only where Artwork offers no
+Compare - Release's own condition, the pressing chosen having a cover - so it never names Release's button: "To
+replace it, compare it with the release's in the Release tab." on both devices (`EditAlbumPage.coverPointer(album,
+compare:)`, the button's word passed only while Release shows it; R11's first `phoneCoverPointer` named "(Compare)"
+where no Compare was). With no release, "To get a cover, first match the album to a release in the Release tab." with
+Go to Release. GetResults.coverPointer and discArtPointer (GetResults.swift, not R11's) are drawn by nothing now;
+EditPartsVectorTests still holds them.
+
+### Left out, and why
+
+- **The cover's file name and pixel size, and CD art's pixels and bytes** (Main.dc.html's Cover and CD art boxes): the
+  scan has the file names alone, and no route answers a picture's size - no server data new.
+- **Lyrics' Each track group** (iEditLyrics, Main.dc.html): which track has lyrics isn't in the scan (it counts them).
+- **"Tick"**: the drawings' verb; the app's is Select (2.0.8's), so the words say Select.
+- **The drawing's 1.2 : 1 columns** on the Mac's Tags: the two boxes share the width equally (an HStack of two
+  `maxWidth: .infinity` frames).
+- **The track table's own scroll**: the table is as tall as its rows inside the editor's scroll, so a long album
+  scrolls the page, not a box inside it.
+
+### The gate's files outside the brief's list
+
+- ios/DeadwaxKit/Tests/DeadwaxCoreTests/DeviceWordsTests.swift, Fixtures/words/iphone.json and mac.json: the two new
+  device-aware words, by hand (above).
+- docs/ios.md's user guide, besides the checks: Edit album's strip, Tags, Artwork, Lyrics and Delete on the phone as
+  they are now (the Select bar, Done and the pushed pages are gone), the Mac's Edit album (no more Open…), and
+  "Click the cover to see it full size." in place of "Click a track's name…" among the Mac's clicks; check 580, 582
+  and 583's words where they named the pages R11 replaced; 612's list and the Not flat yet list.
+- Tests whose pins moved with the structure: test_ios_edit.py (the strip), test_ios_edit_look.py (R10's tests read
+  the root's tabs and three feet), test_ios_edit_parts.py (Tags, Artwork, Lyrics and Delete as tabs; DeleteButton),
+  test_ios_edit_parts_contract.py (`strip_gates()` reads the flattened root), test_ios_phone_look.py (DWCheckbox in the
+  Look's list, FIXED, the targets and buttons, BRANCHES, FLAT_DRAWS, Edit tags' fields in TEXT_INPUTS as the look's
+  well, R11_PAGES in SLICES), test_ios_mac.py (MacTagsTab in ESCAPES and TABS, its field order checked against
+  TagEdit.fields; MacTagsTab and MacArtworkTab in SHEET_ROOTS), test_ios_mac_look.py (twelve Look files),
+  test_ios_mac_halves.py (DWCheckbox's pin, with its comment).
+- Found by the full run on the rebased tree (none of them by the touched files' run before it), each an entry of
+  R11's: test_ios_artist_look.py's `test_every_other_list_draws_as_before` - MacColumnList's `controls` and `voice`
+  were the artist's and an album's alone; MacTagsTab asks both (its checkbox column a control, so a double-click there
+  ticks twice rather than opening the file; the row read as one, as `.combine` would read the checkbox's words into
+  it), allowed by name with that reason. test_ios_readout_rows.py: MacTagsTab among the Mac's tables, and three ALONE
+  entries - the Mac's numbers and years in their wells (as R10's Release), the phone's file name under every tag (a
+  line of its own in PhoneGroup), and the phone's faces handed to TagFileChanges; and the phone's Tags row, whose
+  number and length sat centred beside the title, now on its first text baseline (above). test_ios_edit_parts_look's
+  MacCheckbox users: R14's MacPeoplePage uses it too.
+
+### Tests
+
+- tests/test_ios_edit_parts_look.py (new, 11 tests; 18 after review): every part a tab on both devices; each tab's
+  action in its foot (the Mac's line the drawing's `foots`); only ticked rows counted (`tagTargets`, `ticked` on both
+  devices' Apply and Edit N); a tick over typed work asking first; each write the model's own (applyTags, get, delete - no EditClient,
+  no plan); Delete asking first (DeleteButton the only caller of `model.delete`, from its question's Delete; the red
+  words dw.css's `.red`); the lyrics line the album's, no track drawn, `get` reading again after it wrote; the phone
+  flat (`drawn()` per file, each face that stays with its reason); the checkbox's sizes from dw.css; tokens and each
+  device's fonts only (GetButton's and TagFileChanges' faces handed in by their callers); Queue the word, never "Up
+  Next" or "Tick".
+- Core: EditAlbumPageTests' new cases (above).
+
+### Mutations
+
+Each applied alone by a script (scratch `r11-mutate.py`, `r11-mutate-swift.py`), the file put back byte for byte.
+Python ones ran test_ios_edit, test_ios_edit_look, test_ios_edit_parts, test_ios_edit_parts_contract,
+test_ios_edit_parts_look, test_ios_mac, test_ios_mac_halves, test_ios_mac_look, test_ios_phone_look and
+test_ios_mac_reach (189 tests); Core's ran EditAlbumPageTests. Every one caught:
+
+| mutation | caught by |
+| --- | --- |
+| unticked rows counted: the Mac's Apply to N says `names.count` | test_ios_edit_parts_look's `test_only_the_ticked_rows_are_counted_and_edited` |
+| unticked rows counted: the phone's Edit N tracks… says `names.count` | the same, and test_ios_edit_parts' `test_select_is_the_lists_own_and_edits_the_tracks_chosen_or_all` |
+| unticked rows counted: Core's `ticked` returns `files.count` | EditAlbumPageTests' `onlyTheTickedRowsAreEdited` and `tagsWords` |
+| unticked rows edited: Core's `tagTargets` returns every file | `onlyTheTickedRowsAreEdited` |
+| a tick on a file gone since counted (`ticked.count`) | `onlyTheTickedRowsAreEdited` |
+| Delete without its dialog: DeleteButton's tap calls `model.delete` | `test_delete_asks_first_on_both_devices_with_every_guard`; test_ios_edit_parts' `test_delete_permanently_asks_first_with_cancel_the_default` |
+| the lyrics count not refreshed: `get`'s `await lookUp()` removed | `test_the_lyrics_line_is_the_albums_as_the_editor_holds_it_and_no_track_is_drawn`; test_ios_edit_parts' `test_a_get_holds_a_background_task_reads_again_after_any_write_and_stops_at_a_sign_out` |
+| a track's lyrics state drawn: a ForEach over the files in MacLyricsTab | `test_the_lyrics_line_is_the_albums_as_the_editor_holds_it_and_no_track_is_drawn` |
+| flat: `.background(DWPalette.card)` on Delete's red words | `test_the_phone_is_flat_in_the_parts` |
+| typing: Edit tags' field without DWWellField | `test_the_phone_is_flat_in_the_parts`; test_ios_phone_look's `test_every_place_you_type_on_the_phone_is_still_a_box` |
+
+### After review (2026-11-26)
+
+The review found Delete itself sound - the call, the guards, the dialog with Return on Cancel, `canDelete` - and these:
+
+1. **Delete no longer said how many other files go.** The drawing's "Also in there" row kept DeleteWords.others' names
+   and dropped its lead, and the server names twelve files at most while counting every one (`other_file_count`). Both
+   devices now say deadwax's words, not the drawing's "10 .lrc": "and 40 other files:" in the caution's colour
+   (`DWPalette.amberText`) over the names, ", …" past the twelve - the phone under Tracks as a row of the group, the
+   Mac in the well under "10 tracks · 290 MB" (DeleteWords.counts). `EditAlbumPage.alsoInThere`, `deleteFacts` and
+   `Words.alsoInThere` are gone (drawn by nothing; no fixture held them). The `Text(others.lead)` pin is back in
+   test_ios_edit_parts, with the lead's colour; EditAlbumPageTests has 40 files, 12 named.
+2. **Who holds it, on the Mac,** was only the foot's two lines. MacDeleteTab draws the whole sentence
+   (DeleteWords.holders) in the caution's colour under the well; the foot says it short, "In a library: Ann's"
+   (`EditAlbumPage.deleteFoot`, `held`'s words).
+3. **The Mac's every-tag sheet could lose "Discard changes?"**: Edit this track… put the sheet away and raised the
+   question in one transaction, and SwiftUI drops a question raised over a sheet on its way down. It now sets `picked`
+   and puts the sheet away; the sheet's `onDismiss` chooses it (`choose`, through Core's `EditAlbumPage.asksFirst`), so
+   the question shows once the sheet has gone - and `choose` itself never raises it with a sheet up (it waits in
+   `picked`). `discarding` is held only while the question can show: the dialog's own dismissal, a sheet coming up
+   (`onChange(of: everyTag?.id)`) and the tab's model held anew (with `picked`) each clear it. The names a question is
+   answered with are read when it's answered (`fileNames`), never the body's from before.
+4. **The Mac's Tags editor could be left empty** after a release applied renamed files under a tag draft: TagsModel's
+   read keeps of the ticks and the tracks edited only the names the folder holds, and the editor re-edited only with
+   nothing typed - every edited file renamed left it with nothing to show, and a partial rename left "Apply to all 10
+   tracks" over the 9 it would write. Fixed in MacTagsTab, by Core's `EditAlbumPage.afterRead` (TagsModel needs no
+   change: its filtering is right - Apply never sends a name the folder no longer holds): nothing typed, the editor
+   takes the ticks; typed over with some edited tracks left, those are ticked (`.tick`) - the legend and Apply to N say
+   what Apply writes, the typed work kept; none left (`.stranded`), the editor says so ("The tracks these changes were
+   for have been renamed since, so they can't be written. Discard them to edit the tracks as they are now.",
+   `Words.editedGone`) with **Discard** - never an empty box, never typed work put away unasked. It runs as the files
+   are read and as typed work is put back (`onChange(of: tags.unsaved)`: Revert, every Undo).
+5. **The phone's Tags row was two VoiceOver elements** (the toggle and the ›). The row is one now: the outer HStack
+   `.accessibilityElement(children: .ignore)`, its label and length, the toggle traits, the tick its default action
+   (`.accessibilityAction { toggle() }`), See a file's every tag… a named action.
+6. **TagsFoot at the largest size the foot gives** (PhoneFoot stops at xxxLarge): "Deselect all" and "Edit 10 tracks…"
+   came to about 350 against 343. The foot is a `ViewThatFits`: side by side while they fit, one over the other (and
+   10 more room above and below) once they don't. DeleteButton's, TagsFoot's and Edit tags' Apply's
+   `lineLimit(typeSize.isAccessibilitySize ? 3 : 1)` never applied inside PhoneFoot and are gone. (ReleaseFoot has the
+   same dead line limit - R10's, and test_ios_edit_look holds it; left.)
+7. **The cover pointer named a button not on the page** ("(Compare)", "(Compare full size…)"): it shows exactly where
+   Release shows no Compare. `EditAlbumPage.coverPointer(album, compare:)` names the device's button only when passed
+   one, each device passing it only while `ArtworkLooks.releaseCompares` (Release's own condition, `coverRelease`) -
+   so today the words alone: "To replace it, compare it with the release's in the Release tab."
+   `phoneCoverPointer` is gone.
+8. **Mac VoiceOver said "selected" twice** of a ticked row that is also the list's selected one: the label's ",
+   selected to edit" and MacColumnList's `.isSelected` (the row selected, the one See a file's every tag… opens). The
+   label now says a checkbox's own word, ", checked" (`Words.tagRow`); "selected" is VoiceOver's alone.
+9. **Words drawn nowhere, still pinned**: `TagEditWords.selectNote` (its fixture keys, DeviceWordsTests, the vectors'
+   `selectNote`, MacPowerTests) is in TagEdit.swift, and `GetResults.coverPointer` and `discArtPointer`
+   (EditPartsVectorTests, GetResultsTests) in GetResults.swift - neither file R11's, so all are left as they were and
+   no fixture key changed. (selectNote and the vectors are the web's words, held to the web's panel.)
+10. **The notes said the phone's CD art is 112 with its hole**, but each picture sat unframed in an adaptive grid's
+    cell (112 at least, growing to the row's width over two). The drawing is true now: each disc framed at 112, the
+    cell no wider (`.adaptive(minimum: 112, maximum: 112)`); and "with its hole" said as it is - the hole is the empty
+    disc's, drawn while a picture comes or when it couldn't (the Mac's at 150, said the same).
+11. **(R10's, mine now) A delete from a folder opening left the album's page standing**: `gone` closed pages only by
+    the subject's id, and Choose the folder, the Mac's folder list and Needs a look open `.folder(path)`, with none.
+    Now, opened by its folder, the album's pages are found by the album the folder holds (Core's
+    `EditAlbumPage.folderPages`): each album page open, on every stack, as it was opened, is the folder's album when the
+    folders its own Edit album would find (AlbumEdit.folders - by the release the page knew, else by its name) hold the
+    folder, or when it's the album the id bridge names for the folder's release - asked as Delete's summary is read
+    (`askFolderBridge`, `storeAlbum(releaseMbid:)`, an existing call: no server data new), kept with the folder it was
+    for. Decided as the delete starts (the scan can't say once the folder is gone); once gone, a page it was all of goes
+    (`leaveAlbum` - every stack's on the Mac, the tab shown's top on the phone, as R10 left it), one with folders left
+    is asked again now and after the settle. An album opening's own page is as before. (Not changed: an album opening
+    that picked another album's folder in Choose the folder still treats the subject's page as that folder's.)
+
+**Words changed** (none device-aware, so no fixture key moved): `EditAlbumPage.Words.tagRow`'s ticked ", selected to
+edit" is ", checked"; `Words.editedGone` is new; `Words.alsoInThere` is gone; the replace pointer drops its button's
+name while Release shows none.
+
+#### The review's mutations
+
+Each applied alone by a script (scratch `r11-review-mutate.py` for the app's Swift, against test_ios_edit,
+test_ios_edit_look, test_ios_edit_parts, test_ios_edit_parts_contract, test_ios_edit_parts_look, test_ios_mac,
+test_ios_mac_halves, test_ios_mac_look, test_ios_phone_look, test_ios_mac_reach, test_ios_artist_look and
+test_ios_readout_rows; `r11-review-mutate-swift.py` for Core's, against EditAlbumPageTests and DeleteAlbumTests), the
+file put back byte for byte. M1-M12 are the review's own, each of which passed every test before:
+
+| mutation | caught by |
+| --- | --- |
+| M1: the Mac's Edit this track… calls `tags.edit` itself as it puts the sheet away | test_ios_edit_parts_look's `test_edit_this_track_is_chosen_once_the_sheet_has_gone`, `test_discard_changes_is_held_only_while_it_can_show`, `test_the_macs_editor_says_typed_work_a_rename_stranded_and_never_drops_it` |
+| M2: the phone's Edit N tracks… on while a write runs | `test_the_phones_tags_row_is_one_element_and_its_foot_fits` |
+| M3: the Mac's VoiceOver Select ticks while busy | `test_a_tick_over_typed_work_asks_first_and_a_read_never_puts_it_away` |
+| M5: Select all never deselects - the view (`Set(names)`) | `test_the_phones_tags_row_is_one_element_and_its_foot_fits` |
+| M5: the same in Core (`selectAll` gives every track) | EditAlbumPageTests' `selectAllAndDeselectAll` |
+| M8: the Mac's Edit this track… on during a write | `test_edit_this_track_is_chosen_once_the_sheet_has_gone` |
+| M9: a question waiting kept across a new TagsModel | `test_discard_changes_is_held_only_while_it_can_show` |
+| M12: See a file's every tag… on with no row selected | `test_edit_this_track_is_chosen_once_the_sheet_has_gone` |
+| 1: the phone's "and N other files:" dropped | test_ios_edit_parts' `test_the_page_says_what_goes_and_who_holds_it_as_the_dialog_does` |
+| 1: the phone's lead in t2, not the caution's colour | the same |
+| 1: the Mac's lead dropped | `test_the_macs_delete_says_what_goes_and_who_holds_it_whole` |
+| 1: Core counts the files named, not `otherFileCount` | EditAlbumPageTests' `whatADeleteTakesIsSaidInRows`; DeleteAlbumTests' `anAnswerMissingItsFieldsIsReadAsNothingAndUnreadHoldersStayUnread` |
+| 2: the Mac's holders only in the foot (the row dropped) | `test_the_macs_delete_says_what_goes_and_who_holds_it_whole` |
+| 2: the foot says the whole sentence (`deleteFoot`) | `whatADeleteTakesIsSaidInRows` |
+| 3: the sheet's pick never chosen once it has gone (onDismiss empty) | `test_edit_this_track_is_chosen_once_the_sheet_has_gone` |
+| 3: `choose` raises the question with a sheet up | `test_a_tick_over_typed_work_asks_first_and_a_read_never_puts_it_away`, `test_discard_changes_is_held_only_while_it_can_show` |
+| 3: the question kept when a sheet comes up | `test_discard_changes_is_held_only_while_it_can_show` |
+| 3: `asksFirst` asks with nothing typed / never asks | EditAlbumPageTests' `aTickOverTypedWorkAsksFirst` (each) |
+| 4: a rename under typed work leaves the ticks as they were (`.tick` ignored) | `test_a_tick_over_typed_work_asks_first_and_a_read_never_puts_it_away` |
+| 4: stranded typed work with no Discard | `test_the_macs_editor_says_typed_work_a_rename_stranded_and_never_drops_it` |
+| 4: typed work put back, the editor never following the ticks (no `onChange(of: tags.unsaved)`) | `test_a_tick_over_typed_work_asks_first_and_a_read_never_puts_it_away` |
+| 4: Core's `afterRead` keeps, re-edits over typed work, or leaves stranded work unsaid | EditAlbumPageTests' `theEditorFollowsAReadWithoutLosingTypedWork` (each) |
+| 5: the phone's row two elements again (no `.accessibilityElement(children: .ignore)`) | `test_the_phones_tags_row_is_one_element_and_its_foot_fits` |
+| 5: the row's double-tap ticks nothing (no default action) | the same |
+| 6: the foot one row at every size (ViewThatFits' stack dropped) | the same |
+| 6: Delete's dead `isAccessibilitySize ? 3 : 1` back | the same |
+| 7: the phone's pointer names Compare where Release shows none | test_ios_edit_parts' `test_artwork_draws_the_cover_and_cd_art_and_offers_each_get_as_the_web_does` |
+| 7: the Mac's names Compare full size… where Release shows none | `test_the_cover_pointer_names_compare_only_while_release_shows_it` |
+| 7: Core's `coverPointer` names "(Compare)" with no button passed | EditAlbumPageTests' `artworkAndLyricsWords` |
+| 8: the ticked row says ", selected to edit" again | EditAlbumPageTests' `tagsWords` |
+| 10: the phone's CD art unframed | `test_the_cover_pointer_names_compare_only_while_release_shows_it` |
+| 11: a folder opening's delete closes nothing (`gone` returns) | `test_a_folder_openings_delete_closes_the_albums_pages_by_what_the_folder_holds` |
+| 11: the folder's release never asked of the bridge | the same |
+| 11: pages with folders left never asked again | the same |
+| 11: Core's `folderPages` ignores the bridge, takes it for every page, leaves every page found, finds pages not holding the folder, takes a page twice; `bridgeRelease` untrimmed | EditAlbumPageTests' `aFolderDeleteClosesTheAlbumsPagesByWhatTheFolderHolds` (each) |
+
+43 mutations, every one caught: 27 on the app's Swift (each run 223 tests, 1-3 failing), 16 on Core (each a test run
+of 25 in 2 suites that built and failed - never a compile error). Logs: scratch `r11-review-mutations-py.log` and
+`r11-review-mutations-swift.log`.
+
+### Not verified - only a phone and a Mac can say (checks 585-589)
+
+- Anything on a screen: no Simulator, no phone, no Mac run of this build (Mac smoke run: not done - James's app
+  running). The Mac's Tags at 1280 and narrow: the table's rows, the checkbox's click beside the row's, the
+  double-click and Return, the sheet's Done and Escape, Discard's question after a tick and - the review's 3 - after
+  Edit this track in the every-tag sheet (asked from the sheet's onDismiss, once it has gone: that SwiftUI shows it
+  then, and no longer drops it, is the Mac's to say), the editor's fields in Tab's order. VoiceOver on a ticked row
+  that is also the list's selected one: "…, checked" and "selected" once. A release applied under a tag draft (the
+  review's 4): the ticks following the tracks still edited, and the stranded words with Discard.
+- Delete on the Mac: the well's "and N other files:" in the caution's colour, the holders row's whole sentence under
+  it, and the foot's short "In a library: …" in one line.
+- Artwork's boxes after Get cover and Get CD art (the folder read again, the pictures drawn); Compare with this
+  pressing…'s sheet over the page; the pointer's words with no Compare named.
+- Delete's question on the Mac (Catalyst's confirmationDialog, Return on Cancel) and the phone's action sheet. A delete
+  from a folder opening (Choose the folder, the folder list, Needs a look) closing the album's page wherever it is open
+  - the Mac's every stack; the phone's tab shown, only from its top (R10's leaveAlbum).
+- The phone: the four tabs flat at the standard and accessibility sizes, the 20 pt tick growing with the text, a
+  row's tap ticking and its › pushing; VoiceOver reading a Tags row as one element - double-tap ticking, See a file's
+  every tag… in the actions rotor; TagsFoot stacking at xxxLarge (ViewThatFits' choice, measured by nothing here);
+  the CD art at 112 across; TagsFoot's and Delete's foot under the keyboard, Get lyrics' new count.
+
 ## The redesign, slice R13: Library care and the Event log (2026-11-25)
 
 The Mac redesign's build plan (~/Desktop/Code/deadwax-plans/mac-redesign-build.md), 3.4's R13: Library care and the

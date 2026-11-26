@@ -104,6 +104,19 @@ ALONE = [
     # (R14) a Mac setting box's legend on its edge (.legend.mono), as the drawing sets it
     ("Mac/Manage/MacServerSettingsPage.swift", "Text(setting.key)\n                .font(Typeface.Mac.mono(.label).weight(.bold))",
      "a setting box's name on its top edge: an overlay of its own, nothing beside it"),
+    # (R11) the Mac's Tags: the track and disc numbers and the years typed in their wells, each box centred on its label
+    # as DWFieldRow lays every field, the words inside it centred in it - as Release's years above
+    ("Mac/Edit/MacTagsTab.swift", "input.font(Typeface.Mac.mono(.label))",
+     "the numbers and the years typed in their wells, beside their labels in the Tags editor"),
+    # (R11) a track's page on the phone: the file's name, the last line of its every-tag group (PhoneGroup stacks its
+    # rows), nothing beside it
+    ("Edit/TagsPages.swift", "Text(file.filename)\n                .font(Typeface.Phone.mono(.extraSmall))",
+     "the file's name, a line of its own under every tag in the track's page"),
+    # (R11) the phone's faces handed to TagFileChanges (both devices' preview): each readout in it a line of its own in
+    # its VStacks - the file's name, what a tag says now and what it would say
+    ("Edit/TagsPages.swift",
+     "self.init(file: file, mono: Typeface.Phone.mono(.extraSmall), words: Typeface.Phone.text(.small))",
+     "a file's changes in Edit tags' preview, each readout a line of its own in TagFileChanges' VStacks"),
 ]
 
 
@@ -275,6 +288,8 @@ def test_the_macs_tables_and_status_bar_are_set_on_one_baseline():
     assert pages == ["Mac/Album/MacAlbumPage.swift", "Mac/Album/MacPlaylistPage.swift", "Mac/Artist/MacArtistPage.swift",
                      # (R10) Edit album's folder list
                      "Mac/Edit/MacFolderList.swift",
+                     # (R11) Edit album's Tags, its tracks
+                     "Mac/Edit/MacTagsTab.swift",
                      "Mac/Library/MacAlbumsPage.swift", "Mac/Library/MacArtistsPage.swift",
                      "Mac/Library/MacPlaylistsPage.swift",
                      # (R14) People's list

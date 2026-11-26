@@ -731,7 +731,7 @@ def test_app_look_and_app_phone_hold_their_files():
     files = look_and_phone()
     assert sorted(name for name in files if name.startswith("Look/")) == [
         f"Look/DW{n}.swift" for n in sorted(("Palette", "Corners", "Raised", "ButtonStyle", "Field", "Chip", "Segmented",
-                                             "PopUp", "ToggleStyle", "Meter", "WellField"))]
+                                             "PopUp", "ToggleStyle", "Meter", "WellField", "Checkbox"))]
     assert sorted(name for name in files if name.startswith("Phone/")) == [
         f"Phone/Phone{n}.swift" for n in sorted(("Strip", "Top", "TabItem", "Mini", "Card", "Switch", "Foot", "Meta"))]
 
@@ -792,6 +792,9 @@ FIXED = {
     #? (R8) a meter: its fill's width the share of its track, and its height DWLook's - on the phone grown with the text
     #? by its own @ScaledMetric, so a minimum would only let it stretch
     "Look/DWMeter.swift": ["width: track.size.width * share", "height: height"],
+    #? (R11) a checkbox's box (dw.css's input[type=checkbox]): a mark, 13 on the Mac, 20 on the phone grown with the text
+    #? by its own @ScaledMetric - a row round it is the finger's, never the box
+    "Look/DWCheckbox.swift": ["width: side, height: side"],
 }
 
 
@@ -862,6 +865,7 @@ def test_a_fingers_target_is_44_at_least():
                          ("Look/DWWellField.swift", ".contentShape(DWTarget(face: DWCorners.buttonShape))"),
                          ("Look/DWSegmented.swift", ".contentShape(DWTarget(face: Rectangle()))"),
                          ("Look/DWToggleStyle.swift", ".contentShape(DWTarget(face: DWCorners.boxShape))"),
+                         ("Look/DWCheckbox.swift", ".contentShape(DWTarget(face: DWCorners.chipShape))"),
                          ("Phone/PhoneStrip.swift", ".contentShape(DWTarget(face: DWCorners.buttonShape))"),
                          ("Phone/PhoneTop.swift", ".contentShape(DWTarget(face: Rectangle()))"),
                          ("Phone/PhoneMeta.swift", ".contentShape(DWTarget(face: Rectangle()))"),
@@ -898,9 +902,10 @@ def test_a_fingers_target_is_44_at_least():
             in well), well
     # and no other button is drawn in them - (R1c) DWSegmented's two its devices' segments, the Mac's and the phone's
     buttons = {name: len(re.findall(r"\bButton\s*(\{|\(action:)", code)) for name, code in files.items()}
+    #? (R11) DWCheckbox's one: the box and its words, one button
     assert {name: count for name, count in buttons.items() if count} == {
         "Look/DWSegmented.swift": 2, "Phone/PhoneStrip.swift": 1, "Phone/PhoneTop.swift": 1,
-        "Phone/PhoneTabItem.swift": 1, "Phone/PhoneSwitch.swift": 1}, buttons
+        "Phone/PhoneTabItem.swift": 1, "Phone/PhoneSwitch.swift": 1, "Look/DWCheckbox.swift": 1}, buttons
 
 
 # ----------------------------------------------------------------------------- VoiceOver, text size, the keyboard
@@ -1013,6 +1018,11 @@ BRANCHES = {
     "Look/DWToggleStyle.swift": ["if on, Platform.mac {"],
     #? (R1c's review) a page's own field on the look's well on the phone; on the Mac the field as its page drew it
     "Look/DWWellField.swift": ["if Platform.mac {"],
+    #? (R11) a checkbox's box at each device's size (dw.css's 13 and 20) - the tick's glyph in it - and unticked, the
+    #? Mac's sunk in a well (MacCheckbox's, as it was), the phone's an edge alone
+    "Look/DWCheckbox.swift": ["let side = Platform.mac ? Self.macBox : phoneBox",
+                              ".font(Typeface.symbol(size: Platform.mac ? 8 : side * 0.55, weight: .heavy))",
+                              "} else if Platform.mac {"],
 }
 
 
@@ -1273,6 +1283,9 @@ FLAT_DRAWS = {
     "Look/DWToggleStyle.swift": ["fill: DWPalette.selbg", "strokeBorder: DWPalette.selbd"],
     # (R1c's review) a page's own field on the look's well: a text input's box
     "Look/DWWellField.swift": ["DWWell: focused: focus.wrappedValue == field"],
+    # (R11) a checkbox (iEditTags' input[type=checkbox]): ticked, the box filled in the accent's own checkFill, its tick
+    # on it; unticked, its edge in the third colour - a mark, as the switch's track is, never a raised face
+    "Look/DWCheckbox.swift": ["fill: DWPalette.checkFill", "strokeBorder: DWPalette.t3"],
     # a card's hairline under it, a group's rows' under each
     "Phone/PhoneCard.swift": ["DWRule: DWPalette.cardRule", "DWRule: DWPalette.groupRule", "DWRule: DWPalette.groupRule"],
     # (R10's review) the foot's ground, run on down into the home indicator's room: the page's own black (footFace is
@@ -1384,7 +1397,9 @@ TEXT_INPUTS = {
     "Edit/ChooseFolderView.swift": [SYSTEM],
     # (R10) Release's fields on the look's wells (Artist, Album, Year, Original, Edition: one helper), Choose a release's
     # search iOS's own still
-    "Edit/ReleasePage.swift": [WELL, SYSTEM], "Edit/TagsPages.swift": [SYSTEM],
+    "Edit/ReleasePage.swift": [WELL, SYSTEM],
+    # (R11) Edit tags' eleven fields on the look's wells, as Release's are (one helper)
+    "Edit/TagsPages.swift": [WELL],
     # (R1c's review) Artist and Album on the look's wells, in a flat sheet
     "Get/ManualSearchSheet.swift": [WELL, WELL], "Get/SourcesSheet.swift": [OWN],
     "Library/AlbumsScreen.swift": [SYSTEM], "Library/ArtistsScreen.swift": [SYSTEM], "Library/LibraryView.swift": [WELL],
@@ -1696,6 +1711,10 @@ R9_PAGES = {"You/YouView.swift", "You/AccountSection.swift", "You/PlaybackSectio
             "Downloads/DownloadsScreen.swift"}
 #? R10: Edit album on the phone (iEdit - the top's chip, the header, the strip and its pushes, Release's cards and foot)
 R10_PAGES = {"Edit/EditAlbumSheet.swift", "Edit/ReleasePage.swift"}
+#? R11: Edit album's Tags, Artwork, Lyrics and Delete on the phone, flat (iEditTags, iEditArtwork, iEditLyrics,
+#? iEditDelete - the tracks' rows and their ticks, the groups and their rows, Edit tags' fields on the look's wells, the
+#? tabs' feet; tests/test_ios_edit_parts_look.py holds what each draws)
+R11_PAGES = {"Edit/TagsPages.swift", "Edit/ArtworkLyricsPages.swift", "Edit/DeletePage.swift"}
 #? R13: Library care, In nobody's library and the event log on the phone, flat (iLibraryCare, iEventLog - the groups and
 #? their hairlines, the runs' rows with their meters, Narrow to on the look's well, the level strip, the mono lines;
 #? tests/test_ios_care_look.py holds what each draws)
@@ -1706,7 +1725,7 @@ R13_PAGES = {"Manage/LibraryCareScreen.swift", "Manage/HeldByNobodyScreen.swift"
 R14_PAGES = {"Manage/PeopleScreen.swift", "Manage/PeopleSheets.swift", "Manage/ServerSettingsScreen.swift",
              "Manage/ServerSettingsGroupScreen.swift"}
 SLICES = (R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES
-          | R13_PAGES | R14_PAGES)
+          | R11_PAGES | R13_PAGES | R14_PAGES)
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",
@@ -1723,7 +1742,7 @@ def test_the_phones_pieces_are_drawn_nowhere_yet():
     look = declared(LOOK_DIR) - {"here"}
     assert {"DWPalette", "DWCorners", "DWRaised", "DWRule", "DWButtonStyle", "DWWell", "DWField", "DWFieldRow", "DWChip",
             "DWCount", "DWSegmented", "DWPopUp", "DWCaret", "DWToggleStyle", "DWTarget", "lookHeight",
-            "lookSquare", "DWMeter", "DWWellField"} <= look, look
+            "lookSquare", "DWMeter", "DWWellField", "DWCheckbox", "DWCheckMark"} <= look, look
     phone_use = re.compile(r"\bTypeface\.Phone\b|\bPhoneLook\b|\bPhonePieceWords\b|\b(" + "|".join(sorted(phone, key=len, reverse=True)) + r")\b")
     look_use = re.compile(r"\bTypeface\.Look\b|\bDWLook\b|\bDWLook\.here\b|\b(" + "|".join(sorted(look, key=len, reverse=True))
                           + r")\b")

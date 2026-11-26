@@ -3,76 +3,85 @@ import SwiftUI
 import UIKit
 
 /// Tags (notes/ios-specs/phase8-managing.md 3.4; the web's EditPanel TagsList): the folder's files as read from the disk
-/// just now, a section per disc on a set, each row its number and title (its artist when it isn't the album's). A tap
-/// pushes the track's page; **Select** turns on multi-select, and the bottom bar's button edits the tracks selected -
-/// or every track with none (the web's words). Another set of tracks while typed work waits for its Apply asks
-/// "Discard changes?" first, as Close does. Not the web's Shift-click runs (`tickTracks`): Select is the phone's way.
+/// just now, a heading per disc on a set, each row its number, its title (its artist when it isn't the album's) and its
+/// length. Another set of tracks while typed work waits for its Apply asks "Discard changes?" first, as Close does.
+///
+/// (R11 - notes/ios.md "The redesign, slice R11: Tags, Artwork, Lyrics and Delete") The root's Tags tab, as
+/// iEditTags.dc.html draws it, flat: a row per track run to the screen's edges, its tick at its start - a tap anywhere
+/// on the row ticks it, as the drawing's `<label class="row">` does - and its › pushing the track's page (everything in
+/// its file); the line under them; and the root's foot (TagsFoot): Select all, and Edit N tracks… - the tracks ticked,
+/// every track with none ticked (EditAlbumPage.tagTargets).
 struct TagsListView: View {
     let model: EditAlbumModel
     let tags: TagsModel
     @Binding var path: [EditPage]
 
-    @State private var editMode: EditMode = .inactive
+    private let side = CGFloat(PhoneLook.bigSide)
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            TagsReadState(model: model, tags: tags)
+                .padding(.horizontal, side)
+            let discs = tags.discs
+            if let files = tags.files, !files.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(discs.enumerated()), id: \.offset) { (_: Int, disc: (disc: Int?, files: [AlbumFile])) in
+                        if let number = disc.disc {
+                            // .dw.ph .row.grp: 38 tall, its words at its foot, the heading's 15 semibold
+                            Text(TagEditWords.disc(number))
+                                .font(Typeface.Phone.text(.strip).weight(.semibold))
+                                .foregroundStyle(DWPalette.head)
+                                .padding(.horizontal, side)
+                                .padding(.bottom, 6)
+                                .frame(maxWidth: .infinity, minHeight: 38, alignment: .bottomLeading)
+                                .accessibilityAddTraits(.isHeader)
+                        }
+                        ForEach(disc.files, id: \.filename) { (file: AlbumFile) in
+                            TagTrackRow(tags: tags, file: file, path: $path)
+                        }
+                    }
+                }
+                // iEditTags' `.list`: its hairline over the first row
+                .overlay(alignment: .top) { DWRule(colour: DWPalette.rowRule) }
+                Text(EditAlbumPage.Words.tagsNote(Platform.device))
+                    .font(Typeface.Phone.text(.extraSmall))
+                    .foregroundStyle(DWPalette.t3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, side)
+                    .padding(.vertical, 10)
+            }
+        }
+        // the rows run to the screen's edges, as the strip's hairline does - the root's page is padded by `side`
+        .padding(.horizontal, -side)
+        // the files are read once Tags shows - again for a model held anew
+        .task(id: ObjectIdentifier(tags)) { tags.start() }
+    }
+}
+
+/// The Tags tab's foot (iEditTags' `.foot2`): Select all - Deselect all once every track is ticked - and Edit N tracks…,
+/// the purple one, pushing Edit tags for the tracks ticked, every track with none ticked. Another set of tracks while
+/// typed work waits asks "Discard changes?" first. (R11's review) Side by side while both fit the foot, one over the
+/// other once they don't: PhoneFoot stops its text at xxxLarge, where "Deselect all" and "Edit 10 tracks…" come to
+/// about 350 against the foot's 343 - no accessibility size reaches a foot's words, so they are never cut to fit.
+struct TagsFoot: View {
+    let model: EditAlbumModel
+    let tags: TagsModel
+    @Binding var path: [EditPage]
+
     @State private var discarding: [String]?
 
     var body: some View {
-        @Bindable var tags = tags
-        let selecting = editMode.isEditing
-        List(selection: selecting ? $tags.selection : nil) {
-            TagsReadState(model: model, tags: tags)
-            let discs = tags.discs
-            ForEach(Array(discs.enumerated()), id: \.offset) { (at: Int, disc: (disc: Int?, files: [AlbumFile])) in
-                Section {
-                    ForEach(disc.files, id: \.filename) { (file: AlbumFile) in
-                        if selecting {
-                            TagTrackRow(tags: tags, file: file)
-                        } else {
-                            NavigationLink(value: EditPage.track(file.filename)) {
-                                TagTrackRow(tags: tags, file: file)
-                            }
-                        }
-                    }
-                } header: {
-                    if let number = disc.disc {
-                        Text(TagEditWords.disc(number))
-                            .font(Typeface.footnote)
-                    }
-                } footer: {
-                    if at == discs.count - 1, let files = tags.files, !files.isEmpty {
-                        Text(tags.selection.isEmpty ? TagEditWords.selectNote(Platform.device)
-                             : TagEditWords.selected(tags.selection.count, of: files.count))
-                            .font(Typeface.footnote)
-                    }
-                }
+        let names = (tags.files ?? []).map(\.filename)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: CGFloat(PhoneLook.footGap)) {
+                selectButton(names)
+                editButton(names)
             }
-        }
-        .environment(\.editMode, $editMode)
-        .navigationTitle(AlbumEdit.Part.tags.label)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(selecting ? AlbumInfoWords.done : TagEditWords.select) {
-                    withAnimation {
-                        editMode = selecting ? .inactive : .active
-                        if !editMode.isEditing { tags.selection = [] }
-                    }
-                }
-                .disabled(tags.files?.isEmpty != false)
+            VStack(spacing: CGFloat(PhoneLook.footGap)) {
+                selectButton(names)
+                editButton(names)
             }
-            ToolbarItemGroup(placement: .bottomBar) {
-                if selecting, let files = tags.files {
-                    let all = !files.isEmpty && tags.selection.count == files.count
-                    Button(all ? TagEditWords.deselectAll : TagEditWords.selectAll) {
-                        tags.selection = all ? [] : Set(files.map(\.filename))
-                    }
-                    Spacer()
-                }
-                Button(TagEditWords.editTracks(tags.selection.count)) {
-                    open(targets)
-                }
-                .font(Typeface.headline)
-                .disabled(targets.isEmpty || model.writing)
-            }
+            .padding(.vertical, CGFloat(PhoneLook.footGap))
         }
         .confirmationDialog(EditWords.discardTitle, isPresented: Binding(get: { discarding != nil },
                                                                           set: { if !$0 { discarding = nil } }),
@@ -83,13 +92,30 @@ struct TagsListView: View {
             Button(EditWords.keepEditing, role: .cancel) {}
                 .returnCancels()
         }
-        .task(id: ObjectIdentifier(tags)) { tags.start() }
     }
 
-    /// The tracks Edit tags edits: those selected, in running order - every track with none selected.
-    private var targets: [String] {
-        let names = (tags.files ?? []).map(\.filename)
-        return tags.selection.isEmpty ? names : names.filter { tags.selection.contains($0) }
+    /// Select all - Deselect all once every track is ticked (EditAlbumPage.selectAll): VoiceOver hears TagEditWords'
+    /// whole words.
+    private func selectButton(_ names: [String]) -> some View {
+        let all = EditAlbumPage.allTicked(names, tags.selection)
+        return Button(all ? EditAlbumPage.Words.deselectAll : EditAlbumPage.Words.selectAll) {
+            tags.selection = EditAlbumPage.selectAll(names, tags.selection)
+        }
+        .buttonStyle(DWButtonStyle(size: .large))
+        .accessibilityLabel(all ? TagEditWords.deselectAll : TagEditWords.selectAll)
+        .disabled(names.isEmpty)
+    }
+
+    /// Edit N tracks…, the purple one - off while a write runs: the editor it pushes would start from files about to
+    /// change.
+    private func editButton(_ names: [String]) -> some View {
+        Button {
+            open(EditAlbumPage.tagTargets(names, ticked: tags.selection))
+        } label: {
+            Text(TagEditWords.editTracks(EditAlbumPage.ticked(names, tags.selection)))
+        }
+        .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
+        .disabled(names.isEmpty || model.writing)
     }
 
     private func open(_ names: [String]) {
@@ -106,71 +132,136 @@ struct TagsListView: View {
     }
 }
 
-/// The files read, or reading, or not read - over the Tags list and a track's page: "Reading the files…" while the
-/// first read is on its way; the read's failure in the phone's words with Look again (the scan read again, and with it
-/// the files) - the files' own read's, or (review, 16 Nov) the scan's, when the read a write or a gap waits for
-/// couldn't be made there.
+/// The files read, or reading, or not read - over the Tags tab, a track's page and Edit tags: "Reading the files…"
+/// while the first read is on its way; the read's failure in the phone's words with Look again (the scan read again, and
+/// with it the files) - the files' own read's, or (review, 16 Nov) the scan's, when the read a write or a gap waits for
+/// couldn't be made there. (R11) Flat: a card each.
 struct TagsReadState: View {
     let model: EditAlbumModel
     let tags: TagsModel
 
     var body: some View {
         if tags.files == nil, tags.reading {
-            Section {
+            PhoneCard {
                 HStack(spacing: 10) {
                     ProgressView()
-                    Text(TagEditWords.readingFiles).foregroundStyle(Palette.quiet)
+                    Text(TagEditWords.readingFiles)
+                        .font(Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.t2)
                 }
                 .accessibilityElement(children: .combine)
             }
         }
         if let failure = tags.readFailure ?? (tags.flow.readFailed ? model.scan.failure ?? EditWords.readFailed : nil) {
-            Section {
-                ErrorNote(text: failure)
-                Button(EditWords.lookAgain) {
-                    Task {
-                        await model.lookUp()
-                        await tags.readFiles()
+            PhoneCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    ErrorNote(text: failure)
+                    Button(EditWords.lookAgain) {
+                        Task {
+                            await model.lookUp()
+                            await tags.readFiles()
+                        }
                     }
+                    .buttonStyle(DWButtonStyle(size: .small))
+                    .disabled(!model.online || tags.reading || model.scan.reading)
                 }
-                .disabled(!model.online || tags.reading || model.scan.reading)
             }
         }
     }
 }
 
-/// A track in Tags: "3 · Title", its artist under it when it isn't the album's, read by VoiceOver as one.
+/// A track in Tags (iEditTags' `.row`): its tick, its number, its title (its artist under it when it isn't the album's),
+/// its length, and its › - 48 tall at least on the row's hairline. A tap on the row ticks it; the › pushes the track's
+/// page. (R11's review) VoiceOver reads the whole row as one toggle - its words "Track 3, Title", its length its value -
+/// a double-tap ticking it (its default action) and See a file's every tag… a named action: the › is no element of its
+/// own beside it.
 struct TagTrackRow: View {
     let tags: TagsModel
     let file: AlbumFile
+    @Binding var path: [EditPage]
+
+    private let side = CGFloat(PhoneLook.bigSide)
+    /// The title's size (Typeface.Phone's .row, scaled as it is): the tick is centred on its words' line.
+    @ScaledMetric(relativeTo: Typeface.Phone.Size.row.scaled.style)
+    private var rowWords: CGFloat = Typeface.Phone.Size.row.scaled.points
 
     var body: some View {
         let label = tags.label(file)
         let title = file.title ?? file.filename
         let artist = TagEditWords.artist(file, album: tags.album)
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text(label)
-                .font(Typeface.mono(.footnote))
-                .foregroundStyle(Palette.quiet)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                if let artist {
-                    Text(artist)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+        let ticked = tags.selection.contains(file.filename)
+        HStack(spacing: 0) {
+            Button {
+                toggle()
+            } label: {
+                // the number and the length on the title's first text baseline, the tick centred on its words' line
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    DWCheckMark(on: ticked)
+                        .padding(.leading, side)
+                        .padding(.trailing, 12)
+                        .centredOnWords(rowWords)
+                    // .mono.s.q, 38 wide
+                    Text(label)
+                        .font(Typeface.Phone.mono(.small))
+                        .foregroundStyle(DWPalette.t2)
+                        .frame(minWidth: 38, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(Typeface.Phone.text(.row))
+                            .foregroundStyle(DWPalette.head)
+                        if let artist {
+                            Text(artist)
+                                .font(Typeface.Phone.text(.small))
+                                .foregroundStyle(DWPalette.t2)
+                        }
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
+                    Text(TrackInspector.trackTime(file.length))
+                        .font(Typeface.Phone.mono(.small))
+                        .foregroundStyle(DWPalette.t2)
+                        .padding(.leading, 10)
                 }
+                .frame(minHeight: CGFloat(DWLook.here.rowHeight))
+                .contentShape(Rectangle())
             }
-            .fixedSize(horizontal: false, vertical: true)
+            .buttonStyle(.plain)
+            // the ›: the track's page - a finger's 44 round it, the row's side after it
+            NavigationLink(value: EditPage.track(file.filename)) {
+                PhoneChevron()
+                    .frame(minWidth: CGFloat(DWLook.here.target), minHeight: CGFloat(DWLook.here.target))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, side - 14)
         }
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
+        // one element, the row: a toggle, a double-tap ticking it - the ›'s page its named action
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(TagEditWords.trackRow(label: label, title: title, artist: artist))
+        .accessibilityValue(TrackInspector.trackTime(file.length))
+        .accessibilityAddTraits(ticked ? [.isToggle, .isSelected] : .isToggle)
+        .accessibilityAction { toggle() }
+        .accessibilityAction(named: EditAlbumPage.Words.seeEveryTag) {
+            path.append(.track(file.filename))
+        }
+    }
+
+    /// The row's tap, and VoiceOver's double-tap: ticked or unticked.
+    private func toggle() {
+        if tags.selection.contains(file.filename) {
+            tags.selection.remove(file.filename)
+        } else {
+            tags.selection.insert(file.filename)
+        }
     }
 }
 
 /// A track's page (the web's TrackInspector): its title and where it sits, Edit this track…, every field the web's
 /// inspector shows under its group - the ones the file has; the disc of a file with no disc tag dimmed and saying why -
 /// the pictures inside it (each a row, its facts once it has loaded; a tap shows it full screen), and every tag under
-/// its container's own name.
+/// its container's own name. (R11) Flat: each group a PhoneGroup of rows on the page's black.
 struct TrackPageView: View {
     let model: EditAlbumModel
     let tags: TagsModel
@@ -180,18 +271,25 @@ struct TrackPageView: View {
     @State private var full: FullCover?
     @State private var discarding = false
 
+    private let side = CGFloat(PhoneLook.bigSide)
+
     var body: some View {
-        List {
-            TagsReadState(model: model, tags: tags)
-            if let file = tags.file(filename) {
-                head(file)
-                ForEach(TrackInspector.groups(file)) { (section: TrackInspector.Section) in
-                    InspectorSection(section: section)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                TagsReadState(model: model, tags: tags)
+                if let file = tags.file(filename) {
+                    head(file)
+                    ForEach(TrackInspector.groups(file)) { (section: TrackInspector.Section) in
+                        InspectorSection(section: section)
+                    }
+                    pictures(file)
+                    raw(file)
                 }
-                pictures(file)
-                raw(file)
             }
+            .padding(.horizontal, side)
+            .padding(.bottom, 24)
         }
+        .background(DWPalette.page)
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .appCover(item: $full) { (cover: FullCover) in
@@ -213,30 +311,34 @@ struct TrackPageView: View {
     }
 
     private func head(_ file: AlbumFile) -> some View {
-        Section {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(TrackInspector.title(file).isEmpty ? file.filename : TrackInspector.title(file))
-                    .font(Typeface.headline)
-                if TrackInspector.untitled(file) {
-                    Text(TrackInspector.noTitle)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+        PhoneCard {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(TrackInspector.title(file).isEmpty ? file.filename : TrackInspector.title(file))
+                        .font(Typeface.Phone.text(.row).weight(.semibold))
+                        .foregroundStyle(DWPalette.text)
+                    if TrackInspector.untitled(file) {
+                        Text(TrackInspector.noTitle)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(DWPalette.t2)
+                    }
+                    Text(TrackInspector.place(file, discs: tags.album.discCount))
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                 }
-                Text(TrackInspector.place(file, discs: tags.album.discCount))
-                    .font(Typeface.subheadline)
-                    .foregroundStyle(Palette.quiet)
-            }
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
-            Button(TrackInspector.editThis) {
-                if [filename] != tags.editing && tags.unsaved {
-                    discarding = true
-                } else {
-                    push()
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
+                Button(TrackInspector.editThis) {
+                    if [filename] != tags.editing && tags.unsaved {
+                        discarding = true
+                    } else {
+                        push()
+                    }
                 }
+                .buttonStyle(DWButtonStyle(size: .small))
+                .disabled(model.writing)
             }
-            .disabled(model.writing)
         }
     }
 
@@ -246,12 +348,14 @@ struct TrackPageView: View {
     }
 
     @ViewBuilder private func pictures(_ file: AlbumFile) -> some View {
-        Section {
+        PhoneGroup(legend: TrackInspector.pictures) {
             if file.pictures.isEmpty {
                 Text(TrackInspector.noPictures)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             // by place, not by the server's index: an index read loosely (missing, malformed) is 0, and two pictures
             // with one id would be drawn as one
@@ -265,32 +369,33 @@ struct TrackPageView: View {
                 }
                 .buttonStyle(.plain)
             }
-        } header: {
-            Text(TrackInspector.pictures)
-                .font(Typeface.footnote)
         }
     }
 
     @ViewBuilder private func raw(_ file: AlbumFile) -> some View {
-        Section {
+        PhoneGroup(legend: TrackInspector.rawTitle(file)) {
             ForEach(Array((file.raw ?? []).enumerated()), id: \.offset) { (_, pair: [String]) in
                 VStack(alignment: .leading, spacing: 2) {
                     Text(pair.first ?? "")
-                        .font(Typeface.mono(.footnote))
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.mono(.extraSmall))
+                        .foregroundStyle(DWPalette.t2)
                     Text(pair.dropFirst().first ?? "")
+                        .font(Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.text)
                         .textSelection(.enabled)
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
                 .accessibilityElement(children: .combine)
             }
             Text(file.filename)
-                .font(Typeface.mono(.footnote))
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.mono(.extraSmall))
+                .foregroundStyle(DWPalette.t3)
                 .textSelection(.enabled)
-        } header: {
-            Text(TrackInspector.rawTitle(file))
-                .font(Typeface.footnote)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
@@ -303,45 +408,51 @@ struct InspectorSection: View {
     var body: some View {
         let shown = section.fields.filter { !$0.value.isEmpty }
         if !shown.isEmpty {
-            Section {
+            PhoneGroup(legend: section.group.rawValue) {
                 ForEach(shown) { (field: TrackInspector.Field) in
                     InspectorRow(field: field)
                 }
-            } header: {
-                Text(section.group.rawValue)
-                    .font(Typeface.footnote)
-            } footer: {
-                if let why = shown.compactMap(\.inferred).first {
-                    Text(why)
-                        .font(Typeface.footnote)
-                }
+            }
+            if let why = shown.compactMap(\.inferred).first {
+                Text(why)
+                    .font(Typeface.Phone.text(.small))
+                    .foregroundStyle(DWPalette.t2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
             }
         }
     }
 }
 
-/// One field: its label, its value (in the data face for a number or an id), dimmed when it is a default.
+/// One field (`.kv`): its label in white, its value at its end in the second colour (in the readout face for a number
+/// or an id), the third when it is a default - 42 tall at least on the group's hairline, its value selectable.
 struct InspectorRow: View {
     let field: TrackInspector.Field
 
     var body: some View {
-        let face: Font = field.mono ? Typeface.mono(.body) : Typeface.body
-        let colour: Color = field.inferred == nil ? Color.primary : Palette.quiet
-        LabeledContent {
+        HStack(alignment: .firstTextBaseline, spacing: CGFloat(PhoneLook.kvGap)) {
+            Text(field.label)
+                .font(Typeface.Phone.text(.row))
+                .foregroundStyle(DWPalette.kvLabel)
+                .frame(minWidth: CGFloat(PhoneLook.kvLabelWidth), alignment: .leading)
+            Spacer(minLength: 0)
             Text(field.value)
-                .font(face)
-                .foregroundStyle(colour)
+                .font(field.mono ? Typeface.Phone.mono(.small) : Typeface.Phone.text(.row))
+                .foregroundStyle(field.inferred == nil ? DWPalette.t2 : DWPalette.t3)
                 .multilineTextAlignment(.trailing)
                 .textSelection(.enabled)
-        } label: {
-            Text(field.label)
         }
+        .padding(.vertical, 6)
+        .frame(minHeight: CGFloat(PhoneLook.kvRow))
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
+        .accessibilityElement(children: .combine)
         .accessibilityHint(field.inferred ?? "")
     }
 }
 
 /// One picture inside a file: a thumbnail, its label, and its facts - its pixel size once it has loaded, its bytes, its
-/// format (TrackInspector.pictureFacts). Read by VoiceOver as one, saying a tap shows it.
+/// format (TrackInspector.pictureFacts). Read by VoiceOver as one, saying a tap shows it. The thumbnail's empty square is
+/// a picture's face (the card's), until the picture comes.
 struct PictureRow: View {
     let path: String
     let file: String
@@ -353,7 +464,7 @@ struct PictureRow: View {
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                Palette.coverEmpty
+                DWPalette.card
                 if let image {
                     Image(uiImage: image)
                         .resizable()
@@ -365,20 +476,24 @@ struct PictureRow: View {
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(picture.label)
+                    .font(Typeface.Phone.text(.row))
+                    .foregroundStyle(DWPalette.text)
                 Text(TrackInspector.pictureFacts(picture, pixels: image.map {
                     TrackInspector.pixels(width: Int($0.size.width * $0.scale), height: Int($0.size.height * $0.scale))
                 }))
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.mono(.extraSmall))
+                .foregroundStyle(DWPalette.t2)
                 if !picture.description.isEmpty {
                     Text(picture.description)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
+        .padding(.vertical, 8)
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(TrackInspector.pictureLabel(picture))
@@ -391,16 +506,23 @@ struct PictureRow: View {
     }
 }
 
-/// Edit tags (the web's TrackTagEditor): the eleven fields in four sections (the phone's own grouping, the web's order
-/// in each), each starting at what the files share, the web's line under it and Undo once it is typed over; what would
+/// Edit tags (the web's TrackTagEditor): the eleven fields in four groups (the phone's own grouping, the web's order in
+/// each), each starting at what the files share, the web's line under it and Undo once it is typed over; what would
 /// change - asked `Retag.previewDebounceMs` after the typing stops, only the fields typed over sent - and Apply, on only
 /// for a preview of what the page shows now that changes something with no problem (RetagFlow.canApply). Nothing is
 /// written until Apply, and no file is renamed.
+///
+/// (R11) Flat, as Release's Fields are (iEdit): each field on the look's well (DWWellField) beside its label on the
+/// group's hairline, stacked at the accessibility sizes; what would change under them; and Apply in the page's foot
+/// (`.phoneFoot`) - over the page's foot, under the keyboard, never riding up on a field.
 struct EditTagsView: View {
     let model: EditAlbumModel
     let tags: TagsModel
 
+    @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var focused: String?
+
+    private let side = CGFloat(PhoneLook.bigSide)
 
     /// (The Mac app, slice 7) The fields in the order the page draws them - its sections', in turn: Tab's on the Mac.
     private static let order = TagEdit.sections.flatMap { (section: (title: String, keys: [String])) -> [String] in
@@ -408,218 +530,257 @@ struct EditTagsView: View {
     }
 
     var body: some View {
-        Form {
-            if tags.flow.mayHaveFinished {
-                Section {
-                    MayHaveFinished(reading: tags.reading || model.scan.reading)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                if tags.flow.mayHaveFinished {
+                    PhoneCard {
+                        MayHaveFinished(reading: tags.reading || model.scan.reading)
+                    }
+                }
+                TagsReadState(model: model, tags: tags)
+                if tags.refreshing {
+                    // saved: the fields come back once the files are read again (TagsModel.refreshing) - never what
+                    // they said before under "Saved"; a read that failed is said above, with Look again
+                    PhoneCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let applied = tags.applied {
+                                Text(applied)
+                                    .foregroundStyle(DWPalette.greenText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            if tags.readFailure == nil, !tags.flow.readFailed {
+                                HStack(spacing: 10) {
+                                    ProgressView()
+                                    Text(TagEditWords.readingFiles).foregroundStyle(DWPalette.t2)
+                                }
+                                .accessibilityElement(children: .combine)
+                            }
+                        }
+                    }
+                } else if tags.ready {
+                    editingSection
+                    ForEach(TagEdit.sections, id: \.title) { (section: (title: String, keys: [String])) in
+                        PhoneGroup(legend: section.title) {
+                            ForEach(section.keys, id: \.self) { (key: String) in
+                                if let field = TagEdit.field(key) { fieldRow(field) }
+                            }
+                        }
+                        .disabled(tags.flow.applying)
+                    }
+                    Text(TagEditWords.hint(single: tags.single))
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 8)
+                    previewSection
+                } else if tags.files != nil, !tags.reading, tags.readFailure == nil {
+                    // a file edited has gone since it was chosen (a release applied renames them): back to the list
+                    PhoneCard {
+                        Text(TagEditWords.readFailed).foregroundStyle(DWPalette.t2)
+                    }
                 }
             }
-            TagsReadState(model: model, tags: tags)
-            if tags.refreshing {
-                // saved: the fields come back once the files are read again (TagsModel.refreshing) - never what they
-                // said before under "Saved"; a read that failed is said above, with Look again
-                Section {
-                    if let applied = tags.applied {
-                        Text(applied)
-                            .foregroundStyle(Palette.held)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if tags.readFailure == nil, !tags.flow.readFailed {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                            Text(TagEditWords.readingFiles).foregroundStyle(Palette.quiet)
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                }
-            } else if tags.ready {
-                editingSection
-                ForEach(TagEdit.sections, id: \.title) { (section: (title: String, keys: [String])) in
-                    Section {
-                        ForEach(section.keys, id: \.self) { (key: String) in
-                            if let field = TagEdit.field(key) { fieldRow(field) }
-                        }
-                    } header: {
-                        Text(section.title)
-                            .font(Typeface.footnote)
-                    } footer: {
-                        if section.title == TagEdit.sections.last?.title {
-                            Text(TagEditWords.hint(single: tags.single))
-                                .font(Typeface.footnote)
-                        }
-                    }
-                    .disabled(tags.flow.applying)
-                }
-                previewSection
-                applySection
-            } else if tags.files != nil, !tags.reading, tags.readFailure == nil {
-                // a file edited has gone since it was chosen (a release applied renames them): back to the list
-                Section {
-                    Text(TagEditWords.readFailed).foregroundStyle(Palette.quiet)
-                }
-            }
+            .font(Typeface.Phone.text(.row))
+            .foregroundStyle(DWPalette.text)
+            .padding(.horizontal, side)
+            .padding(.bottom, 24)
         }
+        .scrollDismissesKeyboard(.interactively)
+        .background(DWPalette.page)
         .navigationTitle(TagEditWords.title)
         .navigationBarTitleDisplayMode(.inline)
-        .scrollDismissesKeyboard(.interactively)
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
                 Button(AlbumInfoWords.done) { focused = nil }
             }
         }
+        .phoneFoot { applyButton }
     }
 
     /// What is being edited: one track's title, or the tracks, listed under "Editing these 12 tracks".
     @ViewBuilder private var editingSection: some View {
         let heading = TagEditWords.heading(filenames: tags.editing, files: tags.editingFiles)
-        Section {
-            if tags.single {
-                Text(heading.isEmpty ? tags.editing.first ?? "" : heading)
-                    .font(Typeface.headline)
-                    .accessibilityAddTraits(.isHeader)
-            } else {
-                DisclosureGroup(TagEditWords.editingThese(tags.editing.count)) {
-                    ForEach(tags.editingFiles, id: \.filename) { (file: AlbumFile) in
-                        TagTrackRow(tags: tags, file: file)
+        PhoneGroup(legend: tags.album.album.isEmpty ? tags.album.path : tags.album.album) {
+            PhoneCard {
+                if tags.single {
+                    Text(heading.isEmpty ? tags.editing.first ?? "" : heading)
+                        .fontWeight(.semibold)
+                        .accessibilityAddTraits(.isHeader)
+                } else {
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(tags.editingFiles, id: \.filename) { (file: AlbumFile) in
+                                let label = tags.label(file)
+                                let title = file.title ?? file.filename
+                                Text("\(label) · \(title)")
+                                    .font(Typeface.Phone.text(.small))
+                                    .foregroundStyle(DWPalette.t2)
+                                    .accessibilityLabel(TagEditWords.trackRow(label: label, title: title,
+                                                                              artist: TagEditWords.artist(file, album: tags.album)))
+                            }
+                        }
+                        .padding(.top, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } label: {
+                        Text(TagEditWords.editingThese(tags.editing.count))
+                            .foregroundStyle(DWPalette.text)
                     }
+                    .tint(DWPalette.acc)
                 }
             }
-        } header: {
-            Text(tags.album.album.isEmpty ? tags.album.path : tags.album.album)
-                .font(Typeface.footnote)
         }
     }
 
+    /// A field's row, as Release's are: its label at the left in white, 88 at least, the field on the look's well beside
+    /// it, 44 tall at least on the group's hairline - stacked at the accessibility sizes - and under it the web's line and
+    /// Undo once it is typed over.
     private func fieldRow(_ field: TagEdit.Field) -> some View {
         let shared = tags.shared(field.key)
         let edited = tags.draft[field.key] != nil
         let problem = tags.problems[field.key]
         let note = tags.note(field.key)
-        return VStack(alignment: .leading, spacing: 4) {
-            LabeledContent {
+        let layout = typeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                                                  : AnyLayout(HStackLayout(spacing: 8))
+        return VStack(alignment: .leading, spacing: 0) {
+            layout {
+                Text(field.label)
+                    .font(Typeface.Look.text(.fieldLabel))
+                    .foregroundStyle(DWPalette.rowText)
+                    .frame(minWidth: CGFloat(DWLook.here.labelWidth), alignment: .leading)
+                    .accessibilityHidden(true)
                 TextField(field.label, text: Binding(get: { tags.value(field.key) }, set: { tags.set(field.key, $0) }),
-                          prompt: Text(TagEdit.placeholder(field.key, shared, edited: edited)))
-                    .multilineTextAlignment(.trailing)
+                          prompt: Text(TagEdit.placeholder(field.key, shared, edited: edited)).foregroundStyle(DWPalette.t3))
                     .keyboardType(field.numeric || field.short ? .numbersAndPunctuation : .default)
                     .textInputAutocapitalization(field.short ? .never : .words)
                     .autocorrectionDisabled()
                     .focused($focused, equals: field.key)
                     .tabs($focused, in: Self.order)
-            } label: {
-                Text(field.label)
+                    .modifier(DWWellField(focus: $focused, field: field.key))
+                    .accessibilityLabel(field.label)
+                    .accessibilityValue(note ?? "")
             }
+            .padding(.vertical, typeSize.isAccessibilitySize ? 8 : 0)
+            .frame(minHeight: CGFloat(DWLook.here.fieldRowHeight))
             if note != nil || edited {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     if let note {
                         Text(note)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(problem != nil ? Palette.amber : Palette.quiet)
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(problem != nil ? DWPalette.amberText : DWPalette.t2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
                     if edited {
                         Button(TagEditWords.undo) { tags.revert(field.key) }
-                            .font(Typeface.footnote.weight(.semibold))
-                            .buttonStyle(.borderless)
+                            .buttonStyle(DWButtonStyle(size: .small))
                             .accessibilityHint(TagEditWords.undoHint)
                     }
                 }
+                .padding(.bottom, 8)
             }
         }
-        .accessibilityValue(note ?? "")
+        .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
     }
 
     /// What would change (the web's preview column): the last apply's words while no preview is in hand, the reason
     /// none is asked, the wait, the plan's problems, nothing to change - or each file that would change, its tags from
-    /// what they say to what they'd say.
+    /// what they say to what they'd say; and what Apply's last try came to.
     private var previewSection: some View {
         let plan = tags.currentPlan
         let problems = tags.problems.count
         let planning = tags.flow.planning && !tags.body.edits.isEmpty && problems == 0
-        return Section {
-            if let applied = tags.applied, plan == nil {
-                Text(applied)
-                    .foregroundStyle(Palette.held)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            if tags.body.edits.isEmpty && tags.applied == nil {
-                Text(TagEditWords.changeAField).foregroundStyle(Palette.quiet)
-            }
-            if problems > 0 {
-                Text(TagEditWords.fixFirst(problems)).foregroundStyle(Palette.amber)
-            }
-            if planning {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(TagEditWords.working).foregroundStyle(Palette.quiet)
+        return PhoneGroup(legend: TagEditWords.whatWouldChange) {
+            PhoneCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let applied = tags.applied, plan == nil {
+                        Text(applied)
+                            .foregroundStyle(DWPalette.greenText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if tags.body.edits.isEmpty && tags.applied == nil {
+                        Text(TagEditWords.changeAField).foregroundStyle(DWPalette.t2)
+                    }
+                    if problems > 0 {
+                        Text(TagEditWords.fixFirst(problems)).foregroundStyle(DWPalette.amberText)
+                    }
+                    if planning {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                            Text(TagEditWords.working).foregroundStyle(DWPalette.t2)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                    if !planning, let plan {
+                        ForEach(TagEditWords.problems(plan, filenames: tags.editing), id: \.self) { (problem: String) in
+                            Text(problem).foregroundStyle(DWPalette.amberText)
+                        }
+                        if plan.empty && plan.problems.isEmpty {
+                            Text(TagEditWords.nothingToChange(single: tags.single)).foregroundStyle(DWPalette.t2)
+                        }
+                        ForEach(plan.changed, id: \.filename) { (file: TagEditFile) in
+                            TagFileChanges(file: file)
+                        }
+                    } else if !planning, let error = tags.previewError {
+                        ErrorNote(text: error)
+                    }
+                    if let error = tags.applyError {
+                        ErrorNote(text: error)
+                    } else if let plan = tags.currentPlan, !plan.empty, tags.applied == nil {
+                        Text(TagEditWords.wouldChange(plan)).foregroundStyle(DWPalette.t2)
+                    }
                 }
-                .accessibilityElement(children: .combine)
+                .fixedSize(horizontal: false, vertical: true)
             }
-            if !planning, let plan {
-                ForEach(TagEditWords.problems(plan, filenames: tags.editing), id: \.self) { (problem: String) in
-                    Text(problem).foregroundStyle(Palette.amber)
-                }
-                if plan.empty && plan.problems.isEmpty {
-                    Text(TagEditWords.nothingToChange(single: tags.single)).foregroundStyle(Palette.quiet)
-                }
-                ForEach(plan.changed, id: \.filename) { (file: TagEditFile) in
-                    TagFileChanges(file: file)
-                }
-            } else if !planning, let error = tags.previewError {
-                ErrorNote(text: error)
-            }
-        } header: {
-            Text(TagEditWords.whatWouldChange)
-                .font(Typeface.footnote)
         }
     }
 
-    private var applySection: some View {
-        Section {
-            if let error = tags.applyError {
-                ErrorNote(text: error)
-            } else if let plan = tags.currentPlan, !plan.empty, tags.applied == nil {
-                Text(TagEditWords.wouldChange(plan)).foregroundStyle(Palette.quiet)
+    /// Apply, the foot's purple: the tracks' typed fields written - the model's own (EditAlbumModel.applyTags), the
+    /// server working the plan out again from the body.
+    private var applyButton: some View {
+        Button {
+            focused = nil
+            Task { await model.applyTags() }
+        } label: {
+            HStack(spacing: 8) {
+                if tags.flow.applying { ProgressView().controlSize(.small) }
+                // one line: the foot (PhoneFoot) stops its text at xxxLarge, where Apply fills it with room to spare
+                Text(tags.flow.applying ? TagEditWords.saving : TagEditWords.apply)
             }
-            Button {
-                focused = nil
-                Task { await model.applyTags() }
-            } label: {
-                HStack(spacing: 10) {
-                    if tags.flow.applying { ProgressView() }
-                    Text(tags.flow.applying ? TagEditWords.saving : TagEditWords.apply)
-                        .font(Typeface.headline)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .disabled(!tags.canApply || model.writing || model.marking)
         }
+        .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
+        .disabled(!tags.canApply || model.writing || model.marking)
     }
 }
 
 /// One file's changes in the preview: its name, then each tag - the form's label, what it says now ("—" for nothing),
-/// what it would say ("removed" for nothing).
+/// what it would say ("removed" for nothing). Both devices': the phone's preview and the Mac's Tags well.
 struct TagFileChanges: View {
     let file: TagEditFile
+    /// Each device's own small faces: the name's and the change's readout, and the label's.
+    let mono: Font
+    let words: Font
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(file.filename)
-                .font(Typeface.mono(.footnote))
+                .font(mono)
+                .foregroundStyle(DWPalette.text)
                 .fixedSize(horizontal: false, vertical: true)
             ForEach(file.changes, id: \.tag) { (change: TagChange) in
                 let from = change.from.isEmpty ? TagEditWords.none : change.from
                 let to = change.to.isEmpty ? TagEditWords.removed : change.to
                 VStack(alignment: .leading, spacing: 1) {
                     Text(TagEdit.label(change.tag))
-                        .font(Typeface.footnote.weight(.semibold))
-                        .foregroundStyle(Palette.quiet)
+                        .font(words.weight(.semibold))
+                        .foregroundStyle(DWPalette.t2)
                     Text(from)
-                        .foregroundStyle(Palette.quiet)
+                        .font(mono)
+                        .foregroundStyle(DWPalette.t3)
                         .strikethrough(!change.from.isEmpty)
                     Text(to)
-                        .foregroundStyle(change.to.isEmpty ? Palette.quiet : Color.primary)
+                        .font(mono)
+                        .foregroundStyle(change.to.isEmpty ? DWPalette.t3 : DWPalette.text)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityElement(children: .ignore)
@@ -627,5 +788,12 @@ struct TagFileChanges: View {
             }
         }
         .accessibilityElement(children: .contain)
+    }
+}
+
+extension TagFileChanges {
+    /// The phone's: its readouts in Courier Prime at .xs, the labels at .s.
+    init(file: TagEditFile) {
+        self.init(file: file, mono: Typeface.Phone.mono(.extraSmall), words: Typeface.Phone.text(.small))
     }
 }

@@ -11,34 +11,16 @@ import UIKit
 ///
 /// (R10 - notes/ios.md "The redesign, slice R10: Edit album, the folder list and Release") On the phone Release is the
 /// root's own now, under its strip (iEdit.dc.html): its four cards (ReleaseCards) and its foot (ReleaseFoot - Revert and
-/// Apply). This page is the same cards and foot pushed by themselves, where Artwork's pointer to the Release tab still
-/// pushes them (R11 makes that the strip's tab).
-struct ReleasePage: View {
-    let model: EditAlbumModel
-    let retag: RetagModel
-
-    var body: some View {
-        ScrollView {
-            ReleaseCards(model: model, retag: retag, pushed: true)
-                .padding(.horizontal, CGFloat(PhoneLook.bigSide))
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .background(DWPalette.page)
-        .navigationTitle(EditWords.release)
-        .navigationBarTitleDisplayMode(.inline)
-        .phoneFoot { ReleaseFoot(model: model, retag: retag) }
-    }
-}
-
+/// Apply). (R11) The page R10 kept for Artwork's pointer to push is gone: Artwork's Go to Release shows the Release tab.
+///
 /// Release's cards on the phone (iEdit.dc.html, flat as R1c draws the phone): Release - the pressing chosen, Change…
 /// pushing Choose a release; Fields - Artist, Album, Year beside Original, Edition, each on the look's well; Cover - the
 /// folder's and the pressing's, Replace cover.jpg's switch, Compare pushing Compare covers; What Apply does - the
-/// preview, its summary pushing Changes. `pushed`, the page by itself: the waits are said here too, as the root says
-/// them over its strip.
+/// preview, its summary pushing Changes. The waits the root says over its strip are said there (R11: the page by
+/// itself that said them here too is gone).
 struct ReleaseCards: View {
     let model: EditAlbumModel
     let retag: RetagModel
-    var pushed = false
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @FocusState private var focused: Field?
@@ -53,15 +35,10 @@ struct ReleaseCards: View {
     var body: some View {
         let plan = retag.currentPlan
         VStack(alignment: .leading, spacing: 0) {
-            if retag.flow.mayHaveFinished && pushed {
-                PhoneCard {
-                    MayHaveFinished(reading: model.scan.reading)
-                }
-            }
             // the folder couldn't be read again after a write or a gap: the wait ends here, said, with Look again - on
             // the root its own line says it, where the library's read failed
             if retag.flow.readFailed {
-                if pushed || model.scan.failure == nil {
+                if model.scan.failure == nil {
                     PhoneCard {
                         VStack(alignment: .leading, spacing: 8) {
                             ReadAgainFailed(model: model)

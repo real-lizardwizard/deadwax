@@ -21,6 +21,10 @@ The app's Swift read as text, as the other look tests read it:
 
 Core's EditAlbumPage (the folder list, the chip, the strip and the tabs, Revert's gate, the Mac's widths) is tested in
 Swift (EditAlbumPageTests).
+
+(R11 - notes/ios.md "The redesign, slice R11: Tags, Artwork, Lyrics and Delete") Every part a tab on both devices now:
+the phone's strip shows each under it (no part pushed), the Mac's editor draws each tab's own view, and the foot is the
+tab's. Its rules are test_ios_edit_parts_look's; what this file held of R10's parts-still-pages is held there instead.
 """
 
 import importlib.util
@@ -88,7 +92,7 @@ MAC_FILES = (WINDOW, EDITOR, LIST, HEADER, TAB, FOOTER)
 #? covers and the full cover, the pages pushed from the cards - as they were)
 DRAWN_PARTS = {
     SHEET: ("struct EditAlbumRoot: View {", "private struct MatchedChip: ToolbarContent {"),
-    RELEASE: ("struct ReleasePage: View {", "struct ReleaseCards: View {", "struct ReleaseFoot: View {"),
+    RELEASE: ("struct ReleaseCards: View {", "struct ReleaseFoot: View {"),
 }
 
 
@@ -215,9 +219,9 @@ def test_a_tab_changed_never_touches_typed_work():
     # nothing follows the tab but the content shown
     for code in (window, editor):
         assert not re.search(r"onChange\(of: tab\b|task\(id: tab\b|onChange\(of: self\.tab\b", code)
-    # (the parts still today's pages) a push to Release from one - Artwork's pointer - only shows the tab
-    sheet_path = flat(body(editor, "private var partPath: Binding<[EditPage]> {"))
-    assert "if now.last == .release { sheet = nil tab = .release } else { sheetPath = now }" in sheet_path
+    # (R11) Artwork's Go to Release only shows the tab - on the Mac, and on the phone
+    assert "showRelease: { tab = .release })" in editor
+    assert "partPath" not in editor and "sheet = .part(" not in editor
     # Release's typed work put back only by Revert's own button, and only when there is some to put back
     for name in PHONE_FILES + MAC_FILES + (ROUTES, MODEL):
         code = bare(source(name))
@@ -232,14 +236,16 @@ def test_a_tab_changed_never_touches_typed_work():
     gate = flat(body(bare(source(MODEL)), "var canRevertRelease: Bool {"))
     assert ("EditAlbumPage.canRevert(unsaved: retag.unsaved, online: online, writing: writing, marking: marking, "
             "needsRead: retag.flow.needsRead)") in gate
-    # the phone: the strip's parts pushed over the root, the root - Release's typed work - kept under them
+    # the phone: (R11) the strip's tab the root's own state too - every part shown under the strip, none pushed, and
+    # nothing following the tab but what is shown
     root = flat(body(bare(source(SHEET)), "struct EditAlbumRoot: View {"))
-    assert ("shown: Binding(get: { AlbumEdit.Part.release }, set: { (part: AlbumEdit.Part) -> Void in open(part) })"
-            in root)
-    opener = flat(body(root, "private func open(_ part: AlbumEdit.Part) {"))
-    for part in ("tags", "artwork", "lyrics", "delete"):
-        assert f"case .{part}: path.append(.{part})" in opener
-    assert "case .release: break" in opener
+    assert "@State private var tab: AlbumEdit.Part = .release" in root
+    assert "let shown = EditAlbumPage.shown(tab, in: strip.tabs)" in root
+    assert "shown: Binding(get: { shown }, set: { (part: AlbumEdit.Part) -> Void in tab = part })" in root
+    assert "ArtworkPage(model: model, album: album) { tab = .release }" in root
+    assert "private func open(_ part" not in root
+    assert not re.search(r"path\.append\(\.(release|tags|artwork|lyrics|delete)\)", root)
+    assert not re.search(r"onChange\(of: tab\b|task\(id: tab\b", root)
     # (R10's review) the model's Release is its own again: its setter private, Revert one of its methods
     model = flat(bare(source(MODEL)))
     assert "private(set) var retag: RetagModel?" in model
@@ -264,9 +270,13 @@ def test_the_phones_sheet_keeps_its_rules():
 
 def test_the_phones_foot_never_rides_up_on_a_field():
     root = flat(body(bare(source(SHEET)), "struct EditAlbumRoot: View {"))
-    page = flat(body(bare(source(RELEASE)), "struct ReleasePage: View {"))
-    for name, code in ((SHEET, root), (RELEASE, page)):
+    # (R11) the page R10 kept for Artwork's pointer gone: Release's foot the root's alone - and each tab's foot its own
+    assert "struct ReleasePage" not in bare(source(RELEASE))
+    for name, code in ((SHEET, root),):
         assert code.count(".phoneFoot { ReleaseFoot(model: model, retag: retag) }") == 1, name
+        assert code.count(".phoneFoot { TagsFoot(model: model, tags: tags, path: $path) }") == 1, name
+        assert code.count(".phoneFoot { DeleteButton(model: model, album: album)") == 1, name
+        assert code.count(".phoneFoot") == 3, name
         assert "safeAreaInset" not in code and ".toolbar(" not in code.replace(".toolbar {", ""), name
         assert ".scrollDismissesKeyboard(.interactively)" in code, name
     # PhoneFoot's layer takes the keyboard's room, so the foot stays at the screen's foot under the keyboard, and the
@@ -289,11 +299,11 @@ FLAT = {
     # the page's black (the folder's choice, the album's page); the folder menu's line; the out-of-reach band as it was
     SHEET: ["background: DWPalette.page", "background: DWPalette.page", "DWRule: DWPalette.groupRule", "fill: .bar",
             "fill: Palette.amberFill"],
-    # the page's black; the Fields card's rows' line (one row of Release's own for every field since R10's review);
-    # then the pages pushed from the cards, still iOS's (docs/ios.md's "Not flat yet") - (R10's review: the wider
-    # matcher sees them) Choose a release's Current badge and its chosen row's fill, the full cover's empty square and
-    # Compare covers', and the full cover on black, a photo's ground
-    RELEASE: ["background: DWPalette.page", "DWRule: DWPalette.groupRule", "background: Palette.badgeFill",
+    # the Fields card's rows' line (one row of Release's own for every field since R10's review) - (R11) the page's
+    # black went with ReleasePage, the root's own; then the pages pushed from the cards, still iOS's (docs/ios.md's
+    # "Not flat yet") - (R10's review: the wider matcher sees them) Choose a release's Current badge and its chosen
+    # row's fill, the full cover's empty square and Compare covers', and the full cover on black, a photo's ground
+    RELEASE: ["DWRule: DWPalette.groupRule", "background: Palette.badgeFill",
               "listRowBackground: Palette.toggledFill", "fill: Palette.coverEmpty", "fill: Palette.coverEmpty",
               "ZStack: Color.black"],
 }
@@ -309,7 +319,8 @@ def test_the_phone_is_flat_in_edit_album():
     assert cards.count("TextField(") == 1 and ".modifier(DWWellField(focus: $focused, field: name))" in cards
     assert ".toggleStyle(.phoneSwitch)" in cards
     root = flat(body(bare(source(SHEET)), "struct EditAlbumRoot: View {"))
-    assert "PhoneStrip(options: strip.tabs," in root and "pushes: strip.pushes)" in root
+    assert "PhoneStrip(options: strip.tabs," in root and "spoken: EditAlbumPage.Words.parts)" in root
+    assert "pushes:" not in root
     assert "let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)" in root
     # no List, no Form: the sheet's root is the page's own scroll
     for code in (root, cards):
@@ -461,12 +472,12 @@ def test_the_editor_is_one_view_its_hosts_share():
 
 
 def test_the_macs_foot_is_the_persons_permissions():
-    # finding 7: Release's Revert and Apply only with Edit albums, as the tab and the phone's foot are gated; a part
-    # still today's page keeps its Open… (Delete's, with Look after the library alone)
+    # finding 7: Release's Revert and Apply only with Edit albums, as the tab and the phone's foot are gated; (R11)
+    # every other tab's foot its own - Delete's, with Look after the library alone
     editor = flat(bare(source(EDITOR)))
-    assert "if showing == .release, edit.editors, let retag = model.retag { MacReleaseTab(" in editor
-    assert ("if showing != .release || edit.editors { MacEditFooter(model: model, part: showing) "
-            "{ (part: AlbumEdit.Part) -> Void in sheet = .part(part) } }") in editor
+    assert "case .release: if editors, let retag = model.retag { MacReleaseTab(" in editor
+    assert "tabContent(showing, album: album, editors: edit.editors)" in editor
+    assert "if showing != .release || edit.editors { MacEditFooter(model: model, album: album, part: showing) }" in editor
     assert editor.count("MacEditFooter(") == 1
     root = flat(body(bare(source(SHEET)), "struct EditAlbumRoot: View {"))
     assert "if edit.editors, let retag = model.retag { page.phoneFoot { ReleaseFoot(model: model, retag: retag) } }" in root

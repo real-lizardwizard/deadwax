@@ -574,6 +574,13 @@ def test_every_other_list_draws_as_before():
             continue
         code = flat(bare(path.read_text(encoding="utf-8")))
         for call in re.findall(r"MacColumnList\(.*?\) \{", code):
+            #? (R11) the Mac's Tags asks two: its checkbox column a control (a double-click there ticks twice, never
+            #? opens the file's every tag), and the row read as one ("Track 3, Shoot to Thrill, 5:17, checked")
+            #? with Select or Deselect and See a file's every tag... its actions - `.combine` would read the checkbox's
+            #? words into the row's, as an artist's buttons would theirs
+            if name == "Mac/Edit/MacTagsTab.swift":
+                assert "controls: [0], voice:" in call and "flow:" not in call, name
+                continue
             assert "voice:" not in call and "flow:" not in call, name
             assert "controls:" not in call or name == "Mac/Album/MacAlbumPage.swift", name
 

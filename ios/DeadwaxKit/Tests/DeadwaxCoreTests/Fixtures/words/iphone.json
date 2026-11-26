@@ -414,6 +414,8 @@
   "EQWords.Outputs.speaker" : "iPhone speaker",
   "EQWords.Screen.unitNotMade" : "The EQ can't play on this phone just now, so the sound is as it is. Closing deadwax and opening it again may help.",
   "EQWords.You.footer" : "Each output keeps its own EQ - your headphones, the speaker, the car - and the EQ switches by itself when the output changes. This is kept on this phone.",
+  "EditAlbumPage.Words.seeFullSize" : "Tap the cover to see it full size.",
+  "EditAlbumPage.Words.tagsNote" : "Select tracks to edit only those. Tap › to see everything in a track's file.",
   "GettingWords.modeTitle" : "When I tap Get",
   "InfoDebug.engineRows(lastStart)" : "Last start | 0.31 s from the tap to sound",
   "InstallExpiry.line(days)" : "This install runs until Sat 31 Oct, 14:02",

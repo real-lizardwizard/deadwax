@@ -237,7 +237,8 @@ def test_the_tag_routes_are_waited_for_past_a_folders_read():
 def strip_gates() -> str:
     """(R10) The root's parts are its strip's, by permission: EditAlbumPage.strip(editors:delete:) of Managing.albumEdit,
     its parts AlbumEdit.parts' - Delete by `remove` (Look after the library), Release, Tags, Artwork and Lyrics by
-    `editors` (Edit albums) - each push opening its page. The sheet's code, for the push looked for."""
+    `editors` (Edit albums) - (R11) each the strip's tab, drawn under it as the strip shows it. The sheet's code, its
+    whitespace run together, for the tab looked for."""
     sheet = (CORE.parent.parent.parent / "App" / "Edit" / "EditAlbumSheet.swift").read_text(encoding="utf-8")
     assert "let edit = Managing.albumEdit(server.access.permissions)" in sheet
     assert "let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)" in sheet
@@ -245,7 +246,8 @@ def strip_gates() -> str:
         encoding="utf-8")
     assert "Part.allCases.filter { $0 == .delete ? remove : editors }" in (CORE / "AlbumEdit.swift").read_text(
         encoding="utf-8")
-    return sheet
+    assert "let shown = EditAlbumPage.shown(tab, in: strip.tabs)" in sheet
+    return re.sub(r"\s+", " ", sheet)
 
 
 def test_each_part_is_asked_with_the_permission_the_root_shows_it_for():
@@ -255,7 +257,7 @@ def test_each_part_is_asked_with_the_permission_the_root_shows_it_for():
     assert ROUTES[("POST", "/deadwax/library/tags/preview")] == "edit"
     assert ROUTES[("POST", "/deadwax/library/tags/apply")] == "edit"
     assert ROUTES[("GET", "/deadwax/library/tracks/picture")] == "user"
-    assert "case .tags: path.append(.tags)" in strip_gates()
+    assert "case .tags: if let tags = model.tags { TagsListView(model: model, tags: tags, path: $path) }" in strip_gates()
 
 
 # ---------------------------------------------------------------------------- Artwork and Lyrics: what the phone sends
@@ -487,7 +489,8 @@ def test_artwork_and_lyrics_are_asked_with_the_permission_the_root_shows_them_fo
     assert ROUTES[("POST", "/deadwax/library/disc_art/fetch")] == "edit"
     assert ROUTES[("GET", "/deadwax/library/disc_art")] == "user"
     sheet = strip_gates()
-    assert "case .artwork: path.append(.artwork)" in sheet and "case .lyrics: path.append(.lyrics)" in sheet
+    assert "case .artwork: ArtworkPage(model: model, album: album)" in sheet
+    assert "case .lyrics: LyricsPage(model: model, album: album)" in sheet
 
 
 # ---------------------------------------------------------------------------- Delete album (slice 4)
@@ -563,4 +566,4 @@ def test_delete_is_asked_with_the_permission_the_root_shows_it_for():
     from tests.test_logins import ROUTES
     assert ROUTES[("POST", "/deadwax/library/delete")] == "library"
     assert ROUTES[("GET", "/deadwax/library/deletion_summary")] == "library"
-    assert "case .delete: path.append(.delete)" in strip_gates()
+    assert "case .delete: DeletePage(model: model, album: album)" in strip_gates()

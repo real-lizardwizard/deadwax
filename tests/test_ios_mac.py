@@ -537,8 +537,9 @@ ESCAPES = {
     "Player/NowPlayingView.swift": 1, "Playlists/PlaylistPicker.swift": 2, "Playlists/PlaylistView.swift": 1,
     "Search/PressingPickerSheet.swift": 1, "UpNext/UpNextScreen.swift": 1,
     #? (the redesign, R10) the Mac's Edit album: the Done of the sheet a part still today's page opens in - (its
-    #? review) the editor's own, MacAlbumEditor's, which the page and R12's MacNeedsALook host
-    "Mac/Edit/MacAlbumEditor.swift": 1,
+    #? review) the editor's own, MacAlbumEditor's, which the page and R12's MacNeedsALook host. (R11) Compare covers'
+    #? alone now - and the Tags tab's own, a file's every tag
+    "Mac/Edit/MacAlbumEditor.swift": 1, "Mac/Edit/MacTagsTab.swift": 1,
 }
 
 
@@ -736,8 +737,9 @@ SHEET_ROOTS = {
     #? (the redesign, R5) New playlist…, from the Mac's Playlists' toolbar
     "Mac/Library/MacPlaylistsPage.swift": 1,
     #? (the redesign, R10) the Mac's Edit album: a part still today's page (Tags, Artwork, Lyrics, Delete) or Compare
-    #? covers, over the page - (its review) the editor's own sheet, MacAlbumEditor's
-    "Mac/Edit/MacAlbumEditor.swift": 1,
+    #? covers, over the page - (its review) the editor's own sheet, MacAlbumEditor's. (R11) Compare covers alone; the
+    #? Tags tab's a file's every tag and a picture inside it full size, Artwork's a cover or CD art full size
+    "Mac/Edit/MacAlbumEditor.swift": 1, "Mac/Edit/MacTagsTab.swift": 2, "Mac/Edit/MacArtworkTab.swift": 1,
     #? (the redesign, R14) the Mac's People: Add a person, Reset password and Remove - the flow's one sheet, each its root
     "Mac/Manage/MacPeoplePage.swift": 3,
 }
@@ -1830,7 +1832,9 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
             #? (R8's review) the Mac's Requests' toolbar: Artist, then Album
             "Mac/Requests/MacRequestsPage.swift": 1,
             #? (the redesign, R10) the Mac's Release tab: the search, then the fields
-            "Mac/Edit/MacReleaseTab.swift": 1}
+            "Mac/Edit/MacReleaseTab.swift": 1,
+            #? (R11) the Mac's Tags tab: the eleven fields in the drawing's order, TagEdit.fields'
+            "Mac/Edit/MacTagsTab.swift": 1}
     found = {}
     for name, text in app.items():
         if name == PLATFORM:
@@ -1859,6 +1863,15 @@ def test_tab_moves_between_the_fields_and_return_in_one_never_applies():
     tags = bare(app["Edit/TagsPages.swift"])
     assert "private static let order = TagEdit.sections.flatMap" in tags
     assert "ForEach(TagEdit.sections, id: \\.title)" in tags, "drawn in the sections' order, Tab's order"
+    # (R11) the Mac's Tags tab: drawn in TagEdit.fields' order, Tab's - Track beside Disc, Year beside Original
+    mac_tags = bare(app["Mac/Edit/MacTagsTab.swift"])
+    assert "private static let order = TagEdit.fields.map { (field: TagEdit.Field) -> String in field.key }" in mac_tags
+    fields = _body(app["Mac/Edit/MacTagsTab.swift"], "private var fields: some View {")
+    drawn = re.findall(r'(?:single|pair)\(([^)]*)\)', fields)
+    # each key once, in the order drawn (a pair's second label is Core's for its key)
+    keys = list(dict.fromkeys(key for call in drawn for key in re.findall(r'"(\w+)"', call)))
+    from_core = re.findall(r'Field\(key: "(\w+)"', (CORE / "TagEdit.swift").read_text(encoding="utf-8"))
+    assert keys == from_core and len(keys) == 11, (keys, from_core)
     people = bare(app["Manage/PeopleSheets.swift"])
     assert "private static let order: [Field] = [.user, .name, .password, .again]" in people
     assert "private static let order: [Field] = [.password, .again]" in people

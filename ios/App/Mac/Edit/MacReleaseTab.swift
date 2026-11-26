@@ -324,10 +324,10 @@ struct MacReleaseTab: View {
                     }
                 }
                 VStack(alignment: .leading, spacing: 7) {
-                    Toggle(isOn: Binding(get: { retag.fetchArt }, set: { retag.setFetchArt($0) })) {
-                        Text(RetagWords.coverToggle(existing: existing))
-                    }
-                    .disabled(retag.flow.applying)
+                    // (R11) the drawing's checkbox (`<input type="checkbox">Replace cover.jpg`), the look's
+                    DWCheckbox(words: RetagWords.coverToggle(existing: existing),
+                               on: Binding(get: { retag.fetchArt }, set: { retag.setFetchArt($0) }))
+                        .disabled(retag.flow.applying)
                     Text(RetagWords.coverHint(existing: existing, size: retag.plan?.art.size))
                         .font(Typeface.Mac.text(.small))
                         .foregroundStyle(DWPalette.t3)

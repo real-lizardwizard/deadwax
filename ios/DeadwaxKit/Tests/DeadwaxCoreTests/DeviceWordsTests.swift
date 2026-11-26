@@ -388,6 +388,12 @@ enum DeviceWords {
         add("RequestWords.cancelAsksNote", RequestWords.cancelAsksNote(device))
         add("SettingsWords.kept", SettingsWords.kept(device))
 
+        // MARK: (the redesign, slice R11) Edit album's Tags line - the phone's › to a track's file, the Mac's none (its
+        // row's double-click, and See a file's every tag…, say it) - and Artwork's cover a tap or a click
+
+        add("EditAlbumPage.Words.tagsNote", EditAlbumPage.Words.tagsNote(device))
+        add("EditAlbumPage.Words.seeFullSize", EditAlbumPage.Words.seeFullSize(device))
+
         // MARK: Debug
 
         let utc = TimeZone(identifier: "UTC")!
@@ -537,6 +543,9 @@ enum DeviceWords {
             // R9's (notes/ios.md "The redesign, slice R9: Downloaded, Settings and Sign in"): the cancel note names the
             // Mac's Cancel and Leave where the phone's names its ✕, and the Mac keeps its sign-in in a file
             "RequestWords.cancelAsksNote", "SettingsWords.kept",
+            // R11's (notes/ios.md "The redesign, slice R11: Tags, Artwork, Lyrics and Delete"): the Tags line names the
+            // phone's ›, which the Mac's rows have none of
+            "EditAlbumPage.Words.tagsNote",
         ]
         // a line of the downloads' everyLine (the banned-words checks' list) is no word of its own: one that differs
         // repeats a named word - or one part of one, a banner's line - on both devices, and is held where that is

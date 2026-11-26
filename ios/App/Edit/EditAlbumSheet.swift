@@ -1,10 +1,9 @@
 import DeadwaxCore
 import SwiftUI
 
-/// A page pushed inside Edit album's own stack.
+/// A page pushed inside Edit album's own stack. (R11) Release, Tags, Artwork, Lyrics and Delete are the root's tabs now,
+/// never pushed: what is left is what their tabs push.
 enum EditPage: Hashable {
-    /// Release: the pressing, the fields, the cover, what Apply does, Apply.
-    case release
     /// Choose a release: MusicBrainz's pressings for the album, best first.
     case chooseRelease
     /// Compare covers: the folder's beside the pressing's, and Replace cover only.
@@ -13,18 +12,10 @@ enum EditPage: Hashable {
     case changes
     /// Choose the folder: any folder of the library (the album's own can't be found).
     case chooseFolder
-    /// Tags: the folder's files, a section per disc, Select.
-    case tags
-    /// A track's page: everything its file says, by the file's name.
+    /// A track's page: everything its file says, by the file's name - a Tags row's ›.
     case track(String)
-    /// Edit tags: the fields of the tracks chosen, what would change, Apply.
+    /// Edit tags: the fields of the tracks ticked, what would change, Apply - the Tags tab's Edit N tracks….
     case editTags
-    /// Artwork: the cover and CD art, and their Gets.
-    case artwork
-    /// Lyrics: how many tracks have them, and Get lyrics.
-    case lyrics
-    /// Delete album: what deleting the folder takes, who holds it, and Delete permanently.
-    case delete
 }
 
 /// Edit album (notes/ios-specs/phase8-managing.md 3.2; the web's EditPanel, its title): a sheet over the tabs, its own
@@ -216,8 +207,6 @@ struct EditPageView: View {
     var body: some View {
         Group {
             switch page {
-            case .release:
-                if let retag = model.retag { ReleasePage(model: model, retag: retag) }
             case .chooseRelease:
                 if let retag = model.retag { ChooseReleaseView(retag: retag, path: $path) }
             case .compareCovers:
@@ -231,18 +220,10 @@ struct EditPageView: View {
                     model.choose(path, fromScan: true)
                     self.path.removeAll()
                 }
-            case .tags:
-                if let tags = model.tags { TagsListView(model: model, tags: tags, path: $path) }
             case .track(let filename):
                 if let tags = model.tags { TrackPageView(model: model, tags: tags, filename: filename, path: $path) }
             case .editTags:
                 if let tags = model.tags { EditTagsView(model: model, tags: tags) }
-            case .artwork:
-                if let album = model.album { ArtworkPage(model: model, album: album) }
-            case .lyrics:
-                if let album = model.album { LyricsPage(model: model, album: album) }
-            case .delete:
-                if let album = model.album { DeletePage(model: model, album: album) }
             }
         }
         .editOutOfReach(!model.online)
@@ -256,15 +237,22 @@ struct EditPageView: View {
 ///
 /// (R10 - notes/ios.md "The redesign, slice R10: Edit album, the folder list and Release") Drawn as iEdit.dc.html draws
 /// it, flat: the header (the cover, the album, its byline and facts, its path in the readout face), the strip of five
-/// in place of the root's rows - Release its one tab, drawn under it; Tags, Artwork, Lyrics and Delete pushing their
-/// pages as the rows did (EditAlbumPage.strip, by the same permissions), until R11 draws each as a tab - Release's cards,
-/// and its foot: Revert and Apply, laid over the page's foot and never riding up on the keyboard (`.phoneFoot`).
+/// in place of the root's rows (EditAlbumPage.strip, by the same permissions), Release's cards, and its foot: Revert and
+/// Apply, laid over the page's foot and never riding up on the keyboard (`.phoneFoot`).
+///
+/// (R11 - notes/ios.md "The redesign, slice R11: Tags, Artwork, Lyrics and Delete") Every part a tab of the root's: the
+/// strip shows the one chosen under it - Release's cards, Tags' tracks, Artwork's groups, Lyrics', Delete's - and the
+/// foot is that tab's: Release's Revert and Apply, Tags' Select all and Edit N tracks…, Delete's Delete permanently (the
+/// red one, through today's question). Artwork's and Lyrics' Gets are inline, as their drawings have them: no foot. The
+/// tab is the root's own state: changing it never touches typed work, and a tab no longer offered shows the first.
 struct EditAlbumRoot: View {
     let model: EditAlbumModel
     @Binding var path: [EditPage]
 
     @Environment(ServerModel.self) private var server
     @Environment(\.dynamicTypeSize) private var typeSize
+    /// The tab shown under the strip - the root's own, above the model.
+    @State private var tab: AlbumEdit.Part = .release
 
     private let side = CGFloat(PhoneLook.bigSide)
 
@@ -333,35 +321,52 @@ struct EditAlbumRoot: View {
 
     // MARK: the album
 
-    /// The album's page: what scrolls, and Release's foot over it - Release's wherever its cards are drawn.
+    /// The album's page: what scrolls, and the tab's foot over it.
     @ViewBuilder private func albumPage(_ album: ScanAlbum) -> some View {
         let edit = Managing.albumEdit(server.access.permissions)
+        let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)
+        let shown = EditAlbumPage.shown(tab, in: strip.tabs)
         let page = ScrollView {
-            albumSections(album)
+            albumSections(album, strip: strip, shown: shown)
                 .padding(.horizontal, side)
         }
         .scrollDismissesKeyboard(.interactively)
         .background(DWPalette.page)
-        if edit.editors, let retag = model.retag {
-            page.phoneFoot { ReleaseFoot(model: model, retag: retag) }
-        } else {
+        switch shown {
+        case .release:
+            if edit.editors, let retag = model.retag {
+                page.phoneFoot { ReleaseFoot(model: model, retag: retag) }
+            } else {
+                page
+            }
+        case .tags:
+            if let tags = model.tags {
+                page.phoneFoot { TagsFoot(model: model, tags: tags, path: $path) }
+            } else {
+                page
+            }
+        case .delete:
+            page.phoneFoot {
+                DeleteButton(model: model, album: album)
+                    .buttonStyle(DWButtonStyle(kind: .danger, size: .large, fills: true))
+            }
+        case .artwork, .lyrics:
             page
         }
     }
 
-    @ViewBuilder private func albumSections(_ album: ScanAlbum) -> some View {
+    @ViewBuilder private func albumSections(_ album: ScanAlbum, strip: EditAlbumPage.Strip,
+                                            shown: AlbumEdit.Part) -> some View {
         let edit = Managing.albumEdit(server.access.permissions)
-        let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)
         VStack(alignment: .leading, spacing: 0) {
             header(album)
             if let folders = model.folders, folders.paths.count > 1 {
                 folderMenu(folders.paths, chosen: album.path)
             }
-            if !strip.tabs.isEmpty || !strip.pushes.isEmpty {
+            if !strip.tabs.isEmpty {
                 PhoneStrip(options: strip.tabs, words: { (part: AlbumEdit.Part) -> String in part.label },
-                           shown: Binding(get: { AlbumEdit.Part.release },
-                                          set: { (part: AlbumEdit.Part) -> Void in open(part) }),
-                           spoken: EditAlbumPage.Words.parts, pushes: strip.pushes)
+                           shown: Binding(get: { shown }, set: { (part: AlbumEdit.Part) -> Void in tab = part }),
+                           spoken: EditAlbumPage.Words.parts)
                     // the strip's own sides and hairline run to the screen's edges
                     .padding(.horizontal, -side)
             }
@@ -379,26 +384,25 @@ struct EditAlbumRoot: View {
                     .buttonStyle(DWButtonStyle(size: .small))
                 }
             }
-            // the web's issues and marks are on its Release tab, Edit albums': Look after the library alone has Delete
-            // only - the strip's one push
-            if edit.editors {
-                needsALook(album)
+            switch shown {
+            case .release:
+                // the web's issues and marks are on its Release tab, Edit albums': Look after the library alone has
+                // Delete only - the strip's one tab
+                if edit.editors {
+                    needsALook(album)
+                }
+                if edit.editors, let retag = model.retag {
+                    ReleaseCards(model: model, retag: retag)
+                }
+            case .tags:
+                if let tags = model.tags { TagsListView(model: model, tags: tags, path: $path) }
+            case .artwork:
+                ArtworkPage(model: model, album: album) { tab = .release }
+            case .lyrics:
+                LyricsPage(model: model, album: album)
+            case .delete:
+                DeletePage(model: model, album: album)
             }
-            if edit.editors, let retag = model.retag {
-                ReleaseCards(model: model, retag: retag)
-            }
-        }
-    }
-
-    /// A push of the strip's (R10: Tags, Artwork, Lyrics, Delete - each its page, as the root's rows pushed them; R11
-    /// draws each as a tab instead): Release is the root's own, never pushed.
-    private func open(_ part: AlbumEdit.Part) {
-        switch part {
-        case .release: break
-        case .tags: path.append(.tags)
-        case .artwork: path.append(.artwork)
-        case .lyrics: path.append(.lyrics)
-        case .delete: path.append(.delete)
         }
     }
 

@@ -414,6 +414,8 @@
   "EQWords.Outputs.speaker" : "Mac speakers",
   "EQWords.Screen.unitNotMade" : "The EQ can't play on this Mac just now, so the sound is as it is. Quitting deadwax and opening it again may help.",
   "EQWords.You.footer" : "Each output keeps its own EQ - your headphones, the Mac's speakers, a USB DAC - and the EQ switches by itself when the output changes. This is kept on this Mac.",
+  "EditAlbumPage.Words.seeFullSize" : "Click the cover to see it full size.",
+  "EditAlbumPage.Words.tagsNote" : "Select tracks to edit only those.",
   "GettingWords.modeTitle" : "When I click Get",
   "InfoDebug.engineRows(lastStart)" : "Last start | 0.31 s from the click to sound",
   "InstallExpiry.line(days)" : "This install runs until Sat 31 Oct, 14:02",

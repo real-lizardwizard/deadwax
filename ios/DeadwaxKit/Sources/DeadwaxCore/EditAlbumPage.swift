@@ -105,20 +105,17 @@ public enum EditAlbumPage {
     // MARK: the strip (the phone) and the tabs (the Mac)
 
     /// What the phone's strip offers, by the person's permissions (Managing.albumEdit, AlbumEdit.parts - Release, Tags,
-    /// Artwork and Lyrics with Edit albums, Delete with Look after the library): `tabs` the parts drawn on the root
-    /// under it - Release alone in R10 - and `pushes` the parts that are still pages of their own, pushed as the root's
-    /// rows pushed them (Tags, Artwork, Lyrics, Delete), until R11 makes each a tab of the root. Without Edit albums no
-    /// tab at all: Delete alone, as the root had Delete album… alone.
+    /// Artwork and Lyrics with Edit albums, Delete with Look after the library). (R11 - notes/ios.md "The redesign, slice
+    /// R11: Tags, Artwork, Lyrics and Delete") Every part a tab of the root's own, drawn under the strip as the Mac's
+    /// tabs are - none pushed any more. Without Edit albums, Delete alone; with neither, no strip.
     public struct Strip: Sendable, Equatable {
         public let tabs: [AlbumEdit.Part]
-        public let pushes: [AlbumEdit.Part]
     }
 
     /// The phone's strip for these permissions.
     public static func strip(editors: Bool, delete: Bool) -> Strip {
         let parts = AlbumEdit.parts(editors: editors, remove: delete)
-        let tabs = parts.filter { (part: AlbumEdit.Part) -> Bool in part == .release }
-        return Strip(tabs: tabs, pushes: parts.filter { (part: AlbumEdit.Part) -> Bool in !tabs.contains(part) })
+        return Strip(tabs: parts)
     }
 
     /// The Mac's folder tabs for these permissions: every part the person may use, in the web's order (`EDIT_TABS`).
@@ -130,6 +127,153 @@ public enum EditAlbumPage {
     /// else the first offered - Release, or Delete alone.
     public static func shown(_ chosen: AlbumEdit.Part, in tabs: [AlbumEdit.Part]) -> AlbumEdit.Part {
         tabs.contains(chosen) ? chosen : (tabs.first ?? .release)
+    }
+
+    // MARK: Tags (R11)
+
+    /// The tracks Edit N tracks edits, in running order (`files`, the folder's as read): those ticked - every track with
+    /// none ticked (the web's "Edit all tracks…"). A tick left on a file gone since (a release applied renames them) is
+    /// no track of the folder's.
+    public static func tagTargets(_ files: [String], ticked: Set<String>) -> [String] {
+        let chosen = files.filter { (name: String) -> Bool in ticked.contains(name) }
+        return chosen.isEmpty ? files : chosen
+    }
+
+    /// How many of the folder's tracks are ticked: the N of Edit N tracks… and Apply to N tracks - 0 with none ticked
+    /// (every track, then). Only a ticked row counts, and only one the folder still holds.
+    public static func ticked(_ files: [String], _ ticked: Set<String>) -> Int {
+        files.reduce(0) { (count: Int, name: String) -> Int in count + (ticked.contains(name) ? 1 : 0) }
+    }
+
+    /// Every track ticked: the phone's foot offers Deselect all in place of Select all.
+    public static func allTicked(_ files: [String], _ ticked: Set<String>) -> Bool {
+        !files.isEmpty && Self.ticked(files, ticked) == files.count
+    }
+
+    /// (R11's review) The phone's Select all, and Deselect all once every track is ticked: the ticks it leaves - every
+    /// track, or none.
+    public static func selectAll(_ files: [String], _ ticked: Set<String>) -> Set<String> {
+        allTicked(files, ticked) ? [] : Set(files)
+    }
+
+    /// (R11's review) A tick on the Mac (or Edit this track…) over typed work for another set of tracks: "Discard
+    /// changes?" first. The same tracks, or nothing typed over, and the editor takes the ticks now.
+    public static func asksFirst(_ files: [String], ticked next: Set<String>, editing: [String], typed: Bool) -> Bool {
+        typed && tagTargets(files, ticked: next) != editing
+    }
+
+    /// (R11's review) What the Mac's editor does once the folder's files are read again - a release applied renames
+    /// them, and TagsModel.readFiles keeps of the ticks and of the tracks edited only the names the folder still holds -
+    /// so the ticks, the tracks Apply writes to and the typed work stay in step.
+    public enum AfterRead: Sendable, Equatable {
+        /// As it is: the editor edits the tracks ticked (every track with none).
+        case keep
+        /// Nothing typed over: the editor takes the tracks ticked.
+        case edit([String])
+        /// Typed over, some of the tracks edited still there: the ticks become them, so the legend and Apply to N
+        /// tracks say the tracks Apply writes to - the typed work kept.
+        case tick(Set<String>)
+        /// Typed over, none of the tracks edited still there: said, with Discard the one way on - never put away unasked.
+        case stranded
+    }
+
+    /// See AfterRead. `files` the folder's tracks as read, `ticked` and `editing` as TagsModel holds them after it.
+    public static func afterRead(_ files: [String], ticked: Set<String>, editing: [String], typed: Bool) -> AfterRead {
+        guard !files.isEmpty else { return .keep }
+        let targets = tagTargets(files, ticked: ticked)
+        if targets == editing { return .keep }
+        if !typed { return .edit(targets) }
+        let held = editing.filter { (name: String) -> Bool in files.contains(name) }
+        return held.isEmpty ? .stranded : .tick(Set(held))
+    }
+
+    // MARK: Delete (R11)
+
+    /// The folder's tracks and their size, as the phone's Tracks row says them (iEditDelete): "10 · 290 MB". What else
+    /// is in the folder is deadwax's own words under it (DeleteWords.others): "and 40 other files:" in the caution's
+    /// colour over their names - the summary names twelve at most and counts them all (R11's review).
+    public static func deleteTracks(_ summary: DeletionSummary) -> String {
+        let size = Sources.size(summary.totalBytes)
+        return AlbumInfo.grouped(summary.audioFiles) + (size.isEmpty ? "" : " · \(size)")
+    }
+
+    /// Who holds the album, short (the phone's In a library row): "Yours only", "Nobody's", "Yours, Ann's and Bo's",
+    /// "Ann's" - "Couldn't tell" when deadwax couldn't read it, never "Nobody's"; nil with logins off. The whole sentence
+    /// (DeleteWords.holders) says what deleting does to them.
+    public static func held(_ summary: DeletionSummary?) -> String? {
+        guard let summary else { return nil }
+        if summary.holdersUnknown { return Words.couldntTell }
+        guard let holders = summary.holders else { return nil }
+        let yours = summary.yours == true
+        if holders.isEmpty { return yours ? Words.yoursOnly : Words.nobodys }
+        let names = (yours ? [Words.yours] : []) + holders.map { (name: String) -> String in "\(name)'s" }
+        return DeleteWords.listed(names)
+    }
+
+    /// (R11's review) The Mac's foot under Delete: who holds it, short - "In a library: Ann's" - its whole sentence
+    /// (DeleteWords.holders) the tab's own row; nothing until the summary says, and nothing with logins off.
+    public static func deleteFoot(_ summary: DeletionSummary?) -> String {
+        held(summary).map { (held: String) -> String in "\(Words.inALibrary): \(held)" } ?? ""
+    }
+
+    /// (R11's review) The album pages a delete closes when Edit album was opened by its folder - Choose the folder, the
+    /// Mac's folder list, Needs a look - by the album the folder holds, as an album opening closes its own: each album
+    /// page open (`pages`, what each was opened with) is the folder's album when the folders its own Edit album would
+    /// find (AlbumEdit.folders - by the release the page knew, else by its name) hold the folder; or when it is the
+    /// album the id bridge names for the folder's release (`bridge`, asked as Delete's summary is read), its folders the
+    /// bridge's. One the folder was all of (AlbumEdit.deletesAll) goes back (`leave`); one with folders left is asked
+    /// again (`ask`). Each page once; one found by nothing is left as it is.
+    public struct FolderPages: Sendable, Equatable {
+        public let leave: [String]
+        public let ask: [String]
+
+        public init(leave: [String] = [], ask: [String] = []) {
+            self.leave = leave
+            self.ask = ask
+        }
+    }
+
+    /// See FolderPages. `path` the folder deleted, `tracks` its tracks, `scan` the library's folders before it went.
+    public static func folderPages(_ path: String, tracks: Int, bridge: StoreAlbum?, scan: [ScanAlbum],
+                                   pages: [AlbumEdit.Subject]) -> FolderPages {
+        var leave: [String] = []
+        var ask: [String] = []
+        var seen = Set<String>()
+        for page in pages where !page.id.isEmpty && seen.insert(page.id).inserted {
+            let named = bridge.flatMap { (answer: StoreAlbum) -> AlbumEdit.Bridge? in
+                answer.navidromeId == page.id ? AlbumEdit.Bridge(answer) : nil
+            }
+            let folders = AlbumEdit.folders(named, scan, page)
+            guard folders.paths.contains(path) else { continue }
+            if AlbumEdit.deletesAll(folders, tracks: tracks, page) {
+                leave.append(page.id)
+            } else {
+                ask.append(page.id)
+            }
+        }
+        return FolderPages(leave: leave, ask: ask)
+    }
+
+    /// (R11's review) The release a folder opening asks the id bridge by (`bridge` above): the folder's, trimmed - nil
+    /// for a folder tagged with none, whose album is found by its name alone.
+    public static func bridgeRelease(_ album: ScanAlbum) -> String? {
+        let release = album.releaseMbid.trimmingCharacters(in: .whitespacesAndNewlines)
+        return release.isEmpty ? nil : release
+    }
+
+    // MARK: Artwork (R11)
+
+    /// The Artwork pointer to replacing a cover, on either device: the web's words (GetResults.webCoverPointer) -
+    /// Release a tab on the phone too now - naming the button Release shows to compare the covers (`compare`: the
+    /// phone's Compare, the Mac's Compare full size…) only while Release shows it (R11's review): with none - no
+    /// pressing with a cover found yet - the words alone.
+    public static func coverPointer(_ album: ScanAlbum, compare: String?) -> String? {
+        GetResults.webCoverPointer(album).map { (words: String) -> String in
+            let named = " (\(Words.compareFullSize))"
+            return words.replacingOccurrences(of: named, with: compare.map { (button: String) -> String in
+                " (\(button))"
+            } ?? "")
+        }
     }
 
     // MARK: Revert
@@ -211,10 +355,93 @@ public enum EditAlbumPage {
         public static let hideChanges = "Hide the changes"
         /// The Mac's foot under Release (Main.dc.html's `foots.release`).
         public static let releaseFoot = "Apply writes the tags and files the folder. There is no undo."
-        /// The Mac's foot under the parts still today's pages (R11 draws each): what opens them.
-        public static let partFoot = "Opens as it does today, over this page."
-        /// The Mac's foot under a part still today's page: its button.
-        public static func openPart(_ part: AlbumEdit.Part) -> String { "Open \(part.label)…" }
+        /// (R11) The Mac's foot under each tab (Main.dc.html's `foots`): what the tab's action does - Delete's, who holds
+        /// the album, its summary's (DeleteWords.holders), drawn by the foot itself.
+        public static func foot(_ part: AlbumEdit.Part) -> String {
+            switch part {
+            case .release: return releaseFoot
+            case .tags: return tagsFoot
+            case .artwork: return artworkFoot
+            case .lyrics: return lyricsFoot
+            case .delete: return ""
+            }
+        }
+        public static let tagsFoot = "A field left as it is isn’t written."
+        public static let artworkFoot = "Pictures are saved into the album folder."
+        public static let lyricsFoot = "Lyrics come from LRCLIB, one .lrc beside each track."
+
+        // MARK: Tags (R11)
+
+        /// The phone's foot: Select all - Deselect all once every track is ticked. VoiceOver hears TagEditWords' whole
+        /// words ("Select every track").
+        public static let selectAll = "Select all"
+        public static let deselectAll = "Deselect all"
+        /// The line under the tracks (iEditTags, Main.dc.html) in the app's verb, Select (TagEditWords.select): the
+        /// drawings' "Tick" is never the app's word.
+        public static func tagsNote(_ device: Device) -> String {
+            device == .mac ? "Select tracks to edit only those."
+                : "Select tracks to edit only those. Tap › to see everything in a track's file."
+        }
+        /// The Mac's Tags: the editor's legend - "Edit 3 tracks", "Edit all tracks" with none ticked.
+        public static func editLegend(_ ticked: Int) -> String {
+            ticked > 0 ? "Edit \(ticked) track\(ticked == 1 ? "" : "s")" : "Edit all tracks"
+        }
+        /// The Mac's foot under Tags: Apply, saying what it writes to - "Apply to 3 tracks", "Apply to all 10 tracks".
+        public static func applyTo(ticked: Int, of total: Int) -> String {
+            ticked > 0 ? "Apply to \(ticked) track\(ticked == 1 ? "" : "s")"
+                : "Apply to all \(AlbumInfo.grouped(total)) track\(total == 1 ? "" : "s")"
+        }
+        /// The Mac's Tags: the selected row's file, every tag of it, in a sheet - the phone's ›.
+        public static let seeEveryTag = "See a file's every tag…"
+        /// What VoiceOver says a track's › does on the phone - and the Mac's row, on a double-click.
+        public static let everyTagHint = "Shows everything in the track's file"
+        /// The Mac's Tags row as VoiceOver hears it: the row's words (TagEditWords.trackRow), its length, and whether its
+        /// checkbox is ticked - "Track 3, Shoot to Thrill, 5:17, checked", a checkbox's own word for it. Never
+        /// "selected": VoiceOver says that of the row the list has selected, the one See a file's every tag… opens
+        /// (R11's review - a ticked row was "selected" twice). Its actions: Select or Deselect, and See a file's every
+        /// tag….
+        public static func tagRow(_ row: String, length: String, ticked: Bool) -> String {
+            "\(row), \(length)" + (ticked ? ", checked" : "")
+        }
+        /// (R11's review) The Mac's editor once a release applied has renamed every track the typed work was for
+        /// (EditAlbumPage.AfterRead.stranded): said, with Discard - the typed work is never put away unasked.
+        public static let editedGone = "The tracks these changes were for have been renamed since, so they can't be "
+            + "written. Discard them to edit the tracks as they are now."
+        public static let deselect = "Deselect"
+        /// The Mac's Tags table's columns.
+        public static let number = "#"
+        public static let title = "Title"
+        public static let length = "Length"
+
+        // MARK: Artwork (R11)
+
+        /// Under the cover: a tap (a click) shows it full size.
+        public static func seeFullSize(_ device: Device) -> String {
+            "\(device == .mac ? "Click" : "Tap") the cover to see it full size."
+        }
+        /// CD art beside the tracks: what it is for (iEditArtwork).
+        public static let discArtNote = "What players show for a song with a disc number."
+        /// The Mac's Cover box (Main.dc.html): the folder's cover beside the pressing's, in a sheet - the phone's
+        /// Compare covers….
+        public static let compareWithPressing = "Compare with this pressing…"
+        /// The pointers' button where the album is matched to no release yet: Release, shown.
+        public static let openRelease = "Go to Release"
+
+        // MARK: Lyrics (R11)
+
+        /// Beside Get lyrics: it never replaces what is saved (LyricsFetchBody asks for nothing to be replaced).
+        public static let nothingReplaced = "Nothing saved is replaced."
+
+        // MARK: Delete (R11)
+
+        /// The phone's rows of what goes (iEditDelete).
+        public static let tracks = "Tracks"
+        public static let inALibrary = "In a library"
+        /// Who holds the album, short (EditAlbumPage.held).
+        public static let yoursOnly = "Yours only"
+        public static let nobodys = "Nobody's"
+        public static let yours = "Yours"
+        public static let couldntTell = "Couldn't tell"
         /// What VoiceOver calls the strip and the tabs.
         public static let parts = "Edit album's parts"
         /// The folder list's switch: everything.

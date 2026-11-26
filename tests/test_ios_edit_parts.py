@@ -2,8 +2,11 @@
 The iPhone app's Edit album, its parts after Release, as the App draws and runs them (Phase 8, slices 2-4 -
 notes/ios-specs/phase8-managing.md 3.4-3.7; notes/ios.md "Edit album's Tags, Artwork, Lyrics and Delete").
 
-Read from the Swift source, as tests/test_ios_edit.py reads slice 1's. Tags: the root's row pushes the phone's own list
-(no web app row); Select is a List's selection with the bottom bar's Edit N tracks…; a track's page pushes the editor;
+Read from the Swift source, as tests/test_ios_edit.py reads slice 1's. (R11 - notes/ios.md "The redesign, slice R11:
+Tags, Artwork, Lyrics and Delete": each part the root's tab now, drawn under its strip - what was a page pushed from the
+root is the tab, the rules below unchanged; their look is test_ios_edit_parts_look's.) Tags: the root's row pushes the
+phone's own list (no web app row); Select is a List's selection with the bottom bar's Edit N tracks…; a track's page
+pushes the editor;
 Edit tags is a Form whose Apply is on only as RetagFlow says, and never beside another write; its Apply holds a
 background task, says an answer that never came, reads the folder again, and stops at a sign-out; its reads drop a
 cancellation and only the newest lands; out of reach and back it reads again. Artwork and Lyrics: rows pushing pages of
@@ -34,30 +37,36 @@ def body(text: str, name: str) -> str:
 
 def test_tags_is_a_page_of_the_phones_own():
     sheet = code(SHEET)
-    assert "case tags" in sheet and "case track(String)" in sheet and "case editTags" in sheet
+    assert "case track(String)" in sheet and "case editTags" in sheet
     view = declared(sheet, "struct", "EditPageView")
-    assert "TagsListView(model: model, tags: tags, path: $path)" in view
     assert "TrackPageView(model: model, tags: tags, filename: filename, path: $path)" in view
     assert "EditTagsView(model: model, tags: tags)" in view
-    # (R10) the root's strip pushes it, as its row did - R11 draws it as the strip's tab
+    # (R11) the root's strip shows it as its tab - never pushed
     root = declared(sheet, "struct", "EditAlbumRoot")
-    assert "case .tags: path.append(.tags)" in body(root, "private func open(_ part: AlbumEdit.Part)")
-    assert "PhoneStrip(options: strip.tabs," in body(root, "private func albumSections(")
+    sections = body(root, "private func albumSections(")
+    assert "PhoneStrip(options: strip.tabs," in sections
+    assert "case .tags: if let tags = model.tags { TagsListView(model: model, tags: tags, path: $path) }" in re.sub(
+        r"\s+", " ", sections)
+    assert "case tags" not in sheet and "path.append(.tags)" not in sheet
 
 
 def test_select_is_the_lists_own_and_edits_the_tracks_chosen_or_all():
     pages = code(TAGS_PAGES)
     view = declared(pages, "struct", "TagsListView")
-    assert "List(selection: selecting ? $tags.selection : nil)" in view
-    assert ".environment(\\.editMode, $editMode)" in view
-    # a row pushes its track's page outside Select, and only there
-    assert "NavigationLink(value: EditPage.track(file.filename))" in view
-    assert "ToolbarItemGroup(placement: .bottomBar)" in view and "TagEditWords.editTracks(tags.selection.count)" in view
-    targets = body(view, "private var targets: [String]")
-    assert "tags.selection.isEmpty ? names :" in targets
+    # (R11) a row of each track, its tick the row's own tap (iEditTags' <label class="row">), no List's edit mode
+    row = declared(pages, "struct", "TagTrackRow")
+    assert "TagTrackRow(tags: tags, file: file, path: $path)" in view
+    assert "tags.selection.remove(file.filename)" in row and "tags.selection.insert(file.filename)" in row
+    assert "List(" not in view and "editMode" not in view
+    # a row's › pushes its track's page
+    assert "NavigationLink(value: EditPage.track(file.filename))" in row
+    # the foot's Edit N tracks…: the tracks ticked, every track with none (EditAlbumPage.tagTargets - Swift's tests)
+    foot = declared(pages, "struct", "TagsFoot")
+    assert "TagEditWords.editTracks(EditAlbumPage.ticked(names, tags.selection))" in foot
+    assert "open(EditAlbumPage.tagTargets(names, ticked: tags.selection))" in foot
     # another set of tracks over typed work asks first, as Close does
-    assert "if names != tags.editing && tags.unsaved {" in body(view, "private func open(")
-    assert ".confirmationDialog(EditWords.discardTitle" in view and "Button(EditWords.keepEditing, role: .cancel) {}" in view
+    assert "if names != tags.editing && tags.unsaved {" in body(foot, "private func open(")
+    assert ".confirmationDialog(EditWords.discardTitle" in foot and "Button(EditWords.keepEditing, role: .cancel) {}" in foot
     # the files are read once Tags opens - again for a model held anew
     assert ".task(id: ObjectIdentifier(tags)) { tags.start() }" in view
 
@@ -187,14 +196,13 @@ ART_PAGES = EDIT / "ArtworkLyricsPages.swift"
 
 def test_artwork_and_lyrics_are_pages_of_the_phones_own():
     sheet = code(SHEET)
-    assert "case artwork" in sheet and "case lyrics" in sheet
-    view = declared(sheet, "struct", "EditPageView")
-    assert "ArtworkPage(model: model, album: album)" in view and "LyricsPage(model: model, album: album)" in view
-    # (R10) the root's strip pushes each, as their rows did - R11 draws each as the strip's tab
-    pushed = body(declared(sheet, "struct", "EditAlbumRoot"), "private func open(_ part: AlbumEdit.Part)")
-    assert "case .artwork: path.append(.artwork)" in pushed and "case .lyrics: path.append(.lyrics)" in pushed
-    # Delete album…, the last row that was the web app's, is a page of the phone's own since slice 4
-    assert "case .delete: path.append(.delete)" in pushed and "WebAppRow" not in sheet
+    # (R11) the root's strip shows each as its tab - never pushed
+    sections = re.sub(r"\s+", " ", body(declared(sheet, "struct", "EditAlbumRoot"), "private func albumSections("))
+    assert "case .artwork: ArtworkPage(model: model, album: album) { tab = .release }" in sections
+    assert "case .lyrics: LyricsPage(model: model, album: album)" in sections
+    assert "case artwork" not in sheet and "case lyrics" not in sheet
+    # Delete album…, the last row that was the web app's, is the phone's own since slice 4 - a tab since R11
+    assert "case .delete: DeletePage(model: model, album: album)" in sections and "WebAppRow" not in sheet
 
 
 def test_artwork_draws_the_cover_and_cd_art_and_offers_each_get_as_the_web_does():
@@ -205,20 +213,29 @@ def test_artwork_draws_the_cover_and_cd_art_and_offers_each_get_as_the_web_does(
     assert ".accessibilityLabel(GetResults.seeCover)" in page
     assert "Text(GetResults.coverNote(album.art))" in page
     assert "if GetResults.offersCover(album) {" in page and "GetButton(model: model, kind: .cover" in page
-    # the web's pointer to the Release tab's comparison: a row pushing it - the Release page with no release
-    assert "if let pointer = GetResults.coverPointer(album) {" in page
-    assert "NavigationLink(value: album.releaseMbid.isEmpty ? EditPage.release : EditPage.compareCovers)" in page
+    # (R11) Compare covers… pushed from the Cover group - the web's pointer, with no comparison to make, and with no
+    # release Go to Release showing the Release tab (a tab on both devices: the web's words are both devices', but for
+    # the button its Release has, Compare, on the phone)
+    assert "NavigationLink(value: EditPage.compareCovers)" in page
+    # (R11's review) the pointer names Release's Compare only while Release shows it (its own condition)
+    assert ("if !compares, let pointer = EditAlbumPage.coverPointer(album, compare: "
+            "ArtworkLooks.releaseCompares(model) ? EditAlbumPage.Words.compare : nil) {") in re.sub(r"\s+", " ", page)
+    looks = declared(pages, "enum", "ArtworkLooks")
+    assert "model.retag?.coverRelease != nil" in body(looks, "static func releaseCompares(")
+    assert "&& releaseCompares(model)" in body(looks, "static func compares(")
+    assert "Button(EditAlbumPage.Words.openRelease, action: showRelease)" in page
     # CD art: the scan's pictures in a grid, each by name and full screen; Get CD art as the web offers it
     assert "LazyVGrid(" in page and "ForEach(album.discArt, id: \\.self)" in page
     assert "DiscArtPicture(path: album.path, file: name)" in page
     assert "FullCover(source: .discArt(path: album.path, file: name))" in page
     assert ".accessibilityLabel(GetResults.seeDiscArt(name))" in page
-    assert "Text(GetResults.noDiscArt)" in page and "Text(GetResults.discArtBeside)" in page
+    assert "Text(GetResults.noDiscArt)" in page and "Text(EditAlbumPage.Words.discArtNote)" in page
     assert "if GetResults.offersDiscArt(album) {" in page and "GetButton(model: model, kind: .disc" in page
-    assert "if let pointer = GetResults.discArtPointer(album) {" in page
+    assert "let pointer = GetResults.webDiscArtPointer(album)" in page
     assert ".appCover(item: $full)" in page
     picture = declared(pages, "struct", "DiscArtPicture")
-    assert "client.libraryDiscArt(path: path, file: file)" in picture and ".clipShape(Corners.artShape)" in picture
+    # (R11) round, as a disc is (iEditArtwork) - the phone's square corners are the cover's alone
+    assert "client.libraryDiscArt(path: path, file: file)" in picture and ".clipShape(Circle())" in picture
     release = code(RELEASE)
     assert "case discArt(path: String, file: String)" in release
     assert "client.libraryDiscArt(path: path, file: file)" in release
@@ -240,7 +257,7 @@ def test_a_get_says_its_words_and_is_on_only_as_the_model_says():
     button = declared(pages, "struct", "GetButton")
     assert "GetResults.label(kind, run, trackCount: trackCount)" in button
     assert "Task { await model.get(kind) }" in button and ".disabled(!model.canGet)" in button
-    assert "if run?.state == .working { ProgressView() }" in button
+    assert "if run?.state == .working { ProgressView().controlSize(.small) }" in button
     assert "if let said = run?.said, run?.state != .working {" in button
     wait = declared(pages, "struct", "GetWait")
     assert "if model.unansweredGet != nil {" in wait and "MayHaveFinished(reading: model.scan.reading)" in wait
@@ -297,16 +314,17 @@ ROUTES = EDIT.parent / "Shared" / "Routes.swift"
 
 def test_delete_album_is_a_page_of_the_phones_own():
     sheet = code(SHEET)
-    assert "case delete" in sheet
-    view = declared(sheet, "struct", "EditPageView")
-    assert "DeletePage(model: model, album: album)" in view
-    # (R10) the strip's last push, Delete, under Look after the library's gate alone: Edit albums alone has no Delete
+    # (R10) the strip's last part, Delete, under Look after the library's gate alone: Edit albums alone has no Delete
     # album… (check 338), Look after the library alone only it (342) - EditAlbumPage.strip's (Swift's
-    # EditAlbumPageTests; tests/test_ios_edit_parts_contract.py's strip_gates)
+    # EditAlbumPageTests; tests/test_ios_edit_parts_contract.py's strip_gates). (R11) The strip's tab, never pushed,
+    # Delete permanently the root's foot
     root = declared(sheet, "struct", "EditAlbumRoot")
     assert "let strip = EditAlbumPage.strip(editors: edit.editors, delete: edit.delete)" in body(
-        root, "private func albumSections(")
-    assert "case .delete: path.append(.delete)" in body(root, "private func open(_ part: AlbumEdit.Part)")
+        root, "private func albumPage(")
+    flat_root = re.sub(r"\s+", " ", root)
+    assert "case .delete: DeletePage(model: model, album: album)" in flat_root
+    assert "case .delete: page.phoneFoot { DeleteButton(model: model, album: album)" in flat_root
+    assert "case delete" not in sheet and "path.append(.delete)" not in sheet
     assert "webURL" not in sheet and "inWebAppLine" not in sheet
 
 
@@ -315,17 +333,25 @@ def test_the_page_says_what_goes_and_who_holds_it_as_the_dialog_does():
     # read live as the page opens - and for the folder followed to, and back in reach - never kept
     assert '.task(id: "\\(album.path)|\\(model.online)") { await model.readDeletion() }' in page
     assert "if delete.reading {" in page and "Text(DeleteWords.checking)" in page
-    assert "Text(DeleteWords.counts(summary))" in page
+    # (R11) iEditDelete's rows: what goes, what else is in there, who holds it, and the folder - (R11's review) what
+    # else in deadwax's words, its lead counting every file over the twelve names the summary lists (DeleteWords.others,
+    # EditAlbumPageTests: 40 files, 12 named)
+    assert "PhoneKV(label: EditAlbumPage.Words.tracks, value: EditAlbumPage.deleteTracks(summary), mono: true)" in page
     assert "if let others = DeleteWords.others(summary) {" in page and "Text(others.lead)" in page
     assert "Text(others.names)" in page
-    assert "if let holders = DeleteWords.holders(summary) {" in page
+    lead = re.sub(r"\s+", " ", page[page.index("Text(others.lead)"):page.index("Text(others.names)")])
+    assert ".foregroundStyle(DWPalette.amberText)" in lead
+    assert "alsoInThere" not in page and "alsoInThere" not in code(EDIT.parent / "Mac" / "Edit" / "MacDeleteTab.swift")
+    assert "if let held = EditAlbumPage.held(summary) {" in page
+    assert "if let summary = delete.summary, let holders = DeleteWords.holders(summary) {" in page
     assert "if let failure = delete.readFailure {" in page and "Task { await model.readDeletion() }" in page
-    assert "Text(DeleteWords.warning)" in page and "Text(DeleteWords.title)" in page
-    assert ".navigationTitle(DeleteWords.page)" in page
+    assert "Text(DeleteWords.warning)" in page and "PhoneGroup(legend: DeleteWords.title)" in page
 
 
 def test_delete_permanently_asks_first_with_cancel_the_default():
-    page = declared(code(DELETE_PAGE), "struct", "DeletePage")
+    # (R11) Delete permanently a view of its own, each device's foot's (the phone's PhoneFoot, the Mac's MacEditFooter)
+    shown = declared(code(DELETE_PAGE), "struct", "DeletePage")
+    page = declared(code(DELETE_PAGE), "struct", "DeleteButton")
     button = body(page, "Button(role: .destructive) {")
     # the question keeps the folder and the summary it was raised over (review, 16 Nov) - nothing deleted from here
     assert "if let summary = delete.summary { asking = (album.path, summary) }" in button
@@ -344,10 +370,10 @@ def test_delete_permanently_asks_first_with_cancel_the_default():
     assert ".onChange(of: album.path) { asking = nil }" in page
     # a delete that never answered is said over the page, and a read that failed after it with Look again - as is
     # any read Delete waits for that couldn't be made, the Release's or Tags' (review, 16 Nov)
-    assert "if delete.mayHaveFinished {" in page and "MayHaveFinished(reading: model.scan.reading)" in page
-    assert "if model.readBlocking != nil || (delete.mayHaveFinished && model.scan.failure != nil) {" in page
-    assert "ReadAgainFailed(model: model)" in page
-    assert "if let failure = delete.failure {" in page
+    assert "if delete.mayHaveFinished {" in shown and "MayHaveFinished(reading: model.scan.reading)" in shown
+    assert "if model.readBlocking != nil || (delete.mayHaveFinished && model.scan.failure != nil) {" in shown
+    assert "ReadAgainFailed(model: model)" in shown
+    assert "if let failure = delete.failure {" in shown
 
 
 def test_a_delete_is_a_write_never_beside_another():
