@@ -39,6 +39,48 @@ import Testing
         #expect(answer.topSongs == [LastfmTrack(title: "The Less I Know the Better", playcount: 98_765_432,
                                                 listeners: 2_100_000,
                                                 url: "https://www.last.fm/music/Tame+Impala/_/The+Less+I+Know+the+Better")])
+        // (A2) the sample's ids are elided ("a3b8..."): no MusicBrainz id's shape, so none
+        #expect(answer.similar == [LastfmSimilarArtist(name: "MGMT", match: 0.83, url: "https://www.last.fm/music/MGMT")])
+        #expect(answer.topAlbums == [LastfmAlbum(title: "Currents", plays: 456_789_012, counted: .plays)])
+    }
+
+    /// (A2) Similar artists and albums by plays, read as leniently as the rest: an artist needs a name, an album a
+    /// title, a count and a kind of count this app knows; an id only of MusicBrainz's shape, a match only 0 to 1, a link
+    /// only to Last.fm.
+    @Test func similarAndAlbumsReadLeniently() throws {
+        let odd = try Self.read("""
+            {"enabled": true, "unavailable": false,
+             "similar": [{"name": "Pond", "mbid": " 69AC44F7-C80D-47B4-9BC8-FCC758D209E6 ", "match": 1,
+                          "url": "https://www.last.fm/music/Pond"},
+                         {"name": "GUM", "mbid": "bca076a4", "match": 1.5, "url": "http://www.last.fm/music/GUM"},
+                         {"name": "  "}, {"mbid": "bca076a4-0ff5-43ae-b4c1-27ece7a0ca1c"}, "Temples",
+                         {"name": "Temples", "match": -0.1}],
+             "top_albums": [{"title": "Currents", "mbid": "031ecbde-35e1-4d3a-917f-f89f31aca1c9", "plays": 197990342,
+                             "counted": "plays"},
+                            {"title": "Lonerism", "plays": -3, "counted": "plays"},
+                            {"title": "Deadbeat", "plays": 23596438, "counted": "scrobbles"},
+                            {"title": "", "plays": 5, "counted": "plays"}, {"plays": 5, "counted": "plays"},
+                            {"title": "Innerspeaker", "plays": "many", "counted": "plays"},
+                            {"title": "Dracula", "plays": 6876079}]}
+            """)
+        #expect(odd.similar == [
+            LastfmSimilarArtist(name: "Pond", mbid: "69ac44f7-c80d-47b4-9bc8-fcc758d209e6", match: 1,
+                                url: "https://www.last.fm/music/Pond"),
+            LastfmSimilarArtist(name: "GUM"),
+            LastfmSimilarArtist(name: "Temples"),
+        ])
+        #expect(odd.topAlbums == [LastfmAlbum(title: "Currents", mbid: "031ecbde-35e1-4d3a-917f-f89f31aca1c9",
+                                              plays: 197_990_342, counted: .plays)])
+        // listeners counted where Last.fm gave no plays
+        let listeners = try Self.read("""
+            {"enabled": true, "unavailable": false,
+             "top_albums": [{"title": "Dummy", "mbid": null, "plays": 1200000, "counted": "listeners"}]}
+            """)
+        #expect(listeners.topAlbums == [LastfmAlbum(title: "Dummy", plays: 1_200_000, counted: .listeners)])
+        // absent, null or not a list: none could be had; [] none listed
+        #expect(listeners.similar == nil)
+        #expect(try Self.read(#"{"enabled": true, "similar": null, "top_albums": {}}"#).topAlbums == nil)
+        #expect(try Self.read(#"{"enabled": true, "similar": [], "top_albums": []}"#).similar == [])
     }
 
     @Test func noKeyAndRefusedRead() throws {
@@ -135,6 +177,22 @@ import Testing
         // an id Last.fm doesn't know, asked again by name: the same artist as by the id
         let byName = try Self.named(cases, "an id Last.fm doesn't know").answer
         #expect(byName.url == tame.url && byName.topSongs?.map(\.title) == songs.map(\.title))
+        // (A2) their similar artists and albums by plays, whole: thirty and fifty, every one read
+        for start in ["Tame Impala", "Dance Gavin Dance", "Portishead", "an id Last.fm doesn't know", "getInfo failing"] {
+            let answer = try Self.named(cases, start).answer
+            #expect(answer.similar?.count == 30 && answer.topAlbums?.count == 50, "\(start)")
+            #expect(answer.topAlbums?.allSatisfy { (album: LastfmAlbum) -> Bool in album.counted == .plays } == true)
+            #expect(answer.similar?.filter { (artist: LastfmSimilarArtist) -> Bool in artist.mbid == nil }.count == 2)
+        }
+        let similar = try #require(tame.similar)
+        #expect(similar[0] == LastfmSimilarArtist(name: "Pond", mbid: "69ac44f7-c80d-47b4-9bc8-fcc758d209e6", match: 1,
+                                                  url: "https://www.last.fm/music/Pond"))
+        #expect(similar[1].name == "Melody's Echo Chamber" && similar[1].mbid == nil)
+        // and none for the answers with nothing in them
+        for start in ["an artist Last.fm doesn't know", "Last.fm down", "Last.fm refusing the key", "no key"] {
+            let answer = try Self.named(cases, start).answer
+            #expect(answer.similar == nil && answer.topAlbums == nil, "\(start)")
+        }
     }
 
     @Test func theRoutesOwnAnswersSayWhatThePageDoes() throws {

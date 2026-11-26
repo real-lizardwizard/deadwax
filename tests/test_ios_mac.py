@@ -1148,7 +1148,9 @@ def test_the_grids_and_the_readable_pages():
     routes = bare(app["Shared/Routes.swift"])
     destinations = routes[routes.index("func appRoutes() -> some View {"):]
     readable = re.findall(r"case \.(\w+)\(let \w+\): [^\n]*\.readableOnMac\(\)", destinations)
-    assert readable == ["album", "artist", "group", "mbArtist", "topSongs", "serverSettingsGroup", "person"]
+    # (Last.fm, slice A2) Similar Artists' See All, the phone's grid at the readable width, beside Top Songs
+    assert readable == ["album", "artist", "group", "mbArtist", "topSongs", "similarArtists", "serverSettingsGroup",
+                        "person"]
     mac = bare(app[PLATFORM]).split("\n#else\n")[0]
     #? (slice 3's review) the room either side given to the page's scroll view as its content's margins, never the
     #? scroll view narrowed: the page scrolls anywhere across it, its scroll bar at the page's edge

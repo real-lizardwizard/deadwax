@@ -23,6 +23,13 @@ import Observation
 /// under the page and artist and who they are (`askLastfm`); what lies below Play waiting for it `LastfmPage.waitMs` at
 /// most (`arrival`), Top Songs going where Core's LastfmPage.placeOf puts it; and its rows met with the albums' songs
 /// (`topRows`). A top song you don't have opens its album through `opener`.
+///
+/// And (Last.fm, slice A2 - lastfm.md 3.3) the albums' Most played order: the albums by plays the visit orders by, judged
+/// once as the albums are first drawn - the arrival's LastfmVisit, Core's, driven event by event (the session's answer
+/// drawn at once, the ask that can't be made, a pull, an answer landing, the wait over, a choice) - and the list made
+/// of them (`albumsShown`), with whether the menu offers Most played read the same way (`albumsOffered`). (A2's
+/// review) Each answer is kept part by part over the one before (LastfmArtist.keeping): a later ask's part that
+/// couldn't be had never takes away one drawn.
 @MainActor
 @Observable
 final class ArtistPageModel {
@@ -55,8 +62,8 @@ final class ArtistPageModel {
     /// (Last.fm, slice A1) Last.fm's answer for the artist - the session's kept one at once, then deadwax's; nil before
     /// either.
     private(set) var lastfm: LastfmArtist?
-    /// What lies below Play waiting for it, and where Top Songs went - for one page and artist (`page`, the view's
-    /// taskKey).
+    /// What lies below Play waiting for it, where Top Songs went, and (A2) the albums the visit orders by - for one page
+    /// and artist (`page`, the view's taskKey).
     private(set) var arrival: LastfmArrival?
     /// A top song you don't have, opening its album.
     let opener = TopSongOpener()
@@ -73,6 +80,8 @@ final class ArtistPageModel {
     /// The page and artist whose hero has drawn Last.fm's line (LastfmPage.drawsLine): its height kept for the page's
     /// life, so Play never moves (`LastfmPage.shown`'s `reserved` - the review of A1).
     @ObservationIgnored private var lineKeptFor: String?
+    /// (A2) The Albums list as last made (the page is drawn again as each album's songs land).
+    @ObservationIgnored private var playsMade = AlbumPlays.Made()
 
     init(route: ArtistRoute) {
         self.route = route
@@ -244,7 +253,7 @@ final class ArtistPageModel {
     /// The arrival for the page and artist `page`: the model's once begun - else what it begins as, so the first frame
     /// draws as the begun page will (`kept`, the session's answer for the artist: with one there is no wait).
     func arrival(page: String, state: LastfmState, online: Bool, kept: LastfmPage.Kept.Entry?) -> LastfmPage.Arrival {
-        if let arrival, arrival.page == page { return arrival.value }
+        if let arrival, arrival.page == page { return arrival.visit.arrival }
         return Self.firstArrival(state: state, online: online, kept: kept)
     }
 
@@ -257,7 +266,9 @@ final class ArtistPageModel {
     private func beginLastfm(page: String, state: LastfmState, online: Bool, artists: ArtistsModel) {
         guard arrival?.page != page else { return }
         let kept = artists.keptLastfm(route.id)
-        arrival = LastfmArrival(page: page, value: Self.firstArrival(state: state, online: online, kept: kept))
+        // (A2) a visit begun: with nothing to wait for (the session's answer), the albums drawn now, by it
+        let first = Self.firstArrival(state: state, online: online, kept: kept)
+        arrival = LastfmArrival(page: page, visit: LastfmVisit(arrival: first, answer: kept?.held.answer))
         lastfm = kept?.held.answer
         lastfmAsked = kept?.asked
         lastfmAsks += 1
@@ -265,6 +276,7 @@ final class ArtistPageModel {
         waitBegun = nil
         topMade = nil
         opener.forget()
+        playsMade = AlbumPlays.Made()
     }
 
     /// Whether the page has drawn the hero's Last.fm line (`keepLine`) - the hero keeps its height from then on.
@@ -291,12 +303,15 @@ final class ArtistPageModel {
         beginLastfm(page: page, state: state, online: online, artists: artists)
         keepLine(page: page, state: state, online: online)
         guard state == .on, online, let client else {
-            arrival?.value.release()
+            arrival?.visit.unasked(lastfm)
             return
         }
         if inHand { wait(page: page) }
+        let pulled = again
         let again = again || (retryFailed && lastfm == nil)
         guard let ask, again || ask.key != lastfmAsked else { return }
+        // (A2) a pull: the albums' order judged again by the answer it brings
+        arrival?.visit.asking(pulled: pulled)
         lastfmAsks += 1
         let asked = lastfmAsks
         let id = route.id
@@ -313,27 +328,31 @@ final class ArtistPageModel {
             }
             guard let self, asked == self.lastfmAsks, self.arrival?.page == page else { return }
             if let found {
-                self.lastfm = found
+                // (A2's review) kept part by part over the one in hand: a part this ask couldn't have keeps the last
+                let kept = found.keeping(self.lastfm)
+                self.lastfm = kept
                 self.lastfmAsked = ask.key
                 self.lastfmFailure = nil
-                artists.keepLastfm(id, found, asked: ask.key)
+                artists.keepLastfm(id, kept, asked: ask.key)
             } else if self.lastfm == nil {
                 self.lastfmFailure = failure
                 artists.keepLastfm(id, nil, asked: ask.key)
             }
             self.keepLine(page: page, state: state, online: true)
-            self.arrival?.value.answered(present: LastfmPage.present(self.lastfm))
+            // placed, then (A2) the albums drawn now if they weren't: by this answer - once drawn, nothing moves them
+            self.arrival?.visit.answered(self.lastfm)
         }
     }
 
     /// Their own answer in hand: what lies below Play waits `LastfmPage.waitMs` more at most.
     private func wait(page: String) {
-        guard waitBegun != page, arrival?.value.holding == true else { return }
+        guard waitBegun != page, arrival?.visit.arrival.holding == true else { return }
         waitBegun = page
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(LastfmPage.waitMs) * 1_000_000)
             guard let self, self.arrival?.page == page else { return }
-            self.arrival?.value.release()
+            // released, and (A2) the albums drawn by what is in hand - an answer after this leaves them newest first
+            self.arrival?.visit.waited(self.lastfm)
         }
     }
 
@@ -356,10 +375,41 @@ final class ArtistPageModel {
         topMade = (top, albums, unknown, rows)
         return rows
     }
+
+    // MARK: Last.fm (slice A2 - notes/ios.md "Last.fm, slice A2")
+
+    /// The albums the visit to the page `page` orders by: the model's, once begun - else what it begins with (`kept`,
+    /// the session's answer: with one the albums draw at once, by it).
+    func visitAlbums(page: String, kept: LastfmPage.Kept.Entry?) -> [LastfmAlbum]? {
+        if let arrival, arrival.page == page { return arrival.visit.albums.albums }
+        return AlbumPlays.counted(kept?.held.answer)
+    }
+
+    /// (A2's review) Whether the menu offers Most played - read as the order drawn is (`visitAlbums`): the visit's,
+    /// once begun (its albums, or the answer in hand's - AlbumPlays.Visit.offers), else the session's answer's. So the
+    /// menu is never hidden while the rows are in Most played order.
+    func albumsOffered(page: String, kept: LastfmPage.Kept.Entry?) -> Bool {
+        if let arrival, arrival.page == page { return arrival.visit.albums.offers(lastfm) }
+        return AlbumPlays.offered(kept?.held.answer)
+    }
+
+    /// The Albums list as drawn (AlbumPlays.shown): `chosen` the menu's order, the rows Studio only leaves - Most played
+    /// only with albums the visit orders by.
+    func albumsShown(_ rows: [ArtistJoin.Row], chosen: AlbumOrder, page: String, kept: LastfmPage.Kept.Entry?,
+                     albums: [Album]) -> AlbumPlays.Shown {
+        playsMade.shown(rows, chosen: chosen, visit: visitAlbums(page: page, kept: kept), albums: albums)
+    }
+
+    /// Most played chosen in the menu: the rows ordered by the answer in hand, at once - the person asked them to move.
+    func choseMostPlayed() {
+        arrival?.visit.chose(lastfm)
+    }
 }
 
-/// An artist page's Last.fm arrival (LastfmPage.Arrival), for the page and artist it began for.
+/// An artist page's Last.fm arrival (LastfmPage.Arrival) and (A2) its albums' visit, for the page and artist it began
+/// for.
 struct LastfmArrival {
     let page: String
-    var value: LastfmPage.Arrival
+    /// (A2's review) The arrival and the albums' order judged with it, as Core drives them (LastfmVisit).
+    var visit: LastfmVisit
 }

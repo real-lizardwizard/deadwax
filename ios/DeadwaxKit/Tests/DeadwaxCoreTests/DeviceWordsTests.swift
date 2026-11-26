@@ -382,6 +382,19 @@ enum DeviceWords {
         add("LastfmWords.footRefused", LastfmWords.footRefused)
         add("LastfmWords.serverSettings", LastfmWords.serverSettings)
 
+        // MARK: (Last.fm, slice A2) Similar Artists and the albums' order - the same words on both - and (James, 26
+        // Nov) the Mac's songs section, Your most played, so it never reads as the albums' Most played
+
+        add("LastfmWords.similarArtists", LastfmWords.similarArtists)
+        add("LastfmWords.opensOnceBack", LastfmWords.opensOnceBack)
+        add("LastfmWords.sortAlbums", LastfmWords.sortAlbums)
+        add("LastfmWords.newestFirst", LastfmWords.newestFirst)
+        add("LastfmWords.mostPlayed", LastfmWords.mostPlayed)
+        add("LastfmWords.plays(1)", LastfmWords.plays(1, counted: .plays))
+        add("LastfmWords.plays(4123456)", LastfmWords.plays(4_123_456, counted: .plays))
+        add("LastfmWords.plays(4123456, listeners)", LastfmWords.plays(4_123_456, counted: .listeners))
+        add("ArtistPageFacts.yourMostPlayed", ArtistPageFacts.Words.yourMostPlayed)
+
         // MARK: (the redesign, slice R9) Getting albums' cancel note - the phone's ✕, the Mac's Cancel and Leave - and
         // where Sign in keeps the sign-in: each written for its device, so both are named in theMacsWordsDiffer's own
 

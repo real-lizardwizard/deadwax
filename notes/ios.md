@@ -22193,3 +22193,301 @@ All 41 caught - the 13 above, the review's 7 and 21 for the fixes:
   the folder tabs' marks; a box's legend cut in its middle for a long name.
 - Whether ViewThatFits picks the one-line button exactly where it fits, at each size (the measures here are the
   bundled faces' advances, kerning aside).
+
+## Last.fm, slice A2 (2026-11-26)
+
+Last.fm's second app slice, **A2** of ~/Desktop/Code/deadwax-plans/lastfm.md (2.5's `similar` and `top_albums`, 3.1,
+3.3's order menu, 3.4, 3.6-3.8, section 4's A2, checks 490-493): **Similar Artists** under an artist's albums and the
+albums' **Most played** order, on the iPhone and the Mac alike. The server's half is S4, main's **2.1.43** (notes/lastfm.md
+"S4"), already on this branch: the same `GET /deadwax/lastfm/artist`, its answer carrying both, so nothing new is asked.
+Not in it: Start Radio and Autoplay (A3), About (A4). What it leaves alone:
+- src/ and ui/ are untouched; the app is still 0.13 (13); **ios/Deadwax.xcodeproj is untouched** (the three new App files
+  in the synchronized folder, the Core files and tests found by folder). Core's `DeadwaxClient` and `Routes` are
+  untouched too: the answer decodes from the route A1 calls (the route count stays 111).
+- **The engine files have no diff**, nor does anything of DeadwaxAudio's. Nothing plays differently.
+- Of Routes.swift only the one case and its line in `appRoutes`; nothing of Edit album's, Needs a look's or Manage's
+  (R11's).
+
+### James's decision (26 Nov): "Your most played"
+
+The Mac artist page's songs section under the discography (MostPlayedSongs - the songs of theirs YOU have played most,
+by Navidrome's counts) was "Most played"; A2's menu brings an albums order called "Most played" (Last.fm's plays,
+everyone's). Two "Most played"s on one page, meaning different things, is the confusion James ruled out: the songs
+section is **"Your most played"** everywhere it is shown or spoken (`ArtistPageFacts.Words.yourMostPlayed`, replacing
+`.mostPlayed`; docs/ios.md's mentions, check 560 included), and the menu keeps the plan's words - **"Sort albums"** its
+label, **"Newest first" | "Most played"** its orders (`LastfmWords.sortAlbums`, `.newestFirst`, `.mostPlayed`). Each
+lives once, in Core's words.
+
+### What was built
+
+**Core (pure, tested on Linux and macOS):**
+- `Lastfm.swift`: `LastfmArtist.similar` and `.topAlbums`, read as loosely as the rest (`looseList`: absent, null or
+  not a list is nil, `[]` none listed). `LastfmSimilarArtist` (src/lastfm.py `_similar_entry`): a name needed (one
+  missing or blank is dropped), the `mbid` only of MusicBrainz's shape (`MBID.of`, so trimmed and lowercased), `match`
+  only 0-1 (lastfm.py `similarity`), `url` only Last.fm's (`LastfmLink`). `LastfmAlbum` (lastfm.py `top_albums`): a
+  title, a count (never negative - `LastfmArtist.count`) and its kind, `Counted` - `plays` or `listeners`, lastfm.py
+  COUNTED's two; an album missing any, or of a kind this app doesn't know, is dropped.
+- `AlbumPlays.swift` (new): `AlbumOrder` (`newest`, `played`; UserDefaults `deadwax-artist-album-order`, read with care -
+  anything but `played` is newest); `counted` (the answer's albums of the FIRST album's kind - plays are never set beside
+  listeners - nil for none); `offered`; `of` (each row's plays by its key: an album of yours by Last.fm's `mbid` equal to
+  the album's `musicBrainzId`, a release's, else by `Fold.key` of its title; one of theirs by its group's folded title,
+  since Last.fm's ids are releases', not groups'; several on one row give the LARGEST, never a sum; 0 is none);
+  `ordered` (the rows with plays first, most first, ties and the rest in the order given - newest first - none added,
+  none dropped); `Shown` (the rows, the order drawn, each row's plays in words, and `line`: "4.1M plays · 2015 · in
+  your library" - led by them since the review, and `lines`); `shown`; `Made` (made once per input - the page is drawn
+  again as each album's songs land); `Visit` (which albums the visit orders by: `drawn` judges once, `reopen` for a
+  pull, `chose` for the menu, `offers`); `LastfmVisit` (since the review: the visit's events - see "After review").
+- `SimilarArtists.swift` (new): `shown` 12, `seeAllPast` 4, `gridMin` 112; `Tile` (`opens` - `.artist(Artist)` or
+  `.musicBrainz(mbid:name:)` - its name, id `artist:<id>` or `mb:<mbid>`, `yours`, `line` "Not in your library" for
+  theirs, `spoken` "GUM, Not in your library", `coverArt` only for yours); `Library` (the library's artists by
+  MusicBrainz id and by folded name, made once per list); `tiles` - Last.fm's order, yours by id else by EXACTLY ONE
+  folded name where one side has no id (since the review), theirs only with an mbid, never the page's own (Navidrome's id, and its mbid), each once, 12 at most,
+  with no library in hand every tile theirs; `drawsTiles` (the list answered or failed, or `SearchPacing.ownedWaitMs`,
+  1.5 s, waited); `listed` (enabled, with similar artists); `seesAll` (past four).
+- `LastfmWords.swift`: `similarArtists`, `sortAlbums`, `newestFirst`, `mostPlayed`, and `plays(_:counted:)` - "1 play",
+  "4.1M plays", "1 listener", "4.1M listeners", rounded down as the listeners line is (`short`).
+- `ArtistPageFacts.swift`: `Words.yourMostPlayed`; `MostPlayed.swift` and its tests: docs only (the name).
+
+**App:**
+- `Models/ArtistsModel.swift`: `albumOrder` (the device's, written on every change, read where it's kept);
+  `similarLibrary()` (made once per list serial, dropped in `reset()`); `listKnown` (a list or a failure).
+- `Models/ArtistPageModel.swift`: `visit` (since the review the arrival's `LastfmVisit`) and
+  `albumsShown(_:chosen:page:kept:albums:)`. The visit is judged where the
+  albums are first drawn - the arrival's wait released (`wait`), the answer landing inside it, the ask that can't be made
+  (off, offline, no client), or at once in `beginLastfm` when the session's kept answer means no wait - again after a
+  pull (`reopen`, only for an ask a pull made), and at once by `choseMostPlayed()`. Before the model's arrival has begun
+  for the page (the first frame), `visitAlbums` takes the session's kept answer, so a page drawn from it is in Most
+  played order from its first frame.
+- `Artist/AlbumOrderMenu.swift` (new): `AlbumOrderChoice` (the order drawn, offered, its room, the choice; `none`);
+  `AlbumOrderItems`, the one inline Picker both devices put in their menus (since the review two Toggle items); the phone's `AlbumOrderMenu` - a Menu whose
+  label is `arrow.up.arrow.down` in DWButtonStyle's small (flat: the accent, no face, a 44 target), "Sort albums" to
+  VoiceOver with the order drawn as its value; `albumOrderRoom` - the menu while Most played is offered, the same
+  hidden, disabled and hidden from VoiceOver while only its room is held, else nothing.
+- `Artist/SimilarArtistsSection.swift` (new): `SimilarShown` (listed, drawn, tiles; `shows`, `seesAll`); `Tile.route`
+  (yours `.artist(ArtistRoute(artist))`, theirs `.mbArtist(MBArtistRoute(mbid:name:))` - the MusicBrainz artist page,
+  where Get is); the phone's section - ArtistSectionHead with See All past four, one horizontal row of tiles run out to
+  the screen's edges (the page's 16 inside it), its room held blank until the tiles are drawn, `LastfmCredit` under it;
+  `SimilarArtistTile`, shared with the Mac - ArtistPicture round (the person glyph with no id), the name and line each
+  `lineLimit(lines, reservesSpace: true)` (1, 3 at the accessibility sizes), dimmed and disabled offline for one of
+  theirs, `.help(name)`, one VoiceOver element (its label `spoken`, the button trait unless dimmed, its action).
+- `Artist/SimilarArtistsScreen.swift` (new): See All, `.similarArtists(ArtistRoute)` - the adaptive grid
+  (`GridItem(.adaptive(minimum: side))`, `side` a ScaledMetric of 112) and the credit, drawn `.readableOnMac()` by
+  Routes.swift; like TopSongsScreen it reads the artist page's model under it when there is one, else asks as the page
+  asks (its own load, Last.fm with `retryFailed`, the library's artists, the 1.5 s wait), its failures said as the
+  page says them.
+- `Artist/ArtistView.swift`: the albums drawn from `shown` (the menu's order only while Last.fm is on - `.newest`
+  otherwise, the stored choice kept), each line through `shown.line`; the menu at the Albums heading's end; Similar
+  Artists after the albums and a late Top Songs; a `.task(id:)` asking for the library's artists while Similar Artists is
+  listed and none are in hand; `ArtistDesk` gains `plays`, `albumOrder`, `similar`, `openSimilar` and `seeAllSimilar`,
+  its `rows` the order drawn.
+- `Mac/Artist/MacArtistPage.swift`: the Albums heading's end a `DWPopUp` showing the order drawn, `AlbumOrderItems` in
+  it, `.help` and VoiceOver "Sort albums"; in Most played order each row's plays at the end of In your library
+  (`layoutPriority(1)`, `.help`) and last in what VoiceOver reads of the row; "Your most played"; Similar Artists at the
+  page's foot - the phone's tiles in the Mac's faces (`MacSimilarDrawn`: 16 between, the window's text semibold, the
+  small text), side 112, one row a trackpad scrolls sideways, See All, the credit. `sectionHead` takes a trailing view.
+- Routes: `.similarArtists(ArtistRoute)` in Routes.swift (and `appRoutes`), MacRoutes and MacArtist's pages.
+
+### Decisions, and where this departs from the plan
+
+- **The order is judged once per visit** (`AlbumPlays.Visit`): an answer later than the page's 0.8 s wait leaves the
+  albums newest first for the visit - Most played stored or not - and the menu ticks what is drawn (Newest first); the
+  stored choice isn't changed. Choosing Most played then orders them at once (the person asked them to move); a pull
+  judges the next answer. The plan's rule was only "never re-sort under a finger"; this is its reading.
+- **The menu's room is held** (hidden, inert) while Most played isn't offered but the hero's line is drawn - an answer
+  may yet bring albums by plays - so the heading's end doesn't change as it comes. With Last.fm off there's no menu and
+  no room.
+- **The phone's menu is the glyph**, a flat small button; **the Mac's is a pop-up showing the order** ("Newest first"),
+  as a Mac pop-up shows its value. The same items (`AlbumOrderItems`) in both.
+- **Plays never sum, and never mix**: "Currents" and "Currents (B-Sides)" (one row, `Fold.key` dropping the aside) give
+  the larger; a list's kind is its first album's, and an album of the other kind is left out.
+- **Theirs (MusicBrainz's rows) match by title only**: Last.fm's ids are releases', a MusicBrainz row is a release group.
+- **A similar artist with two library artists of their folded name is no match** ("Low" and "LOW"): drawn as theirs
+  (if Last.fm has an id), never guessed at. **One without an id who isn't yours is left out**: it has nowhere to open.
+- **Theirs get no picture looked up**: the person glyph, as the plan says - no Wikidata or TheAudioDB ask per tile.
+- **The tiles wait for the library's artists** (asked if not in hand) for 1.5 s at most - from the ask, since the
+  review - the row's room held blank, so
+  a tile of yours isn't drawn as theirs only to change; a failed list draws every tile as theirs.
+- **On the Mac, Similar Artists is the page's last section**, after Your most played: that list is about these albums,
+  Similar Artists leads away from the artist - as on the phone, where it is last too.
+- **On the Mac the plays sit in the In your library cell**, not a column of their own (a column only Most played order
+  fills would be empty most of the time). They fit at 660; at the narrowest page (589, beside the side panel) the cell's
+  format gives way first, the plays carried in full by `.help` and VoiceOver.
+- **Tile sizes**: the phone's a ScaledMetric of 112 relative to footnote ("Not in your library" measures 106.9 at 13 pt -
+  it fits), so it grows with the text - never past the page (since the review); the Mac's a fixed 112 (the Mac's faces are the drawings' fixed sizes,
+  Typeface.Mac), which puts four in view at the 589 page.
+- **No right-click on a tile**: a tile has no •••, and on the Mac right-click is exactly the ••• items.
+
+### Words changed (iphone.json and mac.json, by hand, the same eight in each)
+
+Added: `LastfmWords.similarArtists` "Similar Artists", `LastfmWords.sortAlbums` "Sort albums",
+`LastfmWords.newestFirst` "Newest first", `LastfmWords.mostPlayed` "Most played", `LastfmWords.plays(1)` "1 play",
+`LastfmWords.plays(4123456)` "4.1M plays", `LastfmWords.plays(4123456, listeners)` "4.1M listeners",
+`ArtistPageFacts.yourMostPlayed` "Your most played". `ArtistPageFacts.Words.mostPlayed` is gone from the code (it had no
+key in either snapshot). DeviceWordsTests adds the eight.
+
+### Tests, and the faults they were seen failing on
+
+- Swift: **AlbumPlaysTests** (new, 10) - a row's plays by release else title, the largest never a sum, one kind and
+  none for nothing, Most played's order with ties newest first, Studio only still applying, Newest first the page's own,
+  the words, the stored order read with care, the visit judged once, and the recorded albums (Fixtures/lastfm/answers)
+  ordering a page; **SimilarArtistsTests** (new, 8) - yours by id else the one name, two of one name no match, theirs
+  without an id left out, yours opening their page, each once and never the page's own and twelve at most, no library
+  every tile theirs, when tiles draw and See All, and the recorded similar artists met with a library;
+  **LastfmDecodeTests** - 2.5's sample's `similar` and `top_albums`, `similarAndAlbumsReadLeniently`, and the route's
+  recorded answers whole (thirty and fifty, the two without ids, none where there's nothing); **DeviceWordsTests** the
+  eight keys.
+- Python: **tests/test_ios_lastfm_a2.py** (new, 13) - the order the device's, written where it's read; Most played
+  offered only with albums by plays, its room held; the rows the order drawn with their plays; the visit judged as the
+  albums are first drawn; a tile's route; a tile one element with no right-click; See All pushing the grid past four;
+  Similar Artists under the albums on both; the phone's pieces flat and round; tokens and Core's words only; what the Mac
+  reaches at the Mac's sizes; a tile growing with the text; the Mac's "Your most played". **test_ios_contract.py**:
+  LastfmArtist's fields with `similar` and `top_albums` (the `later` set gone), LastfmSimilarArtist's and LastfmAlbum's
+  fields exactly the route's, `Counted` lastfm.py's COUNTED, every exported answer's artists and albums decoded.
+  test_ios_mac.py (`similarArtists` readable), test_ios_mac_reach.py (31 routes, `similarArtists` in PHONES_PAGES),
+  test_ios_phone_look.py (A2's pages in SLICES, beside R11's), test_ios_artist_look.py (its five literals for the new
+  calls), test_ios_artist_discography.py (the albums list's call and its rows' lines, now through `shown`).
+- Faults, each applied alone, its tests run, then restored (each file `cmp`'d against its copy) - every one caught:
+  - Similar matched by name when two library artists share it: `twoWhoShareTheFoldedNameAreNoMatch`.
+  - Theirs without an mbid drawn: `theirsWithoutAnIdIsLeftOut` and four more.
+  - Yours opening the MusicBrainz page (the App's route switch): `test_a_tile_opens_their_page_or_their_musicbrainz_page`.
+  - A sum for several albums on a row: `severalOnOneRowGiveTheLargestNeverASum`, `theRecordedAlbumsOrderAPage`.
+  - Ties out of newest-first order: `mostPlayedFirstTiesAndTheRestNewestFirst`.
+  - Studio only ignored (the memo made without the rows): `studioOnlyStillApplies`.
+  - A late answer re-sorting a drawn page - in Core (`drawn` without its guard): `theVisitIsJudgedOnce`; in the App
+    (`chose` for `drawn` in the completion and the wait): `test_the_visit_is_judged_as_the_albums_are_first_drawn`.
+  - An unknown stored order read as Most played: `theOrderIsReadWithCare`.
+  - The flat rule (`.background(DWPalette.card)` on the tile's face): `test_the_phones_pieces_are_flat_and_round`.
+  - The menu's choice not stored (`didSet` writing nothing): `test_the_order_is_the_devices_written_where_it_is_read`.
+  - A tile of theirs opening `.artist`, and the phone row's tap emptied: `test_a_tile_opens…`.
+  - See All pushing `.topSongs`: `test_see_all_pushes_the_grid_past_four`.
+
+### After review (2026-11-26)
+
+A2's review found eight faults and five nits. Each fix is in the same one commit (still on d18c45a2, as before).
+
+1. **On the phone, Most played's plays were cut off the end of the row.** A row's line is one line
+   (LibraryListRow's `.lineLimit(lines)`), and a 375-point phone leaves it about 271 points at the default size: 375,
+   less the page's 2 x 16, the 44 cover, the text's 2 x 10 and the chevron. With the plays last, "2012 · in the
+   collection · 2 pressings · 65M plays" outgrew that at the default size, and nearly every row did at xxxLarge.
+   **The plays now lead the line** ("4.1M plays · 2015 · in your library", `Shown.line`), so only a line's tail is
+   ever cut. **At the accessibility sizes a row with plays takes two lines** (`Shown.lines(_:accessibility:)`, through
+   LibraryListRow's own `lines`; LibraryTiles is untouched): at AX5 even "9.9M listeners" outgrows a line.
+   `test_most_played_plays_are_never_the_part_cut` measures with ios_fonts' Libre Franklin at footnote's 13, 19, 33
+   and 44 points, using the reviewed worst lines and the widest words `LastfmWords.plays` makes:
+   - at 13 and 19 the plays and an ellipsis fit one line;
+   - at AX3 the plays fit the first of the two lines whole;
+   - at AX5 each word and an ellipsis fits a line;
+   - in the old order, the worst lines' plays fall past the room at all three of the first sizes.
+   The widest words are "999M listeners" and its kin: `short` gives a decimal only under 10 of a unit, so 65.3M is
+   "65M", never "65.3M". On the Mac the plays stay at the end of In your library, kept whole by `layoutPriority`.
+2. **The name fallback ignored a conflicting id.** A similar artist Last.fm has one MusicBrainz id for, and an artist
+   of yours with another id and the same name, were matched by name. Now **a name matches only where one side has no
+   id**: two ids that differ are two artists, whatever their names (`Library.match`). This corrects lastfm.md 3.4's
+   wording ("by MusicBrainz id, else by folded name"), which read as though the name settles it whenever the ids
+   don't agree. Tests: `idsThatDifferAreTwoArtistsWhateverTheName` (Nirvana, the US band and the UK one) and
+   `byNameOnlyWhereOneSideHasNoId` (theirs without an id, and yours without one).
+3. **Similar Artists' 1.5 s wait began when the page opened** (R6's `ownedWaited`, which counts from `.task`'s start).
+   So a list Last.fm brought late found the wait long over, and tiles of yours could be drawn as theirs and then
+   change. Now the tiles have **their own wait (`similarWaited`), begun in the same task that asks for the library's
+   artists**: an `async let` ask, the 1.5 s from that moment, and the task waits for the ask too. With nothing to ask
+   (the list in hand, or deadwax out of reach) there is no wait. See All's page does the same in one task (its
+   separate timer is gone).
+4. **`AlbumPlays.Made` compares the visit's albums**: `theListIsMadeAgainForTheVisitsAlbums` (the same rows and choice,
+   new albums, a new order).
+5. **`Visit.reopen` keeps the albums in hand** until the pull's answer judges them: `aPullKeepsTheAlbumsInHandUntilItsAnswer`.
+6. **Whether Most played was offered and which order was drawn read different answers.** Offered read the model's
+   answer, while the order drawn read the visit's albums. A later answer missing `top_albums` hid the menu while the
+   rows stayed in Most played order. Two fixes:
+   - **An answer is kept part by part** (`LastfmArtist.keeping(_:)`): a later answer's missing part never replaces one
+     in hand. The model keeps the merged answer, and so does the session's Kept.
+   - **Offered reads what the order reads**: `Visit.offers` (the visit's albums, else the answer in hand's), through
+     `ArtistPageModel.albumsOffered(page:kept:)`. Before the page is begun it reads the session's kept answer, as
+     `visitAlbums` does.
+   Tests: `mostPlayedIsOfferedWhileTheRowsAreInItsOrder`, `aLaterAnswersMissingPartsNeverTakeAwayWhatIsDrawn` and
+   `anAnswerIsKeptPartByPart`.
+7. **At AX5 a tile was wider than the page**: the ScaledMetric of 112 grows to about 379, and the phone's page is 343.
+   Each place a tile is drawn measures its width (`onGeometryChange`: the row's section, and See All's grid inside its
+   sides), and the side is `SimilarArtists.side(scaled, page:)`, the smaller of the two. It still grows with the text,
+   so at AX5 the grid is one column. Tests: `aTileNeverOutgrowsThePage` and `test_a_tile_is_never_wider_than_the_page`.
+8. **"Newest first" couldn't be chosen while a visit was drawn Newest first with Most played stored.** A Picker never
+   sets the value it already shows, so the next artist opened in Most played anyway. **The items are two Toggles** (a
+   menu's checkmark items, the drawn one ticked), and every tap chooses its own order, the ticked one's too. The pin
+   is `AlbumOrderItems`' whole body, with no Picker left in the file.
+
+**The nits:**
+- **Fold keys are `FoldKey`** (UTF-16 units, as the rest of Core compares them) in `SimilarArtists.Library` and
+  `AlbumPlays.of`. After Fold's NFKD the difference from String's comparison can't be observed with real names, so
+  the rule is pinned by source.
+- **A dimmed tile of theirs says why it does nothing**: its VoiceOver value is "Opens once deadwax is back"
+  (`LastfmWords.opensOnceBack`, a new key in both iphone.json and mac.json, by hand; DeviceWordsTests adds it).
+- **Two artists of yours with one id: the first wins**, as `ArtistJoin.claimed` keeps the first by release id
+  (`twoLibraryArtistsWithOneIdGiveTheFirst`).
+- **The visit's timing is Core's**: `LastfmVisit` takes A1's arrival and the albums' `Visit` together, event by event
+  - begun, unasked, asking(pulled:), answered, waited, chose - and ArtistPageModel only reports each event where it
+  happens. Its behaviour is tested: `anAnswerInsideTheWaitOrdersTheAlbums`, `anAnswerAfterTheWaitLeavesThemNewestFirst`,
+  `onlyAPullJudgesAgain` and `aKeptAnswerOrNoAskDrawsTheAlbumsAtOnce`.
+- The other nits' mutations are below, each now caught.
+
+**Tests now:** AlbumPlaysTests 19 (was 10), SimilarArtistsTests 12 (was 8), tests/test_ios_lastfm_a2.py 15 (was 13).
+test_ios_artist_look.py's rows pin takes `lines: lines`.
+
+**test_ios_contract.py's Last.fm test was slow**, found on the full suite's rerun. It took about 25 minutes, because
+A2's exported answers hold some 450 similar artists and albums, and each was checked with `fields()` read afresh
+(three reads each, every read parsing all of DeadwaxCore, about 1.1 s). Now it reads each struct once, and
+`assert_decodes` takes the read, so it runs in 9 s with the same assertions. Seen biting: LastfmAlbum's `mbid` made
+required fails it, both at the field list and, with that loosened, at the decode ("LastfmAlbum needs ['mbid']").
+
+**Each fault applied alone, its tests run, the file restored and `cmp`'d** (the Swift ones under
+AlbumPlaysTests, SimilarArtistsTests, LastfmDecodeTests and LastfmPageTests, and every one under A2's Python tests):
+- 1, the plays back at the line's end: `newestFirstIsThePagesOwnWithNothingAtTheEnds`,
+  `test_most_played_plays_are_never_the_part_cut`. One line at every size (`lines` always 1): the same two. The rows
+  not given their lines: `test_the_rows_are_the_order_drawn_with_their_plays`.
+- 2, the name matched whatever the ids: `idsThatDifferAreTwoArtistsWhateverTheName`.
+- 3, the tiles on R6's `ownedWaited`, and the wait begun after the ask rather than with it:
+  `test_similar_artists_sits_under_the_albums_on_both`.
+- 4, `Made` ignoring the visit: `theListIsMadeAgainForTheVisitsAlbums`.
+- 5, `reopen` dropping the albums: `aPullKeepsTheAlbumsInHandUntilItsAnswer`, `onlyAPullJudgesAgain`.
+- 6:
+  - `keeping` returning the later answer whole: `aLaterAnswersMissingPartsNeverTakeAwayWhatIsDrawn`,
+    `anAnswerIsKeptPartByPart`;
+  - the model storing `found` unmerged: `test_the_visit_is_judged_as_the_albums_are_first_drawn`;
+  - `offers` ignoring the visit's albums: `mostPlayedIsOfferedWhileTheRowsAreInItsOrder`;
+  - the view reading `AlbumPlays.offered(model.lastfm)`: `test_most_played_is_offered_only_with_albums_by_plays_and_its_room_held`.
+- 7, the side unclamped, in Core: `aTileNeverOutgrowsThePage`. In the row or the grid:
+  `test_a_tile_is_never_wider_than_the_page`.
+- 8, the ticked item not storing (`if order != choice.shown`): `test_the_order_is_the_devices_written_where_it_is_read`.
+- The nits:
+  - `similarLibrary()` ignoring the serial: `test_similar_artists_sits_under_the_albums_on_both`.
+  - See All's own list ask removed, and its 1.5 s timer removed: `test_see_all_pushes_the_grid_past_four`.
+  - `mbid: nil` to `tiles`: on the page, `test_similar_artists_sits_under_the_albums_on_both`; on See All,
+    `test_see_all_pushes_the_grid_past_four`.
+  - The last artist with an id winning: `twoLibraryArtistsWithOneIdGiveTheFirst`.
+  - String fold keys (the library's, the plays'): `test_similar_artists_sits_under_the_albums_on_both`.
+  - The offline VoiceOver value removed: `test_a_tile_is_one_element_with_no_right_click`.
+- The visit's timing, in Core:
+  - an answer choosing rather than drawing: `anAnswerAfterTheWaitLeavesThemNewestFirst`, `onlyAPullJudgesAgain`;
+  - the wait's end not drawing: the same two;
+  - a kept answer not drawn at once, and no ask not releasing: `aKeptAnswerOrNoAskDrawsTheAlbumsAtOnce`;
+  - every ask reopening: `onlyAPullJudgesAgain`.
+- The visit's timing, in the model: `answered` made `chose`, and every ask made a pull:
+  `test_the_visit_is_judged_as_the_albums_are_first_drawn`.
+
+All 32 were caught, and every file was restored and `cmp`'d against its copy.
+
+### Not verified - only James's phone, Ethan's and the Mac can say (490-493)
+
+- **Against a real deadwax with a real key**: the answers here are the route's own over Last.fm's recordings of
+  2026-11-25; whether the matching suits James's library (490's question) is his to see.
+- The drawing: the round tiles, the glyph, the row run out to the edges and scrolled by a finger, a trackpad's sideways
+  scroll on the Mac (491), See All's grid at each size, the menu from the glyph and the Mac's pop-up in the heading,
+  the plays in the Mac's In your library cell at 589 and 660. Nothing ran in a simulator (none is used here), and the
+  Mac smoke run was not done (James's installed app was running).
+- Whether 1.5 s for the library's artists, and A1's 0.8 s for Last.fm, are right in practice: a page whose answer comes
+  late stays newest first for the visit (492 asks whether it's in order as it first appears).
+- The choice surviving a quit (UserDefaults, 492); VoiceOver's reading of a tile and the menu's label and value; the
+  dimming offline (493).
+- (After review) The plays leading a phone row's line, and its two lines at the accessibility sizes, are measured with
+  the bundled faces, not seen (492 now asks about the largest sizes). Also unseen:
+  - a tile held to the page's width at AX5, which depends on the width `onGeometryChange` reports;
+  - the two Toggle items drawn as the menu's checkmarks, in the phone's menu and in the Mac's pop-up;
+  - VoiceOver saying "Opens once deadwax is back" on a dimmed tile.

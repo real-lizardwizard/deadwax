@@ -17,10 +17,10 @@ public enum ArtistPageFacts {
         /// in full beside it (`.help`, VoiceOver).
         public static let images = ArtistManageWords.imagesItem
         public static let moveAlbums = "Move albums\u{2026}"
-        /// The Mac's section under the discography (MostPlayedSongs): songs. (R6's review) Slice A2's albums order -
-        /// most played first, a menu at the Albums heading's end - is another thing, and needs words of its own beside
-        /// this.
-        public static let mostPlayed = "Most played"
+        /// The Mac's section under the discography (MostPlayedSongs): the songs YOU have played most. "Your most
+        /// played" since slice A2 (James, 26 Nov), so it never reads as the albums' order - "Most played" in the Albums
+        /// heading's menu (LastfmWords.mostPlayed), Last.fm's plays, everyone's.
+        public static let yourMostPlayed = "Your most played"
         /// The Mac's table's columns (Artist.dc.html's .cols): Album, Year, Songs, In your library, and the buttons'.
         public static let album = LibraryColumnWords.album
         public static let year = LibraryColumnWords.year

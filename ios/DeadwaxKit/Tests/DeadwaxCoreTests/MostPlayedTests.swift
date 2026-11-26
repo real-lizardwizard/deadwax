@@ -1,9 +1,9 @@
 import Testing
 @testable import DeadwaxCore
 
-/// An artist's most-played songs (MostPlayedSongs, the Mac artist page's Most played - slice R6): each song once across
-/// its pressings, its plays one take's (never a sum), most first with ties in album order, the never-played left out,
-/// and what a tap plays.
+/// An artist's most-played songs (MostPlayedSongs, the Mac artist page's Your most played - slice R6): each song once
+/// across its pressings, its plays one take's (never a sum), most first with ties in album order, the never-played left
+/// out, and what a tap plays.
 @Suite struct MostPlayedTests {
     static func song(_ id: String, _ title: String?, album: String, plays: Int?) -> Song {
         Song(id: id, title: title, albumId: album, playCount: plays)

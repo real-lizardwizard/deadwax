@@ -35,6 +35,8 @@ struct DrawnArtists {
 /// - The last `ArtistPage.kept` artists' answers (ARTISTS_KEPT): an artist page opened again draws at once, and while
 ///   deadwax can't be reached, from what was in hand.
 /// - (Last.fm, slice A1) Their Last.fm answers beside them (LastfmPage.Kept), and the artist pages showing, for Top Songs.
+/// - (Last.fm, slice A2) The albums' order on an artist's page, per device (AlbumOrder.storageKey), and the list as
+///   Similar Artists meets it (SimilarArtists.Library, made once per list).
 ///
 /// `reset()` - a new person - drops everything in memory, and nothing asked before it lands after it.
 @MainActor
@@ -207,6 +209,28 @@ final class ArtistsModel {
     /// The artist page showing for the artist, if one still is.
     func page(_ id: String) -> ArtistPageModel? { pages[id]?.page }
 
+    // MARK: Last.fm (slice A2 - notes/ios.md "Last.fm, slice A2")
+
+    /// (A2) The albums' order on an artist's page, kept per device (`deadwax-artist-album-order`, read with
+    /// AlbumOrder(saved:): anything but `played` is newest first).
+    var albumOrder: AlbumOrder = AlbumOrder(saved: UserDefaults.standard.string(forKey: AlbumOrder.storageKey)) {
+        didSet { UserDefaults.standard.set(albumOrder.rawValue, forKey: AlbumOrder.storageKey) }
+    }
+
+    /// (A2) The library's artists as Similar Artists meets them, made once per list - nil while no list is in hand.
+    @ObservationIgnored private var similarMade: (serial: Int, library: SimilarArtists.Library)?
+
+    func similarLibrary() -> SimilarArtists.Library? {
+        guard let list else { return nil }
+        if let made = similarMade, made.serial == serial { return made.library }
+        let library = SimilarArtists.Library(list)
+        similarMade = (serial, library)
+        return library
+    }
+
+    /// (A2) Whether the library's artists have answered (or failed) - Similar Artists' tiles wait for one or the other.
+    var listKnown: Bool { list != nil || failure != nil }
+
     // MARK: who an artist is, chosen (Phase 8, slice 5)
 
     /// Who an artist page's artist is on MusicBrainz, chosen with Which artist is this? - by the page's artist id, for
@@ -234,6 +258,7 @@ final class ArtistsModel {
         chosen = [:]
         lastfm = LastfmPage.Kept()
         pages = [:]
+        similarMade = nil
     }
 }
 

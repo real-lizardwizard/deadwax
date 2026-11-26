@@ -556,14 +556,16 @@ def optional_fields(struct: str) -> set[str]:
     return {name for name, optional in fields(struct).items() if optional}
 
 
-def assert_decodes(struct: str, answer: dict):
+def assert_decodes(struct: str, answer: dict, read: dict[str, bool] | None = None):
     """What decoding `answer` as `struct` needs: every field the Swift reads is a key the answer has (one renamed would
     read as absent, or fail), and every one it can't do without is there and not null (a null where the Swift has a
-    plain type fails the whole answer)."""
-    reads = set(fields(struct))
+    plain type fails the whole answer). `read`: the struct's `fields`, for a caller decoding many answers (each read
+    parses every DeadwaxCore file)."""
+    read = fields(struct) if read is None else read
+    reads = set(read)
     assert reads <= set(answer), f"{struct} reads {sorted(reads - set(answer))}, never sent"
     sent = {name for name, value in answer.items() if value is not None}
-    needs = required_fields(struct)
+    needs = {name for name, optional in read.items() if not optional}
     assert needs <= sent, f"{struct} needs {sorted(needs - sent)}: {answer}"
 
 
@@ -2172,8 +2174,8 @@ def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
     # (server 2.1.41, built on main beside slice A1: this FAILS on the ios branch until main is merged into it)
     # GET /deadwax/lastfm/artist, asked with only what it takes, and every answer it builds - no key, refused,
     # whole, a part late - holding what LastfmArtist and LastfmTrack read: only a track's title is needed. Since
-    # 2.1.43 the answer also carries `similar` and `top_albums`, which this app doesn't read yet (slice A2 will):
-    # a key it doesn't declare, ignored by its decoder, so the answer holds LastfmArtist's keys and those two
+    # 2.1.43 the answer also carries `similar` and `top_albums`, which the app reads since slice A2 (LastfmSimilarArtist:
+    # only a name needed; LastfmAlbum: a title, plays and what they count)
     from src import lastfm as lastfm_rules
     from src.routes import lastfm as lastfm_route
 
@@ -2190,18 +2192,29 @@ def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
     body = swift_function("DeadwaxClient.swift", "lastfmArtist")
     assert 'if let mbid = ask.mbid { query.append(("mbid", mbid)) }' in body
     assert 'if let name = ask.name { query.append(("name", name)) }' in body
-    # what the app reads
-    assert fields("LastfmArtist") == {"enabled": False, "unavailable": False, "why": True, "url": True,
-                                      "listeners": True, "top_songs": True}
-    assert fields("LastfmTrack") == {"title": False, "playcount": True, "listeners": True, "url": True}
+    # what the app reads - each struct read once: the exported answers below hold some 450 entries (A2's similar
+    # artists and albums), and a read parses every DeadwaxCore file
+    read = {struct: fields(struct) for struct in ("LastfmArtist", "LastfmTrack", "LastfmSimilarArtist", "LastfmAlbum")}
+    assert read["LastfmArtist"] == {"enabled": False, "unavailable": False, "why": True, "url": True,
+                                      "listeners": True, "top_songs": True, "similar": True, "top_albums": True}
+    assert read["LastfmTrack"] == {"title": False, "playcount": True, "listeners": True, "url": True}
+    assert read["LastfmSimilarArtist"] == {"name": False, "mbid": True, "match": True, "url": True}
+    assert read["LastfmAlbum"] == {"title": False, "mbid": True, "plays": False, "counted": False}
+    # what an album's count counts: the route's kinds, each the app's (LastfmAlbum.Counted)
+    album = swift_struct("LastfmAlbum")
+    assert re.search(r"public enum Counted: String, Sendable, Equatable, Hashable \{\s*case plays, listeners\s*\}", album)
+    assert {counted for counted, _ in lastfm_rules.COUNTED} == {"plays", "listeners"}
     # the answers the route builds
     tracks = {"artist_url": "https://www.last.fm/music/Tame+Impala",
               "top_songs": [{"title": "Let It Happen", "playcount": 12, "listeners": 3,
                              "url": "https://www.last.fm/music/Tame+Impala/_/Let+It+Happen"}]}
     info = {"url": "https://www.last.fm/music/Tame+Impala", "listeners": 2345678}
     refusal = lastfm_rules.Refused(10, "Invalid API key", 0.0)
-    similar = {"artist": "Tame Impala", "similar": []}
-    albums = {"top_albums": []}
+    similar = {"artist": "Tame Impala", "similar": [
+        {"name": "Pond", "mbid": "1b4d2f0c-5f2b-4d6e-9a59-1a5bd4f1d6e2", "match": 1.0,
+         "url": "https://www.last.fm/music/Pond"},
+        {"name": "GUM", "mbid": None, "match": None, "url": None}]}
+    albums = {"top_albums": [{"title": "Currents", "mbid": None, "plays": 4123456, "counted": "plays"}]}
     known = lastfm_rules.NotKnown
     answers = [lastfm_rules.no_key_answer(),
                lastfm_rules.artist_answer(lastfm_rules.Answer(info), lastfm_rules.Answer(tracks),
@@ -2210,16 +2223,23 @@ def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
                lastfm_rules.artist_answer(lastfm_rules.Answer(info), None, None, None, None),
                lastfm_rules.artist_answer(None, None, None, None, refusal),
                lastfm_rules.artist_answer(known(), known(), known(), known(), None)]
-    later = {"similar", "top_albums"}
     for answer in answers:
-        assert set(answer) == set(fields("LastfmArtist")) | later, answer
-        assert_decodes("LastfmArtist", answer)
+        assert set(answer) == set(read["LastfmArtist"]), answer
+        assert_decodes("LastfmArtist", answer, read["LastfmArtist"])
         for song in answer["top_songs"] or []:
-            assert set(song) == set(fields("LastfmTrack")), song
-            assert_decodes("LastfmTrack", song)
+            assert set(song) == set(read["LastfmTrack"]), song
+            assert_decodes("LastfmTrack", song, read["LastfmTrack"])
+        for artist in answer["similar"] or []:
+            assert set(artist) == set(read["LastfmSimilarArtist"]), artist
+            assert_decodes("LastfmSimilarArtist", artist, read["LastfmSimilarArtist"])
+        for album in answer["top_albums"] or []:
+            assert set(album) == set(read["LastfmAlbum"]), album
+            assert_decodes("LastfmAlbum", album, read["LastfmAlbum"])
     whole = answers[1]
     assert whole["enabled"] and not whole["unavailable"] and whole["listeners"] == 2345678
     assert whole["top_songs"][0]["title"] == "Let It Happen"
+    assert [artist["name"] for artist in whole["similar"]] == ["Pond", "GUM"]
+    assert whole["top_albums"] == [{"title": "Currents", "mbid": None, "plays": 4123456, "counted": "plays"}]
     # refused with nothing kept: not enabled, and unavailable - the app's `refused` (LastfmPage.state); no key: off
     assert not answers[3]["enabled"] and answers[3]["unavailable"]
     assert not answers[0]["enabled"] and not answers[0]["unavailable"]
@@ -2245,12 +2265,19 @@ def test_lastfms_answer_is_what_the_app_decodes(monkeypatch):
     for case in exported["cases"]:
         answer = case["answer"]
         assert case["path"] == "/deadwax/lastfm/artist" and case["status"] == 200, case["name"]
-        assert set(answer) == set(fields("LastfmArtist")) | later, case["name"]
-        assert_decodes("LastfmArtist", answer)
+        assert set(answer) == set(read["LastfmArtist"]), case["name"]
+        assert_decodes("LastfmArtist", answer, read["LastfmArtist"])
         for song in answer["top_songs"] or []:
-            assert set(song) == set(fields("LastfmTrack")), song
-            assert_decodes("LastfmTrack", song)
+            assert set(song) == set(read["LastfmTrack"]), song
+            assert_decodes("LastfmTrack", song, read["LastfmTrack"])
             assert song["url"] is None or lastfm_rules.lastfm_url(song["url"]) == song["url"]
+        for artist in answer["similar"] or []:
+            assert set(artist) == set(read["LastfmSimilarArtist"]), artist
+            assert_decodes("LastfmSimilarArtist", artist, read["LastfmSimilarArtist"])
+        for album in answer["top_albums"] or []:
+            assert set(album) == set(read["LastfmAlbum"]), album
+            assert_decodes("LastfmAlbum", album, read["LastfmAlbum"])
+            assert album["counted"] in {"plays", "listeners"}
         assert set(case["query"]) <= {"mbid", "name"} and case["query"]
         if "mbid" in case["query"]:
             assert re.fullmatch(search_musicbrainz.MBID_PATTERN, case["query"]["mbid"])

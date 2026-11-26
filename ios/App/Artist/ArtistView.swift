@@ -46,6 +46,14 @@ import SwiftUI
 /// draws at once, in place. With Last.fm off or refused nothing of it is drawn - and for whoever runs deadwax the page's
 /// foot says so, with Server settings to open its Connections.
 ///
+/// LAST.FM (slice A2 - lastfm.md 3.3, 3.4; notes/ios.md "Last.fm, slice A2"): with Last.fm on, the Albums heading's
+/// order menu - "Newest first" or "Most played", chosen per device (ArtistsModel.albumOrder), Most played offered only
+/// with albums by plays in the answer - its rows in Most played order each line led by "4.1M plays · ", judged once for
+/// the visit as the albums are first drawn (Core's LastfmVisit: an answer later than that leaves them newest first, a
+/// pull takes the next); and Similar Artists under the albums (SimilarArtistsSection): Last.fm's similar artists met with
+/// the library's (asked if they aren't in hand), round tiles in a row, See All past four. The Mac's page draws both from
+/// the desk.
+///
 /// THE REDESIGN (slice R6 - notes/ios.md "The redesign, slice R6: an artist"; iArtist.dc.html, Artist.dc.html): on the
 /// phone flat, as iArtist draws it - the top as R1c drew it (the round picture beside the name) with who they are on
 /// MusicBrainz under the name ("Group · Sydney · since 1973", MBArtistPage.factsLine) and the listeners; Play and
@@ -74,6 +82,10 @@ struct ArtistView<Desk: View>: View {
     @State private var nameInBar = false
     /// The page has waited `SearchPacing.ownedWaitMs` for `/library/owned`: MusicBrainz's rows are drawn with what it has.
     @State private var ownedWaited = false
+    /// (A2's review) Similar Artists' tiles have waited `SearchPacing.ownedWaitMs` since the library's artists were asked
+    /// for (or there was nothing to ask): drawn with what is in hand. Its own wait, begun with the ask - R6's
+    /// `ownedWaited` begins as the page opens, long before Similar Artists is listed.
+    @State private var similarWaited = false
     /// (Phase 8, slice 5) The artist tools: the library's names for them and deadwax's word on each, and the sheet open.
     @State private var tools = ArtistToolsModel()
     @State private var toolSheet: ArtistToolSheet?
@@ -143,13 +155,21 @@ struct ArtistView<Desk: View>: View {
         let lastfm = LastfmPage.shown(state: LastfmPage.state(me: server.access.lastfm, answer: model.lastfm),
                                       online: online, answer: model.lastfm, seesDetail: server.access.seesDetail,
                                       reserved: model.lineKept(page: taskKey))
-        let arrival = model.arrival(page: taskKey, state: server.access.lastfm, online: online,
-                                    kept: artists.keptLastfm(route.id))
+        let kept = artists.keptLastfm(route.id)
+        let arrival = model.arrival(page: taskKey, state: server.access.lastfm, online: online, kept: kept)
         let factsAsked = ArtistPageFacts.holdsFacts(mbid: mbid, online: online, facts: model.facts)
+        // (Last.fm, slice A2) the albums in the order the menu has drawn, its menu, and Similar Artists
+        let order = albumOrder(lastfm, kept: kept)
+        let shown = model.albumsShown(rows, chosen: lastfmOn ? artists.albumOrder : .newest, page: taskKey, kept: kept,
+                                      albums: albums)
+        let choice = AlbumOrderChoice(shown: shown.order, offered: order.offered, room: order.room,
+                                      choose: { (chosen: AlbumOrder) -> Void in chooseOrder(chosen) })
+        let similar = similarShown()
         Group {
             if let desk, Platform.mac {
-                desk(artistDesk(rows: rows, albums: albums, mine: mine, managing: managing, offered: offered,
-                                lastfm: lastfm, arrival: arrival, online: online, personal: personal))
+                desk(artistDesk(rows: rows, shown: shown, choice: choice, similar: similar, albums: albums, mine: mine,
+                                managing: managing, offered: offered, lastfm: lastfm, arrival: arrival, online: online,
+                                personal: personal))
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -176,9 +196,11 @@ struct ArtistView<Desk: View>: View {
                                 let top = lastfm.topSongs ? topRows(mine, online: online) : []
                                 if !top.isEmpty && arrival.place == .inPlace { topSongs(top) }
                                 strip(managing, offered, online: online)
-                                albumsList(rows, albums: albums, online: online, personal: personal)
+                                albumsList(shown, choice: choice, albums: albums, online: online, personal: personal)
                                 // an answer that came once the albums were drawn: after them, for the page's life
                                 if !top.isEmpty && arrival.place != .inPlace { topSongs(top) }
+                                // (A2) Similar Artists, under the albums (and a late Top Songs)
+                                if similar.shows { similarArtists(similar) }
                             }
                             if let foot = lastfm.foot { lastfmFoot(foot) }
                         }
@@ -242,6 +264,20 @@ struct ArtistView<Desk: View>: View {
         // (Last.fm) asked once their answer is in hand, for who they are now; the page shown is the one its Top Songs
         // page reads
         .task(id: lastfmKey) { askLastfm() }
+        // (Last.fm, slice A2) the library's artists, to meet Similar Artists with - asked if they aren't in hand, the
+        // tiles' own wait begun with the ask (A2's review); with nothing to ask (in hand, or deadwax out of reach) none
+        .task(id: "\(taskKey)|\(similarListed)|\(reachability.online)") {
+            guard similarListed else { return }
+            guard reachability.online, artists.list == nil else {
+                similarWaited = true
+                return
+            }
+            let artists = self.artists
+            async let asked: Void = artists.ask()
+            try? await Task.sleep(nanoseconds: UInt64(SearchPacing.ownedWaitMs) * 1_000_000)
+            if !Task.isCancelled { similarWaited = true }
+            await asked
+        }
         .onAppear { artists.showing(model) }
         .pullToRefresh {
             // deadwax out of reach: a pull asks whether it is back (the banner says why nothing changes)
@@ -358,6 +394,45 @@ struct ArtistView<Desk: View>: View {
     private func topSongs(_ rows: [TopSongs.Row]) -> some View {
         TopSongsSection(rows: rows, route: route, name: model.name, mbid: mbid, credit: model.lastfm?.url,
                         opener: model.opener)
+    }
+
+    // MARK: Last.fm (slice A2)
+
+    /// (A2) Last.fm is on for the page (LastfmPage.state - /me's word, or the answer's that it isn't enabled): the
+    /// albums' order and Similar Artists only then.
+    private var lastfmOn: Bool { LastfmPage.state(me: server.access.lastfm, answer: model.lastfm) == .on }
+
+    /// (A2) Whether the menu offers Most played - read as the order drawn is (ArtistPageModel.albumsOffered, A2's
+    /// review: the visit's albums, or the answer in hand's) - and, with it not, whether its room is held: the hero's
+    /// line drawn, so an answer may yet bring it.
+    private func albumOrder(_ lastfm: LastfmPage.Shown, kept: LastfmPage.Kept.Entry?) -> (offered: Bool, room: Bool) {
+        let offered = lastfmOn && model.albumsOffered(page: taskKey, kept: kept)
+        return (offered, !offered && lastfm.heroLine)
+    }
+
+    /// (A2) A choice in the menu, in the tap: kept per device (ArtistsModel.albumOrder) - Most played ordering the rows
+    /// by the answer in hand at once (ArtistPageModel.choseMostPlayed).
+    private func chooseOrder(_ order: AlbumOrder) {
+        artists.albumOrder = order
+        if order == .played { model.choseMostPlayed() }
+    }
+
+    /// (A2) Similar Artists is Last.fm's to list: on, with similar artists in its answer.
+    private var similarListed: Bool { lastfmOn && SimilarArtists.listed(model.lastfm) }
+
+    /// (A2) Similar Artists as drawn: Core's tiles, met with the library's artists (asked if they aren't in hand) - drawn
+    /// once those have answered or failed, or the page has waited for them since they were asked (`similarWaited`).
+    private func similarShown() -> SimilarShown {
+        guard similarListed else { return .none }
+        return SimilarShown(listed: true,
+                            drawn: SimilarArtists.drawsTiles(listKnown: artists.listKnown, waited: similarWaited),
+                            tiles: SimilarArtists.tiles(model.lastfm?.similar, library: artists.similarLibrary(),
+                                                        page: route.id, mbid: mbid))
+    }
+
+    /// (A2) The phone's Similar Artists: the heading with See All, the row of tiles, the credit.
+    private func similarArtists(_ shown: SimilarShown) -> some View {
+        SimilarArtistsSection(shown: shown, route: route, credit: model.lastfm?.url)
     }
 
     /// The foot line, for whoever runs deadwax while Last.fm is off or refused - and Server settings, to its Connections,
@@ -569,20 +644,27 @@ struct ArtistView<Desk: View>: View {
     /// holds with the chevron too, theirs nobody holds with Get (ArtistPageFacts.offersGet) - which opens the album you
     /// don't have, as the row's tap does.
     @ViewBuilder
-    private func albumsList(_ rows: [ArtistJoin.Row], albums: [Album], online: Bool, personal: Bool) -> some View {
+    private func albumsList(_ shown: AlbumPlays.Shown, choice: AlbumOrderChoice, albums: [Album], online: Bool,
+                            personal: Bool) -> some View {
+        // (A2) the rows in the order drawn - Most played's each line led by its plays, two lines at the accessibility
+        // sizes, so the number they are sorted by is never the part cut (A2's review)
+        let rows = shown.rows
+        let accessibility = typeSize.isAccessibilitySize
         // offline the page is your albums alone: nothing of MusicBrainz's is drawn, said or asked
         let theirs = online ? model.discography : nil
         if !rows.isEmpty || theirs != nil {
-            albumsHead(ArtistPageFacts.counts(rows, personal: personal))
+            albumsHead(ArtistPageFacts.counts(rows, personal: personal), choice: choice)
             ForEach(rows) { (row: ArtistJoin.Row) in
                 switch row {
                 case .yours(let mine):
-                    ArtistAlbumRow(row: mine, line: ArtistPage.line(mine, personal: personal),
+                    ArtistAlbumRow(row: mine, line: shown.line(row, ArtistPage.line(mine, personal: personal)),
+                                   lines: shown.lines(row, accessibility: accessibility),
                                    dimmed: !online && !downloads.album(id: mine.albumId).hasSongsHere) {
                         open(mine, albums: albums)
                     }
                 case .theirs(let other):
-                    ArtistTheirRow(row: other, line: MBArtistPage.line(other, personal: personal),
+                    ArtistTheirRow(row: other, line: shown.line(row, MBArtistPage.line(other, personal: personal)),
+                                   lines: shown.lines(row, accessibility: accessibility),
                                    get: ArtistPageFacts.offersGet(other, mayGet: server.access.can(.request)),
                                    busy: theirs?.opening == other.key) {
                         theirs?.open(other, client: server.client, online: reachability.online, navigation: navigation)
@@ -597,11 +679,14 @@ struct ArtistView<Desk: View>: View {
     }
 
     /// (R6, iArtist's .row.grp) "Albums", and their count at its end in the readout face - "16 · 6 yours" - laid out
-    /// whatever it says, so the heading is one height before who they are is known and after.
-    private func albumsHead(_ counts: ArtistPageFacts.Counts) -> some View {
+    /// whatever it says, so the heading is one height before who they are is known and after; (A2) and at its end the
+    /// order menu (AlbumOrderMenu), its room held while Last.fm's answer may yet offer Most played.
+    private func albumsHead(_ counts: ArtistPageFacts.Counts, choice: AlbumOrderChoice) -> some View {
         ArtistSectionHead(words: ArtistWords.albumsHeading, count: ArtistPageFacts.heading(counts),
-                          spoken: ArtistPageFacts.headingSpoken(counts))
-            .padding(.top, 4)
+                          spoken: ArtistPageFacts.headingSpoken(counts)) {
+            AlbumOrderMenu(choice: choice)
+        }
+        .padding(.top, 4)
     }
 
     /// Under the rows, MusicBrainz's word, once (ArtistTheirFoot) - its Try again asking their albums again.
@@ -625,7 +710,8 @@ struct ArtistView<Desk: View>: View {
 
     /// What the Mac's page is handed (ArtistDesk): this page's model, its rows, what it draws of Last.fm, the managers'
     /// tools, and its own calls - so MacArtistPage asks and plays nothing this page doesn't.
-    private func artistDesk(rows: [ArtistJoin.Row], albums: [Album], mine: [ArtistPage.Row], managing: ArtistManaged,
+    private func artistDesk(rows: [ArtistJoin.Row], shown: AlbumPlays.Shown, choice: AlbumOrderChoice,
+                            similar: SimilarShown, albums: [Album], mine: [ArtistPage.Row], managing: ArtistManaged,
                             offered: ArtistManage.Offered, lastfm: LastfmPage.Shown, arrival: LastfmPage.Arrival,
                             online: Bool, personal: Bool) -> ArtistDesk {
         let order = ArtistPage.playOrder(mine)
@@ -633,11 +719,11 @@ struct ArtistView<Desk: View>: View {
         let theirs = online ? model.discography : nil
         return ArtistDesk(
             model: model, route: route, mbid: mbid, byChoice: byChoice, online: online, personal: personal,
-            mayGet: server.access.can(.request), rows: rows,
+            mayGet: server.access.can(.request), rows: shown.rows, plays: shown.plays, albumOrder: choice,
             theirs: theirs, holding: !ArtistJoin.drawsTheirs(online: online, indexKnown: search.ownedIndex != nil,
                                                               waited: ownedWaited),
             lastfm: lastfm, arrival: arrival,
-            top: lastfm.topSongs && !arrival.holding ? topRows(mine, online: online) : [],
+            top: lastfm.topSongs && !arrival.holding ? topRows(mine, online: online) : [], similar: similar,
             mostPlayed: mostPlayed(mine, online: online),
             songs: albums.reduce(0) { (count: Int, album: Album) -> Int in count + max(album.songCount ?? 0, 0) },
             playable: online ? model.asks.playable : !offlineAlbums.isEmpty,
@@ -657,7 +743,9 @@ struct ArtistView<Desk: View>: View {
             tool: { (kind: ArtistToolSheet.Kind) -> Void in toolSheet = ArtistToolSheet(kind: kind) },
             tryAgain: { model.again(client: server.client) },
             theirsAgain: { model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true) },
-            reload: { reload() })
+            reload: { reload() },
+            openSimilar: { (tile: SimilarArtists.Tile) -> Void in navigation.open(tile.route) },
+            seeAllSimilar: { navigation.open(.similarArtists(route)) })
     }
 
     /// (R6, the Mac's Top Songs) A top song you have, in the tap: every top song you have that plays now, in Last.fm's
@@ -730,8 +818,11 @@ struct ArtistDesk {
     let personal: Bool
     /// (R6's review) The person may get albums (the request permission): Get, and "10 more to get", only then.
     let mayGet: Bool
-    /// The discography: your albums and theirs among them (ArtistJoin.rows).
+    /// The discography: your albums and theirs among them (ArtistJoin.rows) - (A2) in the order drawn (AlbumPlays.Shown).
     let rows: [ArtistJoin.Row]
+    /// (A2) In Most played order, each row's plays in words ("4.1M plays"), by its key; and the Albums heading's menu.
+    let plays: [String: String]
+    let albumOrder: AlbumOrderChoice
     /// Their albums on MusicBrainz (online, who they are known) - its Studio only, its asking and its trouble - and
     /// whether its rows wait a moment for the library.
     let theirs: MBArtistModel?
@@ -740,6 +831,8 @@ struct ArtistDesk {
     let lastfm: LastfmPage.Shown
     let arrival: LastfmPage.Arrival
     let top: [TopSongs.Row]
+    /// (A2) Similar Artists: whether it is listed, its tiles and whether they are drawn.
+    let similar: SimilarShown
     /// The songs you have played most (MostPlayedSongs).
     let mostPlayed: [MostPlayedSongs.Row]
     /// The songs of your albums of theirs, as Navidrome counts them - the status bar's.
@@ -768,6 +861,9 @@ struct ArtistDesk {
     let tryAgain: () -> Void
     let theirsAgain: () -> Void
     let reload: () -> Void
+    /// (A2) A similar artist's tile opened (their page, or their MusicBrainz page), and See All's grid.
+    let openSimilar: (SimilarArtists.Tile) -> Void
+    let seeAllSimilar: () -> Void
 }
 
 /// (R6) The strip's parts (iArtist's .chips): the two tabs - Studio only, Everything - and the managers' two, pushes.
@@ -831,12 +927,15 @@ struct ArtistHeroPicture: View {
 private struct ArtistAlbumRow: View {
     let row: ArtistPage.Row
     let line: String
+    /// (A2's review) The lines its title and line may take - two for one led by its plays at the accessibility sizes
+    /// (AlbumPlays.Shown.lines), so they wrap rather than being cut.
+    let lines: Int
     let dimmed: Bool
     let open: () -> Void
 
     var body: some View {
         Button(action: open) {
-            LibraryListRow(title: row.title, line: line) {
+            LibraryListRow(title: row.title, line: line, lines: lines) {
                 LibraryCover(id: row.coverArt, pixels: CoverSize.row)
                     .clipShape(DWCorners.chipShape)
             } trailing: {
@@ -866,6 +965,8 @@ private struct ArtistAlbumRow: View {
 private struct ArtistTheirRow: View {
     let row: MBArtistPage.Row
     let line: String
+    /// (A2's review) As ArtistAlbumRow's: two for one led by its plays at the accessibility sizes.
+    let lines: Int
     let get: Bool
     let busy: Bool
     let open: () -> Void
@@ -873,7 +974,7 @@ private struct ArtistTheirRow: View {
     var body: some View {
         HStack(spacing: 0) {
             Button(action: open) {
-                LibraryListRow(title: row.title, line: line) {
+                LibraryListRow(title: row.title, line: line, lines: lines) {
                     ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: row.group.id),
                                  size: ArchiveCoverSize.row)
                         .clipShape(DWCorners.chipShape)

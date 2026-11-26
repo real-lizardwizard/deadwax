@@ -21,6 +21,7 @@ enum MacRoutes {
         // an artist's
         case .artist(let artist): MacArtist.page(for: .artist(artist))
         case .topSongs(let artist): MacArtist.page(for: .topSongs(artist))
+        case .similarArtists(let artist): MacArtist.page(for: .similarArtists(artist))
         // Search's: the album you don't have, a MusicBrainz artist
         case .group(let group): MacSearch.page(for: .group(group))
         case .mbArtist(let artist): MacSearch.page(for: .mbArtist(artist))

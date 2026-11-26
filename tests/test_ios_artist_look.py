@@ -160,7 +160,7 @@ def test_the_phones_page_runs_top_to_foot_as_drawn():
         "phoneHero(managing, lastfm: lastfm, factsRoom: factsAsked || factsRoomFor == taskKey)",
         "plays(rows: mine, online: online, personal: personal)",
         "if !top.isEmpty && arrival.place == .inPlace { topSongs(top) }", "strip(managing, offered, online: online)",
-        "albumsList(rows, albums: albums, online: online, personal: personal)",
+        "albumsList(shown, choice: choice, albums: albums, online: online, personal: personal)",
         "if !top.isEmpty && arrival.place != .inPlace { topSongs(top) }", "if let foot = lastfm.foot { lastfmFoot(foot) }")]
     assert order == sorted(order), order
     # the top: who they are on MusicBrainz under the name, for everyone now - their facts asked whoever looks
@@ -172,11 +172,12 @@ def test_the_phones_page_runs_top_to_foot_as_drawn():
     # the pair R5 drew for an album and a playlist, and the line under it held at its height
     plays = body(view, "private func plays(")
     assert "AlbumPlayPair(enabled: playable," in plays and 'Text(line.isEmpty ? " " : line)' in plays
-    # the rows on their hairlines: yours the library's tall row with its chevron, theirs with Get or the chevron
+    # the rows on their hairlines: yours the library's tall row with its chevron, theirs with Get or the chevron (each
+    # its line's count of lines - two for Most played's plays at the accessibility sizes, A2's review)
     mine = body(view, "private struct ArtistAlbumRow: View {")
-    assert "LibraryListRow(title: row.title, line: line)" in mine and "LibraryChevron()" in mine
+    assert "LibraryListRow(title: row.title, line: line, lines: lines)" in mine and "LibraryChevron()" in mine
     theirs = body(view, "private struct ArtistTheirRow: View {")
-    assert "LibraryListRow(title: row.title, line: line)" in theirs
+    assert "LibraryListRow(title: row.title, line: line, lines: lines)" in theirs
     assert "if busy { ProgressView() } else if !get { LibraryChevron() }" in theirs
 
 
@@ -284,7 +285,7 @@ def test_get_is_only_on_an_album_nobody_holds_and_opens_the_album_you_dont_have(
     # (R6's review) only for someone who may get albums - the request permission, as the album you don't have and
     # Requests hide Get without it: on the phone the row's chevron, on the Mac its Open, and the band's "10 more to get"
     # with it; every call of the rule, on both devices, says who is asking
-    assert "mayGet: server.access.can(.request), rows: rows," in body(view, "private func artistDesk(")
+    assert "mayGet: server.access.can(.request), rows: shown.rows," in body(view, "private func artistDesk(")
     calls = re.findall(r"offersGet\(([^()]*(?:\([^()]*\))?[^()]*)\)", view + mac)
     assert len(calls) == 3 and all("mayGet: " in call and "mayGet: true" not in call for call in calls), calls
     assert "ArtistPageFacts.chips(counts, mayGet: desk.mayGet)" in body(mac, "private func band(")
@@ -349,7 +350,8 @@ def test_the_macs_artist_is_drawn_by_the_phones_page():
     area = flat(bare(source(MAC_AREA)))
     assert "case .artist(let artist): ArtistView(route: artist, desk: MacArtistPage.init(desk:))" in area
     view = flat(bare(source(VIEW)))
-    assert "if let desk, Platform.mac { desk(artistDesk(rows: rows, albums: albums, mine: mine," in view
+    assert ("if let desk, Platform.mac { desk(artistDesk(rows: rows, shown: shown, choice: choice, similar: similar, "
+            "albums: albums, mine: mine,") in view
     assert "extension ArtistView where Desk == EmptyView {" in view
     assert "init(route: ArtistRoute) { self.route = route desk = nil" in view
     # the page's one sheet and one pull, its asks, all ArtistView's: the Mac's page asks nothing itself
@@ -386,11 +388,13 @@ def test_the_macs_discography_takes_the_row_size_and_fits_its_pages():
     table = body(mac, "@ViewBuilder private var discography: some View {")
     assert ("MacColumnList(columns: Self.columns, rows: rows, controls: [Self.buttonsColumn], voice: { (row: "
             "ArtistJoin.Row) -> MacRowVoice in voice(row) }, flow: flow(.discography), selected: $selected,") in table
-    # (R6's review) "Albums" over it, the phone's heading: a row whose end is where A2's albums order will go
+    # (R6's review) "Albums" over it, the phone's heading: a row whose end is (since A2) the albums' order
+    # (tests/test_ios_lastfm_a2.py holds the pop-up)
     assert "if !rows.isEmpty || desk.theirs != nil { albumsHead }" in table
-    assert "private var albumsHead: some View { sectionHead(ArtistWords.albumsHeading) }" in mac
-    head = body(mac, "private func sectionHead(")
-    assert "HStack(alignment: .firstTextBaseline, spacing: 8) { Text(words)" in head and "Spacer(minLength: 0) }" in head
+    assert "private var albumsHead: some View { sectionHead(ArtistWords.albumsHeading) { DWPopUp(" in mac
+    head = body(mac, "private func sectionHead<")
+    assert "HStack(alignment: .firstTextBaseline, spacing: 8) { Text(words)" in head
+    assert "Spacer(minLength: 0) trailing() }" in head
     assert ".frame(width: CGFloat(rowSize.cover), height: CGFloat(rowSize.cover))" in body(mac, "private func cell(")
     assert "@Environment(\\.macRowSize) private var rowSize" in source(MAC_PAGE)
     # the columns: Album and In your library flexible, Year, Songs and the buttons fixed
@@ -670,7 +674,9 @@ def test_voiceover_reads_a_discography_row_as_one_with_its_buttons_its_actions()
     table = body(mac, "@ViewBuilder private var discography: some View {")
     assert "voice: { (row: ArtistJoin.Row) -> MacRowVoice in voice(row) }" in table
     voice = body(mac, "private func voice(_ row: ArtistJoin.Row) -> MacRowVoice {")
-    assert "MacRowVoice(label: ArtistPageFacts.spoken(row, personal: desk.personal, format: format), actions: actions)" in voice
+    # (Last.fm, slice A2) with its plays last in Most played order (tests/test_ios_lastfm_a2.py)
+    assert "let spoken = ArtistPageFacts.spoken(row, personal: desk.personal, format: format)" in voice
+    assert "return MacRowVoice(label: label, actions: actions)" in voice
     for action in ("MacRowAction(words: ArtistPageFacts.Words.play) { desk.playAlbum(mine.albumId) }",
                    "MacRowAction(words: ArtistPageFacts.Words.open) { open(row) }",
                    "MacRowAction(words: get ? ArtistPageFacts.Words.get : ArtistPageFacts.Words.open) { open(row) }"):

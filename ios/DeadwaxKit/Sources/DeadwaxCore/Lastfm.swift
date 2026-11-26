@@ -60,8 +60,8 @@ public struct LastfmTrack: Decodable, Sendable, Equatable, Hashable {
 /// deadwax's answer for an artist (`GET /deadwax/lastfm/artist`, server 2.1.41 - lastfm.md 2.5): whether Last.fm is
 /// there at all (`enabled`), whether a part couldn't be had just now (`unavailable` - kept a moment only), why not for
 /// whoever runs deadwax (`why`), the artist's page, their listeners and their top songs (nil when they couldn't be had,
-/// none when Last.fm lists none). Every field read leniently: a part absent or malformed is nil. `similar` and
-/// `top_albums` are slice A2's.
+/// none when Last.fm lists none) - and (slice A2, server 2.1.43) the artists Last.fm calls similar and their albums by
+/// plays, the same way. Every field read leniently: a part absent or malformed is nil.
 public struct LastfmArtist: Decodable, Sendable, Equatable {
     public let enabled: Bool
     public let unavailable: Bool
@@ -70,20 +70,29 @@ public struct LastfmArtist: Decodable, Sendable, Equatable {
     public let url: String?
     public let listeners: Int?
     public let topSongs: [LastfmTrack]?
+    /// (A2) The artists Last.fm calls similar, in its order - Similar Artists' tiles (SimilarArtists).
+    public let similar: [LastfmSimilarArtist]?
+    /// (A2) Their albums by plays, in Last.fm's order (which isn't by plays) - the albums' Most played order
+    /// (AlbumPlays).
+    public let topAlbums: [LastfmAlbum]?
 
     enum CodingKeys: String, CodingKey {
-        case enabled, unavailable, why, url, listeners
+        case enabled, unavailable, why, url, listeners, similar
         case topSongs = "top_songs"
+        case topAlbums = "top_albums"
     }
 
     public init(enabled: Bool = true, unavailable: Bool = false, why: String? = nil, url: String? = nil,
-                listeners: Int? = nil, topSongs: [LastfmTrack]? = nil) {
+                listeners: Int? = nil, topSongs: [LastfmTrack]? = nil, similar: [LastfmSimilarArtist]? = nil,
+                topAlbums: [LastfmAlbum]? = nil) {
         self.enabled = enabled
         self.unavailable = unavailable
         self.why = why
         self.url = LastfmLink.checked(url)
         self.listeners = Self.count(listeners)
         self.topSongs = topSongs
+        self.similar = similar
+        self.topAlbums = topAlbums
     }
 
     public init(from decoder: any Decoder) throws {
@@ -95,12 +104,109 @@ public struct LastfmArtist: Decodable, Sendable, Equatable {
         url = LastfmLink.checked(fields.looseField(String.self, .url))
         listeners = Self.count(fields.looseField(Int.self, .listeners))
         topSongs = fields.looseList(LastfmTrack.self, .topSongs)
+        similar = fields.looseList(LastfmSimilarArtist.self, .similar)
+        topAlbums = fields.looseList(LastfmAlbum.self, .topAlbums)
+    }
+
+    /// (A2's review) This answer over an earlier one for the same artist, part by part: a part this answer couldn't have
+    /// (nil - Last.fm late or failing for it, the route's 4 s passed) keeps the earlier answer's, so a later ask (by
+    /// their MusicBrainz id, after one by name) never takes away what is drawn - Most played's albums, Similar Artists,
+    /// Top Songs, the listeners, the link. A part this answer has, `[]` included, is this answer's. An answer that isn't
+    /// enabled is taken whole: Last.fm is off, or refuses the key.
+    public func keeping(_ earlier: LastfmArtist?) -> LastfmArtist {
+        guard enabled, let earlier, earlier.enabled else { return self }
+        return LastfmArtist(enabled: true, unavailable: unavailable, why: why, url: url ?? earlier.url,
+                            listeners: listeners ?? earlier.listeners, topSongs: topSongs ?? earlier.topSongs,
+                            similar: similar ?? earlier.similar, topAlbums: topAlbums ?? earlier.topAlbums)
     }
 
     /// A count as deadwax sends one (lastfm.py `count`): never negative.
     static func count(_ value: Int?) -> Int? {
         guard let value, value >= 0 else { return nil }
         return value
+    }
+}
+
+/// (A2) One of the artists Last.fm calls similar, as deadwax passes it on (src/lastfm.py `_similar_entry`, server
+/// 2.1.43): the name as Last.fm wrote it, their MusicBrainz id when Last.fm has one of its shape (MBID.of), how alike
+/// Last.fm calls them (0-1) and their page on Last.fm. Read leniently: only a name is needed - one without (or with a
+/// blank one) is left out of the list.
+public struct LastfmSimilarArtist: Decodable, Sendable, Equatable, Hashable {
+    public let name: String
+    public let mbid: String?
+    /// Last.fm's 0 to 1 - else nil.
+    public let match: Double?
+    /// Their page on Last.fm - only an https address on last.fm (LastfmLink), else nil.
+    public let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, mbid, match, url
+    }
+
+    public init(name: String, mbid: String? = nil, match: Double? = nil, url: String? = nil) {
+        self.name = name
+        self.mbid = MBID.of(mbid)
+        self.match = Self.match(match)
+        self.url = LastfmLink.checked(url)
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        guard let name = fields.looseField(String.self, .name), !PyText.strip(name).isEmpty else {
+            throw LastfmTrack.NoTitle()
+        }
+        self.name = name
+        mbid = MBID.of(fields.looseField(String.self, .mbid))
+        match = Self.match(fields.looseField(Double.self, .match))
+        url = LastfmLink.checked(fields.looseField(String.self, .url))
+    }
+
+    /// lastfm.py `similarity`: 0 to 1, else nil.
+    static func match(_ value: Double?) -> Double? {
+        guard let value, value.isFinite, value >= 0, value <= 1 else { return nil }
+        return value
+    }
+}
+
+/// (A2) One of an artist's albums by plays, as deadwax passes it on (src/lastfm.py `top_albums`, server 2.1.43): its
+/// title as Last.fm wrote it, its MusicBrainz id when Last.fm has one of its shape (a release's, not a release
+/// group's), and its count - plays, or (`counted`) listeners where Last.fm gave no plays. Read leniently: an album
+/// without a title, a count or a kind of count this app knows is left out of the list.
+public struct LastfmAlbum: Decodable, Sendable, Equatable, Hashable {
+    /// What an album's count counts - the list's one kind (lastfm.py COUNTED).
+    public enum Counted: String, Sendable, Equatable, Hashable {
+        case plays, listeners
+    }
+
+    public let title: String
+    public let mbid: String?
+    public let plays: Int
+    public let counted: Counted
+
+    enum CodingKeys: String, CodingKey {
+        case title, mbid, plays, counted
+    }
+
+    public init(title: String, mbid: String? = nil, plays: Int, counted: Counted = .plays) {
+        self.title = title
+        self.mbid = MBID.of(mbid)
+        self.plays = max(plays, 0)
+        self.counted = counted
+    }
+
+    /// No title, no count, or a count of a kind this app doesn't know: not an album the order can use.
+    struct Unusable: Error {}
+
+    public init(from decoder: any Decoder) throws {
+        let fields = try decoder.container(keyedBy: CodingKeys.self)
+        guard let title = fields.looseField(String.self, .title), !PyText.strip(title).isEmpty,
+              let plays = LastfmArtist.count(fields.looseField(Int.self, .plays)),
+              let counted = fields.looseField(String.self, .counted).flatMap(Counted.init(rawValue:))
+        else { throw Unusable() }
+        self.title = title
+        mbid = MBID.of(fields.looseField(String.self, .mbid))
+        self.plays = plays
+        self.counted = counted
     }
 }
 

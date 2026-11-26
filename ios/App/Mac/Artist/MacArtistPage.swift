@@ -31,11 +31,18 @@ import SwiftUI
 ///   one of theirs the library holds. A double-click or Return opens the row - a double-click on its buttons is
 ///   theirs alone (`controls`); a right-click on an album you have is its page's •••. VoiceOver reads a row as one,
 ///   its buttons its actions (`voice`). While deadwax can't be reached an album with nothing on this Mac is dimmed and
-///   does nothing. Over it "Albums", the phone's heading - where slice A2's albums order will go; under it
-///   MusicBrainz's word (ArtistTheirFoot).
-/// - Most played (560): the songs of their albums you have played most (MostPlayedSongs) - each song once across its
-///   pressings, its plays its most-played take's, the number its album's page shows under Plays - in the same list with
-///   Plays at its end. A double-click or Return plays the list from the song (playMost); a right-click is its •••.
+///   does nothing. Over it "Albums", the phone's heading, and at its end (Last.fm, slice A2) the albums' order - a
+///   pop-up, "Newest first" or "Most played" (AlbumOrderItems, the phone's items), its room held while Last.fm's answer
+///   may yet offer Most played; in Most played order each row's plays ("4.1M plays") at the end of In your library, and
+///   in what VoiceOver reads of it. Under it MusicBrainz's word (ArtistTheirFoot).
+/// - Your most played (560; "Most played" until slice A2 - James, 26 Nov: so it never reads as the albums' order): the
+///   songs of their albums you have played most (MostPlayedSongs) - each song once across its pressings, its plays its
+///   most-played take's, the number its album's page shows under Plays - in the same list with Plays at its end. A
+///   double-click or Return plays the list from the song (playMost); a right-click is its •••.
+/// - (Last.fm, slice A2) Similar Artists, at the page's foot: the phone's tiles (SimilarArtistTile) in the Mac's faces,
+///   one row that a trackpad scrolls sideways, four always in view at the narrowest page - and past four See All, the
+///   phone's grid (SimilarArtistsScreen), where a mouse reaches every one. A click opens their page, or their
+///   MusicBrainz page; no right-click (a tile has no •••). "From Last.fm" under it.
 /// - The status bar: "16 albums", "6 in your library", "59 songs". The drawing's "MusicBrainz asked 4 minutes ago" is
 ///   left out (the page keeps no time for its answer).
 struct MacArtistPage: View {
@@ -397,6 +404,8 @@ struct MacArtistPage: View {
                 // an answer that came once the albums were drawn: after them, for the page's life
                 if !desk.top.isEmpty && desk.arrival.place != .inPlace { topSongs }
                 if !desk.mostPlayed.isEmpty { mostPlayed }
+                // (A2) Similar Artists, at the foot
+                if desk.similar.shows { similarArtists }
             }
             if let foot = desk.lastfm.foot { lastfmFoot(foot) }
             Color.clear
@@ -430,10 +439,10 @@ struct MacArtistPage: View {
             .padding(.bottom, Drawn.below)
     }
 
-    /// Most played: its heading and the songs you have played most, in the Mac's list with Plays at its end - lines of
-    /// the page's lazy stack, as Top Songs'. Never drawn with no plays at all (desk.mostPlayed empty).
+    /// Your most played: its heading and the songs you have played most, in the Mac's list with Plays at its end - lines
+    /// of the page's lazy stack, as Top Songs'. Never drawn with no plays at all (desk.mostPlayed empty).
     @ViewBuilder private var mostPlayed: some View {
-        sectionHead(ArtistPageFacts.Words.mostPlayed)
+        sectionHead(ArtistPageFacts.Words.yourMostPlayed)
         MacColumnList(columns: Self.mostColumns, rows: desk.mostPlayed, flow: flow(.most), selected: $selectedMost,
                       open: { (row: MostPlayedSongs.Row) -> Void in openMost(row) },
                       menu: { (row: MostPlayedSongs.Row) -> SongRightClick in
@@ -447,18 +456,24 @@ struct MacArtistPage: View {
     }
 
     /// A section's heading (.h3): 18 above its list, 8 over it, 22 in - a row, its end where a section's own control
-    /// goes (A2's albums order, at the Albums heading's). A header to VoiceOver.
-    private func sectionHead(_ words: String) -> some View {
+    /// goes (`trailing`: A2's albums order at the Albums heading's, Similar Artists' See All). A header to VoiceOver.
+    private func sectionHead<Trailing: View>(_ words: String, @ViewBuilder trailing: () -> Trailing) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(words)
                 .font(Typeface.Mac.text(.h3).weight(.semibold))
                 .foregroundStyle(DWPalette.head)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 0)
+            trailing()
         }
         .padding(.horizontal, Drawn.side)
         .padding(.top, Drawn.headAbove)
         .padding(.bottom, Drawn.headBelow)
+    }
+
+    /// A heading with nothing at its end.
+    private func sectionHead(_ words: String) -> some View {
+        sectionHead(words) { EmptyView() }
     }
 
     /// The room under a section, 20: a line of its own in the page's stack.
@@ -617,10 +632,51 @@ struct MacArtistPage: View {
         }
     }
 
-    /// "Albums" over the discography (R6's review), as the phone's Albums heading: a heading row whose end is where
-    /// slice A2's albums order - a menu - will go. Nothing there yet.
+    /// "Albums" over the discography (R6's review), as the phone's Albums heading - and (A2) at its end the albums'
+    /// order: a pop-up showing the order drawn, the phone's items in it, "Sort albums" to VoiceOver and the pointer.
     private var albumsHead: some View {
-        sectionHead(ArtistWords.albumsHeading)
+        sectionHead(ArtistWords.albumsHeading) {
+            DWPopUp(words: desk.albumOrder.shown.words, size: .small) {
+                AlbumOrderItems(choice: desk.albumOrder)
+            }
+            .help(LastfmWords.sortAlbums)
+            .accessibilityLabel(LastfmWords.sortAlbums)
+            .accessibilityValue(desk.albumOrder.shown.words)
+            .albumOrderRoom(desk.albumOrder)
+        }
+    }
+
+    // MARK: Similar Artists (Last.fm, slice A2)
+
+    /// Similar Artists: its heading with See All past four, one row of the phone's tiles in the Mac's faces - a trackpad
+    /// scrolls it sideways, and four are in view at the narrowest page - its room held, blank, until the tiles are drawn;
+    /// "From Last.fm" under it.
+    @ViewBuilder private var similarArtists: some View {
+        let similar = desk.similar
+        let side = CGFloat(SimilarArtists.gridMin)
+        sectionHead(LastfmWords.similarArtists) {
+            if similar.seesAll {
+                Button(LastfmWords.seeAll, action: desk.seeAllSimilar)
+                    .buttonStyle(DWButtonStyle(size: .small))
+            }
+        }
+        ScrollView(.horizontal) {
+            LazyHStack(alignment: .top, spacing: MacSimilarDrawn.gap) {
+                if similar.drawn {
+                    ForEach(similar.tiles) { (tile: SimilarArtists.Tile) in
+                        SimilarArtistTile(tile: tile, side: side, name: MacSimilarDrawn.name, line: MacSimilarDrawn.line) {
+                            desk.openSimilar(tile)
+                        }
+                    }
+                } else {
+                    SimilarArtistTile.room(side: side, lines: 1, name: MacSimilarDrawn.name, line: MacSimilarDrawn.line)
+                }
+            }
+            .padding(.horizontal, Drawn.side)
+        }
+        LastfmCredit(lastfmPage: desk.model.lastfm?.url, font: Typeface.Mac.text(.small), above: Drawn.headBelow)
+            .padding(.horizontal, Drawn.side)
+            .padding(.bottom, Drawn.below)
     }
 
     /// (R6's review) A row as VoiceOver reads it: one element, its cells' words in order (ArtistPageFacts.spoken), its
@@ -647,7 +703,10 @@ struct MacArtistPage: View {
                 })
             }
         }
-        return MacRowVoice(label: ArtistPageFacts.spoken(row, personal: desk.personal, format: format), actions: actions)
+        // (A2) in Most played order its plays last, as the cell draws them
+        let spoken = ArtistPageFacts.spoken(row, personal: desk.personal, format: format)
+        let label = desk.plays[row.key].map { (plays: String) -> String in "\(spoken), \(plays)" } ?? spoken
+        return MacRowVoice(label: label, actions: actions)
     }
 
     /// An album of yours as a right-click opens its page's •••; nil for one of theirs.
@@ -693,7 +752,19 @@ struct MacArtistPage: View {
                     .font(Typeface.Mac.mono(.small))
                     .foregroundStyle(DWPalette.t2)
             case 3:
-                held(row)
+                // (A2) in Most played order, its plays at the cell's end - kept whole while the format gives way
+                if let plays = desk.plays[row.key] {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        held(row)
+                        Text(plays)
+                            .font(Typeface.Mac.mono(.small))
+                            .foregroundStyle(DWPalette.t2)
+                            .layoutPriority(1)
+                            .help(plays)
+                    }
+                } else {
+                    held(row)
+                }
             default:
                 buttons(row)
             }
@@ -788,6 +859,14 @@ struct MacArtistPage: View {
         }
         .disabled(dimmed(row))
     }
+}
+
+/// (Last.fm, slice A2) Similar Artists' row on the Mac: 16 between tiles, as the Artists grid's; the name in the
+/// window's words, semibold, the line in the small ones (the Artists grid's faces).
+private enum MacSimilarDrawn {
+    static let gap: CGFloat = 16
+    static let name = Typeface.Mac.text(.base).weight(.semibold)
+    static let line = Typeface.Mac.text(.small)
 }
 
 /// (R6) A discography row's right-click (MacColumnList's `menu`): an album of yours its page's ••• (AlbumRightClick, as

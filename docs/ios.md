@@ -328,14 +328,16 @@ menus and keys, and these differences.
   Under it a band: their round picture, their name, who they are on MusicBrainz ("Group · Sydney · since 1973"), their
   Last.fm listeners, and chips at its right - "6 in your library", "2 in the collection", "10 more to get" (that one
   only for someone who can get albums). Then **Top Songs** (all ten, with **From Last.fm** under them - after the albums
-  when Last.fm answered late), **Albums**: the discography in columns - **Album**, **Year**, **Songs**, **In your
-  library** (a chip, then the album's format once its songs have come, "2 pressings", or "not in your library") and the
-  buttons: **Play** and **Open** for an album of yours, **Get** for one nobody has (it opens the album you don't have;
+  when Last.fm answered late), **Albums** - at its heading's end the order, a pop-up of **Newest first** and **Most
+  played** ([from Last.fm](#artists): in Most played order an album's plays end its In your library, "4.1M plays") -
+  the discography in columns: **Album**, **Year**, **Songs**, **In your library** (a chip, then the album's format once
+  its songs have come, "2 pressings", or "not in your library") and the buttons: **Play** and **Open** for an album of yours, **Get** for one nobody has (it opens the album you don't have;
   for someone who can't get albums - with logins on, an admin gives **Get albums** - it's **Open**), **Open** for one of
-  theirs the library holds - and **Most played**: the songs of theirs you've played most, each once however many
-  pressings it's on, with its plays (no section at all until you've played one of them). Double-click or Return plays
-  from a song or opens an album - a double-click on a row's buttons is the buttons', not the row's; right-click one of
-  yours for its menu. The tables are part of the page, which scrolls as one; ↑ and ↓ move through the table you last
+  theirs the library holds - then **Your most played**: the songs of theirs you've played most, each once however many
+  pressings it's on, with its plays (no section at all until you've played one of them) - and at the page's foot
+  **Similar Artists** ([from Last.fm](#artists)), a row of round pictures that two fingers on a trackpad scroll
+  sideways, with **See All** for a grid of them all. Double-click or Return plays from a song or opens an album - a
+  double-click on a row's buttons is the buttons', not the row's; right-click one of yours for its menu. The tables are part of the page, which scrolls as one; ↑ and ↓ move through the table you last
   clicked, bringing its row into view. VoiceOver reads an album's row as one - "Low, 1977, in your library, FLAC" - its
   Play, Open and Get as its actions. The status bar: "16 albums", "6 in your library", "59 songs".
   **Downloaded** is the Mac's own since the new look: **Albums | Playlists**, **Remove all…** (which asks first) and
@@ -1505,6 +1507,47 @@ for all ten. Under them, **From Last.fm** opens their page on last.fm in the bro
   not on this phone dimmed (it plays nothing, and one you don't have opens nothing). A song that may be on one of
   their albums the phone hasn't the songs of (one not downloaded, on a page opened since deadwax went away) is
   dimmed with no line under it, never "Not in your library". Any other artist has nothing of Last.fm's, and no gap.
+
+**Similar Artists, and the albums by Most played** (with the key, and **deadwax 2.1.43 or later** - on 2.1.41 and
+2.1.42 neither is there, and nothing is drawn in their place):
+
+- **Similar Artists**, under the albums (after a late Top Songs; on the Mac at the page's foot, after Your most
+  played): up to 12 of the artists Last.fm calls similar, in its order, as round pictures in one row - a finger
+  scrolls it sideways, and on the Mac two fingers on a trackpad do. Past four, **See All** at the heading's end opens
+  them as a grid on a page titled Similar Artists (on the Mac, how a mouse reaches every one). **From Last.fm** under
+  the row opens their page on last.fm.
+- **An artist you have** shows their picture and their name, and opens their page. **One you don't** shows the person
+  glyph, their name and "Not in your library", and opens their MusicBrainz page, where Get is. One is yours when
+  Last.fm's MusicBrainz id for them is your artist's, or else - only where Last.fm or your artist has no MusicBrainz
+  id - when exactly one of your artists has their name (case, accents, a bracketed aside and a leading "The" aside).
+  Two ids that differ are two artists, whatever their names; two of yours who share a name ("Low" and "LOW") are no
+  match, so neither is guessed at; two of yours with the same id, the first in your library. Someone Last.fm has no MusicBrainz id for, and who isn't yours, has nowhere to open and isn't
+  shown; nor is the artist themselves, or anyone twice.
+- Until the app has your artists (it asks for them if it hasn't, and waits 1.5 s at most from that ask) the row's
+  place is held, blank, so nothing moves under it as the pictures come. If it can't get them, everyone is shown as one you don't have.
+- **Offline**, an artist you don't have is dimmed and does nothing (VoiceOver adds "Opens once deadwax is back"); one
+  of yours opens their page from what the app has. A picture is never wider than the page, at any text size.
+- VoiceOver reads a picture as one button - "Pond", "GUM, Not in your library". There's no **•••** on one, and on the
+  Mac no right-click.
+- **The albums' order**: at the Albums heading's end, **Sort albums** - on the phone a ↑↓ button, on the Mac a pop-up
+  showing the order - with **Newest first** (the page's order, as before) and **Most played**: the albums Last.fm has
+  plays for first, most first, each line led by them ("4.1M plays · 2015 · in your library" - at the
+  accessibility text sizes (Larger Accessibility Sizes) the line takes two lines, so the plays are never the part cut off; on the Mac at the end of
+  In your library, kept whole), then the ties and the rest newest first. Studio only and Everything still decide which albums
+  are listed; Most played only orders them. Where Last.fm counts listeners rather than plays for an artist's albums,
+  the line says listeners ("1.2M listeners").
+- An album's plays are Last.fm's for that release (by its MusicBrainz id), or else for an album of its title (as the
+  similar artists' names are compared). Two of Last.fm's albums that are one row ("Currents" and "Currents (B-Sides)")
+  give it the larger, never the two added up.
+- **The choice is kept on the device**: quit and reopen, and it's still Most played. Choosing either item keeps it,
+  even the one already ticked - so with a visit left newest first while Most played is kept, choosing Newest first
+  keeps that. The menu offers Most played only once Last.fm's answer has albums with plays, and always while the
+  albums are in Most played order; until then its place at the heading's end is kept, blank. A later answer missing a
+  part (its albums, say) never takes away the part already shown.
+- **Nothing moves under your finger**: the order is set once, as the albums are first drawn. If Last.fm answers after
+  that (later than its 0.8 s wait, the first time an artist is opened), the albums stay newest first for that visit,
+  and the menu says so; choose Most played, or pull the page down, and they're ordered then (on a pull, the albums
+  stay as they are until the new answer comes).
 
 **Offline**, the Artists page lists what it last listed, an artist with nothing on this phone dimmed (it
 opens nothing). With no list in hand it lists the artists of the albums on the phone, under "Only the
@@ -6477,6 +6520,30 @@ Ethan's phone as a listener (the one that sees no foot line). Say "pass", or wha
 - **487 [key] VoiceOver.** A top song reads its title and line ("Let It Happen, Currents · 2015"); a missing one
   "…, Not in your library"; "From Last.fm" reads as a link; the listeners line is read under the name.
 
+### Last.fm's second slice's checks (490-493)
+
+**Not done yet.** These come with Last.fm's second slice on the app - [Similar Artists and the albums by Most
+played](#artists) on an artist's page (still app 0.13 (13)). They need **deadwax 2.1.43 or later** on the server; on
+2.1.41 and 2.1.42 the page is as 476-487 left it. All four are **[key]**. As for 476-487: both phones and the Mac,
+deadwax's plain `http://` address, logins on. Say "pass", or what you saw.
+
+- **490 [key] Similar Artists.** **Not done yet.** Open Tame Impala. Below Albums, a row of round pictures. Ones you
+  have show their picture and open their page; the others show the person glyph and "Not in your library", and open
+  their MusicBrainz page, with Get there. Is anyone listed you'd call wrongly matched - an artist of yours shown as
+  one you don't have, or the other way round? Does anything under the row move as the pictures come in?
+- **491 [key] See All, and the Mac.** **Not done yet.** With more than four, See All shows them as a grid, titled
+  Similar Artists, each opening as on the page. On the Mac, Similar Artists is at the page's foot, after Your most
+  played: the row scrolls sideways with two fingers on the trackpad, four in view at the narrowest window, and See All
+  reaches every one with a mouse. A right-click on a picture does nothing.
+- **492 [key] Most played.** **Not done yet.** At the Albums heading's end, sort by Most played (on the phone the ↑↓
+  button, on the Mac the pop-up). The rows reorder, each line led by "x plays · " (on the Mac at the end of In your
+  library) - on the phone, at the largest text sizes too, are the plays ever cut off? Studio only and Everything
+  still apply. Quit and reopen: still Most played. Open an artist you haven't
+  opened since the app started: are the albums already in Most played order as they first appear, and does nothing
+  reorder under your finger after? Does it help you pick what to get next?
+- **493 [key] Offline, similar.** **Not done yet.** With Tame Impala open, turn on Airplane Mode (and WireGuard off):
+  pictures of artists you don't have are dimmed and do nothing; one of yours still opens their page.
+
 ### The Mac redesign's checks (518-614)
 
 The new look, drawn on the design canvas and built a slice at a time (still app 0.13 (13)): the Mac's first, and the
@@ -6785,11 +6852,11 @@ with Last.fm on.
   more to get". The toolbar: **Play**, **Shuffle**, then Studio only | Everything once their albums on MusicBrainz are
   asked, and - only for someone who may - **Artist images…**, **Move albums…** and **Which artist is this?** at its end;
   in a window of 880 those three fold into a **•••**. The status bar: "16 albums", "6 in your library", "59 songs".)
-- **560 Top Songs and Most played.** **Not done yet.** Each plays from the tap; Most played matches the albums' plays.
-  (On the Mac a double-click or Return plays from a song, as an album's songs do; a top song you don't have opens the
-  album you don't have, its row spinning while it's asked; a right-click on a song you have gives its menu. Top Songs
-  shows all ten, with "From Last.fm" under it, and comes after the discography when Last.fm answered late. Most played
-  lists each song once - a song on two pressings is one row, its number the most-played copy's, the number its album's
+- **560 Top Songs and Your most played.** **Not done yet.** Each plays from the tap; Your most played matches the
+  albums' plays. (On the Mac a double-click or Return plays from a song, as an album's songs do; a top song you don't
+  have opens the album you don't have, its row spinning while it's asked; a right-click on a song you have gives its
+  menu. Top Songs shows all ten, with "From Last.fm" under it, and comes after the discography when Last.fm answered
+  late. Your most played lists each song once - a song on two pressings is one row, its number the most-played copy's, the number its album's
   page shows under **Plays**. A song you have never played isn't listed.)
 - **561 The discography.** **Not done yet.** Each album shows its format; Play, Open and Get work. (Columns: Album,
   Year, Songs, In your library - the chip, then the album's format, "FLAC · 24-bit / 96 kHz", once its songs have come,

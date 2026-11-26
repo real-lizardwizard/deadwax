@@ -2,7 +2,8 @@ import Foundation
 
 /// Last.fm's words on the artist page (lastfm.md 3.6) - the same on the iPhone and the Mac (DeviceWordsTests holds them
 /// in words/iphone.json and words/mac.json). Slice A1's: Top Songs, its rows' lines, the credit, the two troubles of a
-/// song you don't have, the listeners line and the foot line for whoever runs deadwax.
+/// song you don't have, the listeners line and the foot line for whoever runs deadwax. Slice A2's: Similar Artists,
+/// and the albums' order and plays.
 public enum LastfmWords {
     // MARK: Top Songs
 
@@ -44,6 +45,28 @@ public enum LastfmWords {
         let tenths = count / (unit / 10)
         guard tenths < 100 else { return "\(count / unit)\(letter)" }
         return tenths % 10 == 0 ? "\(tenths / 10)\(letter)" : "\(tenths / 10).\(tenths % 10)\(letter)"
+    }
+
+    // MARK: (A2) Similar Artists, and the albums' order
+
+    /// The section under the albums, and its See All page's title.
+    public static let similarArtists = "Similar Artists"
+    /// (A2's review) VoiceOver's value for a similar artist you don't have, dimmed while deadwax can't be reached -
+    /// their MusicBrainz page is deadwax's - as an album row's "Not on this iPhone" says why it does nothing.
+    public static let opensOnceBack = "Opens once deadwax is back"
+    /// The Albums heading's menu: VoiceOver's name for it, and its two orders (AlbumOrder).
+    public static let sortAlbums = "Sort albums"
+    public static let newestFirst = "Newest first"
+    public static let mostPlayed = "Most played"
+
+    /// An album's plays, in Most played order - "4.1M plays", "1 play", or listeners where Last.fm counted those ("4.1M
+    /// listeners", "1 listener") - rounded down as the listeners line is: leading the phone's line, before " · " ("4.1M
+    /// plays · 2015 · in your library", AlbumPlays.Shown.line), and in the Mac's In your library cell.
+    public static func plays(_ count: Int, counted: LastfmAlbum.Counted) -> String {
+        switch counted {
+        case .plays: return count == 1 ? "1 play" : "\(short(count)) plays"
+        case .listeners: return count == 1 ? "1 listener" : "\(short(count)) listeners"
+        }
     }
 
     // MARK: the foot line (whoever runs deadwax only)

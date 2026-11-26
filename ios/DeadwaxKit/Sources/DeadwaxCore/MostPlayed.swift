@@ -1,9 +1,10 @@
 import Foundation
 
 /// An artist's most-played SONGS (the redesign, slice R6 - notes/ios.md "The redesign, slice R6: an artist"): the songs
-/// of their albums in hand you have played most, by Navidrome's play count - the Mac artist page's Most played, under
-/// their discography. Songs, by your plays: not Last.fm's Top Songs (TopSongs, everyone's listens), and not slice A2's
-/// order of their ALBUMS by plays, which is another list with another rule.
+/// of their albums in hand you have played most, by Navidrome's play count - the Mac artist page's "Your most played"
+/// (its name since slice A2, James, 26 Nov - ArtistPageFacts.Words.yourMostPlayed), under their discography. Songs, by
+/// your plays: not Last.fm's Top Songs (TopSongs, everyone's listens), and not slice A2's "Most played" order of their
+/// ALBUMS by Last.fm's plays (AlbumPlays), which is another list with another rule.
 ///
 /// - EACH SONG ONCE ACROSS ITS PRESSINGS: a song is its key - the one Top Songs meets songs by (LastfmMatch.key: "Let It
 ///   Happen" and "Let It Happen - 2015 Remaster" are one song, "Elephant (Max Cooper remix)" another) - so a song on the

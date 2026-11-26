@@ -48,7 +48,8 @@ def test_play_and_shuffle_take_your_albums_alone():
     # your rows as they were, for Play and Shuffle and the page's empty states; the joined rows only for the list
     assert "let mine = ArtistPage.rows(albums)" in body
     assert "plays(rows: mine, online: online, personal: personal)" in body
-    assert "albumsList(rows, albums: albums, online: online, personal: personal)" in body
+    # (Last.fm, slice A2) the joined rows in the order the menu has drawn (AlbumPlays.Shown)
+    assert "albumsList(shown, choice: choice, albums: albums, online: online, personal: personal)" in body
     assert "model.rows(albums: albums, groups: theirGroups(online: online)" in body
     plays = function(view, "private func plays(rows: [ArtistPage.Row]")
     assert "ArtistPage.playOrder(rows)" in plays
@@ -78,10 +79,12 @@ def test_a_row_of_theirs_is_opened_by_the_musicbrainz_pages_model():
     view = code(VIEW)
     listed = function(view, "private func albumsList(")
     assert "ForEach(rows) { (row: ArtistJoin.Row) in" in listed
-    assert "case .yours(let mine):" in listed and "ArtistAlbumRow(row: mine, line: ArtistPage.line(mine" in listed
+    # (A2) each line through the order drawn's - its plays at its end in Most played order
+    assert "case .yours(let mine):" in listed
+    assert "ArtistAlbumRow(row: mine, line: shown.line(row, ArtistPage.line(mine" in listed
     assert "case .theirs(let other):" in listed
     # (R6) the page's own flat row, the MusicBrainz page's words and its model's open - Get only where nobody holds it
-    assert "ArtistTheirRow(row: other, line: MBArtistPage.line(other, personal: personal)" in listed
+    assert "ArtistTheirRow(row: other, line: shown.line(row, MBArtistPage.line(other, personal: personal))" in listed
     assert ("get: ArtistPageFacts.offersGet(other, mayGet: server.access.can(.request)),\n"
             "                                   busy: theirs?.opening == other.key)") in listed
     assert "theirs?.open(other, client: server.client, online: reachability.online, navigation: navigation)" in listed

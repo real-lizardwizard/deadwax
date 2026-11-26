@@ -93,6 +93,9 @@ enum AppRoute: Hashable {
     case mbArtist(MBArtistRoute)
     /// (Last.fm, slice A1) An artist's Top Songs (TopSongsScreen): all of Last.fm's ten - from their page's See All.
     case topSongs(ArtistRoute)
+    /// (Last.fm, slice A2) An artist's Similar Artists (SimilarArtistsScreen): every tile in a grid - from their page's
+    /// See All, so a mouse reaches every one.
+    case similarArtists(ArtistRoute)
     /// (Phase 8, slice 1) Settings > Manage > Edit an album: Choose the folder - any folder of the library, its Edit
     /// album opened over the tabs.
     case chooseFolder
@@ -1071,6 +1074,7 @@ extension View {
                 case .group(let group): GroupView(route: group).readableOnMac()
                 case .mbArtist(let artist): MBArtistView(route: artist).readableOnMac()
                 case .topSongs(let artist): TopSongsScreen(route: artist).readableOnMac()
+                case .similarArtists(let artist): SimilarArtistsScreen(route: artist).readableOnMac()
                 // (the Mac app, slice 7) Manage's pages at the same readable width - the web's desktop draws Needs a
                 // look, Server settings, the event log and Library care so - their lists' rows never a window wide
                 case .chooseFolder: ChooseFolderScreen().readableOnMac()

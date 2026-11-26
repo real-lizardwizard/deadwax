@@ -353,7 +353,7 @@ def test_the_frame_stacks_are_the_macs_with_its_own_routes():
 
 def test_mac_routes_says_every_route_once_each_to_its_area():
     cases = app_route_cases()
-    assert len(cases) == 30, cases
+    assert len(cases) == 31, cases
     routes = bare(app_sources()["Mac/Frame/MacRoutes.swift"])
     switch = body(routes, "switch route {")
     said = re.findall(r"^\s*case \.(\w+)\b[^:]*: (Mac\w+)\.page\(for: \.(\w+)\b", switch, re.M)
@@ -375,9 +375,11 @@ def test_mac_routes_says_every_route_once_each_to_its_area():
 #? R10 took .chooseFolder: the Mac's Edit album (MacEditWindow), the folders beside the editor - asserted below.
 #? R14 took .people and .person (MacPeoplePage, the list and a person side by side) and .serverSettings and
 #? .serverSettingsGroup (MacServerSettingsPage, opened at the group's tab) - asserted below.
+#? (Last.fm, slice A2) .similarArtists came as the phone's page: Similar Artists' See All grid (SimilarArtistsScreen), in
+#? the text styles and the look's pieces alone, so a mouse reaches every tile - as .topSongs is.
 PHONES_PAGES = {"downloads", "serverAddress", "debug", "eq", "gettingAlbums", "playback",
                 "account", "thisPhone", "about", "allSongs",
-                "mbArtist", "topSongs", "needsALook",
+                "mbArtist", "topSongs", "similarArtists", "needsALook",
                 "changePassword"}
 #? (R13) the routes each slice gave a Mac page of its own in place of the phone's, and the page
 MACS_OWN = {"libraryCare": "MacLibraryCarePage()", "heldByNobody": "MacLibraryCarePage()", "eventLog": "MacEventLogPage()"}
