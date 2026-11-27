@@ -447,14 +447,38 @@ def test_the_titles_row_is_the_titles_alone():
     for gone in ("NowPlayingReadout", "Layout", "firstTextBaseline", "isAccessibilitySize", "readoutGap"):
         assert gone not in titles and gone not in member(now, "func coverNames"), gone
     assert "readoutGap" not in now
-    # the readout drawn once: in the scrubber's row, passed into ScrubberView - on the cover alone, so the turntable's
-    # row is the hidden scrubber's as it was (its titles have nothing beside them either)
+    # the readout drawn once: in the scrubber's row, passed into ScrubberView (on both faces - the next test) - the
+    # turntable's titles have nothing beside them either
     assert len(re.findall(r"\bNowPlayingReadout\(", now)) == 1
     content = flat(member(now, "func content"))
-    assert ("ZStack { ScrubberView(visible: !turntable && !sheetOver) { if !turntable { NowPlayingReadout() } } "
+    assert ("ZStack { ScrubberView(visible: !turntable && !sheetOver) { NowPlayingReadout() } "
             ".opacity(turntable ? 0 : 1) .allowsHitTesting(!turntable) .accessibilityHidden(turntable) if turntable { "
             "TurntableTimeLine() .transition(.opacity) } }") in content
     assert "NowPlayingReadout" not in member(now, "func titles")
+
+
+def test_both_faces_scrubber_rows_pass_the_same_readout():
+    """(27 Nov, after review) Nothing jumps at the swap (check 3): one ScrubberView is both faces' row, and it is passed
+    the readout on both - on the turntable unseen and unheard with the hidden scrubber - so where the readout folds
+    under the times (xxxLarge, a long shuffle's from xLarge) both faces' rows are that line taller and the titles and
+    everything above them stay where they were. Passed on the cover alone, the cover's row was a line taller than the
+    turntable's and the titles moved about 23 pt at every swap. The cost, at those sizes alone: the plinth's room is a
+    line shorter."""
+    now = bare(NOW_PLAYING)
+    assert len(re.findall(r"\bScrubberView\(", now)) == 1
+    content = flat(member(now, "func content"))
+    row = content[content.index("ZStack { ScrubberView("):content.index("transport .padding(.top, 12)")]
+    # what is passed reads nothing of the face: the same readout either way
+    opened = row.index("ScrubberView(visible: !turntable && !sheetOver) {") + len("ScrubberView(visible: "
+                                                                                    "!turntable && !sheetOver) ")
+    passed = row[opened:reader.closing(row, opened) + 1]
+    assert passed == "{ NowPlayingReadout() }", passed
+    assert "turntable" not in passed and "turntable" not in member(now, "struct NowPlayingReadout: View")
+    # on the turntable the whole scrubber - its readout with it - is unseen, untouchable and unheard, the time line
+    # in its row
+    assert (".opacity(turntable ? 0 : 1) .allowsHitTesting(!turntable) .accessibilityHidden(turntable) "
+            "if turntable { TurntableTimeLine() .transition(.opacity) } }") in row
+    assert "maxHeight" not in row
 
 
 #? (27 Nov) the scrubber's body: the slider - its bar and its two times, its VoiceOver as it was - then the readout in
@@ -462,7 +486,7 @@ def test_the_titles_row_is_the_titles_alone():
 SCRUBBER_PARTS = (".accessibilityAdjustableAction { direction in", ".layoutValue(key: TimesPartKey.self, value: .scrubber) "
                   "readout .font(Typeface.readout(.caption)) .foregroundStyle(DWPalette.t3) "
                   ".multilineTextAlignment(.center) .layoutValue(key: TimesPartKey.self, value: .readout) "
-                  "WidestTimes(words: TimesReadout.widest(length: length)) "
+                  "WidestTimes(words: TimesReadout.widest(listed: listed, playing: length)) "
                   ".layoutValue(key: TimesPartKey.self, value: .widest) } .onChange(of: track)")
 
 
@@ -487,8 +511,8 @@ def test_the_readout_is_one_line_centred_between_the_times():
     # on the times' line: one line (its own ideal size), centred on the row, its foot the times' foot - the times'
     # face and size, so its baseline is theirs
     layout = flat(member(scrubber, "struct TimesAndReadout: Layout"))
-    assert ("if between(bounds.width, subviews) { readout.place(at: CGPoint(x: bounds.midX, y: bounds.minY + "
-            "slider.height), anchor: .bottom, proposal: .unspecified) }") in layout
+    assert ("if proposal.width == nil || between(bounds.width, subviews) { readout.place(at: CGPoint(x: bounds.midX, "
+            "y: bounds.minY + slider.height), anchor: .bottom, proposal: .unspecified) }") in layout
     # the slider's foot is the times' foot: the clocks its last row, nothing under them (test_ios_readout_rows says so)
     assert ("ScrubberClocks(elapsed: PlayerWords.elapsed(shown: time), remaining: PlayerWords.remaining(shown: time, "
             "length: length)) .equatable() } } .accessibilityElement(children: .ignore)") in body
@@ -533,7 +557,9 @@ def test_where_the_three_dont_fit_the_readout_takes_a_line_of_its_own_measured()
         "{ let clear: CGFloat let under: CGFloat func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, "
         "cache: inout ()) -> CGSize { guard let scrubber = part(.scrubber, of: subviews) else { return .zero } "
         "let slider = scrubber.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil)) "
-        "guard let readout = part(.readout, of: subviews), !between(slider.width, subviews) else { return slider } "
+        "guard let readout = part(.readout, of: subviews) else { return slider } "
+        "guard proposal.width != nil else { return CGSize(width: max(slider.width, CGFloat(oneLine(subviews))), "
+        "height: slider.height) } if between(slider.width, subviews) { return slider } "
         "let own = readout.sizeThatFits(ProposedViewSize(width: slider.width, height: nil)) "
         "return CGSize(width: slider.width, height: slider.height + under + own.height) } "
         "func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) { "
@@ -542,21 +568,27 @@ def test_where_the_three_dont_fit_the_readout_takes_a_line_of_its_own_measured()
         "scrubber.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, "
         "height: slider.height)) part(.widest, of: subviews)?.place(at: bounds.origin, anchor: .topLeading, "
         "proposal: .unspecified) guard let readout = part(.readout, of: subviews) else { return } "
-        "if between(bounds.width, subviews) { readout.place(at: CGPoint(x: bounds.midX, y: bounds.minY + "
-        "slider.height), anchor: .bottom, proposal: .unspecified) } else { readout.place(at: CGPoint(x: bounds.midX, "
-        "y: bounds.minY + slider.height + under), anchor: .top, proposal: ProposedViewSize(width: bounds.width, "
-        "height: nil)) } } private func between(_ width: CGFloat, _ subviews: Subviews) -> Bool { "
-        "guard let readout = part(.readout, of: subviews) else { return true } "
-        "let words = readout.sizeThatFits(.unspecified).width "
+        "if proposal.width == nil || between(bounds.width, subviews) { readout.place(at: CGPoint(x: bounds.midX, "
+        "y: bounds.minY + slider.height), anchor: .bottom, proposal: .unspecified) } else { readout.place(at: "
+        "CGPoint(x: bounds.midX, y: bounds.minY + slider.height + under), anchor: .top, proposal: "
+        "ProposedViewSize(width: bounds.width, height: nil)) } } "
+        "private func between(_ width: CGFloat, _ subviews: Subviews) -> Bool { let (words, time) = "
+        "measured(subviews) return TimesReadout.fitsBetween(readout: words, time: time, width: Double(width), "
+        "clear: Double(clear)) } private func oneLine(_ subviews: Subviews) -> Double { let (words, time) = "
+        "measured(subviews) return TimesReadout.oneLine(readout: words, time: time, clear: Double(clear)) } "
+        "private func measured(_ subviews: Subviews) -> (words: Double, time: Double) { "
+        "let words = part(.readout, of: subviews)?.sizeThatFits(.unspecified).width ?? 0 "
         "let time = part(.widest, of: subviews)?.sizeThatFits(.unspecified).width ?? 0 "
-        "return TimesReadout.fitsBetween(readout: Double(words), time: Double(time), width: Double(width), "
-        "clear: Double(clear)) } private func part(_ which: TimesPart, of subviews: Subviews) -> LayoutSubview? { "
+        "return (Double(words), Double(time)) } "
+        "private func part(_ which: TimesPart, of subviews: Subviews) -> LayoutSubview? { "
         "subviews.first { (subview: LayoutSubview) -> Bool in subview[TimesPartKey.self] == which } } }"), layout
-    # Core's rule: the readout centred on the row clears the wider time by `clear` on both sides; the times at their
-    # widest are the time played at the song's end and the time left at its start
-    rule = flat(member(code(CORE / "TimesReadout.swift"), "public static func fitsBetween"))
-    assert rule == "{ readout + 2 * (time + clear) <= width }", rule
-    widest = flat(member(code(CORE / "TimesReadout.swift"), "public static func widest"))
+    # Core's rule: the readout centred on the row clears the wider time by `clear` on both sides - the row the three
+    # need on one line; the times at their widest are the time played at the song's end and the time left at its start
+    core = code(CORE / "TimesReadout.swift")
+    rule = flat(member(core, "public static func fitsBetween"))
+    assert rule == "{ oneLine(readout: readout, time: time, clear: clear) <= width }", rule
+    assert flat(member(core, "public static func oneLine")) == "{ readout + 2 * (time + clear) }"
+    widest = flat(member(core, "public static func widest(length"))
     assert widest == "{ [PlayerWords.elapsed(shown: length), PlayerWords.remaining(shown: 0, length: length)] }", widest
     # never a text size: nothing in the scrubber, the readout or the scrubber's row reads one
     sizes = re.compile(r"(?i)dynamicTypeSize|isAccessibilitySize|sizeCategory|ContentSizeCategory|DynamicTypeSize")
@@ -566,9 +598,47 @@ def test_where_the_three_dont_fit_the_readout_takes_a_line_of_its_own_measured()
     row = flat(member(now, "func content"))
     row = row[row.index("ZStack { ScrubberView("):row.index("transport .padding(.top, 12)")]
     assert not sizes.search(row), row
-    # a text size where the Layout decides would be a threshold: what it asks of Core is measured widths alone
-    assert "fitsBetween(readout: Double(words), time: Double(time), width: Double(width)" in layout
-    assert "Typeface" not in layout and "CGFloat(" not in layout
+    # a text size where the Layout decides would be a threshold: what it asks of Core is measured widths alone, and
+    # the only figures in it are the nothing measured with nothing to measure
+    assert "fitsBetween(readout: words, time: time, width: Double(width)" in layout
+    assert "Typeface" not in layout and re.findall(r"\b\d+(?:\.\d+)?\b", layout) == ["0", "0"], layout
+
+
+def test_asked_its_ideal_size_the_readout_goes_between_on_one_line():
+    """(after review) With no width proposed - a `.fixedSize()`, a ViewThatFits, an ImageRenderer asking the row's ideal
+    size - the fold was judged against the slider's own ideal width and the readout measured wrapped to it, about three
+    lines: now the readout is measured on one line and goes between the times, the row as wide as the three need
+    (TimesReadout.oneLine), no taller than the slider - and placed between however the row is then laid out."""
+    layout = flat(member(bare(SCRUBBER), "struct TimesAndReadout: Layout"))
+    fits = layout[layout.index("func sizeThatFits"):layout.index("func placeSubviews")]
+    assert fits.index("guard proposal.width != nil else {") < fits.index("if between(slider.width, subviews)")
+    assert ("guard proposal.width != nil else { return CGSize(width: max(slider.width, CGFloat(oneLine(subviews))), "
+            "height: slider.height) }") in fits
+    place = layout[layout.index("func placeSubviews"):layout.index("private func between")]
+    assert "if proposal.width == nil || between(bounds.width, subviews) { readout.place(" in place
+    # measured on one line: the readout's own ideal size, never offered the slider's width to wrap in, until it folds
+    assert layout.count("sizeThatFits(.unspecified)") == 2
+    assert layout.count("readout.sizeThatFits(ProposedViewSize(width: slider.width, height: nil))") == 1
+
+
+def test_the_widest_times_are_the_songs_longer_length():
+    """(after review) Decided once a song: `player.duration` is Navidrome's whole-second length until the engine's first
+    tick swaps in the decoded one, and a song whose two straddle a figure (600 listed, 599.98 decoded) changed line half
+    a second in. The widest times are taken at the longer of the song's listed length and the one playing, so they
+    never shrink within the song (TimesReadoutTests holds the switch and no length at all)."""
+    body = flat(scrubber_body())
+    assert "let length = player.duration let listed = player.current?.track.duration " in body
+    assert "WidestTimes(words: TimesReadout.widest(listed: listed, playing: length))" in body
+    assert "TimesReadout.widest(length:" not in body
+    core = code(CORE / "TimesReadout.swift")
+    assert (flat(member(core, "public static func widest(listed"))
+            == "{ widest(length: songLength(listed: listed, playing: playing)) }")
+    assert (flat(member(core, "public static func songLength"))
+            == "{ [listed ?? 0, playing].filter { (length: Double) -> Bool in length.isFinite && length > 0 }.max() ?? 0 }")
+    tests = (CORE.parents[1] / "Tests" / "DeadwaxCoreTests" / "TimesReadoutTests.swift").read_text(encoding="utf-8")
+    for case in ("noLengthYetIsTheClocksOwnWordsForNone", "theDecodedLengthComingInNeverShrinksTheWidestTimes",
+                 "oneLineIsTheReadoutAndBothTimesClear"):
+        assert f"@Test func {case}()" in tests, case
 
 
 def test_between_at_the_default_size_and_under_at_the_largest():

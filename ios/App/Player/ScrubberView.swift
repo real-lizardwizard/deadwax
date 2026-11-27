@@ -37,7 +37,8 @@ struct ScrubberView<Readout: View>: View {
     /// time line in its place) and Up Next's, Info's, the EQ's and the playlist picker's sheets cover it - and no
     /// frame is drawn for a bar no one sees (review, 15 Nov).
     let visible: Bool
-    /// (27 Nov) What goes between the times: Now Playing's readout (nothing on the turntable).
+    /// (27 Nov) What goes between the times: Now Playing's readout - on both faces, unseen with the scrubber on the
+    /// turntable, so the two faces' rows are one height (after review).
     let readout: Readout
     /// The finger on the bar (one: a phone's bar takes one touch).
     @State private var drag: Scrub.Drag?
@@ -68,6 +69,9 @@ struct ScrubberView<Readout: View>: View {
     var body: some View {
         let track = player.current?.track.id ?? ""
         let length = player.duration
+        // (after review) the song's listed length, Navidrome's: the widest times are taken at the longer of the two,
+        // so the decoded one coming in at the first tick never shrinks them (TimesReadout.widest(listed:playing:))
+        let listed = player.current?.track.duration
         let held = Scrub.dragFor(drag, track: track)
         // VoiceOver's value and its swipes: the ticker's, never the frames'
         let shown = Scrub.shownTime(held, position: player.shownPosition, length: length)
@@ -128,7 +132,7 @@ struct ScrubberView<Readout: View>: View {
                 .foregroundStyle(DWPalette.t3)
                 .multilineTextAlignment(.center)
                 .layoutValue(key: TimesPartKey.self, value: .readout)
-            WidestTimes(words: TimesReadout.widest(length: length))
+            WidestTimes(words: TimesReadout.widest(listed: listed, playing: length))
                 .layoutValue(key: TimesPartKey.self, value: .widest)
         }
         .onChange(of: track) { _, now in drag = Scrub.dragFor(drag, track: now) }
@@ -211,7 +215,9 @@ private struct TimesPartKey: LayoutValueKey {
 /// own `under` them, centred, its words wrapping as they need. Decided by measuring what is drawn - the readout's words
 /// on one line, the times at their widest for the song (WidestTimes, in the times' face) - never by a text size; and
 /// once for the song, so it never jumps as a clock loses a figure. Nothing to say, nothing under the times: the row is
-/// the slider's alone.
+/// the slider's alone. (after review) Asked its ideal size - no width proposed: a fixedSize, a ViewThatFits, an
+/// ImageRenderer - the three go on one line, the row as wide as they need (TimesReadout.oneLine), never the readout
+/// judged against the slider's own ideal width and wrapped to it.
 private struct TimesAndReadout: Layout {
     let clear: CGFloat
     let under: CGFloat
@@ -219,7 +225,12 @@ private struct TimesAndReadout: Layout {
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         guard let scrubber = part(.scrubber, of: subviews) else { return .zero }
         let slider = scrubber.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
-        guard let readout = part(.readout, of: subviews), !between(slider.width, subviews) else { return slider }
+        guard let readout = part(.readout, of: subviews) else { return slider }
+        guard proposal.width != nil else {
+            // no width proposed: the readout on one line between the times, the row as wide as the three need
+            return CGSize(width: max(slider.width, CGFloat(oneLine(subviews))), height: slider.height)
+        }
+        if between(slider.width, subviews) { return slider }
         let own = readout.sizeThatFits(ProposedViewSize(width: slider.width, height: nil))
         return CGSize(width: slider.width, height: slider.height + under + own.height)
     }
@@ -232,7 +243,7 @@ private struct TimesAndReadout: Layout {
         // placed, never seen or heard
         part(.widest, of: subviews)?.place(at: bounds.origin, anchor: .topLeading, proposal: .unspecified)
         guard let readout = part(.readout, of: subviews) else { return }
-        if between(bounds.width, subviews) {
+        if proposal.width == nil || between(bounds.width, subviews) {
             // one line on the times' line: their face and size, so its foot is theirs
             readout.place(at: CGPoint(x: bounds.midX, y: bounds.minY + slider.height), anchor: .bottom,
                           proposal: .unspecified)
@@ -245,11 +256,21 @@ private struct TimesAndReadout: Layout {
     /// The readout goes between the times in a row `width` wide: its words on one line, and the wider time at its
     /// widest, measured as they are drawn.
     private func between(_ width: CGFloat, _ subviews: Subviews) -> Bool {
-        guard let readout = part(.readout, of: subviews) else { return true }
-        let words = readout.sizeThatFits(.unspecified).width
+        let (words, time) = measured(subviews)
+        return TimesReadout.fitsBetween(readout: words, time: time, width: Double(width), clear: Double(clear))
+    }
+
+    /// The row the readout and the two times need on one line.
+    private func oneLine(_ subviews: Subviews) -> Double {
+        let (words, time) = measured(subviews)
+        return TimesReadout.oneLine(readout: words, time: time, clear: Double(clear))
+    }
+
+    /// The readout's words on one line, and the wider time at its widest, as they are drawn (none, none to draw).
+    private func measured(_ subviews: Subviews) -> (words: Double, time: Double) {
+        let words = part(.readout, of: subviews)?.sizeThatFits(.unspecified).width ?? 0
         let time = part(.widest, of: subviews)?.sizeThatFits(.unspecified).width ?? 0
-        return TimesReadout.fitsBetween(readout: Double(words), time: Double(time), width: Double(width),
-                                        clear: Double(clear))
+        return (Double(words), Double(time))
     }
 
     private func part(_ which: TimesPart, of subviews: Subviews) -> LayoutSubview? {

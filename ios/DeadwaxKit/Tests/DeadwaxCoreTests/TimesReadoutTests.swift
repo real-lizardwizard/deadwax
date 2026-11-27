@@ -68,7 +68,41 @@ import Testing
         }
     }
 
+    @Test func noLengthYetIsTheClocksOwnWordsForNone() {
+        // (after review) the length-0 path: no listed length and none decoded, or neither a length at all
+        #expect(TimesReadout.songLength(listed: nil, playing: 0) == 0)
+        #expect(TimesReadout.songLength(listed: 0, playing: 0) == 0)
+        #expect(TimesReadout.songLength(listed: .nan, playing: -1) == 0)
+        #expect(TimesReadout.songLength(listed: .infinity, playing: .nan) == 0)
+        #expect(TimesReadout.widest(listed: nil, playing: 0) == ["0:00", "-0:00"])
+        // one of the two a length: that one
+        #expect(TimesReadout.songLength(listed: nil, playing: 221.4) == 221.4)
+        #expect(TimesReadout.songLength(listed: 221, playing: 0) == 221)
+        #expect(TimesReadout.widest(listed: 221, playing: .nan) == ["3:41", "-3:41"])
+    }
+
+    @Test func theDecodedLengthComingInNeverShrinksTheWidestTimes() {
+        // (after review) Navidrome's whole seconds until the engine's first tick swaps in the decoded length: a song
+        // whose two straddle a figure keeps its widest times - and so its readout's line - when the decoded one comes
+        let before = TimesReadout.widest(listed: 600, playing: 600)
+        let after = TimesReadout.widest(listed: 600, playing: 599.98)
+        #expect(before == ["10:00", "-10:00"] && after == before)
+        // the decoded one alone would have shrunk them by a figure: the line the readout is on could change
+        #expect(TimesReadout.widest(length: 599.98) == ["9:59", "-9:59"])
+        // the decoded one the longer: that one, the words the same as the listed one's
+        #expect(TimesReadout.songLength(listed: 599, playing: 599.98) == 599.98)
+        #expect(TimesReadout.widest(listed: 599, playing: 599) == TimesReadout.widest(listed: 599, playing: 599.98))
+    }
+
     // MARK: between the times, or under them
+
+    @Test func oneLineIsTheReadoutAndBothTimesClear() {
+        // (after review) the row the three need on one line - what a row is asked for with no width proposed
+        #expect(TimesReadout.oneLine(readout: 100, time: 40, clear: 10) == 200)
+        #expect(TimesReadout.oneLine(readout: 0, time: 40, clear: 10) == 100)
+        #expect(TimesReadout.fitsBetween(readout: 100, time: 40,
+                                         width: TimesReadout.oneLine(readout: 100, time: 40, clear: 10), clear: 10))
+    }
 
     @Test func itGoesBetweenWhileItClearsBothTimes() {
         // exactly at the edge: between; a hair over: under

@@ -212,7 +212,8 @@ struct NowPlayingView: View {
             // the titles crossfade between the looks (leading on the cover, centred on the turntable) - a fade, not a
             // slide; in a ZStack, so the two share their place through it
             ZStack {
-                // (R4b) the cover's titles and the readout (coverTitles); the turntable's exactly as they were (titles)
+                // (R4b) the cover's titles, their row the title's alone since 27 Nov (coverTitles); the turntable's
+                // exactly as they were (titles)
                 if turntable {
                     titles(track, centred: true)
                         .transition(.opacity)
@@ -232,13 +233,15 @@ struct NowPlayingView: View {
             }
             .padding(.bottom, 12)
 
-            // the scrubber's row either way: the scrubber on the cover, the time line centred in it on the turntable,
-            // so the swap moves no row (2.1) - and hidden there or under a sheet, no frames drawn for it (review, 15 Nov)
+            // the scrubber's row either way, the readout in it on both faces: the scrubber on the cover, hidden on the
+            // turntable with the time line centred in it, so the swap moves no row (2.1) at any size - and hidden there
+            // or under a sheet, no frames drawn for it (review, 15 Nov)
             ZStack {
                 ScrubberView(visible: !turntable && !sheetOver) {
-                    // (27 Nov) the readout between its times - on the cover alone, so the turntable's row is the
-                    // hidden scrubber's, as it was
-                    if !turntable { NowPlayingReadout() }
+                    // (27 Nov, after review) the readout between its times, passed on the turntable too - unseen and
+                    // unheard there with the scrubber, so where it folds under the times both faces' rows are a line
+                    // taller and nothing jumps at the swap; the plinth's room is that line shorter, at those sizes alone
+                    NowPlayingReadout()
                 }
                 .opacity(turntable ? 0 : 1)
                 .allowsHitTesting(!turntable)

@@ -7654,14 +7654,18 @@ between the scrubber's two times. The Mac's player bar keeps its own, as it was.
 - **655 The title's row, and the readout between the times.** **Not done yet.** On Green Anole, then on Ethan's phone:
   queue an album and open Now Playing. The title, and "Artist — Album" under it, have the whole width with nothing
   beside them - a long title runs on to the right-hand margin before it is cut short. Under the scrubber, one line:
-  the time played at the left, "3 of 11 · FLAC 16/44.1" centred between, the time left at the right, all in the same
-  small typewriter figures, the middle one a shade dimmer than the times. The times are where they were, at the bar's
-  two ends, and the middle one holds still as they count. Skip a song: the number moves on. Play a song added with
-  Play Next: the format alone, still centred. With VoiceOver on, after "Position in the song" it reads "3 of 11, FLAC,
-  16-bit, 44.1 kHz", as before. Make the text the largest accessibility size: the readout takes a line of its own
-  under the times, centred - never beside the title - and the times stay where they were. Tap **Turntable** and back
-  at that size: the turntable is as it was, with no readout of the song's place. (Say whether the middle line reads
-  well between the times, or sits too close to either.)
+  the time played at the left, "3 of 11 · FLAC 16/44.1" in the middle, the time left at the right, all in the same
+  small typewriter figures, the middle one a shade dimmer than the times. The times are at the bar's two ends, as
+  before. The middle one is centred on the screen's width rather than in the gap the times leave, so it sits about
+  3.6 points off that gap's middle (the time left has its minus sign): that way it holds still as the clocks count and
+  gain or lose a figure. Skip a song: the number moves on. Play a song added with Play Next: the format alone, still
+  centred. With VoiceOver on, after "Position in the song" it reads "3 of 11, FLAC, 16-bit, 44.1 kHz", as before. Make
+  the text the largest accessibility size: the readout takes a line of its own under the times, centred - never
+  beside the title - and the bar and its times rise by that line, the titles with them; the play buttons and
+  everything under them stay where they were. Tap **Turntable** and back at that size: nothing jumps - the titles and
+  everything above them stay put through the swap. The turntable shows no readout of the song's place, and at that
+  size alone its record has a line less room. (Say whether the middle line reads well between the times, or sits too
+  close to either.)
 
 ## What it can't do yet
 

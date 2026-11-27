@@ -13,10 +13,30 @@ public enum TimesReadout {
         [PlayerWords.elapsed(shown: length), PlayerWords.remaining(shown: 0, length: length)]
     }
 
+    /// (after review) The same, at the longer of the song's two lengths: `listed`, Navidrome's whole seconds, and
+    /// `playing`, PlayerModel's (the listed one until the engine's first tick swaps in the decoded one). A song whose
+    /// two straddle a figure - 600 listed, 599.98 decoded - keeps "10:00" when the decoded one comes, so its widest
+    /// times never shrink within the song and the readout never changes line half a second in.
+    public static func widest(listed: Double?, playing: Double) -> [String] {
+        widest(length: songLength(listed: listed, playing: playing))
+    }
+
+    /// The longer of the song's two lengths, neither one read when it isn't a length (none, 0, not finite).
+    public static func songLength(listed: Double?, playing: Double) -> Double {
+        [listed ?? 0, playing].filter { (length: Double) -> Bool in length.isFinite && length > 0 }.max() ?? 0
+    }
+
+    /// The row the three need on one line: the readout `readout` wide, centred, and the wider of the two times
+    /// (`time` wide) at either end, `clear` from it on both sides - the readout's own row's width when no width is
+    /// proposed (an ideal size asked), and what a row must hold for it to go between.
+    public static func oneLine(readout: Double, time: Double, clear: Double) -> Double {
+        readout + 2 * (time + clear)
+    }
+
     /// The readout goes between the times: `readout` wide and centred on a row `width` wide, it clears the wider of
     /// the two times (`time` wide, at either end of the row) by `clear` on both sides. Else it takes a line of its own
     /// under them.
     public static func fitsBetween(readout: Double, time: Double, width: Double, clear: Double) -> Bool {
-        readout + 2 * (time + clear) <= width
+        oneLine(readout: readout, time: time, clear: clear) <= width
     }
 }
