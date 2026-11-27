@@ -93,4 +93,66 @@ import Testing
         #expect(kept.count == 2)
         #expect(KeptAlbums.most == 40)
     }
+
+    // MARK: fix 3 - Edit opens without the whole scan
+
+    private static let scanBody = #"{"albums": [{"path": "Portishead/Dummy", "artist": "Portishead", "album": "Dummy"}], "issue_types": {}, "problem": null}"#
+
+    @Test func aKeptScanIsReadBackOnlyForItsServerAndSession() throws {
+        let kept = ScanKept(server: "192.168.3.20:8090", session: "cookie-1", etag: "\"abc\"", body: Data(Self.scanBody.utf8))
+        let bytes = try kept.encoded()
+        #expect(ScanKept.read(bytes, server: "192.168.3.20:8090", session: "cookie-1") == kept)
+        // another person (another session), a sign-in again, another server, logins off: none of theirs
+        #expect(ScanKept.read(bytes, server: "192.168.3.20:8090", session: "cookie-2") == nil)
+        #expect(ScanKept.read(bytes, server: "192.168.3.21:8090", session: "cookie-1") == nil)
+        #expect(ScanKept.read(bytes, server: "192.168.3.20:8090", session: nil) == nil)
+        #expect(ScanKept.read(Data("not a record".utf8), server: "192.168.3.20:8090", session: "cookie-1") == nil)
+        // the cookie itself is never written - only its digest
+        #expect(!String(decoding: bytes, as: UTF8.self).contains("cookie-1"))
+        #expect(ScanKept.who(nil) == "-" && ScanKept.who("") == "-" && ScanKept.who("cookie-1") != ScanKept.who("cookie-2"))
+        // another version is no record
+        let older = String(decoding: bytes, as: UTF8.self).replacingOccurrences(of: #""version":1"#, with: #""version":0"#)
+        #expect(ScanKept.read(Data(older.utf8), server: "192.168.3.20:8090", session: "cookie-1") == nil)
+        // the body is deadwax's, read as a fresh answer is, with the 304's headers laid on
+        let answer = try #require(kept.answer(HTTPResponse(status: 304, headers: ["X-Scanned-At": "1763251200.5",
+                                                                                   "X-Scan-Stale": "1"])))
+        #expect(answer.albums.map(\.path) == ["Portishead/Dummy"])
+        #expect(answer.scannedAt == 1_763_251_200.5 && answer.stale)
+        #expect(ScanKept.folder(server: "192.168.3.20:8090") == ["deadwax", "192%2E168%2E3%2E20%3A8090", "library-scan"])
+    }
+
+    @Test func aScanIsWrittenAndReadInTheCachesFolder() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("speed-a-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let files = ScanFiles(base: base)
+        #expect(files.read(server: "s", session: "c") == nil)
+        let kept = ScanKept(server: "s", session: "c", etag: "\"1\"", body: Data(Self.scanBody.utf8))
+        files.write(kept)
+        #expect(files.read(server: "s", session: "c") == kept)
+        #expect(files.file(server: "s").path.hasSuffix("deadwax/s/library-scan/scan.kept"))
+        // the next person's scan replaces it: one per server
+        let next = ScanKept(server: "s", session: "d", etag: "\"2\"", body: Data(Self.scanBody.utf8))
+        files.write(next)
+        #expect(files.read(server: "s", session: "c") == nil)
+        #expect(files.read(server: "s", session: "d") == next)
+    }
+
+    @Test func theScanIsAskedWithTheKeptETagAndA304IsThatScan() async throws {
+        let (deadwax, transport) = client(session: "s")
+        transport.answer("/deadwax/library/albums", 200, Self.scanBody, headers: ["ETag": "\"abc\"", "X-Scan-Stale": "0"])
+        guard case .fresh(let answer, let etag, let body) = try await deadwax.libraryScanKeeping(ifNoneMatch: nil) else {
+            Issue.record("no answer"); return
+        }
+        #expect(transport.last?.url.query == "tracks=false" && transport.last?.headers["If-None-Match"] == nil)
+        #expect(etag == "\"abc\"" && body == Data(Self.scanBody.utf8) && answer.albums.count == 1)
+        transport.answer("/deadwax/library/albums", 304, "", headers: ["ETag": "\"abc\"", "X-Scanned-At": "5"])
+        guard case .unchanged(let unchanged) = try await deadwax.libraryScanKeeping(ifNoneMatch: "\"abc\"") else {
+            Issue.record("not unchanged"); return
+        }
+        #expect(transport.last?.headers["If-None-Match"] == "\"abc\"")
+        #expect(unchanged.header("X-Scanned-At") == "5")
+        // a 304 to a request that sent no ETag is no answer
+        await #expect(throws: APIFailure.self) { _ = try await deadwax.libraryScanKeeping(ifNoneMatch: nil) }
+    }
+
 }

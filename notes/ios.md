@@ -23936,3 +23936,38 @@ session's read made `if false`), `test_the_kept_answers_are_per_person_and_drop_
 **Not verified (a device):** the album page drawing its songs on the first frame when opened from an artist's page or
 opened again (check 650); that a write made outside the app (the web's Edit) is the one thing a kept answer can't hear
 of - it is replaced as soon as deadwax answers behind it.
+
+### 3. Edit opens without the whole scan
+
+**Confirmed:** LibraryScanModel held the scan and its ETag in memory on the page that asked it, "never on disk", and every
+page that reads it (Choose the folder, Edit album's look-up, the Mac's Edit window, Needs a look, Library care) makes a
+model of its own - so the first read of each page, and above all the first Edit of a launch, sent no `If-None-Match` and
+downloaded every folder of the library (`/library/albums?tracks=false`) to find one.
+
+**Now:** the scan is kept on disk with its ETag, one file per server (`Caches/deadwax/<server>/library-scan/scan.kept`,
+Core's `ScanKept` and `ScanFiles`), for the session that read it: a line of JSON (version, server, the session's FNV-1a
+digest - never the cookie - and the ETag) and then deadwax's body byte for byte. A page's first read (nothing in hand)
+reads it off the main actor and asks with its ETag (`libraryScanKeeping`, a new Core call on the same route, beside
+`libraryScan`, which Server settings still uses); a 304 makes the copy the scan in hand, decoded off the main actor
+with the 304's own headers (deadwax sends X-Scanned-At and X-Scan-Stale on it too). A 200 is drawn as before and kept on
+disk in the copy's place. A copy deadwax vouched for that can't be read is passed over: asked again without an ETag, and
+that answer replaces it. Later reads on the page send the ETag in hand, as before. The decision "never on disk:
+managing shows nothing stale as live" still holds in its point - **the copy is never drawn before deadwax's 304 says it
+is still the scan** - and test_ios_edit.py's `test_the_scan_is_the_editors_own_and_asked_without_tracks` now says so
+(the model itself still touches no FileManager; Core's ScanFiles does).
+
+**What drops what's kept:** deadwax's ETag. The scan's ETag is a digest of its whole body (json_with_etag), so any
+change to the library - an Edit's apply, a delete, a re-file, a filing, a change made elsewhere - is a 200 and the new
+scan replaces the copy. Another person, a sign-in again or a sign-out: another session, whose digest is not the copy's,
+so it is never read for them, and their first fresh scan replaces it. A Rescan's answer is held in memory as before and
+not written (Core's rescan hands back no body); the copy it leaves behind is replaced by the next read's 200. Caches
+is the system's to empty, and never backed up.
+
+**Tests:** SpeedATests `aKeptScanIsReadBackOnlyForItsServerAndSession` (another session, server, logins off, another
+version and garbage are no record; the cookie is never in the bytes; the 304's headers are laid on),
+`aScanIsWrittenAndReadInTheCachesFolder`, `theScanIsAskedWithTheKeptETagAndA304IsThatScan`; test_ios_speed_a.py
+`test_a_pages_first_read_asks_with_the_scan_kept_on_disk`, seen failing with the first read's ETag made nil.
+
+**Not verified (a device or the server log):** the first Edit of a launch answered by a 304 (the server log shows
+`/library/albums` 304 with no body; check 651, and the audit's "finding the folder" timed on a cold launch against a
+second open); how long a big library's copy takes to read and decode off the main actor.

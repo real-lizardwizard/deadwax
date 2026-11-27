@@ -5,7 +5,9 @@ import UIKit
 
 /// The library's scan as Edit album and Choose the folder read it (notes/ios-specs/phase8-managing.md 3.1): every
 /// album folder deadwax's scan lists, without its tracks (`GET /library/albums?tracks=false`), held in memory by the
-/// page that asked it with its ETag - so asking again is a 304 when nothing changed - and never on disk: managing shows
+/// page that asked it with its ETag - so asking again is a 304 when nothing changed. (Speed A, fix 3) And kept on disk
+/// with its ETag, per server and session (Core's ScanKept), so a page's first read - the first Edit of a launch - asks
+/// with it too; the copy on disk is drawn only once deadwax's 304 says it is still the scan, so managing still shows
 /// nothing stale as live. Only the newest read lands; a read that fails keeps what is in hand and says why
 /// (EditWords.said, the library's own words for whoever runs deadwax); a read cancelled is neither, and changes nothing.
 @MainActor
@@ -63,14 +65,35 @@ final class LibraryScanModel {
     }
 
     /// The read `ticket` is: only the newest lands, and its end is told to whoever waits on it (ScanReads.ended).
+    ///
+    /// (Speed A, fix 3) A page's first read sends the ETag of the scan kept on disk for this server and session
+    /// (ScanKept), so an unchanged library is a 304 - and only then is the kept copy the scan in hand, with the 304's
+    /// headers. A fresh answer is kept on disk in its place. A kept copy deadwax vouched for that can't be read is passed
+    /// over: the scan is asked again without its ETag, and that answer replaces it.
     private func fetch(_ client: DeadwaxClient, admin: Bool, ticket: Int) async -> Read {
         reading = true
         do {
-            let got = try await client.libraryScan(ifNoneMatch: answer == nil ? nil : etag)
+            let first = answer == nil
+            let disk = first ? await Self.kept(client) : nil
+            var got = try await client.libraryScanKeeping(ifNoneMatch: first ? disk?.etag : etag)
+            // a 304 to the kept copy's ETag: the copy is the scan - unless it can't be read, then asked again without it
+            var copy: (answer: ScanAnswer, etag: String)?
+            if first, let disk, case .unchanged(let unchanged) = got {
+                if let scan = await Self.decoded(disk, unchanged) {
+                    copy = (scan, disk.etag)
+                } else {
+                    got = try await client.libraryScanKeeping(ifNoneMatch: nil)
+                }
+            }
             guard reads.isNewest(ticket) else { return .dropped }
-            if case .fresh(let fresh, let tag) = got {
+            if let copy {
+                answer = copy.answer
+                etag = copy.etag
+            }
+            if case .fresh(let fresh, let tag, let body) = got {
                 answer = fresh
                 etag = tag
+                Self.keep(client, etag: tag, body: body)
             }
             failed = nil
             reading = false
@@ -83,6 +106,27 @@ final class LibraryScanModel {
             failed = (error, admin)
             return reads.ended(ticket, .failed)
         }
+    }
+
+    /// (Speed A) The scan kept on disk for the client's server and session, read off the main actor - nil for none.
+    private static func kept(_ client: DeadwaxClient) async -> ScanKept? {
+        let server = client.server.key
+        let session = client.session
+        return await Task.detached(priority: .userInitiated) { () -> ScanKept? in
+            ScanFiles.inCaches()?.read(server: server, session: session)
+        }.value
+    }
+
+    /// (Speed A) The kept copy read as the scan, with the 304's headers - decoded off the main actor, as a fresh answer is.
+    private static func decoded(_ disk: ScanKept, _ unchanged: HTTPResponse) async -> ScanAnswer? {
+        await Task.detached(priority: .userInitiated) { () -> ScanAnswer? in disk.answer(unchanged) }.value
+    }
+
+    /// (Speed A) A fresh scan kept on disk as its server's, for the session that read it - written off the main actor.
+    private static func keep(_ client: DeadwaxClient, etag: String?, body: Data) {
+        guard let etag, !etag.isEmpty else { return }
+        let record = ScanKept(server: client.server.key, session: client.session, etag: etag, body: body)
+        Task.detached(priority: .utility) { ScanFiles.inCaches()?.write(record) }
     }
 
     /// (Phase 8, slice 7) Library care's Rescan (`POST /library/rescan?tracks=false`): the cache dropped and every file

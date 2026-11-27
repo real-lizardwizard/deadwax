@@ -7658,6 +7658,9 @@ differently.
   too, and Play plays them straight away. Change something in Edit album (a title, say) and go back to the album: it
   shows the change, not the old songs. Sign out and in as someone else: nothing of the first person's albums shows
   before deadwax answers.
+- **651 Edit album after a restart.** **Not done yet.** Quit the app, open it, and open Edit album on an album (or
+  Settings > Manage > Edit an album): the folder is found sooner than it was on the first try after a restart. Change
+  something in it, quit, open it again and edit it: it shows the change.
 
 ## What it can't do yet
 

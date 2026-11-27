@@ -200,3 +200,34 @@ def test_the_artist_pages_prefetch_fills_the_same_store():
     assert len(loads) == 5 and all(flat(call).endswith("kept: keptStamp)") for call in loads), loads
     # (not `kept`: the body's own `kept` is the Last.fm answer, and its tasks and pull would read that one instead)
     assert "let kept = artists.keptLastfm(route.id)" in view
+
+
+# ---------------------------------------------------------------------------- fix 3: Edit opens without the whole scan
+
+
+def test_a_pages_first_read_asks_with_the_scan_kept_on_disk():
+    scan = code(APP / "Edit" / "LibraryScanModel.swift")
+    fetch = flat(func(scan, "fetch"))
+    # the first read of a page (nothing in hand) sends the kept copy's ETag; later ones the one in hand, as before
+    assert fetch.startswith("reading = true do { let first = answer == nil let disk = first ? await Self.kept(client) : nil"
+                            " var got = try await client.libraryScanKeeping(ifNoneMatch: first ? disk?.etag : etag)")
+    # the copy is the scan only after deadwax's 304 to its ETag - read with the 304's headers; unreadable, asked again
+    assert ("if first, let disk, case .unchanged(let unchanged) = got { if let scan = await Self.decoded(disk, unchanged)"
+            " { copy = (scan, disk.etag) } else { got = try await client.libraryScanKeeping(ifNoneMatch: nil) } }") in fetch
+    # only the newest read lands, the copy or a fresh answer - which is kept on disk in its place
+    assert ("guard reads.isNewest(ticket) else { return .dropped } if let copy { answer = copy.answer etag = copy.etag }"
+            " if case .fresh(let fresh, let tag, let body) = got { answer = fresh etag = tag"
+            " Self.keep(client, etag: tag, body: body) }") in fetch
+    # per server and per session, off the main actor; written only with an ETag to ask by
+    kept = flat(func(scan, "kept"))
+    assert "ScanFiles.inCaches()?.read(server: server, session: session)" in kept and "Task.detached" in kept
+    keep = flat(func(scan, "keep"))
+    assert keep.startswith("guard let etag, !etag.isEmpty else { return }")
+    assert "ScanKept(server: client.server.key, session: client.session, etag: etag, body: body)" in keep
+    assert "Task.detached(priority: .utility) { ScanFiles.inCaches()?.write(record) }" in keep
+    assert "disk.answer(unchanged)" in func(scan, "decoded") and "Task.detached" in func(scan, "decoded")
+    # Core's: the copy is read back only for the server and session that wrote it, in Caches, the cookie never written
+    rules = code(CORE / "ScanKept.swift")
+    assert "head.server.utf16.elementsEqual(server.utf16), head.who.utf16.elementsEqual(who(session).utf16)" in rules
+    assert "return SessionFile.fnv1a(session)" in rules
+    assert "FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)" in rules

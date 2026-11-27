@@ -307,8 +307,9 @@ def test_nothing_in_edit_album_opens_a_url():
 
 def test_the_scan_is_the_editors_own_and_asked_without_tracks():
     scan = code(SCAN)
-    assert "client.libraryScan(ifNoneMatch:" in scan
-    # never written to disk: managing shows nothing stale as live
+    assert "client.libraryScanKeeping(ifNoneMatch:" in scan
+    # (Speed A, fix 3) kept on disk only through Core's ScanFiles, for its ETag - drawn only once deadwax's 304 says it
+    # is still the scan, so managing shows nothing stale as live (tests/test_ios_speed_a.py): never by the model itself
     for word in ("FileManager", "UserDefaults", "write(to:"):
         assert word not in scan, word
     core = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "EditClient.swift").read_text(encoding="utf-8")
