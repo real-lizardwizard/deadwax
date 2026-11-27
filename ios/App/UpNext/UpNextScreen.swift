@@ -47,19 +47,26 @@ import SwiftUI
 /// small views of their own, so a download's progress redraws them, never this list.
 ///
 /// RADIO AND AUTOPLAY (Last.fm, slice A3 - deadwax-plans/lastfm.md 3.5; notes/ios.md "Last.fm, slice A3"): while Last.fm
-/// is on, "Autoplay" after Repeat - on the phone the foot's flat button as Shuffle's and Repeat's, on the Mac the panel's
-/// chip with `infinity` - lit and "selected" while on, its hint "Keeps playing similar songs from your library when the
+/// is on, "Autoplay" after Repeat - on the phone the foot's flat button as Shuffle's and Repeat's, on the Mac (R16) the
+/// dock header's `.btn.sm` - lit and "selected" while on, its hint "Keeps playing similar songs from your library when the
 /// queue ends." Off by default. The rows Autoplay gave the queue, the list's tail, are drawn under a heading of their
 /// own, "Autoplay" (Core's Station.split), after the list's own under its title; a radio's songs are the list itself.
 /// They come out in Edit as any of the list's rows, and move among themselves (a drag stays under its heading, as it
 /// stays in its group; the move is made in the whole list's places). Shuffle is dimmed while the queue has a station,
 /// as during a library's shuffle.
+///
+/// (The panel review's R16 - notes/ios.md "The panel review, R16: the Mac's dock tabs (2026-11-26)"; Album.dc.html's
+/// panel) In the Mac's dock no bar, no title, no Done - Escape is the panel's (MacPanel), and Done's while in Edit: a
+/// DockHeader with Shuffle, Repeat and Autoplay as `.btn.sm`s lit while on, History and Clear at the right (in a •••
+/// where the panel's 400 can't hold them all), then Edit (Done in it); `.navh` headings - Playing, Playing Next, "Next
+/// from …", Autoplay - over the song playing (a row 44 tall on the selection's ground at a box's corners) and the rows,
+/// each at View ▸ Row Size's height (DockQueueRow); the time left at the foot as before.
 struct UpNextScreen: View {
     /// (R3b) In the sheet over Now Playing (iQueue): `‹ Now Playing` and the strip at its top, History, Clear and Edit at
     /// the top's right, the song playing as the selected row first - (R3b's review) no heading over it, nor over
     /// Playing Next's songs after it: the top has said where the page is - "Next from …" over the list, rows 48 tall,
-    /// and Shuffle, Repeat and the time left at its foot. Nil in the Mac's side panel, which keeps its list as it
-    /// was, with the time left at its foot in the Mac's look.
+    /// and Shuffle, Repeat and the time left at its foot. Nil in the Mac's side panel (R16: the dock's header, `.navh`s
+    /// and rows), with the time left at its foot in the Mac's look.
     var sheet: SheetTop?
 
     @Environment(PlayerModel.self) private var player
@@ -113,9 +120,8 @@ struct UpNextScreen: View {
         var placed = false
     }
 
-    /// The covers' sizes: the song playing's, and a row's - (R3b) on the phone the selected row's alone, iQueue's
-    /// `.row.tall .cover` (44): its rows have none.
-    private static let playingCover: CGFloat = 64
+    /// (R3b) The phone's selected row's cover, iQueue's `.row.tall .cover` (44): its rows have none - (R16) nor the
+    /// dock's, whose song playing's is DockLook's.
     private static let rowCover: CGFloat = 44
     /// (R3b) iQueue: its rows' sides (`.row > div` padding 16; the Mac's dock's 10), the heading's room under its words
     /// (`.row.grp` padding-bottom 6), and the foot (`.f` height 60, gap 8, padding 0 16px).
@@ -160,7 +166,7 @@ struct UpNextScreen: View {
                                         VStack(alignment: .leading, spacing: 8) {
                                             ErrorNote(failure, failed: UpNextWords.earlierFailed, retry: true)
                                             Button(UpNextWords.tryAgain) { history.retry() }
-                                                .buttonStyle(.borderless)
+                                                .modifier(QueueTryAgain(phone: phone))
                                         }
                                         .modifier(QueuePhoneNote(phone: phone, side: Self.side))
                                     }
@@ -188,17 +194,16 @@ struct UpNextScreen: View {
                                         .onAppear { seen.ids.insert(Self.card) }
                                         .onDisappear { seen.ids.remove(Self.card) }
                                 } else {
-                                    playingCard(playing)
+                                    //? (R16) the dock's: under its `.navh`, the selected row - Shuffle and Repeat are
+                                    //? the dock's header's
+                                    macHeading(MacDock.Words.playing)
+                                    macPlaying(playing)
                                         .id(Self.card)
                                         .onAppear { seen.ids.insert(Self.card) }
                                         .onDisappear { seen.ids.remove(Self.card) }
                                 }
                                 if view.repeatOne {
                                     note(UpNextWords.repeatingOne)
-                                }
-                                //? (R3b) on the phone Shuffle and Repeat are the foot's
-                                if !phone {
-                                    modes
                                 }
                                 if player.paged != nil {
                                     note(UpNextWords.shufflingLibrary)
@@ -215,23 +220,12 @@ struct UpNextScreen: View {
                                         }
                                     }
                                 } else {
+                                    //? (R16) under its `.navh`; Clear is the dock's header's
                                     Section {
+                                        macHeading(UpNextWords.playingNext)
                                         rows(view.added, lines: true) { index in
                                             view.added.indices.contains(index + 1) ? view.added[index + 1] : listRows.first
                                         }
-                                    } header: {
-                                        Group {
-                                            HStack {
-                                                Text(UpNextWords.playingNext)
-                                                    .accessibilityAddTraits(.isHeader)
-                                                Spacer()
-                                                Button(UpNextWords.clear, action: clear)
-                                                    .buttonStyle(.borderless)
-                                                    .font(Typeface.subheadline)
-                                            }
-                                            .textCase(nil)
-                                        }
-                                        .font(Typeface.footnote)
                                     }
                                 }
                             }
@@ -265,37 +259,28 @@ struct UpNextScreen: View {
                                         }
                                     }
                                 } else {
+                                    //? (R16) Album.dc.html's: "Next from …" a `.navh` over the list's rows - an album's
+                                    //? its titles, as the phone's - then Autoplay's under theirs
                                     if let list = split.list {
                                         Section {
+                                            macHeading(QueuePageWords.heading(list.title))
                                             //? (2.1.3) Playing Next is carried after a list row tapped: what plays next
                                             //? is its head
-                                            rows(whole.rows, lines: true, part: 0..<own) { index in
+                                            rows(whole.rows, lines: QueuePageWords.showsLines(list.rows, title: list.title),
+                                                 part: 0..<own) { index in
                                                 view.added.first ?? (whole.rows.indices.contains(index + 1) ? whole.rows[index + 1] : nil)
                                             }
                                             if list.more > 0 {
                                                 note(UpNextWords.more(list.more))
                                             }
-                                        } header: {
-                                            Group {
-                                                Text(list.title)
-                                                    .textCase(nil)
-                                                    .accessibilityAddTraits(.isHeader)
-                                            }
-                                            .font(Typeface.footnote)
                                         }
                                     }
                                     if !split.autoplay.isEmpty {
                                         Section {
+                                            macHeading(LastfmWords.autoplay)
                                             rows(whole.rows, lines: true, part: own..<whole.rows.count) { index in
                                                 view.added.first ?? (whole.rows.indices.contains(index + 1) ? whole.rows[index + 1] : nil)
                                             }
-                                        } header: {
-                                            Group {
-                                                Text(LastfmWords.autoplay)
-                                                    .textCase(nil)
-                                                    .accessibilityAddTraits(.isHeader)
-                                            }
-                                            .font(Typeface.footnote)
                                         }
                                     }
                                 }
@@ -316,9 +301,10 @@ struct UpNextScreen: View {
                     //? (app 0.8) an older page on its way: over the list's top, so nothing in it moves
                     .overlay(alignment: .top) {
                         if history.loading && !editing {
+                            //? (R16) no material: the sheet's own ground on the phone, a box of the look's on the Mac
                             ProgressView()
                                 .padding(10)
-                                .background(.regularMaterial, in: Corners.cardShape)
+                                .modifier(QueueLoadingGround(phone: phone))
                                 .padding(.top, 8)
                                 .accessibilityLabel(UpNextWords.loadingEarlier)
                         }
@@ -362,7 +348,7 @@ struct UpNextScreen: View {
                     .queueTop(sheet) {
                         phoneTop(view, editable: editable, earlier: !past.isEmpty || !view.history.isEmpty, proxy: proxy)
                     } mac: {
-                        macToolbar(editable: editable)
+                        macTop(view, editable: editable, earlier: !past.isEmpty || !view.history.isEmpty, proxy: proxy)
                     }
                 }
             }
@@ -384,26 +370,87 @@ struct UpNextScreen: View {
 
     // MARK: the tops (R3b)
 
-    /// The Mac's side panel's toolbar, as it was: its title, Edit at the left, Done at the right.
-    @ToolbarContentBuilder
-    private func macToolbar(editable: Bool) -> some ToolbarContent {
-        ToolbarItem(placement: .cancellationAction) {
-            if !editing && editable {
-                Button(UpNextWords.edit) {
+    /// (R16) The Mac's dock's header (Album.dc.html's): Shuffle, Repeat and Autoplay at the left (macModes); History
+    /// and Clear at the right, out of Edit - in a ••• where the panel's 400 can't hold them beside the three (Autoplay
+    /// with "Repeat one": test_ios_dock_look.py works it out); then Edit, Done while editing - focused after a change with
+    /// nothing left to focus, dimmed with nothing to edit, and Escape's while editing, which holds the panel's Escape
+    /// (`dockHoldsEscape`) so Escape ends Edit before it puts the panel away.
+    private func macTop(_ view: UpNextView, editable: Bool, earlier: Bool, proxy: ScrollViewProxy) -> some View {
+        let clearable = !view.added.isEmpty
+        return DockHeader {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: DockLook.headerGap) {
+                    macModes
+                    Spacer(minLength: 0)
+                    if !editing {
+                        Button(UpNextWords.history) { toHistory(proxy) }
+                            .disabled(!earlier)
+                        Button(UpNextWords.clear, action: clear)
+                            .disabled(!clearable)
+                    }
+                }
+                HStack(spacing: DockLook.headerGap) {
+                    macModes
+                    Spacer(minLength: 0)
+                    if !editing {
+                        Menu {
+                            Button(UpNextWords.history) { toHistory(proxy) }
+                                .disabled(!earlier)
+                            Button(UpNextWords.clear, action: clear)
+                                .disabled(!clearable)
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .accessibilityLabel(QueuePageWords.more)
+                        }
+                        .menuStyle(.button)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                    }
+                }
+            }
+        } trailing: {
+            Button(editing ? UpNextWords.done : UpNextWords.edit) {
+                if editing {
+                    editing = false
+                } else {
                     editing = true
                     refocus(.done)
                 }
             }
-        }
-        ToolbarItem(placement: .confirmationAction) {
-            Button(UpNextWords.done) {
-                if editing { editing = false } else { close() }
-            }
+            .disabled(!editing && !editable)
             .accessibilityFocused($focus, equals: .done)
-            // (the Mac app, slice 3) a panel's Done: Escape's after a field with the cursor, before the page's
-            // Edit (MacFrame.escape - one owner)
-            .escapeCloses(MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)
+            // (R16) Escape ends Edit first - MacFrame.escape's panel, the panel's own key standing aside meanwhile
+            .escapeCloses(editing && MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)
         }
+        .background(DWPalette.panel)
+        .dockHoldsEscape(editing)
+    }
+
+    /// (R16) The dock's Shuffle, Repeat and (Last.fm, A3) Autoplay, as `.btn.sm`s: each lit while on (`.btn.on`) and
+    /// "selected" to VoiceOver - Shuffle dimmed during a library's shuffle, and while the queue has a station; Autoplay
+    /// only while Last.fm is on, with its hint. One group for VoiceOver, as the chips were.
+    private var macModes: some View {
+        let mode = player.repeatMode
+        return HStack(spacing: DockLook.headerGap) {
+            Button(UpNextWords.shuffle, action: toggleShuffle)
+                .buttonStyle(DWButtonStyle(kind: player.shuffle ? .on : .normal, size: .small))
+                .disabled(player.paged != nil || player.stationHoldsShuffle)
+                .accessibilityAddTraits(player.shuffle ? .isSelected : [])
+                .accessibilityFocused($focus, equals: .shuffle)
+            Button(repeatLabel(mode), action: cycleRepeat)
+                .buttonStyle(DWButtonStyle(kind: mode != .off ? .on : .normal, size: .small))
+                .accessibilityAddTraits(mode != .off ? .isSelected : [])
+            if server.access.lastfm == .on {
+                Button(LastfmWords.autoplay, action: toggleAutoplay)
+                    .buttonStyle(DWButtonStyle(kind: player.autoplay ? .on : .normal, size: .small))
+                    .accessibilityAddTraits(player.autoplay ? .isSelected : [])
+                    .accessibilityHint(LastfmWords.autoplayHint)
+                    .help(LastfmWords.autoplayHint)
+            }
+        }
+        .fixedSize()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(UpNextWords.modesGroup)
     }
 
     /// (R3b) The phone's top's right (iQueue's): History - the songs before the one playing, scrolled to - and Clear,
@@ -607,37 +654,65 @@ struct UpNextScreen: View {
 
     // MARK: the song playing, and Shuffle and Repeat
 
-    private func playingCard(_ playing: QueueTrack) -> some View {
-        HStack(spacing: 12) {
-            CoverImage(id: playing.coverArt, size: Self.playingCover)
-                .frame(width: Self.playingCover, height: Self.playingCover)
-                .clipShape(Corners.artShape)
-            VStack(alignment: .leading, spacing: 2) {
-                let line = UpNextWords.songLine(artist: playing.artist, album: playing.album)
-                if line.isEmpty {
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(playing.title)
-                            .font(Typeface.headline)
-                        UpNextSongMark(songID: playing.id)
-                    }
-                } else {
-                    Text(playing.title)
-                        .font(Typeface.headline)
-                    HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(line)
-                            .font(Typeface.subheadline)
-                            .foregroundStyle(Palette.quiet)
-                        UpNextSongMark(songID: playing.id)
-                    }
+    /// (R16) The dock's song playing (Album.dc.html's `.row.on`): 44 tall on the selection's ground and edge at a box's
+    /// corners, 8 in from the panel's sides - its cover (30), its title, "Artist · Album" under it, its mark and its
+    /// length in Courier Prime at the right. One element and a heading, as the card was; marked, never dimmed.
+    private func macPlaying(_ playing: QueueTrack) -> some View {
+        let line = UpNextWords.songLine(artist: playing.artist, album: playing.album)
+        return HStack(spacing: DockLook.rowSide) {
+            CoverImage(id: playing.coverArt, size: DockLook.playingCover)
+                .frame(width: DockLook.playingCover, height: DockLook.playingCover)
+                .clipShape(DWCorners.chipShape)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(playing.title)
+                    .font(DockType.words.weight(.semibold))
+                    .lineLimit(1)
+                    .help(playing.title)
+                if !line.isEmpty {
+                    Text(line)
+                        .font(DockType.small)
+                        .lineLimit(1)
+                        .help(line)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            UpNextSongMark(songID: playing.id)
+            Text(AboutCard.trackTime(playing.duration))
+                .font(DockType.smallReadout)
+                .frame(width: DockLook.lengthWidth, alignment: .trailing)
         }
+        .foregroundStyle(DWPalette.selt)
+        .padding(.horizontal, DockLook.rowSide)
+        .frame(height: DockLook.playingRow)
+        .background(DWPalette.selbg, in: DWCorners.boxShape)
+        .overlay(DWCorners.boxShape.strokeBorder(DWPalette.selbd, lineWidth: 1))
         .accessibilityElement(children: .combine)
         //? (2.1.3) the song playing's title a heading, as the web's: between History and what's to come
         .accessibilityAddTraits(.isHeader)
-        //? marked, never dimmed: the song playing is the player's to speak for (7.3's stopped line)
         .modifier(UpNextDownload(songID: playing.id, part: .card))
+        .dockListRow(rule: false)
     }
+
+    /// (R16) A `.navh` in the dock's list - Playing, Playing Next, "Next from …", Autoplay: 11.5 semibold in the label's
+    /// colour, 13 above and 4 below, at the header's 12 from the panel's side; a heading for VoiceOver.
+    private func macHeading(_ words: String) -> some View {
+        Text(words)
+            .font(DockType.heading)
+            .foregroundStyle(DWPalette.label)
+            .lineLimit(1)
+            //? (R16's review) "Next from …" cut short in the 400 keeps its whole for the pointer
+            .help(words)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, DockLook.headerSide - DockLook.rowInset)
+            .padding(.top, Self.navhAbove)
+            .padding(.bottom, Self.navhBelow)
+            .accessibilityAddTraits(.isHeader)
+            .dockListRow(rule: false)
+    }
+
+    /// (R16) `.navh`'s room: 13 above its words, 4 below.
+    private static let navhAbove: CGFloat = 13
+    private static let navhBelow: CGFloat = 4
 
     /// (R3b) The phone's song playing (iQueue's `.row.tall.on`): the selected row - the selection's ground, edge and
     /// words - 60 tall at least, its cover 44, its title, "Artist · Album" under it and its length at the right, square.
@@ -701,57 +776,10 @@ struct UpNextScreen: View {
                 .modifier(QueuePhoneNote(phone: true, side: Self.side))
         } else {
             Text(words)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
-        }
-    }
-
-    /// The Mac's chips: Shuffle, Repeat and (Last.fm, A3) Autoplay after it, while Last.fm is on. (A3's review) The three
-    /// don't fit on one line of the 400-point panel's inset row with "Repeat one" (test_ios_lastfm_a3.py works it out),
-    /// so where they don't, Autoplay goes on a line of its own under the two - the text capped at xxxLarge, as the
-    /// phone's foot is. The chips don't read the Row Size: it sizes rows, not words.
-    private var modes: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: Self.chipGap) {
-                shuffleChip
-                repeatChip
-                autoplayChip
-                Spacer(minLength: 0)
-            }
-            VStack(alignment: .leading, spacing: Self.chipGap) {
-                HStack(spacing: Self.chipGap) {
-                    shuffleChip
-                    repeatChip
-                    Spacer(minLength: 0)
-                }
-                autoplayChip
-            }
-        }
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(UpNextWords.modesGroup)
-    }
-
-    /// The gap between the Mac's chips, and between their lines.
-    private static let chipGap: CGFloat = 8
-
-    private var shuffleChip: some View {
-        Chip(glyph: "shuffle", label: UpNextWords.shuffle, on: player.shuffle,
-             enabled: player.paged == nil && !player.stationHoldsShuffle, action: toggleShuffle)
-            .accessibilityFocused($focus, equals: .shuffle)
-    }
-
-    private var repeatChip: some View {
-        let mode = player.repeatMode
-        return Chip(glyph: mode == .one ? "repeat.1" : "repeat", label: repeatLabel(mode), on: mode != .off, enabled: true,
-                    action: cycleRepeat)
-    }
-
-    //? (Last.fm, A3) Autoplay after Repeat, while Last.fm is on
-    @ViewBuilder private var autoplayChip: some View {
-        if server.access.lastfm == .on {
-            Chip(glyph: LastfmWords.autoplaySymbol, label: LastfmWords.autoplay, on: player.autoplay, enabled: true,
-                 hint: LastfmWords.autoplayHint, action: toggleAutoplay)
+                .font(DockType.label)
+                .foregroundStyle(DWPalette.t3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .modifier(QueuePhoneNote(phone: false, side: DockLook.rowSide))
         }
     }
 
@@ -880,14 +908,16 @@ struct UpNextScreen: View {
             .lookHeight(DWLook.here.rowHeight)
             .contentShape(Rectangle())
         } else {
-            HStack(spacing: 12) {
-                CoverImage(id: track.coverArt, size: Self.rowCover)
-                    .frame(width: Self.rowCover, height: Self.rowCover)
-                    .clipShape(Corners.artShape)
-                text(track, lines: true)
-                Spacer(minLength: 0)
-            }
-            .contentShape(Rectangle())
+            macWords(track, lines: lines)
+        }
+    }
+
+    /// (R16) A row's words in the dock (DockQueueRow): its title, its line where `lines` says so, its mark and its
+    /// length - at View ▸ Row Size's height.
+    private func macWords(_ track: QueueTrack, lines: Bool) -> some View {
+        DockQueueRow(title: track.title, line: lines ? UpNextWords.songLine(artist: track.artist, album: track.album) : "",
+                     length: AboutCard.trackTime(track.duration)) {
+            UpNextSongMark(songID: track.id)
         }
     }
 
@@ -898,22 +928,40 @@ struct UpNextScreen: View {
         let title = row.track.title
         let line = UpNextWords.songLine(artist: row.track.artist, album: row.track.album)
         return HStack(spacing: 8) {
-            Button {
-                remove(row, at: index, in: rows)
-            } label: {
-                Image(systemName: "minus.circle.fill")
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .red)
-                    .font(Typeface.symbol(.title3))
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
+            if phone {
+                Button {
+                    remove(row, at: index, in: rows)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, .red)
+                        .font(Typeface.symbol(.title3))
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityHidden(true)
+                //? offline, only the words and the mark dim: the minus and the handle stay whole, and work
+                text(row.track, lines: lines)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .modifier(UpNextDownload(songID: row.track.id, part: .look))
+            } else {
+                //? (R16) the dock's: the red (-) in the look's red, at the row's height, then the row's words
+                Button {
+                    remove(row, at: index, in: rows)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(DWPalette.text, DWPalette.redChipText)
+                        .font(DockType.words)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.leading, DockLook.rowSide)
+                .accessibilityHidden(true)
+                macWords(row.track, lines: lines)
+                    .modifier(UpNextDownload(songID: row.track.id, part: .look))
             }
-            .buttonStyle(.borderless)
-            .accessibilityHidden(true)
-            //? offline, only the words and the mark dim: the minus and the handle stay whole, and work
-            text(row.track, lines: lines)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .modifier(UpNextDownload(songID: row.track.id, part: .look))
         }
         //? (R3b) the phone's row: 48 tall at least, as out of Edit
         .modifier(QueueRowHeight(phone: phone))
@@ -947,34 +995,22 @@ struct UpNextScreen: View {
             } else {
                 title(track.title)
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    if phone {
-                        Text(line)
-                            .font(Typeface.Phone.text(.small))
-                            .foregroundStyle(DWPalette.t2)
-                            .lineLimit(1)
-                    } else {
-                        Text(line)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
-                    }
+                    Text(line)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
+                        .lineLimit(1)
                     UpNextSongMark(songID: track.id)
                 }
             }
         }
     }
 
-    /// A row's title: the Mac's as it was; (R3b) the phone's at the row's 16 in white, on one line.
-    @ViewBuilder
+    /// A row's title: (R3b) the phone's at the row's 16 in white, on one line - (R16) the Mac's words are DockQueueRow's.
     private func title(_ words: String) -> some View {
-        if phone {
-            Text(words)
-                .font(Typeface.Phone.text(.row))
-                .foregroundStyle(DWPalette.text)
-                .lineLimit(1)
-        } else {
-            Text(words)
-                .foregroundStyle(.primary)
-        }
+        Text(words)
+            .font(Typeface.Phone.text(.row))
+            .foregroundStyle(DWPalette.text)
+            .lineLimit(1)
     }
 
     // MARK: what each change does
@@ -1090,36 +1126,41 @@ private struct UpNextDownload: ViewModifier {
     }
 }
 
-/// Shuffle or Repeat as Up Next's chip: its glyph and its words, pressed (VoiceOver's "selected") and tinted while on -
-/// and (Last.fm, A3) Autoplay, with its hint.
-private struct Chip: View {
-    let glyph: String
-    let label: String
-    let on: Bool
-    let enabled: Bool
-    var hint: String = ""
-    let action: () -> Void
+/// (R16) The ground under the loading spinner over the list's top, in place of the material - (R16's review) the
+/// sheet's own ground on the phone, square, with no edge (R1c: no grey box), so it only hides the rows under it; on the
+/// Mac a box of the look's, the card's ground with its hairline at a box's corners.
+private struct QueueLoadingGround: ViewModifier {
+    let phone: Bool
 
-    var body: some View {
-        Button(action: action) {
-            Label(label, systemImage: glyph)
-                .font(Typeface.subheadline.weight(.medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .foregroundStyle(on ? Color.black : Color.primary)
-                .background(on ? AnyShapeStyle(Palette.accent) : AnyShapeStyle(Color.primary.opacity(0.12)),
-                            in: Corners.controlShape)
-                .contentShape(Corners.controlShape)
+    @ViewBuilder func body(content: Content) -> some View {
+        if phone {
+            content
+                .background(DWPalette.panel)
+        } else {
+            content
+                .background(DWPalette.card, in: DWCorners.boxShape)
+                .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line))
         }
-        .buttonStyle(.borderless)
-        .disabled(!enabled)
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .accessibilityHint(hint)
+    }
+}
+
+/// (R16) The history's Try again: the phone's words in the accent (R3b's, as it was), the Mac's a `.btn.sm`.
+private struct QueueTryAgain: ViewModifier {
+    let phone: Bool
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if phone {
+            content
+                .buttonStyle(.borderless)
+        } else {
+            content
+                .buttonStyle(DWButtonStyle(size: .small))
+        }
     }
 }
 
 /// (R3b) The Queue's list: on the phone iQueue's plain list on the sheet's ground - its own rows, hairlines and
-/// headings, none of the system's - and on the Mac the inset list it was.
+/// headings, none of the system's - and (R16) on the Mac the same, on the panel's ground: the dock's rows and `.navh`s.
 private struct QueueListLook: ViewModifier {
     let phone: Bool
 
@@ -1132,7 +1173,11 @@ private struct QueueListLook: ViewModifier {
                 .environment(\.defaultMinListRowHeight, 0)
         } else {
             content
-                .listStyle(.insetGrouped)
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .listSectionSpacing(0)
+                .environment(\.defaultMinListRowHeight, 0)
+                .background(DWPalette.panel)
         }
     }
 }
@@ -1153,12 +1198,15 @@ private struct QueuePhoneRow: ViewModifier {
                 .listRowSeparator(.hidden)
                 .listRowBackground(DWPalette.panel)
         } else {
+            //? (R16) the dock's row: 8 in from the panel's sides, its rowline under it
             content
+                .dockListRow(rule: rule)
         }
     }
 }
 
-/// (R3b) A row's height in Edit on the phone: 48 at least, as out of Edit (DWLook's rowHeight); the Mac's as it was.
+/// (R3b) A row's height in Edit on the phone: 48 at least, as out of Edit (DWLook's rowHeight); (R16) the Mac's its
+/// words' own (DockQueueRow's, at View ▸ Row Size's height).
 private struct QueueRowHeight: ViewModifier {
     let phone: Bool
 
@@ -1172,7 +1220,7 @@ private struct QueueRowHeight: ViewModifier {
 }
 
 /// (R3b) A note in the phone's list - a line under a group, History's failure - at the rows' side, with room above and
-/// below; as it was on the Mac.
+/// below; (R16) on the Mac the same, at the dock's rows' side.
 private struct QueuePhoneNote: ViewModifier {
     let phone: Bool
     let side: CGFloat
@@ -1187,6 +1235,9 @@ private struct QueuePhoneNote: ViewModifier {
                 .listRowBackground(DWPalette.panel)
         } else {
             content
+                .padding(.horizontal, side)
+                .padding(.vertical, side / 2)
+                .dockListRow(rule: false)
         }
     }
 }
@@ -1214,16 +1265,16 @@ private struct QueueTimeLeftLine: View {
 
 extension View {
     /// (R3b) The Queue's top: in the sheet over Now Playing the sheet's (`‹ Now Playing`, the strip, and the page's own
-    /// at its right); in the Mac's side panel its title and toolbar, as it was.
+    /// at its right); (R16) in the Mac's side panel no bar - the dock's header (DockHeader) at the top of the page.
     @ViewBuilder
-    fileprivate func queueTop<Phone: View, Mac: ToolbarContent>(_ sheet: SheetTop?, @ViewBuilder phone: () -> Phone,
-                                                               @ToolbarContentBuilder mac: () -> Mac) -> some View {
+    fileprivate func queueTop<Phone: View, Mac: View>(_ sheet: SheetTop?, @ViewBuilder phone: () -> Phone,
+                                                      @ViewBuilder mac: () -> Mac) -> some View {
         if let sheet {
             sheetTop(sheet, trailing: phone)
         } else {
-            navigationTitle(UpNextWords.title)
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar(content: mac)
+            let top = mac()
+            self.toolbar(.hidden, for: .navigationBar)
+                .safeAreaInset(edge: .top, spacing: 0) { top }
         }
     }
 }

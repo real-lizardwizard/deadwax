@@ -185,21 +185,16 @@ def test_the_chip_is_after_repeat_on_both_and_only_while_lastfm_is_on():
             ".buttonStyle(DWButtonStyle(kind: player.autoplay ? .on : .normal)) "
             ".accessibilityAddTraits(player.autoplay ? .isSelected : []) "
             ".accessibilityHint(LastfmWords.autoplayHint) } }") in buttons
-    # the Mac's: the panel's chip, with `infinity`, after Repeat's - on its line, or (A3's review) on its own under it
-    modes = inner(queue, "private var modes: some View {")
-    assert modes == ("ViewThatFits(in: .horizontal) { HStack(spacing: Self.chipGap) { shuffleChip repeatChip "
-                     "autoplayChip Spacer(minLength: 0) } VStack(alignment: .leading, spacing: Self.chipGap) { "
-                     "HStack(spacing: Self.chipGap) { shuffleChip repeatChip Spacer(minLength: 0) } autoplayChip } } "
-                     ".dynamicTypeSize(...DynamicTypeSize.xxxLarge) .accessibilityElement(children: .contain) "
-                     ".accessibilityLabel(UpNextWords.modesGroup)")
-    assert inner(queue, "@ViewBuilder private var autoplayChip: some View {") == (
-        "if server.access.lastfm == .on { Chip(glyph: LastfmWords.autoplaySymbol, label: LastfmWords.autoplay, "
-        "on: player.autoplay, enabled: true, hint: LastfmWords.autoplayHint, action: toggleAutoplay) }")
-    assert inner(queue, "private var repeatChip: some View {") == (
-        'let mode = player.repeatMode return Chip(glyph: mode == .one ? "repeat.1" : "repeat", label: '
-        "repeatLabel(mode), on: mode != .off, enabled: true, action: cycleRepeat)")
-    chip = body(queue, "private struct Chip: View {")
-    assert 'var hint: String = ""' in chip and ".accessibilityHint(hint)" in chip
+    # the Mac's: (R16) the dock header's `.btn.sm` after Repeat's, lit and selected while on, with its hint - the header
+    # folds History and Clear into a ••• where the three don't leave them room (tests/test_ios_dock_look.py)
+    modes = body(queue, "private var macModes: some View {")
+    assert modes.index("Button(UpNextWords.shuffle, action: toggleShuffle)") < modes.index(
+        "Button(repeatLabel(mode), action: cycleRepeat)") < modes.index("if server.access.lastfm == .on {")
+    assert ("if server.access.lastfm == .on { Button(LastfmWords.autoplay, action: toggleAutoplay) "
+            ".buttonStyle(DWButtonStyle(kind: player.autoplay ? .on : .normal, size: .small)) "
+            ".accessibilityAddTraits(player.autoplay ? .isSelected : []) "
+            ".accessibilityHint(LastfmWords.autoplayHint)") in modes
+    assert "private struct Chip: View {" not in queue
     # the chip's own call, said as Shuffle's and Repeat's are
     assert inner(queue, "private func toggleAutoplay() {") == (
         "let on = !player.autoplay player.setAutoplay(on) Notice.announce(LastfmWords.autoplaySaid(on))")
@@ -247,8 +242,8 @@ def test_autoplays_rows_are_drawn_under_their_own_heading():
     assert ("heading(QueuePageWords.heading(list.title)) rows(whole.rows, lines: QueuePageWords.showsLines(list.rows, "
             "title: list.title), part: 0..<own)") in queue
     assert "heading(LastfmWords.autoplay) rows(whole.rows, lines: true, part: own..<whole.rows.count)" in queue
-    # the Mac's: a section's header, as the list's title is
-    assert queue.count("Text(LastfmWords.autoplay) .textCase(nil) .accessibilityAddTraits(.isHeader)") == 1
+    # the Mac's: (R16) a `.navh` of the dock's over them, as the list's title is
+    assert queue.count("macHeading(LastfmWords.autoplay) rows(whole.rows, lines: true, part: own..<whole.rows.count)") == 1
     assert queue.count("rows(whole.rows, lines: true, part: own..<whole.rows.count)") == 2
     # a drag in a part moves in the whole group's places
     assert "let drawn = part.map { $0.clamped(to: rows.indices) } ?? rows.indices" in queue
@@ -275,9 +270,10 @@ def test_shuffle_is_dimmed_while_the_queue_has_a_station():
     queue = code(QUEUE)
     assert (".disabled(player.paged != nil || player.stationHoldsShuffle)"
             in body(queue, "@ViewBuilder private var modeButtons"))
-    assert inner(queue, "private var shuffleChip: some View {") == (
-        'Chip(glyph: "shuffle", label: UpNextWords.shuffle, on: player.shuffle, enabled: player.paged == nil && '
-        "!player.stationHoldsShuffle, action: toggleShuffle) .accessibilityFocused($focus, equals: .shuffle)")
+    #? (R16) the dock header's Shuffle
+    assert ("Button(UpNextWords.shuffle, action: toggleShuffle) .buttonStyle(DWButtonStyle(kind: player.shuffle ? .on : "
+            ".normal, size: .small)) .disabled(player.paged != nil || player.stationHoldsShuffle)"
+            in body(queue, "private var macModes: some View {"))
     assert ("guard player.paged == nil, !player.stationHoldsShuffle else { return }"
             in body(queue, "private func toggleShuffle()"))
     for name in ("Player/NowPlayingView.swift", "Player/PlayerBar.swift"):
@@ -427,71 +423,8 @@ def test_the_notices_are_the_players():
     assert "if outcome == .failed { scheduleAgain() } check()" in answered
 
 
-#? Dynamic Type's subheadline at each standard size (Apple's table): the Mac's chips' words, capped at xxxLarge
-SUBHEADLINE = {"xSmall": 12, "small": 13, "medium": 14, "large": 15, "xLarge": 17, "xxLarge": 19, "xxxLarge": 21}
-#? an SF Symbol's width in a Label, at its words' size, taken wide (test_ios_library_look.py's SYMBOL), and the gap a
-#? Label leaves between its symbol and its words, taken wide too
-SYMBOL = 1.3
-LABEL_GAP = 8
-#? the Mac's inset row in the dock's 400-point panel: its 1-point edge, the inset list's margins (20 a side, the
-#? regular width's - the compact width's are 16) and the row's own content margins (20 a side), taken at their widest
-PANEL_EDGE = 1
-LIST_INSET = 20
-ROW_MARGIN = 20
-
-
-def chip_width(words: str, points: float) -> float:
-    """One of the Mac's chips (UpNextScreen's Chip): 12 either side, its symbol, the Label's gap and its words, in the
-    medium face at the subheadline's size."""
-    return 2 * 12 + SYMBOL * points + LABEL_GAP + fonts.words(words, points, "medium")
-
-
-def test_the_macs_chips_take_two_lines_where_the_three_dont_fit():
-    # (A3's review) Shuffle, the longest Repeat and Autoplay don't fit on one line of the Mac panel's inset row, so
-    # Autoplay goes on a line of its own under the two (ViewThatFits) - each line fits, at every text size the chips
-    # draw at (capped at xxxLarge) and every Row Size (the chips don't read it: it sizes rows, not words)
-    look = flat(core("MacLook.swift"))
-    panel = float(re.search(r"public static let panelWidth: Double = (\d+)", look).group(1))
-    assert panel == 400
-    room = panel - PANEL_EDGE - 2 * LIST_INSET - 2 * ROW_MARGIN
-    queue = code(QUEUE)
-    assert "private static let chipGap: CGFloat = 8" in queue
-    chip = body(queue, "private struct Chip: View {")
-    assert (".font(Typeface.subheadline.weight(.medium)) .padding(.horizontal, 12)" in chip
-            and "Label(label, systemImage: glyph)" in chip)
-    assert "static let subheadline = text(15, .subheadline)" in flat(source("Shared/Typeface.swift"))
-    words = {"shuffle": "Shuffle", "repeat": "Repeat one", "autoplay": "Autoplay"}
-    assert 'public static let shuffle = "Shuffle"' in flat(core("Info.swift"))
-    assert 'case .one: return "Repeat one"' in flat(core("UpNextView.swift"))
-    assert 'public static let autoplay = "Autoplay"' in flat(core("LastfmWords.swift"))
-    for chips in ("shuffleChip", "repeatChip", "autoplayChip", "modes"):
-        opening = {"autoplayChip": "@ViewBuilder private var autoplayChip: some View {"}.get(
-            chips, f"private var {chips}: some View {{")
-        part = body(queue, opening)
-        assert "rowSize" not in part and "RowSize" not in part, chips
-    assert room == 319
-    gap = 8
-    repeats = re.findall(r'case \.(?:off|all|one): return "([^"]+)"', flat(core("UpNextView.swift")))
-    assert sorted(repeats) == ["Repeat", "Repeat all", "Repeat one"], repeats
-    for size, points in SUBHEADLINE.items():
-        shuffle, autoplay = chip_width(words["shuffle"], points), chip_width(words["autoplay"], points)
-        for said in repeats:
-            repeat = chip_width(said, points)
-            # the two lines: Shuffle and Repeat, then Autoplay alone - each inside the row
-            assert shuffle + repeat + gap <= room, (size, said, shuffle + repeat + gap, room)
-            assert autoplay <= room, size
-            # the three on one line need more than the row has, at the Mac's own size and every one above it: the
-            # two-line form is what the Mac draws (at the narrower list margins, 16 a side, too: 335)
-            if points >= SUBHEADLINE["large"]:
-                assert shuffle + repeat + autoplay + 2 * gap > room + 2 * (LIST_INSET - 16) + 2 * (ROW_MARGIN - 16), (
-                    size, said)
-    large = {said: chip_width(words["shuffle"], 15) + chip_width(said, 15) + chip_width(words["autoplay"], 15) + 2 * gap
-             for said in repeats}
-    # the review's estimate: about 365 with "Repeat one"
-    assert round(large["Repeat one"]) == 367 and round(large["Repeat"]) == 337, large
-    assert round(chip_width("Shuffle", 15) + chip_width("Repeat one", 15) + gap) == 243
-    # the largest the two lines come to, at xxxLarge with "Repeat one": still inside the row
-    assert round(chip_width("Shuffle", 21) + chip_width("Repeat one", 21) + gap) == 312
+#? (R16) The Mac's chips are gone: Shuffle, Repeat and Autoplay are the dock header's `.btn.sm`s, and how they fit the
+#? panel's 400 is tests/test_ios_dock_look.py's (test_the_queues_header_fits_the_dock).
 
 
 def foot_draws(text: str) -> list[str]:
@@ -507,7 +440,8 @@ def test_the_phones_new_button_is_flat():
     # buttons, with no face of their own - the foot's ground and hairline are phoneFoot's, as before
     assert QUEUE in phone_look.SLICES
     assert foot_draws(source(QUEUE)) == []
-    assert code(QUEUE).count(".buttonStyle(DWButtonStyle(kind:") == 3
+    #? and (R16) the Mac dock header's three, the same kinds at the small size
+    assert code(QUEUE).count(".buttonStyle(DWButtonStyle(kind:") == 6
     # (the mutation's guard) a face given to the phone's Autoplay is found
     planted = source(QUEUE).replace(".accessibilityHint(LastfmWords.autoplayHint)\n        }",
                                     ".accessibilityHint(LastfmWords.autoplayHint)\n            .background(DWPalette.card)\n"

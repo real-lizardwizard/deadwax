@@ -540,7 +540,7 @@ def test_a_right_click_is_the_menus_own_items():
 ESCAPES = {
     "Album/AlbumInfoView.swift": 1, "Artist/ArtistImagesSheet.swift": 1, "Artist/ArtistMoveSheet.swift": 3,
     "EQ/EQImport.swift": 2, "EQ/EQRoute.swift": 1, "Edit/EditAlbumSheet.swift": 1, "Edit/ReleasePage.swift": 1,
-    "Get/ManualSearchSheet.swift": 1, "Get/SourcesSheet.swift": 1, "Info/InfoView.swift": 1, "Library/LibraryView.swift": 1,
+    "Get/ManualSearchSheet.swift": 1, "Get/SourcesSheet.swift": 1, "Library/LibraryView.swift": 1,
     "Manage/PeopleSheets.swift": 3, "Manage/ServerSettingsGroupScreen.swift": 1, "Player/CoverViewer.swift": 1,
     "Player/MacPanels.swift": 1, "Root/MacSidebarView.swift": 1,
     "Player/NowPlayingView.swift": 1, "Playlists/PlaylistPicker.swift": 2, "Playlists/PlaylistView.swift": 1,
@@ -549,6 +549,8 @@ ESCAPES = {
     #? review) the editor's own, MacAlbumEditor's, which the page and R12's MacNeedsALook host. (R11) Compare covers'
     #? alone now - and the Tags tab's own, a file's every tag
     "Mac/Edit/MacAlbumEditor.swift": 1, "Mac/Edit/MacTagsTab.swift": 1,
+    #? (R16) the dock has no Done: MacPanels' one Escape is the panel's own key (DockEscapeKey), Info has none, and the
+    #? Queue's one is its Done while in Edit
 }
 
 
@@ -565,9 +567,9 @@ GUARDED_ESCAPES = {
     "Playlists/PlaylistPicker.swift": ["!(model.making && nameTyped))", "escapes && blank)"],
     #? (slice 3, and its review) the main window's Escape has one owner, MacFrame.escape's: a field with the cursor (the
     #? sidebar's search, a page's), then the side panel's Done, then the page's - a playlist's Edit, its Cancel
-    "UpNext/UpNextScreen.swift": ["MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)"],
-    "Info/InfoView.swift": ["MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)"],
-    "Player/MacPanels.swift": ["MacFrame.escape(typing: TextEditing.shared.typing,"],
+    #? (R16) the panel's own key, while no page in the dock holds Escape; the Queue's Done only while in Edit
+    "UpNext/UpNextScreen.swift": ["editing && MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)"],
+    "Player/MacPanels.swift": ["!held && MacFrame.escape(typing: TextEditing.shared.typing,"],
     "Playlists/PlaylistView.swift": ["MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .page)"],
     #? the sidebar's clear button: Escape empties the field only while it has the cursor
     "Root/MacSidebarView.swift": ["focused)"],
@@ -615,10 +617,13 @@ def test_escape_presses_close_and_return_never_confirms():
             assert any(each.startswith(guard) for each in found), f"{name}: {guard}"
     # (slice 3's review) the main window's owners, each through the one rule - the only Escapes not inside a sheet
     rule = "MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == "
-    for name, owner in (("UpNext/UpNextScreen.swift", ".panel"), ("Info/InfoView.swift", ".panel"),
-                        ("Player/MacPanels.swift", ".panel"), ("Playlists/PlaylistView.swift", ".page")):
+    #? (R16) the panel's through its own key in MacPanel, the Queue's Edit's Done before it while editing
+    for name, held, owner in (("UpNext/UpNextScreen.swift", "editing && ", ".panel"),
+                              ("Player/MacPanels.swift", "!held && ", ".panel"),
+                              ("Playlists/PlaylistView.swift", "", ".page")):
         flat = re.sub(r"\s+", " ", bare(app[name]))
-        assert flat.count(".escapeCloses(" + rule + owner + ")") == 1, name
+        assert flat.count(".escapeCloses(" + held + rule + owner + ")") == 1, name
+    assert ".escapeCloses(" not in bare(app["Info/InfoView.swift"]), "(R16) Info's Escape is the dock's"
     picker = bare(app["Playlists/PlaylistPicker.swift"])
     assert "typed: Platform.mac ? $nameTyped : nil" in picker, "the iPhone's picker told nothing"
     assert ".onChange(of: blank, initial: true) { (_: Bool, now: Bool) -> Void in typed?.wrappedValue = !now }" in picker
@@ -1037,11 +1042,13 @@ def test_the_panels_are_one_at_a_time_and_never_modal():
     assert panels.index("private struct DockEQ") < panels.index(".appSheet(") < panels.index("struct LyricsPanel: View {")
     lyrics = panels[panels.index("struct LyricsPanel: View {"):]
     assert ".onAppear {\n            lyrics.showing = true" in lyrics and ".onDisappear { lyrics.showing = false }" in lyrics
-    assert "LyricsView(lyrics: shown, covered: false)" in lyrics and "LyricsWords.nothingPlaying" in lyrics
-    #? the dock's Done: the panel put away, Escape's through the one rule - Lyrics', the selection's Info, the EQ's
-    done = panels[panels.index("struct DockDone: View {"):panels.index("private struct DockInfo")]
-    assert "navigation.closePanel()" in done
-    assert "DockDone()" in lyrics
+    assert "LyricsView(lyrics: shown, covered: false, docked: true)" in lyrics and "LyricsWords.nothingPlaying" in lyrics
+    #? (R16) no Done on a tab's page: the panel put away by Escape's key in MacPanel - DockDone only the EQ's pushed pages'
+    done = panels[panels.index("struct DockDone: View {"):panels.index("enum DockType {")]
+    assert "navigation.closePanel()" in done and ".escapeCloses(" not in done
+    assert "DockDone(" not in lyrics and "DockDone(" not in panels.replace("struct DockDone: View {", "")
+    key = panels[panels.index("private struct DockEscapeKey: View {"):panels.index("final class DockEscapeHolds")]
+    assert "navigation.closePanel()" in key
     eq = bare(app["EQ/EQRoute.swift"])
     assert "if inSidePanel {" in eq and "DockDone(words: EQWords.Screen.done)" in eq
     #? Info: about the selection, else the song playing, its heading saying which (MacDock's)
@@ -1057,11 +1064,12 @@ def test_the_panels_are_one_at_a_time_and_never_modal():
     link = eq[eq.index("struct EQLink"):eq.index("struct EQDestination")]
     assert "if done != nil || inSidePanel {" in link and "navigation.showPanel(.eq)" in link
     assert "MacFrame.drawsDesktop(Platform.device)" in link
-    # Up Next's and Info's Done put the panel away there, and dismiss their sheet as before on the iPhone
+    # Up Next puts the panel away there as the queue ends, and dismisses its sheet as before on the iPhone - (R16) its
+    # Done and Info's are gone from the dock
     for name in ("UpNext/UpNextScreen.swift", "Info/InfoView.swift"):
         code = bare(app[name])
         assert "@Environment(\\.inSidePanel) private var inSidePanel" in code, name
-        assert "if inSidePanel { navigation.closePanel() } else { dismiss() }" in code, name
+    assert "if inSidePanel { navigation.closePanel() } else { dismiss() }" in bare(app["UpNext/UpNextScreen.swift"])
     routes = bare(app["Shared/Routes.swift"])
     assert "private(set) var macPanel: MacDock.Tab?" in routes
     for rule in ("macPanel = MacDock.toggled(macPanel, tab, getOpen: macGetOpen)",

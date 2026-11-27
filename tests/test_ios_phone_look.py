@@ -1740,6 +1740,9 @@ A2_PAGES = {"Artist/AlbumOrderMenu.swift", "Artist/SimilarArtistsSection.swift",
 #? (Last.fm, slice A4) About at the foot of the artist and album pages: the phone's section (the small words, the
 #? link's 44-point target) flat, and the words both devices draw in their own faces (tests/test_ios_lastfm_a4.py)
 A4_PAGES = {"Shared/AboutSection.swift"}
+#? (the panel review's R16) Album info flat on the phone (PhoneGroups on hairlines) and in the look's pieces on the Mac,
+#? and Lyrics' rows in the Mac's dock (tests/test_ios_dock_look.py holds what each draws)
+R16_PAGES = {"Album/AlbumInfoView.swift", "Player/LyricsView.swift"}
 #? (R18, the panel review's) the sheets, faces and banners left over: Add to a playlist and New playlist, Choose the folder,
 #? the album's Mine block, Can't reach deadwax, the notice, the offline banner, the cover viewer's close - and the
 #? sheets' own measures they share (SheetLook); tests/test_ios_sheets_look.py holds what each draws
@@ -1751,7 +1754,8 @@ R18_PAGES = {"Playlists/PlaylistPicker.swift", "Edit/ChooseFolderView.swift", "A
 #? pages are R10's file's (tests/test_ios_holdouts_look.py holds what each draws)
 R20_PAGES = {"You/DebugView.swift", "Artist/ArtistImagesSheet.swift", "Artist/ArtistMoveSheet.swift"}
 SLICES = (R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES
-          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES | A4_PAGES | R18_PAGES | R20_PAGES)
+          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES | A4_PAGES | R16_PAGES | R18_PAGES
+          | R20_PAGES)
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

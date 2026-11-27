@@ -221,10 +221,11 @@ def test_the_queues_rows_and_foot_on_the_phone():
     #? (R3b's review) the Mac's at the dock's left, as the status bar's words are
     assert "HStack(spacing: 0) {\n            QueueTimeLeftLine(view: view)\n            Spacer(minLength: 0)\n        }" in member(
         queue, "private func macFoot")
-    #? the Mac's side panel keeps its List: its Edit, its Done with Escape, its section headers with Clear
-    mac = member(queue, "private func macToolbar")
-    assert "placement: .cancellationAction" in mac and "placement: .confirmationAction" in mac
-    assert "Button(UpNextWords.clear, action: clear)\n                                                    .buttonStyle(.borderless)" in body
+    #? (R16) the Mac's dock keeps its List, its bar gone: Edit (Done in it, Escape's then) and History and Clear in the
+    #? dock's header - tests/test_ios_dock_look.py holds it
+    mac = member(queue, "private func macTop")
+    assert "DockHeader {" in mac and "Button(UpNextWords.clear, action: clear)" in mac
+    assert "placement:" not in queue
 
 
 def test_the_time_left_is_a_small_view_of_its_own_reading_the_rows_drawn():
@@ -288,10 +289,11 @@ def test_played_is_said_against_a_day_that_moves_at_midnight():
     #? (R3b's review) Size: the file's size and bit rate from the song as the player has it (Navidrome's)
     assert "let song = player.song(for: entry)" in facts
     assert "Date()" not in info
-    #? the Mac's dock says the same facts - Played among them - under the song's name
-    about = member(info, "private func about")
-    assert "ForEach(facts.song, id: \\.label) { (row: InfoRow) in\n                LabeledContent(row.label, value: row.value)" in about
-    assert "about.song.lines" not in about
+    #? the Mac's dock says the same facts - Played among them - (R16) in Properties, a DockFact each
+    about = member(info, "private func macAbout")
+    assert "ForEach(format + facts.song + sound.dropFirst(), id: \\.label) { (row: InfoRow) in" in about
+    assert "DockFact(label: row.label, value: row.value, mono: row.mono)" in about
+    assert "about.song.lines" not in about and "LabeledContent" not in info
     core = bare(CORE / "About.swift")
     played = member(core, "public static func played")
     assert "guard let plays = WebText.whole(counted?.playCount), plays > 0 else { return nil }" in played

@@ -50,6 +50,16 @@ struct AlbumInfoPush: Hashable {
 /// ("Copied" said to VoiceOver, the button's sign a tick for a moment); a MusicBrainz page opens in Safari, beside the
 /// app (openURL), and if iOS refuses, a line under the row says so. A line wraps at every text size, never truncated;
 /// VoiceOver reads each line's label and words as one.
+///
+/// (The panel review's R16 - notes/ios.md "The panel review, R16: the Mac's dock tabs (2026-11-26)") Drawn flat on both
+/// devices, no List. On the Mac (Albums.dc.html's panel - the dock's Info for an album, Info's Album info, the
+/// right-click's Album info…) the cover (112, a cover's corners) beside the title (18, bold), the artist in the accent
+/// and the year; in the dock only, the album's Play (the primary), Shuffle and Add to Queue from its songs in hand -
+/// each an existing PlayerModel call in the click, offline the songs on this Mac - and Edit for whoever may
+/// (Managing.albumEdit), the album's ••• and right-click's own, then its songs in a box, a row each at View ▸ Row Size;
+/// then every section as a `.group` of DockFact rows, an id or a path in Courier Prime with its copy glyph, a link in
+/// the accent. On the phone (iInfo's) the header as it was, each section a PhoneGroup on hairlines - a fact a `.kv`
+/// (PhoneKV), a long or copyable one its label over its words, its copy glyph a finger's target, a link a PhoneGo.
 struct AlbumInfoList: View {
     let album: Album
 
@@ -57,6 +67,10 @@ struct AlbumInfoList: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
     @Environment(\.openURL) private var openURL
+    @Environment(PlayerModel.self) private var player
+    @Environment(AppNavigation.self) private var navigation
+    /// (R16) In the Mac's dock: the album's own Play, Shuffle, Add to Queue and Edit, and its songs.
+    @Environment(\.inSidePanel) private var inSidePanel
     /// What deadwax said, for which album, by which asking (`runs`).
     @State private var said: (run: Int, albumID: String, said: AlbumInfoAsk.Said)?
     /// Each asking's number: the one that ends marks only its own answer as cut short.
@@ -68,8 +82,11 @@ struct AlbumInfoList: View {
     /// (R5) Now, for Played's day words - re-read at a day's change, never per row.
     @State private var now = ArtistTotals.now()
 
-    /// The header's cover.
-    private static let cover: CGFloat = 60
+    /// The phone's header's cover (iInfo's 64) and the gap beside it, and the page's sides and foot.
+    private static let cover: CGFloat = 64
+    private static let coverGap: CGFloat = 12
+    private static let side: CGFloat = 16
+    private static let foot: CGFloat = 34
     /// How long a Copy button shows its tick.
     private static let copiedSeconds = 2.0
 
@@ -78,43 +95,51 @@ struct AlbumInfoList: View {
         //? the album's own answer once it has come; a playlist's stub of it is never counted from
         let whole = answer?.album ?? (album.partial ? nil : album)
         let online = reachability.online && server.client != nil
-        List {
-            Section {
-                header(whole ?? album)
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: Platform.mac ? DockLook.gap : 0) {
+                if Platform.mac {
+                    macHeader(whole ?? album)
+                    if inSidePanel { macTools(whole, online: online) }
+                } else {
+                    header(whole ?? album)
+                }
 
-            if let whole {
-                ForEach(AlbumInfo.local(album: whole, onPhone: onPhone(whole), device: Platform.device,
-                                        played: played(whole))) { section in
-                    infoSection(section)
+                if let whole {
+                    ForEach(AlbumInfo.local(album: whole, onPhone: onPhone(whole), device: Platform.device,
+                                            played: played(whole))) { section in
+                        infoSection(section)
+                    }
+                }
+
+                // deadwax's answers once they've come (or the wait is over); offline, what is in hand
+                if answer != nil || !online {
+                    ForEach(AlbumInfo.fromServer(album: whole ?? album, extras: answer?.extras, store: answer?.store,
+                                                 files: answer?.files, folders: server.access.isAdmin,
+                                                 countryName: Self.countryName)) { section in
+                        infoSection(section)
+                    }
+                }
+
+                if online, let answer, let note = missing(answer) {
+                    missingNote(note)
+                        .padding(.top, Platform.mac ? 0 : Self.coverGap)
+                }
+
+                if online && (answer?.reading ?? true) {
+                    reading
+                        .padding(.top, Platform.mac ? 0 : Self.coverGap)
+                } else if !online && !(answer?.complete ?? false) {
+                    quiet(AlbumInfoWords.offline)
+                        .padding(.top, Platform.mac ? 0 : Self.coverGap)
                 }
             }
-
-            // deadwax's answers once they've come (or the wait is over); offline, what is in hand
-            if answer != nil || !online {
-                ForEach(AlbumInfo.fromServer(album: whole ?? album, extras: answer?.extras, store: answer?.store,
-                                             files: answer?.files, folders: server.access.isAdmin,
-                                             countryName: Self.countryName)) { section in
-                    infoSection(section)
-                }
-            }
-
-            if online, let answer, let note = missing(answer) {
-                Section { missingNote(note) }
-            }
-
-            if online && (answer?.reading ?? true) {
-                Section { reading }
-            } else if !online && !(answer?.complete ?? false) {
-                Section {
-                    Text(AlbumInfoWords.offline)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Platform.mac ? DockLook.side : Self.side)
+            .padding(.top, Platform.mac ? DockLook.side : CGFloat(PhoneLook.topGap))
+            .padding(.bottom, Platform.mac ? DockLook.side : Self.foot)
         }
-        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Platform.mac ? DWPalette.panel : DWPalette.page)
         .navigationTitle(AlbumInfoWords.title)
         .navigationBarTitleDisplayMode(.inline)
         .task(id: askKey) { await ask() }
@@ -133,71 +158,171 @@ struct AlbumInfoList: View {
 
     // MARK: drawing
 
+    /// The phone's header (iInfo's song row, for the album): its cover, its title, its artist in the accent - one element.
     private func header(_ album: Album) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Self.coverGap) {
             CoverImage(id: album.coverArt, size: Self.cover)
                 .frame(width: Self.cover, height: Self.cover)
-                .clipShape(Corners.artShape)
-            VStack(alignment: .leading, spacing: 3) {
+                .clipShape(Rectangle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(album.name ?? "")
-                    .font(Typeface.headline)
+                    .font(Typeface.Phone.text(.row).weight(.semibold))
+                    .foregroundStyle(DWPalette.text)
                 if let artist = album.artist, !artist.isEmpty {
                     Text(artist)
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.acc)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
     }
 
-    private func infoSection(_ section: AlbumInfoSection) -> some View {
-        Section {
-            ForEach(section.rows) { row in
-                infoRow(row)
+    /// (R16) The Mac's header (Albums.dc.html's panel): the cover, the title, the artist in the accent and the year -
+    /// one element, every line wrapping.
+    private func macHeader(_ album: Album) -> some View {
+        HStack(alignment: .top, spacing: DockLook.gap) {
+            CoverImage(id: album.coverArt, size: DockLook.cover)
+                .frame(width: DockLook.cover, height: DockLook.cover)
+                .clipShape(DWCorners.chipShape)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(album.name ?? "")
+                    .font(DockType.title)
+                    .foregroundStyle(DWPalette.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let artist = album.artist, !artist.isEmpty {
+                    Text(artist)
+                        .font(DockType.words)
+                        .foregroundStyle(DWPalette.acc)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let year = album.year, year > 0 {
+                    Text(String(year))
+                        .font(DockType.small)
+                        .foregroundStyle(DWPalette.t2)
+                        .padding(.top, 2)
+                }
             }
-        } header: {
-            Text(section.title).font(Typeface.footnote)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// (R16) The songs the dock's Play, Shuffle and Add to Queue take: the album's own, once its answer is in - never a
+    /// stub's, which are a playlist's - and offline only those on this Mac.
+    private func playable(_ whole: Album?, online: Bool) -> [Song] {
+        let songs = whole?.song ?? []
+        return online ? songs : OfflineAlbum.playable(songs, here: downloads.isHere)
+    }
+
+    /// (R16) The dock's row of the album's actions (Albums.dc.html's: Play, Shuffle, Play next … Edit) - only those it
+    /// has today, behind their own gates: Play, Shuffle and Add to Queue on the songs in hand, in the click with nothing
+    /// awaited (dimmed until they are), and Edit at the right for whoever may edit the album, while deadwax can be
+    /// reached; then the songs, in a box.
+    @ViewBuilder
+    private func macTools(_ whole: Album?, online: Bool) -> some View {
+        let songs = playable(whole, online: online)
+        let queued = whole.flatMap { (album: Album) -> QueuePick<Song>? in
+            QueuePick.album(album).flatMap { AddToQueue.pick($0, online: online, gone: false, here: downloads.isHere) }
+        }
+        HStack(spacing: DockLook.headerGap) {
+            Button {
+                guard let whole, !songs.isEmpty else { return }
+                player.play(songs: songs, album: whole, at: nil)
+            } label: {
+                HStack(spacing: DockLook.headerGap) {
+                    SharpSymbol(.play)
+                    Text(PlaylistWords.play)
+                }
+            }
+            .buttonStyle(DWButtonStyle(kind: .pri))
+            .disabled(songs.isEmpty)
+            Button(ShuffleWords.shuffle) {
+                guard let whole, !songs.isEmpty else { return }
+                player.play(songs: songs, album: whole, at: nil, shuffle: true)
+            }
+            .buttonStyle(DWButtonStyle())
+            .disabled(songs.isEmpty)
+            Button(AddToQueue.words) {
+                guard let queued else { return }
+                _ = player.addToQueue(queued, album: whole)
+            }
+            .buttonStyle(DWButtonStyle())
+            .disabled(queued == nil)
+            Spacer(minLength: 0)
+            if Managing.albumEdit(server.access.permissions).shown, online, let whole {
+                Button(PlaylistWords.edit) {
+                    navigation.editAlbum(AlbumEditRequest(target: .album(AlbumEdit.Subject(whole))))
+                }
+                .buttonStyle(DWButtonStyle())
+            }
+        }
+        if let tracks = whole?.song, !tracks.isEmpty {
+            VStack(spacing: 0) {
+                ForEach(tracks) { (song: Song) in
+                    DockSongRow(number: song.track.map(String.init) ?? "", title: song.title ?? "",
+                                length: Format.trackTime(song.duration))
+                }
+            }
+            .padding(.bottom, -1)
+            .clipShape(DWCorners.boxShape)
+            .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line))
         }
     }
 
     @ViewBuilder
-    private func infoRow(_ row: AlbumInfoRow) -> some View {
+    private func infoSection(_ section: AlbumInfoSection) -> some View {
+        if Platform.mac {
+            DockGroup(legend: section.title) {
+                ForEach(section.rows) { row in
+                    macRow(row)
+                }
+            }
+        } else {
+            PhoneGroup(legend: section.title) {
+                ForEach(section.rows) { row in
+                    phoneRow(row)
+                }
+            }
+        }
+    }
+
+    /// (R16) A row in the Mac's `.group`: a fact, a fact to copy with its glyph, or a link in the accent.
+    @ViewBuilder
+    private func macRow(_ row: AlbumInfoRow) -> some View {
+        let note = row.lines.isEmpty ? nil : row.lines.joined(separator: "\n")
         switch row.style {
         case .plain:
-            words(row)
-                .accessibilityElement(children: .combine)
+            DockFact(label: row.label, value: row.value, note: note)
         case .copyable:
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                words(row)
-                    .accessibilityElement(children: .combine)
-                Button {
-                    copy(row)
-                } label: {
-                    Image(systemName: copied == row.id ? AlbumInfoWords.copiedSymbol : AlbumInfoWords.copySymbol)
-                        .font(Typeface.symbol(.body))
-                        .foregroundStyle(Palette.accent)
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel(AlbumInfoWords.copyName(row.label))
+            //? (R16's review) one element for VoiceOver - its label, its words, its lines - with Copy its named action,
+            //? the Mac's rule (plan 3.3): the glyph is for the pointer
+            HStack(alignment: .firstTextBaseline, spacing: DockLook.headerGap) {
+                DockFact(label: row.label, value: row.value, mono: true, note: note)
+                copyButton(row)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(([row.label, row.value] + row.lines).joined(separator: ", "))
+            .accessibilityActions {
+                Button(AlbumInfoWords.copyName(row.label)) { copy(row) }
             }
         case .link:
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 Button {
                     open(row)
                 } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(row.label)
-                            .foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
                         Image(systemName: AlbumInfoWords.outSymbol)
-                            .font(Typeface.symbol(.body))
-                            .foregroundStyle(Palette.quiet)
                             .accessibilityHidden(true)
                     }
+                    .font(DockType.small)
+                    .foregroundStyle(DWPalette.acc)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -209,24 +334,92 @@ struct AlbumInfoList: View {
         }
     }
 
-    /// A line's label, its words, and the lines under them.
+    /// (R1c) A row in the phone's group: a fact as a `.kv`, a long or copyable one its label over its words with its
+    /// copy glyph, or a link as a `.go` - each on its hairline.
+    @ViewBuilder
+    private func phoneRow(_ row: AlbumInfoRow) -> some View {
+        switch row.style {
+        case .plain where row.lines.isEmpty:
+            PhoneKV(label: row.label, value: row.value)
+        case .plain:
+            words(row)
+                .accessibilityElement(children: .combine)
+                .modifier(AlbumInfoPhoneRule())
+        case .copyable:
+            HStack(spacing: CGFloat(PhoneLook.kvGap)) {
+                words(row)
+                    .accessibilityElement(children: .combine)
+                copyButton(row)
+            }
+            .modifier(AlbumInfoPhoneRule())
+        case .link:
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    open(row)
+                } label: {
+                    PhoneGo {
+                        Text(row.label)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: AlbumInfoWords.outSymbol)
+                            .font(Typeface.Phone.text(.small).weight(.semibold))
+                            .foregroundStyle(DWPalette.t3)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint(AlbumInfoWords.opensInSafari)
+                if refused == row.id {
+                    ErrorNote(text: AlbumInfoWords.notOpened)
+                        .padding(.vertical, CGFloat(PhoneLook.kvGap) / 2)
+                }
+            }
+        }
+    }
+
+    /// A row's Copy: its glyph in the accent - a tick for a moment once copied, "Copied" said to VoiceOver - a finger's
+    /// target on the phone, the glyph's own on the Mac.
+    private func copyButton(_ row: AlbumInfoRow) -> some View {
+        Button {
+            copy(row)
+        } label: {
+            Image(systemName: copied == row.id ? AlbumInfoWords.copiedSymbol : AlbumInfoWords.copySymbol)
+                .font(Platform.mac ? DockType.small : Typeface.Phone.text(.row))
+                .foregroundStyle(DWPalette.acc)
+                .lookSquare(Platform.mac ? 0 : DWLook.here.target)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(AlbumInfoWords.copyName(row.label))
+        .accessibilityLabel(AlbumInfoWords.copyName(row.label))
+    }
+
+    /// The phone's: a line's label, its words - in Courier Prime where they are to copy - and the lines under them.
     private func words(_ row: AlbumInfoRow) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 2) {
             Text(row.label)
-                .font(Typeface.subheadline)
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.row))
+                .foregroundStyle(DWPalette.kvLabel)
             Text(row.value)
-                .font(row.style == .copyable ? Typeface.mono(.body) : Typeface.body)
+                .font(row.style == .copyable ? Typeface.Phone.mono(.small) : Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .textSelection(.enabled)
             ForEach(row.lines, id: \.self) { line in
                 Text(line)
-                    .font(Typeface.subheadline)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Typeface.Phone.text(.extraSmall))
+                    .foregroundStyle(DWPalette.t3)
             }
         }
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 2)
+    }
+
+    /// A quiet line - offline, no folder, reading: the dock's label size on the Mac, the small 13 on the phone.
+    private func quiet(_ words: String) -> some View {
+        Text(words)
+            .font(Platform.mac ? DockType.label : Typeface.Phone.text(.small))
+            .foregroundStyle(DWPalette.t3)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// What couldn't be had - the first of: the album, where its files are, the files - else that deadwax knows no
@@ -259,20 +452,15 @@ struct AlbumInfoList: View {
         case .gone:
             ErrorNote(text: ErrorWords.albumGone)
         case .noFolder:
-            Text(AlbumInfoWords.noFolder)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
-                .fixedSize(horizontal: false, vertical: true)
+            quiet(AlbumInfoWords.noFolder)
         }
     }
 
     private var reading: some View {
         HStack(spacing: 10) {
             ProgressView()
-            Text(AlbumInfoWords.reading)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
-                .fixedSize(horizontal: false, vertical: true)
+                .controlSize(Platform.mac ? .small : .regular)
+            quiet(AlbumInfoWords.reading)
         }
         .accessibilityElement(children: .combine)
     }
@@ -340,5 +528,15 @@ struct AlbumInfoList: View {
     /// A two-letter country code in words, in the app's own English ("GB" -> "United Kingdom").
     static func countryName(_ code: String) -> String? {
         Locale(identifier: "en_GB").localizedString(forRegionCode: code)
+    }
+}
+
+/// (R16) A phone row's room and hairline (`.kv`'s): 42 tall at least, half the gap above and below what it holds.
+private struct AlbumInfoPhoneRule: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.vertical, CGFloat(PhoneLook.kvGap) / 2)
+            .lookHeight(PhoneLook.kvRow)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
     }
 }

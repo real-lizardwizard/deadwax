@@ -34,16 +34,23 @@ import SwiftUI
 /// then This song and The album as groups of kv rows (AboutCard.facts - Played "19 times · today", the day only where the
 /// song's answer has a date; Sound's rows in This song, its Format first), Album info the album's last row, and Go to
 /// album and Go to artist under them. An admin's About or Debug is a segmented control under the song's row, the choice
-/// the sheet's (`picked`), so the strip's taps keep it; Debug's sections are groups too. In the Mac's side panel the page
-/// is as it was, its song's lines the same facts as rows - Played among them.
+/// the sheet's (`picked`), so the strip's taps keep it; Debug's sections are groups too.
+///
+/// (The panel review's R16 - notes/ios.md "The panel review, R16: the Mac's dock tabs (2026-11-26)"; Albums.dc.html's
+/// panel, for a song) In the Mac's dock no bar, no title, no Done - Escape is the panel's (MacPanel): the song's cover
+/// (112, a cover's corners) beside its title (18, bold), its artist in the accent, "Album · Year" and its facts in Courier
+/// Prime ("FLAC 16/44.1 · 24 MB · 921 kbps"); an admin's About or Debug in the look's segmented control; About's Go to
+/// album (the primary), Go to artist and Album info as a row of the look's buttons; then the same facts as the phone's
+/// in `.group`s - Properties (the song's, Sound's, Plays from and the EQ), The album - each a `.kv` of DockFact, a
+/// number, a time or a path in Courier Prime; Debug's sections as groups too. Album info is pushed with `‹ Info`
+/// (DockBack) in the bar's place.
 struct InfoView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(EQModel.self) private var eq
     @Environment(ServerModel.self) private var server
     @Environment(DownloadModel.self) private var downloads
     @Environment(AppNavigation.self) private var navigation
-    @Environment(\.dismiss) private var dismiss
-    /// (The Mac app, slice 3) Drawn in the desktop frame's side panel: Done puts the panel away (MacPanel).
+    /// (The Mac app, slice 3) Drawn in the desktop frame's side panel - (R16) Album info pushed with `‹ Info` there.
     @Environment(\.inSidePanel) private var inSidePanel
     @Environment(\.dynamicTypeSize) private var typeSize
     /// (R3b) In Now Playing's sheet: its top (`‹ Now Playing`, the strip) - nil in the Mac's side panel.
@@ -58,8 +65,6 @@ struct InfoView: View {
     /// (R3b) The day Played's words are said against: moved at midnight and whenever Info comes up.
     @State private var now = ArtistTotals.now()
 
-    /// The album card's cover.
-    private static let cover: CGFloat = 60
     /// (R3b) The phone's: the song's row's cover (iInfo's 64), its gap, the page's sides, the room above the two ways on
     /// (18) and between them (8), and under the page (34, the drawing's foot).
     private static let songCover: CGFloat = 64
@@ -87,6 +92,8 @@ struct InfoView: View {
                 //? album it was opened for when the song changes under it
                 .navigationDestination(for: AlbumInfoPush.self) { push in
                     AlbumInfoList(album: push.album)
+                        //? (R16) in the Mac's dock, `‹ Info` in the bar's place; the phone's bar and Back as they were
+                        .dockBack(inSidePanel ? InfoWords.title : nil)
                 }
         }
         .task(id: player.current?.track.id) { await askDetails() }
@@ -103,48 +110,15 @@ struct InfoView: View {
         .onAppear { now = ArtistTotals.now() }
     }
 
-    /// The page: the phone's in the sheet, under its top; the Mac's in the side panel, as it was.
+    /// The page: the phone's in the sheet, under its top; the Mac's in the side panel, with no bar (R16).
     @ViewBuilder
     private func page(tabs: [InfoTab], tab: InfoTab, admin: Bool) -> some View {
         if let sheet {
             phonePage(tabs: tabs, tab: tab, admin: admin)
                 .sheetTop(sheet) {}
         } else {
-            VStack(spacing: 0) {
-                if tabs.count > 1 {
-                    Picker(InfoWords.title, selection: picked) {
-                        ForEach(tabs, id: \.self) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                }
-                if let entry = player.current {
-                    List {
-                        switch tab {
-                        case .about: about(entry, folders: admin)
-                        case .debug: debug(entry)
-                        }
-                    }
-                    .listStyle(.insetGrouped)
-                    //? each tab, and each song, from its top
-                    .id("\(tab.rawValue)|\(entry.key)")
-                } else {
-                    Spacer()
-                }
-            }
-            .navigationTitle(InfoWords.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(InfoWords.done) {
-                        if inSidePanel { navigation.closePanel() } else { dismiss() }
-                    }
-                    // (the Mac app, slice 3) a panel's Done: Escape's after a field with the cursor, before the page's
-                    // Edit (MacFrame.escape - one owner)
-                    .escapeCloses(MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == .panel)
-                }
-            }
+            macPage(tabs: tabs, tab: tab, admin: admin)
+                .toolbar(.hidden, for: .navigationBar)
         }
     }
 
@@ -325,147 +299,153 @@ struct InfoView: View {
                                folders: folders, size: song?.size, bitRate: song?.bitRate, now: now)
     }
 
+    // MARK: the Mac's page (R16)
+
     @ViewBuilder
-    private func about(_ entry: QueueEntry, folders: Bool) -> some View {
-        let track = entry.track
-        let album = playedAbout(track)
-        let details = saidDetails(track)
-        let about = AboutCard.about(track: AboutTrack(entry: track), album: album, details: details, folders: folders)
-        let facts = aboutFacts(entry, folders: folders)
-        let song = player.song(for: entry) ?? Song(queued: track)
-
-        Section {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(about.song.title)
-                    .font(Typeface.headline)
-                if !about.song.artist.isEmpty {
-                    Text(about.song.artist)
-                        .foregroundStyle(Palette.quiet)
-                }
-            }
-            .padding(.vertical, 2)
-            .accessibilityElement(children: .combine)
-            //? (R3b) the song's lines as rows - Track, Disc, Length, Played ("19 times · today"), Written by - as the
-            //? phone's This song has them
-            ForEach(facts.song, id: \.label) { (row: InfoRow) in
-                LabeledContent(row.label, value: row.value)
-            }
-        } header: {
-            Text(InfoWords.songTitle).font(Typeface.footnote)
-        }
-
-        if let card = about.album {
-            Section {
-                if let route = PlayedAlbum.route(id: card.id, track: track, player: player) {
-                    Button {
-                        navigation.openAlbum(route)
-                    } label: {
-                        HStack(spacing: 12) {
-                            albumCard(card)
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.right")
-                                .font(Typeface.symbol(.footnote).weight(.semibold))
-                                .foregroundStyle(Palette.quiet)
-                                .accessibilityHidden(true)
-                        }
-                        .contentShape(Rectangle())
+    private func macPage(tabs: [InfoTab], tab: InfoTab, admin: Bool) -> some View {
+        if let entry = player.current {
+            let facts = aboutFacts(entry, folders: admin)
+            ScrollView {
+                VStack(alignment: .leading, spacing: DockLook.gap) {
+                    macSong(entry, facts: facts)
+                    if tabs.count > 1 {
+                        DWSegmented(options: tabs, words: { (each: InfoTab) -> String in each.label }, chosen: picked,
+                                    spoken: InfoWords.title)
                     }
-                    .buttonStyle(.plain)
-                } else {
-                    albumCard(card)
-                }
-                if let id = card.id, !id.isEmpty {
-                    //? the album as it was played from - or, for a playlist's songs, a stub Album info asks the whole of
-                    let album = player.playedAlbum(id: id)
-                        ?? Album(id: id, name: card.title, artist: track.artist, coverArt: card.coverArt, partial: true)
-                    NavigationLink(value: AlbumInfoPush(album: album)) {
-                        Label(AlbumInfoWords.title, systemImage: AlbumInfoWords.symbol)
+                    switch tab {
+                    case .about: macAbout(entry, facts: facts)
+                    case .debug: macDebug(entry)
                     }
                 }
-            } header: {
-                Text(InfoWords.albumTitle).font(Typeface.footnote)
+                .padding(DockLook.side)
             }
-        }
-
-        if let artist = about.artist {
-            Section {
-                Text(artist.name)
-                    .font(Typeface.headline)
-            } header: {
-                Text(InfoWords.artistTitle).font(Typeface.footnote)
-            }
-        }
-
-        Section {
-            let rows = LevelWords.soundRows(song: song, level: track.level, key: entry.key, decisions: player.levelDecisions,
-                                            live: track.albumId.flatMap { player.loudness(albumID: $0) })
-            ForEach(rows, id: \.label) { row in
-                LabeledContent(row.label, value: row.value)
-            }
-            // the phone's own row, apart from the web's three
-            LabeledContent(DownloadWords.playsFrom, value: playsFrom(track.id))
-            // and the EQ, only while it is on (3.1)
-            if let sound = eq.infoSound {
-                LabeledContent(EQWords.Info.label, value: sound)
-            }
-        } header: {
-            Text(LevelWords.soundTitle).font(Typeface.footnote)
-        }
-
-        //? last: a path to copy, and a line landing late here moves no card a finger is reaching for
-        if let folder = about.album?.folder {
-            Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(InfoWords.folder)
-                    Text(folder)
-                        .font(Typeface.mono(.footnote))
-                        .foregroundStyle(Palette.quiet)
-                        .textSelection(.enabled)
-                }
-                .accessibilityElement(children: .combine)
-            } header: {
-                Text(InfoWords.serverTitle).font(Typeface.footnote)
-            }
+            .scrollContentBackground(.hidden)
+            //? each tab, and each song, from its top
+            .id("\(tab.rawValue)|\(entry.key)")
+        } else {
+            Spacer()
         }
     }
 
-    private func albumCard(_ card: About.AlbumCard) -> some View {
-        HStack(spacing: 12) {
-            CoverImage(id: card.coverArt, size: Self.cover)
-                .frame(width: Self.cover, height: Self.cover)
-                .clipShape(Corners.artShape)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(card.title)
-                    .font(Typeface.headline)
-                if !card.line.isEmpty {
-                    Text(card.line)
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
+    /// The song's head (Albums.dc.html's, for a song): its cover, its title, its artist in the accent, "Album · Year" and
+    /// its facts in Courier Prime - one element, every line wrapping.
+    private func macSong(_ entry: QueueEntry, facts: AboutFacts) -> some View {
+        let track = entry.track
+        let song = player.song(for: entry) ?? Song(queued: track)
+        let format = soundRows(entry).first?.value
+        let readout = MacDock.Words.facts([format, AboutCard.sizeLine(size: song.size, bitRate: song.bitRate)])
+        return HStack(alignment: .top, spacing: DockLook.gap) {
+            CoverImage(id: track.coverArt, size: DockLook.cover)
+                .frame(width: DockLook.cover, height: DockLook.cover)
+                .clipShape(DWCorners.chipShape)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(track.title)
+                    .font(DockType.title)
+                    .foregroundStyle(DWPalette.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !track.artist.isEmpty {
+                    Text(track.artist)
+                        .font(DockType.words)
+                        .foregroundStyle(DWPalette.acc)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                if let pressing = card.pressing {
-                    Text(pressing)
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
+                if !facts.line.isEmpty {
+                    Text(facts.line)
+                        .font(DockType.small)
+                        .foregroundStyle(DWPalette.t2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 2)
+                }
+                if !readout.isEmpty {
+                    Text(readout)
+                        .font(DockType.readout)
+                        .foregroundStyle(DWPalette.t3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
     }
 
-    // MARK: Debug
+    /// Sound's rows for the queue's entry (LevelWords.soundRows): Format, Gapless, Normalization.
+    private func soundRows(_ entry: QueueEntry) -> [InfoRow] {
+        let track = entry.track
+        let song = player.song(for: entry) ?? Song(queued: track)
+        return LevelWords.soundRows(song: song, level: track.level, key: entry.key, decisions: player.levelDecisions,
+                                    live: track.albumId.flatMap { player.loudness(albumID: $0) })
+            .map { InfoRow(label: $0.label, value: $0.value) }
+    }
 
+    /// The Mac's About: Info's ways on as a row of the look's buttons - Go to album the primary, Go to artist, Album info
+    /// at the right - each only where there is somewhere to go; then Properties (the song's facts, Sound's, Plays from
+    /// and the EQ while it is on) and The album, as groups.
     @ViewBuilder
-    private func debug(_ entry: QueueEntry) -> some View {
-        ForEach(Array(debugSections(entry).enumerated()), id: \.offset) { _, section in
-            Section {
-                ForEach(Array(section.rows.enumerated()), id: \.offset) { _, row in
-                    DebugRowView(row: row)
+    private func macAbout(_ entry: QueueEntry, facts: AboutFacts) -> some View {
+        let track = entry.track
+        let song = player.song(for: entry) ?? Song(queued: track)
+        let card = AboutCard.about(track: AboutTrack(entry: track), album: playedAbout(track), details: saidDetails(track)).album
+        let route = card.flatMap { PlayedAlbum.route(id: $0.id, track: track, player: player) }
+        let artistID = facts.artistID ?? song.artistId.flatMap { $0.isEmpty ? nil : $0 }
+        let id = card?.id.flatMap { $0.isEmpty ? nil : $0 }
+        if route != nil || artistID != nil || id != nil {
+            HStack(spacing: DockLook.headerGap) {
+                if let route {
+                    Button(AboutFactWords.goToAlbum) { navigation.openAlbum(route) }
+                        .buttonStyle(DWButtonStyle(kind: .pri))
                 }
-            } header: {
-                Text(section.title).font(Typeface.footnote)
+                if let artistID {
+                    Button(AboutFactWords.goToArtist) { goToArtist(artistID, name: track.artist) }
+                        .buttonStyle(DWButtonStyle())
+                }
+                Spacer(minLength: 0)
+                if let id, let card {
+                    //? the album as it was played from - or, for a playlist's songs, a stub Album info asks the whole of
+                    let album = player.playedAlbum(id: id)
+                        ?? Album(id: id, name: card.title, artist: track.artist, coverArt: card.coverArt, partial: true)
+                    NavigationLink(value: AlbumInfoPush(album: album)) {
+                        Text(AlbumInfoWords.title)
+                    }
+                    .buttonStyle(DWButtonStyle())
+                }
+            }
+        }
+
+        let sound = soundRows(entry)
+        //? Sound's Format first, as the phone's This song has it, then the song's facts, then the rest of how it sounds
+        let format = sound.prefix(1).map { InfoRow(label: $0.label, value: $0.value, mono: true) }
+        DockGroup(legend: MacAlbumFacts.Words.properties) {
+            ForEach(format + facts.song + sound.dropFirst(), id: \.label) { (row: InfoRow) in
+                DockFact(label: row.label, value: row.value, mono: row.mono)
+            }
+            DockFact(label: DownloadWords.playsFrom, value: playsFrom(track.id))
+            // the EQ, only while it is on - a view of its own, so the EQ's changes redraw it alone
+            InfoEQFact()
+        }
+
+        if !facts.album.isEmpty {
+            DockGroup(legend: AboutFactWords.theAlbum) {
+                ForEach(facts.album, id: \.label) { (row: InfoRow) in
+                    DockFact(label: row.label, value: row.value, mono: row.mono)
+                }
             }
         }
     }
+
+    /// The Mac's Debug: its sections as groups, each row its label, its value and its note.
+    @ViewBuilder
+    private func macDebug(_ entry: QueueEntry) -> some View {
+        ForEach(Array(debugSections(entry).enumerated()), id: \.offset) { _, section in
+            DockGroup(legend: section.title) {
+                ForEach(Array(section.rows.enumerated()), id: \.offset) { _, row in
+                    DockFact(label: row.label, value: row.value, mono: row.mono, note: row.note, noteMono: row.noteMono)
+                }
+            }
+        }
+    }
+
+    // MARK: Debug
 
     /// Debug's sections, the copy on this phone in Sent to this device (Phase 2).
     private func debugSections(_ entry: QueueEntry) -> [InfoSection] {
@@ -534,28 +514,14 @@ struct InfoView: View {
     }
 }
 
-/// One of Debug's rows: its label, its value - in the monospaced face for an id or a path - and a smaller note
-/// under it; the value and note can be selected, to copy.
-private struct DebugRowView: View {
-    let row: InfoRow
+/// (R16) Properties' EQ row in the Mac's dock, only while the EQ is on - a view of its own, as the phone's InfoEQRow is.
+private struct InfoEQFact: View {
+    @Environment(EQModel.self) private var eq
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(row.label)
-                .font(Typeface.subheadline.weight(.medium))
-            Text(row.value)
-                .font(row.mono ? Typeface.mono(.footnote) : Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
-                .textSelection(.enabled)
-            if let note = row.note, !note.isEmpty {
-                Text(note)
-                    .font(row.noteMono ? Typeface.mono(.caption) : Typeface.caption)
-                    .foregroundStyle(Palette.quiet)
-                    .textSelection(.enabled)
-            }
+        if let sound = eq.infoSound {
+            DockFact(label: EQWords.Info.label, value: sound)
         }
-        .padding(.vertical, 2)
-        .accessibilityElement(children: .combine)
     }
 }
 

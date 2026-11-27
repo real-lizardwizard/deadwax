@@ -7504,12 +7504,74 @@ the purple is as it was.
 
 ### The panel review's fixes (617-648)
 
-You asked for every panel's design to be reviewed (26 Nov). Some screens the redesign hadn't reached were still
-iOS's: sheets drawn as grey grouped lists, the old rounded grey buttons, the system's frosted strips behind the
-notice and the offline strip, a grey box round the full-screen cover's ✕, and the pages no drawing showed - Settings'
-Debug, an artist's picture and move sheets, and the pages Edit album's Release opens. Each is now built from the
-redesign's own pieces: flat on the black on the phone, the Mac's boxes, groups and buttons on the Mac. Nothing works
-any differently.
+You asked for every panel's design to be reviewed (26 Nov). On the Mac, the tabs in the side panel beside the play
+bar still had the old look inside. Info was a rounded grey list. The Queue and Lyrics sat under a bar with a title
+and Done, with the old buttons and type: "everything is still rounded". Now every tab is drawn like the rest of the
+Mac app: square, on the panel's own dark ground, words in Libre Franklin, numbers in Courier Prime, and the app's own
+buttons. On the phone, an album's Album info is now flat like every other page.
+
+Elsewhere, some screens the redesign hadn't reached were still iOS's: sheets drawn as grey grouped lists, the old
+rounded grey buttons, the system's frosted strips behind the notice and the offline strip, a grey box round the
+full-screen cover's ✕, and the pages no drawing showed - Settings' Debug, an artist's picture and move sheets, and
+the pages Edit album's Release opens. Each is now built from the redesign's own pieces: flat on the black on the
+phone, the Mac's boxes, groups and buttons on the Mac. Nothing works any differently.
+
+#### The Mac's dock tabs (617-624)
+
+Have something playing with a few songs queued, and a song with synced lyrics. Open the panel from the buttons beside
+the play bar, or from View > Queue, Info, Lyrics and EQ.
+
+- **617 No bar, no Done.** **Not done yet.** On the Mac, open each of Queue, Info and Lyrics. No tab has a bar with
+  a title or a **Done** across its top: its page starts right under the panel's tabs. **Escape** still puts the
+  panel away from any tab, the EQ's too, and so do the View keys and a click on the open tab, as before.
+  - While you're typing in a field (the Library's Find, say), Escape belongs to the field, as before.
+  - In the Queue's **Edit**, the first Escape ends Edit and the next one puts the panel away.
+  - The EQ keeps its old bar for now, with its **•••** (Rename…) and **Done**, on every page: its own redraw comes
+    next. Check that **•••** > **Rename…** still renames the output.
+- **618 Info, a song.** **Not done yet.** With nothing selected in the Library, Info shows the song that's playing.
+  - At the top: its cover, square; the title, large and bold; the artist in purple; the album and year under them;
+    and a line of the file's facts in Courier Prime (format, size, rate).
+  - Under that, **About** and **Debug** are the app's own switch, not the system's.
+  - About has **Go to album** (purple), **Go to artist** and **Album info**.
+  - Below those, a **Properties** group: labels on the left, values beside them, numbers in Courier Prime, with Plays
+    from and the EQ among the rows. **The album** group follows.
+  - Nothing is rounded or in a grey box, and Debug's groups read the same way.
+  - **Album info** opens the album's info in the panel, with **‹ Info** in purple at its top. Click it to go back.
+- **619 Info, an album.** **Not done yet.** Select an album in the Library with Info open.
+  - At the top: the album's cover, title, artist (purple) and year.
+  - Then **Play** (purple), **Shuffle**, **Add to Queue** and, if you can edit albums, **Edit**. Each one plays or
+    queues at once, and Edit opens Edit album.
+  - Under them: the tracks in a thin-lined box (number, title, length), then the album's groups on thin lines. A
+    purple link opens beside the app, and a copy button copies.
+  - Right-click an album > **Album info…**: its sheet shows the same groups, keeps its **Done**, and has no buttons or
+    tracks.
+- **620 Info, an artist.** **Not done yet.** Select an artist.
+  - You see their round picture, their name large and bold, a line counting their albums, and **Go to artist**.
+  - Under those is the same About as on the artist's own page: the description and its source.
+  - There's no Play or Shuffle here yet, because the panel doesn't have the artist's songs to hand.
+- **621 The Queue.** **Not done yet.**
+  - **The top row:** **Shuffle**, **Repeat** and **Autoplay** (when Last.fm is on) are small buttons, lit purple
+    while on. Then **History** and **Clear**, and **Edit** at the right. When the three toggles leave no room,
+    History and Clear fold into a **•••** menu.
+  - **Below it:** the small grey headings (Playing, Playing Next, the list's own name, Autoplay). The song that's
+    playing is in a 44-tall row with a purple edge and its small cover. The rows under it follow View > Row Size.
+  - **Edit** turns into **Done**, and each row gets a minus to remove it, as before.
+  - Everything the Queue did before is still there.
+  - While older songs load, the small box at the top of the list no longer has frosted glass.
+- **622 Lyrics.** **Not done yet.**
+  - At the top: the song's title and artist, with a small green **synced** chip when the lines are timed.
+  - Each line has its time at the left in Courier Prime.
+  - The line being sung is white on a purple ground, and the page follows it as the song plays. There's no Follow
+    button.
+  - Click a line to play from there, as before.
+  - A song with plain lyrics shows its lines with no times and no chip.
+  - If the lyrics fail to load, **Try again** is the app's own button.
+- **623 Album info on the phone.** **Not done yet.** On the phone, open an album's ••• > **Album info**, or Info >
+  Album info. The cover, title and artist are at the top. Each group is a grey heading over rows on thin lines, with
+  no grey cells. A link row opens and a copy button copies, as before.
+- **624 Both phones.** **Not done yet.** On Green Anole, check 623. The Queue, Info and Lyrics should look exactly as
+  before, except that while older songs load, the spinner at the top of the Queue sits on the page's own ground, with
+  no frosted glass or box. On Ethan's phone, check 623, or say "not done yet".
 
 #### Sheets, faces and banners (631-638)
 

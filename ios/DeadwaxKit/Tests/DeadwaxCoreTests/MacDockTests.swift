@@ -21,6 +21,17 @@ import Testing
         #expect(Set(names).count == names.count)
     }
 
+    /// (R16) The dock's own words for its pages' tops: a page's way back read as iOS reads its own back button, the
+    /// page it goes back to first; and Lyrics' synced chip, in the drawing's own lower case.
+    @Test func theDocksWayBackAndItsSyncedChip() {
+        #expect(MacDock.Words.back(to: InfoWords.title) == "Info, Back")
+        #expect(MacDock.Words.back(to: EQWords.nowPlaying) == "EQ, Back")
+        #expect(MacDock.Words.synced == "synced")
+        #expect(MacDock.Words.facts(["FLAC 16/44.1", "290 MB · 921 kbps"]) == "FLAC 16/44.1 · 290 MB · 921 kbps")
+        #expect(MacDock.Words.facts([LevelWords.notKnown, " 24 MB "]) == "24 MB")
+        #expect(MacDock.Words.facts([nil, "", "  "]) == "")
+    }
+
     @Test func theWebsThreePanelsAreThreeOfTheTabs() {
         #expect(MacDock.Tab.allCases.compactMap(\.panel) == [.upNext, .lyrics, .info])
         #expect(MacDock.Tab.eq.panel == nil && MacDock.Tab.sources.panel == nil, "the Mac's own two")

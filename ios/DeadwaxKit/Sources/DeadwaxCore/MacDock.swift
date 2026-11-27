@@ -185,6 +185,25 @@ public enum MacDock {
         /// The Sources tab (Get.dc.html's): the sources found for the album being got.
         public static let sources = "Sources"
 
+        /// (R16) What VoiceOver calls a page's way back inside the dock (DockBack, "‹ Info"): the page it goes back to,
+        /// then "Back", as iOS's own back button is read ("Info, Back").
+        public static func back(to page: String) -> String {
+            "\(page), Back"
+        }
+
+        /// (R16) Lyrics' chip in the dock's header while the song's lines are synced (Playlist.dc.html's panel).
+        public static let synced = "synced"
+
+        /// (R16) Info's line of facts under a song's name in the dock (Albums.dc.html's "FLAC 16/44.1 · 290 MB"): the
+        /// parts known, " · " between them - none empty, none "Not known" - and "" for none.
+        public static func facts(_ parts: [String?]) -> String {
+            parts.compactMap { (part: String?) -> String? in
+                guard let part = part?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !part.isEmpty, part != LevelWords.notKnown else { return nil }
+                return part
+            }.joined(separator: " · ")
+        }
+
         /// Info's heading - what it is about: the selected album, the selected artist, or the song playing; none with
         /// nothing.
         public static func heading(_ subject: Subject) -> String? {

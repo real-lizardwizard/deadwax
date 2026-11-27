@@ -18,11 +18,18 @@ import SwiftUI
 /// - VOICEOVER: each line one element - its words, its time ("1:23", the lit one "1:23, now"), "Plays from here.",
 ///   and on every line but the lit one the action "Go to the line being sung". The lyrics a container named "Lyrics".
 ///   Breaks and dots hidden. Nothing announced as lines change.
+/// - (R16 - notes/ios.md "The panel review, R16: the Mac's dock tabs (2026-11-26)") IN THE MAC'S DOCK (`docked`,
+///   LyricsPanel's; Playlist.dc.html's panel) each line is a row 40 tall at least - its time in Courier Prime, 36 wide,
+///   then its words in the window's 13, 14 in from the panel's sides - and the lit one on the purple ground, its time and
+///   words the selection's; plain lyrics' rows have no time. Following, the hold and a line's tap are the phone's own:
+///   only the rows are drawn otherwise, and the phone's (`docked` false) are as they were.
 struct LyricsView: View {
     /// The song's answer - synced or plain, with lines.
     let lyrics: SongLyrics
     /// Up Next or Info is over Now Playing: the clock stands.
     let covered: Bool
+    /// (R16) In the Mac's dock (LyricsPanel): its rows.
+    let docked: Bool
 
     @Environment(PlayerModel.self) private var player
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -47,9 +54,10 @@ struct LyricsView: View {
     /// The top of the lyrics, above the first line: where following goes before anything is lit.
     private static let top = -1
 
-    init(lyrics: SongLyrics, covered: Bool) {
+    init(lyrics: SongLyrics, covered: Bool, docked: Bool = false) {
         self.lyrics = lyrics
         self.covered = covered
+        self.docked = docked
         lines = lyrics.synced ? Lyrics.withIntro(lyrics.lines) : lyrics.lines
     }
 
@@ -70,7 +78,14 @@ struct LyricsView: View {
                         .frame(height: Lyrics.edge)
                         .id(Self.top)
                         .accessibilityHidden(true)
-                    if !synced {
+                    if !synced, docked {
+                        Text(LyricsWords.notSynced)
+                            .font(DockType.label)
+                            .foregroundStyle(DWPalette.t3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, DockLyricsLook.side)
+                            .padding(.bottom, Lyrics.lineSpace / 2)
+                    } else if !synced {
                         Text(LyricsWords.notSynced)
                             .font(Typeface.footnote)
                             .foregroundStyle(Palette.quiet)
@@ -157,7 +172,11 @@ struct LyricsView: View {
             Button {
                 playFrom(index, proxy: proxy)
             } label: {
-                lineText(line.text, color: isLit ? Color.primary : dim)
+                if docked {
+                    dockedLine(line.text, time: time, lit: isLit)
+                } else {
+                    lineText(line.text, color: isLit ? Color.primary : dim)
+                }
             }
             .buttonStyle(.plain)
             .accessibilityValue(LyricsWords.lineValue(time, lit: isLit))
@@ -168,10 +187,36 @@ struct LyricsView: View {
                 }
             }
             .accessibilityFocused($focus, equals: index)
+        } else if docked {
+            // plain: every line bright, nothing to tap, no time
+            dockedLine(line.text, time: nil, lit: false)
         } else {
             // plain: every line bright, nothing to tap
             lineText(line.text, color: Color.primary)
         }
+    }
+
+    /// (R16) A line in the Mac's dock: its time (none for plain lyrics) and its words, the lit one on the purple ground.
+    private func dockedLine(_ text: String, time: Double?, lit isLit: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: DockLyricsLook.gap) {
+            if let time {
+                Text(LyricsWords.time(time))
+                    .font(DockType.smallReadout)
+                    .foregroundStyle(isLit ? DWPalette.acct : DWPalette.t3)
+                    .frame(width: DockLyricsLook.time, alignment: .leading)
+            }
+            Text(text)
+                .font(DockType.words)
+                .foregroundStyle(isLit ? DWPalette.selt : (synced ? DWPalette.t3 : DWPalette.text))
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, DockLyricsLook.side)
+        .padding(.vertical, DockLyricsLook.wrap)
+        .frame(minHeight: DockLyricsLook.line)
+        .background { if isLit { DWPalette.selbg } }
+        .contentShape(Rectangle())
     }
 
     private func lineText(_ text: String, color: Color) -> some View {
@@ -198,6 +243,7 @@ struct LyricsView: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: Lyrics.breakHeight, maxHeight: Lyrics.breakHeight, alignment: .leading)
+        .padding(.leading, docked ? DockLyricsLook.side + DockLyricsLook.time + DockLyricsLook.gap : 0)
         .accessibilityHidden(true)
     }
 
@@ -246,6 +292,16 @@ struct LyricsView: View {
 
     /// Milliseconds on a clock that only goes forward - the hold's.
     private static func nowMs() -> Double { Monotonic.seconds() * 1000 }
+}
+
+/// (R16) A docked line's sizes (Playlist.dc.html's panel): 40 tall at least, 14 in from the panel's sides and between
+/// its time and its words, its time 36 wide, 6 above and below the words of a line that wraps.
+private enum DockLyricsLook {
+    static let line: CGFloat = 40
+    static let side: CGFloat = 14
+    static let gap: CGFloat = 14
+    static let time: CGFloat = 36
+    static let wrap: CGFloat = 6
 }
 
 /// The clock: the lines lit as the player says now, handed up when they change - and the next song's ask as the
