@@ -305,9 +305,9 @@ def test_the_phones_foot_never_rides_up_on_a_field():
 # ----------------------------------------------------------------------------- the phone is flat
 
 FLAT = {
-    # the page's black (the folder's choice, the album's page); the folder menu's line; the out-of-reach band as it was
-    SHEET: ["background: DWPalette.page", "background: DWPalette.page", "DWRule: DWPalette.groupRule", "fill: .bar",
-            "fill: Palette.amberFill"],
+    # the page's black (the folder's choice, the album's page); the folder menu's line - (R18) the out-of-reach band on
+    # BannerGround now, the offline banner's solid ground (tests/test_ios_sheets_look.py holds what it draws)
+    SHEET: ["background: DWPalette.page", "background: DWPalette.page", "DWRule: DWPalette.groupRule"],
     # the Fields card's rows' line (one row of Release's own for every field since R10's review) - (R11) the page's
     # black went with ReleasePage, the root's own; then the pages pushed from the cards, still iOS's (docs/ios.md's
     # "Not flat yet") - (R10's review: the wider matcher sees them) Choose a release's Current badge and its chosen

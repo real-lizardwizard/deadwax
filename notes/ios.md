@@ -20354,6 +20354,85 @@ judges those.
 as it was) fails with t3 put back; test_ios_palette, phone_look, mac_look, search_look and test_type pass. **Not
 verified**: how it reads - check 616.
 
+## The panel review, R18: sheets, faces and banners (2026-11-26)
+
+The panel review's rows M11-M16, P2 and P4-P9 (panel-review.md): sheets and one-offs no slice had drawn - Add to a
+playlist and New playlist as default Lists with no well, Downloaded playlists and Edit order as system Lists, Choose the
+folder's List and ContentUnavailableView, the old PrimaryFace (17 pt) and SecondaryPill (the grey gradient R1c took from
+the phone) on the first ask, Songs' Shuffle, MineBlock, the Navidrome gate and Can't reach deadwax, `.bordered` on See
+All music, the notice's thinMaterial, the offline banner's `.bar`, Edit album's out-of-reach line on `.bar` and
+Palette.amberFill, and a grey Palette.card box round the cover viewer's ✕. No drawing has any of them, so (James's
+answer 4) each is drawn from dw.css's pieces: flat on the phone, the Mac's boxes and buttons on the Mac. Checks 631-638.
+
+**SheetLook** (Shared/SheetLook.swift, new): what they share, both devices' sizes in one place, because a shared file
+may name no Mac type (test_ios_mac_reach) - the Mac's words come through Typeface.Look's roles (field 13, smallButton
+12, chip 11.5), the phone's through Typeface.Phone's (row 16, topName 17, small 13, legend 13). `ground` (the phone's
+page black, the Mac's --bg), `rule` (rowRule / rowline), `rowHeight` (DWLook's 48 / 30), `macCover` (20, Row Size's
+Small - a sheet's window reads Small), and four pieces: **SheetPage** (a ScrollView down the sheet's ground, behind its
+bar too - one more `ignoresSafeArea` line in test_ios_palette's list), **SheetRows** (the phone's rows straight on the
+page; the Mac's in a `.box`: card ground, the line's edge, DWCorners.boxShape), `.sheetRow()` (least height, 10 in on
+the Mac, its hairline) and **SheetButtons** / **SheetButtonWords** (side by side; one over the other, each across, words
+to three lines at the accessibility sizes).
+
+- **Add to a playlist and New playlist** (Playlists/PlaylistPicker): the picker a SheetPage, New playlist… and the
+  playlists in SheetRows - the phone's rows LibraryListRow (iArtists'), the Mac's an HStack of the 20 cover, the name in
+  --head, the count; New playlist's fields **NewPlaylistFields**, the name on DWWell on both devices (the chain written
+  inline: DWWellField is nothing on the Mac), Create `.pri` and Cancel flat, `fills: stacked` in place of the labels'
+  maxWidth frames (a flat body is fixedSize unless it fills). **NewPlaylistSheet** (new, in the picker's file) is the
+  Playlists pages' sheet on both devices (PlaylistsScreen, MacPlaylistsPage), their Lists gone. The gate is unchanged:
+  `rows` is Core's PlaylistRules.picker (`mine && editable`), the one list drawn. The Escape guards, focus and
+  macSheet counts are as they were. The empty cover's square stays Palette.coverEmpty, as the Library's rows draw it
+  (no DWPalette token for it).
+- **Downloaded playlists** (PlaylistsScreen): a ScrollView of PlaylistRow, which lost its `inList` half (only Downloaded
+  used the List form). **Edit order** (LibraryView): still a List - only a List in edit mode gives its rows drag handles -
+  but plain, on the sheet's ground, its rows' separators the rule, its footer a row. **The Navidrome gate**: SheetLook's
+  words and greys, Try again and Set up Navidrome each `.pri` (both were PrimaryFace; Core never offers both at once),
+  PlaceGroup's legend and PlaceRow on their hairline.
+- **Choose the folder** (Edit/ChooseFolderView, phone only - the Mac's is MacEditWindow's): a LazyVStack down the page,
+  FolderRow on its hairline (the path in SheetLook.mono, t3), the problem in amberText; `.searchable` kept, iOS's own
+  box (TEXT_INPUTS: SYSTEM). Its out-of-reach word is **FolderNeedsDeadwax**, the look's words in place of
+  ContentUnavailableView. One pull, as before.
+- **The first ask, See All music, Shuffle, Mine, Can't reach deadwax** (AlbumsScreen, SongsScreen, MineBlock,
+  UnreachableView): DWButtonStyle throughout, `.pri` where PrimaryFace was, flat where SecondaryPill and `.bordered`
+  were. The first ask's Mac half is a `.box` now and its buttons have no device split; See All music none either - both
+  **re-pinned in test_ios_mac_halves on purpose** (FirstAskCard 63ad9fb3f0571d83 -> c7e1aaca1d094c1b, EmptyLibraryNote
+  72f1e022695aeff8 -> 856096846aa8fcf2). Mine's busy fade is DWPalette.off (it was a raw 0.55).
+- **The notice** (Shared/Notice): the phone's page black inside the line's edge, the Mac's card in a box's corners - no
+  thinMaterial - and `.allowsHitTesting(false)`. Its phone words Typeface.Phone.text(.strip), Libre Franklin 15 relative
+  to the subheadline: the same face NowPlayingView's NoticeWord measures with (Typeface.subheadline), so the middle-or-
+  below rule still holds. **Never over a target**, worked out in test_the_notice_sits_above_the_mini_players_target: it
+  sits `home + TabBarFoot.room(content, home) + 8` up from the screen's foot, the bar's top `content + below(home)`, so
+  it is at least 8 clear of the bar for every home (0-48) and bar height (0-240); the seek line over the bar's edge takes
+  no touch. With the keyboard up the bar is under it and tabBarRoom 0.
+- **The offline banner and Edit's out-of-reach line** (Root/OfflineBanner, EditAlbumSheet's `editOutOfReach` alone):
+  **BannerGround** (new) - the phone's page black, the Mac's --bg under `.chip.amber`'s fill, and the amber's edge as a
+  hairline at the foot; no material. **BannerLook** (side 16, foot 6). Try again is DWButtonStyle() (it was
+  `.borderless`; test_ios_lastfm_a4's list of borderless buttons loses it, and a ButtonStyle of its own keeps its target);
+  its reach (44 - 36) / 2 = 4 is inside the strip's foot of 6. Both are safe-area insets, so they cover nothing.
+- **The cover viewer's close** (Player/CoverViewer: CoverCloseButton and the new CoverCloseKey alone): the phone's a
+  bare white glyph, faded while pressed, in a 44 target; the Mac's a round key - DWRaised on a Circle in **DWPalette's
+  `.btn` colours** (buttonFace, sheen, edge, drop): MacPalette's own key colours can't be named from a shared file.
+
+Words keys: none changed (iphone.json, mac.json untouched).
+
+**Tests**: tests/test_ios_sheets_look.py (new, 11): the flat rule over every part R18 drew (R18_DRAWS, the greys gone, a
+planted card on SheetRows seen), the picker's rows and the Mac's box, only editable playlists (the one ForEach, Core's
+rule), the new name's well on both devices and in R1c's typing walk, Downloaded playlists and Choose the folder down the
+page, every old face the look's button, the notice's ground and its font, the arithmetic above, the banners' ground and
+reach, the cover's close on each device, tokens only. Changed on purpose: test_ios_phone_look (R18_PAGES in SLICES; the
+picker's field WELL; the first ask's and See All music's asserts), test_ios_mac_halves (the two pins),
+test_ios_readout_rows (SheetLook.mono said ALONE: the folder's path and the unreached address, each a line of its own),
+test_ios_palette (SheetPage's fill), test_ios_edit_look (Edit's out-of-reach band on BannerGround), test_ios_cover_viewer
+(CoverCloseKey), test_ios_album_look (`fills: stacked`), test_ios_lastfm_a4 (OfflineBanner's Try again),
+test_ios_now_playing_look (the notice's face read as Typeface.Phone.text(.strip), the same font as NoticeWord's).
+
+**Left as they were**: the From files group's title (Typeface.title3) on Playlists, which matches R2's LibraryHeader;
+the cover viewer's own ground and its empty square (old Palette, outside the close); the Songs row's title, R2's
+LibraryListRow face; the Downloaded top's own words outside the first ask (not in the review's ranges).
+
+**Not verified**: anything on a device (checks 631-638) - how the sheets read, the notice's ground over a moving list,
+the banner's tint on the Mac, the round key's look against the cover, a tap beside the ✕.
+
 ## The redesign, slice R7: Search, Get and Sources (2026-11-25)
 
 The plan is ~/Desktop/Code/deadwax-plans/mac-redesign-build.md 3.4, "R7 - Search, Get and Sources", and the drawings

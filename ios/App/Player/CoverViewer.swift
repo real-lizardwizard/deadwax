@@ -218,9 +218,10 @@ struct CoverViewer: View {
     }
 }
 
-/// The viewer's ✕: the glyph on the card's ground, a 44-point target. Its square grows with the text size as the
-/// glyph does (`side`, scaled from 36 points), and the viewer holds both at the first accessibility size, so the glyph
-/// never outgrows its square nor the square the corner.
+/// The viewer's ✕, a 44-point target. Its square grows with the text size as the glyph does (`side`, scaled from 36
+/// points), and the viewer holds both at the first accessibility size, so the glyph never outgrows its square nor the
+/// square the corner. (R18 - notes/ios.md "The panel review, R18: sheets, faces and banners (2026-11-26)") On the phone
+/// a bare white glyph, no face (it was a grey card's square), faded while held; on the Mac a round key (CoverCloseKey).
 private struct CoverCloseButton: View {
     let action: () -> Void
     @ScaledMetric(relativeTo: .body) private var side: CGFloat = 36
@@ -229,16 +230,36 @@ private struct CoverCloseButton: View {
         Button(action: action) {
             Image(systemName: "xmark")
                 .font(Typeface.symbol(.body).weight(.semibold))
-                .foregroundStyle(Color.primary)
+                .foregroundStyle(DWPalette.text)
                 .frame(width: side, height: side)
-                .background(Palette.card, in: Corners.controlShape)
-                .frame(minWidth: 44, minHeight: 44)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CoverCloseKey())
         .accessibilityLabel(CoverViewerWords.close)
         // (the Mac app, slice 2) Escape closes the viewer; nothing on the iPhone
         .escapeCloses()
+    }
+}
+
+/// (R18) The ✕'s face: on the Mac a round key - a circle raised in the look's button colours (`.btn`'s face, sheen,
+/// edge and drop: the player's own key colours are App/Mac's, which this shared file can't name), pressed in while held,
+/// the pointer taking the circle as a Mac's control takes its face; on the phone none - the glyph alone, faded while held
+/// as a flat button is (DWPalette.off), in a finger's 44 round it.
+private struct CoverCloseKey: ButtonStyle {
+    @ViewBuilder func makeBody(configuration: Configuration) -> some View {
+        if Platform.mac {
+            configuration.label
+                .background {
+                    DWRaised(shape: Circle(), face: DWPalette.buttonFace, sheen: DWPalette.buttonSheen,
+                             edge: DWPalette.buttonEdge, drop: DWPalette.buttonDrop, pressed: configuration.isPressed)
+                }
+                .contentShape(Circle())
+                .frame(minWidth: 44, minHeight: 44)
+        } else {
+            configuration.label
+                .opacity(configuration.isPressed ? DWPalette.off : 1)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
     }
 }
 

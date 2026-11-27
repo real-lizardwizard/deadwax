@@ -86,16 +86,13 @@ struct PlaylistsPage: View {
             }
         }
         .appSheet(item: $newSheet, onDismiss: openMade) { (sheet: NewSheet) in
-            NavigationStack {
-                List {
-                    NewPlaylistFields(escapes: true) { name in
-                        try await make(name, from: sheet)
-                    } cancel: {
-                        if newSheet == sheet { newSheet = nil }
-                    }
+            // (R18) the sheet's own flat page, no List (NewPlaylistSheet)
+            NewPlaylistSheet {
+                NewPlaylistFields(escapes: true) { name in
+                    try await make(name, from: sheet)
+                } cancel: {
+                    if newSheet == sheet { newSheet = nil }
                 }
-                .navigationTitle(PlaylistWords.newPlaylistTitle)
-                .navigationBarTitleDisplayMode(.inline)
             }
             .presentationDetents([.medium, .large])
             .macSheet()
@@ -147,24 +144,27 @@ struct PlaylistsPage: View {
                     .padding(.top, 8)
             }
             if list.isEmpty {
+                // (R18) the words in the look's sizes and greys, New playlist a flat button's accent words (it was the
+                // grey SecondaryPill R1c took from the phone)
                 VStack(alignment: .leading, spacing: 8) {
                     Text(PlaylistWords.playlistsEmpty)
+                        .font(SheetLook.words)
                     Text(PlaylistWords.playlistsEmptyHow)
-                        .font(Typeface.subheadline)
+                        .font(SheetLook.small)
                         .fixedSize(horizontal: false, vertical: true)
                     if online {
                         Button(PlaylistWords.newPlaylist) { newSheet = NewSheet() }
-                            .buttonStyle(SecondaryPill())
+                            .buttonStyle(DWButtonStyle())
                             .padding(.top, 4)
                     }
                 }
-                .foregroundStyle(Palette.quiet)
+                .foregroundStyle(DWPalette.t2)
                 .padding(.top, 8)
             } else {
                 let found = PlaylistRules.found(list, typed: typed.wrappedValue)
                 if found.isEmpty {
                     Text(LibrarySwitchWords.noPlaylistMatch(typed.wrappedValue))
-                        .foregroundStyle(Palette.quiet)
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)
                 } else {
@@ -175,11 +175,11 @@ struct PlaylistsPage: View {
             // (slice 3) no list in hand: the downloaded playlists still open, and play
             let downloaded = PlaylistDownloads.shelf(downloads.playlists.kept)
             Text(downloaded.isEmpty ? PlaylistWords.offlineList : PlaylistDownloadWords.offlineDownloaded)
-                .foregroundStyle(Palette.quiet)
+                .foregroundStyle(DWPalette.t2)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.vertical, 8)
             ForEach(PlaylistRules.found(downloaded, typed: typed.wrappedValue)) { (playlist: Playlist) in
-                PlaylistRow(playlist: playlist, dimmed: !downloads.playlistPlaysOffline(playlist.id), inList: false)
+                PlaylistRow(playlist: playlist, dimmed: !downloads.playlistPlaysOffline(playlist.id))
             }
         } else if let failure = playlists.failure {
             ListFailedNote(failure: failure) { Task { await playlists.ask(fresh: true) } }
@@ -253,7 +253,7 @@ struct PlaylistsPage: View {
         ForEach(list) { playlist in
             let dimmed = !online && !playlists.playsOffline(playlist.id, here: downloads.isHere)
                 && !downloads.playlistPlaysOffline(playlist.id)
-            PlaylistRow(playlist: playlist, dimmed: dimmed, inList: false)
+            PlaylistRow(playlist: playlist, dimmed: dimmed)
         }
     }
 
@@ -268,7 +268,10 @@ struct PlaylistsPage: View {
 /// by name, each a row opening its page - drawn from what this phone keeps, so it lists them with no connection too
 /// (one with nothing of it here yet dimmed then). Reached from the Library's Downloaded (the •••'s, since slice 3b): no
 /// place of its own above the albums. With none, what is empty and how to fill it. A pull
-/// looks at deadwax for their changes now - or, with no connection, whether deadwax is back.
+/// looks at deadwax for their changes now - or, with no connection, whether deadwax is back. (R18 - notes/ios.md "The
+/// panel review, R18: sheets, faces and banners (2026-11-26)") Flat, as the Library's Playlists page is: no List - the
+/// same rows (PlaylistRow, iPlaylists' tall row on its hairline) down the page, 16 in from its sides. The phone's alone:
+/// the Mac's Downloaded page has its own Playlists tab (MacDownloadedPage).
 struct DownloadedPlaylistsScreen: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(Reachability.self) private var reachability
@@ -276,24 +279,28 @@ struct DownloadedPlaylistsScreen: View {
     var body: some View {
         let online = reachability.online
         let shelf = PlaylistDownloads.shelf(downloads.playlists.kept)
-        List {
-            if shelf.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(PlaylistDownloadWords.noneYet)
-                    Text(PlaylistDownloadWords.noneYetHow(Platform.device))
-                        .font(Typeface.subheadline)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .foregroundStyle(Palette.quiet)
-                .listRowSeparator(.hidden)
-                .accessibilityElement(children: .combine)
-            } else {
-                ForEach(shelf) { (playlist: Playlist) in
-                    PlaylistRow(playlist: playlist, dimmed: !online && !downloads.playlistPlaysOffline(playlist.id))
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if shelf.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(PlaylistDownloadWords.noneYet)
+                            .font(SheetLook.words)
+                        Text(PlaylistDownloadWords.noneYetHow(Platform.device))
+                            .font(SheetLook.small)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .foregroundStyle(DWPalette.t2)
+                    .padding(.top, 8)
+                    .accessibilityElement(children: .combine)
+                } else {
+                    ForEach(shelf) { (playlist: Playlist) in
+                        PlaylistRow(playlist: playlist, dimmed: !online && !downloads.playlistPlaysOffline(playlist.id))
+                    }
                 }
             }
+            .padding(.horizontal, SheetLook.side)
+            .padding(.bottom, 24)
         }
-        .listStyle(.plain)
         .navigationTitle(PlaylistDownloadWords.place)
         .navigationBarTitleDisplayMode(.large)
         .pullToRefresh {
@@ -309,55 +316,28 @@ struct DownloadedPlaylistsScreen: View {
 
 /// One playlist's row (PlaylistsPage.tsx `row`): the mosaic at the rows' size - or the playlist mark on a quiet square
 /// for one with none - the name, its line, and the chevron; a page pushed on the tab's path. Read as one: "Late night,
-/// 12 songs · 48 min". Dimmed, and opening nothing, while deadwax can't be reached and nothing of it plays here. In a
-/// List (Downloaded playlists) the List draws its chevron and separator; on the Library's Playlists page, a scroll view
-/// since slice 3b, the row draws its own - since R2 iPlaylists' tall row (LibraryListRow).
+/// 12 songs · 48 min". Dimmed, and opening nothing, while deadwax can't be reached and nothing of it plays here. Since R2
+/// iPlaylists' tall row (LibraryListRow), drawing its own chevron and hairline - (R18) on Downloaded playlists too, which
+/// drew it in a List's own row until then.
 struct PlaylistRow: View {
     let playlist: Playlist
     var dimmed = false
-    /// In a List, which draws the chevron, the separator and the row's padding.
-    var inList = true
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        if inList {
-            link
-        } else {
-            link
-                .buttonStyle(.plain)
-        }
-    }
-
-    private var link: some View {
         NavigationLink(value: AppRoute.playlist(PlaylistRoute(playlist))) {
-            Group {
-                if inList {
-                    HStack(spacing: 12) {
-                        PlaylistCover(id: playlist.coverArt, side: LibraryRow.cover, pixels: CoverSize.row)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(playlist.name)
-                                .foregroundStyle(DWPalette.text)
-                            Text(PlaylistRules.rowLine(playlist))
-                                .font(Typeface.subheadline)
-                                .foregroundStyle(Palette.quiet)
-                        }
-                        .lineLimit(2)
-                    }
-                    .padding(.vertical, 4)
-                } else {
-                    // (R2's review) two lines at the accessibility sizes, as the row had before R2: a long name not cut
-                    LibraryListRow(title: playlist.name, line: PlaylistRules.rowLine(playlist),
-                                   lines: typeSize.isAccessibilitySize ? 2 : 1) {
-                        PlaylistCover(id: playlist.coverArt, side: LibraryLook.rowCover, pixels: CoverSize.row)
-                    } trailing: {
-                        LibraryChevron()
-                    }
-                }
+            // (R2's review) two lines at the accessibility sizes, as the row had before R2: a long name not cut
+            LibraryListRow(title: playlist.name, line: PlaylistRules.rowLine(playlist),
+                           lines: typeSize.isAccessibilitySize ? 2 : 1) {
+                PlaylistCover(id: playlist.coverArt, side: LibraryLook.rowCover, pixels: CoverSize.row)
+            } trailing: {
+                LibraryChevron()
             }
             .contentShape(Rectangle())
             .opacity(dimmed ? DWPalette.off : 1)
         }
+        .buttonStyle(.plain)
         .disabled(dimmed)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(playlist.name), \(PlaylistRules.rowLine(playlist))")
@@ -406,7 +386,9 @@ private struct ListFailedNote: View {
         VStack(alignment: .leading, spacing: 8) {
             ErrorNote(text: PlaylistWords.listFailed(line.said), detail: line.detail)
             if let retry {
+                // (R18) the look's button - flat accent words on the phone - not the system's
                 Button(PlaylistWords.tryAgain, action: retry)
+                    .buttonStyle(DWButtonStyle())
             }
         }
         .padding(.vertical, 4)

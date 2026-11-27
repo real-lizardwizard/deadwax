@@ -86,16 +86,13 @@ struct MacPlaylistsPage: View {
             if kept != selected { selected = kept }
         }
         .appSheet(item: $newSheet, onDismiss: openMade) { (sheet: PlaylistsPage.NewSheet) in
-            NavigationStack {
-                List {
-                    NewPlaylistFields(escapes: true) { (name: String) in
-                        try await make(name, from: sheet)
-                    } cancel: {
-                        if newSheet == sheet { newSheet = nil }
-                    }
+            // (R18) the sheet's own page, no List: the name on the Mac's well, Create and Cancel the Mac's buttons
+            NewPlaylistSheet {
+                NewPlaylistFields(escapes: true) { (name: String) in
+                    try await make(name, from: sheet)
+                } cancel: {
+                    if newSheet == sheet { newSheet = nil }
                 }
-                .navigationTitle(PlaylistWords.newPlaylistTitle)
-                .navigationBarTitleDisplayMode(.inline)
             }
             .macSheet()
         }

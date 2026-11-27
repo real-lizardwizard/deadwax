@@ -27,6 +27,11 @@ struct PlaylistPickRequest: Identifiable {
 /// gone asks the list again. Closing the sheet while an add is out never calls it off (a write) - the notice still
 /// says how it went. New playlist… opens the name in place of its row and makes the playlist WITH the songs ("Made
 /// Late night with Roads"). It plays nothing.
+///
+/// (The redesign, slice R18 - notes/ios.md "The panel review, R18: sheets, faces and banners (2026-11-26)") No List:
+/// the sheet's own page (SheetPage) - the head in the small words, then the rows (SheetRows): on the phone each on its
+/// hairline, the Library's playlist row (iPlaylists'), no fill; on the Mac a box of 30 pt rows. The question's two
+/// answers are the look's buttons (the purple one first), New playlist's name on the look's well.
 struct PlaylistPicker: View {
     let request: PlaylistPickRequest
 
@@ -51,15 +56,14 @@ struct PlaylistPicker: View {
     var body: some View {
         let rows = playlists.list.map(PlaylistRules.picker) ?? []
         NavigationStack {
-            List {
-                Section {
-                    Text(PlaylistRules.pickLine(model.pick))
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
-                        .lineLimit(3)
-                    if let failure = model.failure {
-                        ErrorNote(failure)
-                    }
+            SheetPage {
+                Text(PlaylistRules.pickLine(model.pick))
+                    .font(SheetLook.small)
+                    .foregroundStyle(DWPalette.t2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let failure = model.failure {
+                    ErrorNote(failure)
                 }
 
                 if let question = model.question {
@@ -79,6 +83,7 @@ struct PlaylistPicker: View {
                 }
             }
         }
+        .presentationBackground(SheetLook.ground)
         .task {
             // afresh each time it opens
             await playlists.ask(fresh: true)
@@ -95,19 +100,25 @@ struct PlaylistPicker: View {
 
     // MARK: the list
 
+    /// New playlist… and the playlists you can add to - only those, as before (PlaylistRules.picker: yours and
+    /// editable) - each one of SheetRows' rows; New playlist's name in its row's place while it is open.
     @ViewBuilder private func listSection(_ rows: [Playlist]) -> some View {
-        Section {
-            if playlists.list != nil, rows.isEmpty, playlists.failure == nil {
-                Text(PlaylistWords.noPlaylistsYet)
-                    .foregroundStyle(Palette.quiet)
-            }
+        let busy = playlists.writes.busy
+        if playlists.list != nil, rows.isEmpty, playlists.failure == nil {
+            Text(PlaylistWords.noPlaylistsYet)
+                .foregroundStyle(DWPalette.t2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        SheetRows {
             if model.making {
-                NewPlaylistFields(busyOutside: playlists.writes.busy, typed: Platform.mac ? $nameTyped : nil) { name in
+                NewPlaylistFields(busyOutside: busy, typed: Platform.mac ? $nameTyped : nil) { name in
                     try await model.make(name: name, playlists: playlists, player: player)
                 } cancel: {
                     model.making = false
                     refocus(.first)
                 }
+                .padding(.vertical, SheetLook.gap)
+                .sheetRow()
             } else {
                 Button {
                     guard !playlists.writes.busy else { return }
@@ -115,7 +126,9 @@ struct PlaylistPicker: View {
                 } label: {
                     PickerRow(cover: nil, name: PlaylistWords.newPlaylistRow, line: nil, symbol: "plus")
                 }
-                .disabled(playlists.writes.busy)
+                .buttonStyle(.plain)
+                .disabled(busy)
+                .opacity(busy ? DWPalette.off : 1)
                 .accessibilityFocused($focus, equals: .first)
             }
             ForEach(rows) { playlist in
@@ -127,53 +140,63 @@ struct PlaylistPicker: View {
                                   : PlaylistRules.songCount(playlist.songCount),
                               symbol: nil)
                 }
-                .disabled(playlists.writes.busy)
+                .buttonStyle(.plain)
+                .disabled(busy)
+                // the one being added to stays as it is, "Adding…"; the rest wait, faded
+                .opacity(busy && playlists.writes.adding(playlist.id) == nil ? DWPalette.off : 1)
             }
-            if playlists.list == nil {
-                if let failure = playlists.failure {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ErrorNote(text: PlaylistWords.listFailed(ErrorWords.of(failure, admin: server.access.seesDetail,
-                                                                               retry: true).said))
-                        Button(PlaylistWords.tryAgain) { Task { await playlists.ask(fresh: true) } }
-                    }
-                } else {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .accessibilityLabel(PlaylistWords.loading)
+        }
+        if playlists.list == nil {
+            if let failure = playlists.failure {
+                VStack(alignment: .leading, spacing: 8) {
+                    ErrorNote(text: PlaylistWords.listFailed(ErrorWords.of(failure, admin: server.access.seesDetail,
+                                                                           retry: true).said))
+                    Button(PlaylistWords.tryAgain) { Task { await playlists.ask(fresh: true) } }
+                        .buttonStyle(DWButtonStyle())
                 }
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel(PlaylistWords.loading)
             }
         }
     }
 
     // MARK: the question
 
+    /// Some of the songs are there already: the question in words, then its two answers - the purple one (add them
+    /// again) and the other (skip those, or Cancel back to the list) - side by side, one over the other at the largest
+    /// text sizes.
     private func questionSection(_ question: PlaylistPickerFlow.Asked) -> some View {
         let asked = PlaylistRules.duplicateQuestion(already: question.already, asked: question.asked, pick: model.pick,
                                                     name: question.playlist.name)
         let adding = playlists.writes.adding(question.playlist.id)
-        return Section {
+        return VStack(alignment: .leading, spacing: SheetLook.gap) {
             Text(asked.text)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityFocused($focus, equals: .question)
-            Button {
-                model.add(to: question.playlist, mode: .add, playlists: playlists, player: player,
-                          admin: server.access.seesDetail)
-            } label: {
-                Text(adding != nil && adding == asked.yes.mode ? PlaylistWords.adding : asked.yes.label)
-                    .fontWeight(.semibold)
-            }
-            .disabled(playlists.writes.busy)
-            Button {
-                if let mode = asked.no.mode {
-                    model.add(to: question.playlist, mode: mode, playlists: playlists, player: player,
+            SheetButtons { (stacked: Bool) in
+                Button {
+                    model.add(to: question.playlist, mode: .add, playlists: playlists, player: player,
                               admin: server.access.seesDetail)
-                } else {
-                    model.back()
+                } label: {
+                    SheetButtonWords(adding != nil && adding == asked.yes.mode ? PlaylistWords.adding : asked.yes.label)
                 }
-            } label: {
-                Text(adding != nil && adding == asked.no.mode ? PlaylistWords.adding : asked.no.label)
+                .buttonStyle(DWButtonStyle(kind: .pri, fills: stacked))
+                .disabled(playlists.writes.busy)
+                Button {
+                    if let mode = asked.no.mode {
+                        model.add(to: question.playlist, mode: mode, playlists: playlists, player: player,
+                                  admin: server.access.seesDetail)
+                    } else {
+                        model.back()
+                    }
+                } label: {
+                    SheetButtonWords(adding != nil && adding == asked.no.mode ? PlaylistWords.adding : asked.no.label)
+                }
+                .buttonStyle(DWButtonStyle(fills: stacked))
+                .disabled(playlists.writes.busy)
             }
-            .disabled(playlists.writes.busy)
         }
     }
 
@@ -184,42 +207,66 @@ struct PlaylistPicker: View {
 }
 
 /// One row of the picker: the playlist's mosaic (or New playlist…'s plus on the empty cover's square), its name and its
-/// count - "Adding…" while its add is out. Read as one: "Late night, 12 songs".
+/// count - "Adding…" while its add is out. Read as one: "Late night, 12 songs". (R18) On the phone the Library's
+/// playlist row (LibraryListRow, iPlaylists' tall row on its hairline); on the Mac a box's row (`.row`, 30 tall, its
+/// cover 20 - a sheet's own window reads the Small Row Size), the count after the name in the second colour, a long
+/// name cut short with the whole of it in `.help` and VoiceOver.
 private struct PickerRow: View {
     let cover: String?
     let name: String
     let line: String?
     let symbol: String?
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        HStack(spacing: 12) {
-            if let symbol {
-                ZStack {
-                    Palette.coverEmpty
-                    Image(systemName: symbol)
-                        .font(Typeface.symbol(.title3).weight(.semibold))
-                        .foregroundStyle(Palette.accent)
+        Group {
+            if Platform.mac {
+                HStack(spacing: 10) {
+                    mark(side: SheetLook.macCover)
+                    Text(name)
+                        .foregroundStyle(DWPalette.head)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 8)
+                    if let line {
+                        Text(line)
+                            .font(SheetLook.small)
+                            .foregroundStyle(DWPalette.t2)
+                            .lineLimit(1)
+                    }
                 }
-                .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                .clipShape(Corners.artShape)
-                .accessibilityHidden(true)
+                .font(SheetLook.words)
+                .sheetRow()
+                .help(name)
             } else {
-                PlaylistCover(id: cover, side: LibraryRow.cover, pixels: CoverSize.row)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name)
-                    .foregroundStyle(.primary)
-                if let line {
-                    Text(line)
-                        .font(Typeface.subheadline)
-                        .foregroundStyle(Palette.quiet)
+                LibraryListRow(title: name, line: line ?? "", lines: typeSize.isAccessibilitySize ? 2 : 1) {
+                    mark(side: LibraryLook.rowCover)
+                } trailing: {
+                    EmptyView()
                 }
             }
-            .lineLimit(2)
-            Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([name, line].compactMap { $0 }.joined(separator: ", "))
+    }
+
+    /// The playlist's mosaic, or New playlist…'s plus in the accent on the empty cover's square - a picture's place.
+    @ViewBuilder private func mark(side: CGFloat) -> some View {
+        if let symbol {
+            ZStack {
+                Palette.coverEmpty
+                Image(systemName: symbol)
+                    .font(Typeface.symbol(size: side * 0.45, weight: .semibold))
+                    .foregroundStyle(DWPalette.acc)
+            }
+            .frame(width: side, height: side)
+            .clipShape(DWCorners.chipShape)
+            .accessibilityHidden(true)
+        } else {
+            PlaylistCover(id: cover, side: side, pixels: CoverSize.row)
+        }
     }
 }
 
@@ -294,6 +341,24 @@ final class PlaylistPickerModel {
     }
 }
 
+/// New playlist's sheet (the Library's Playlists on the phone, the Mac's Playlists page - each with its own
+/// NewPlaylistFields, the page's own Create): (R18) no List - the form on the sheet's own page (SheetPage), flat on the
+/// phone's black, the Mac's window ground in its own window, under the sheet's bar and its title.
+struct NewPlaylistSheet<Fields: View>: View {
+    @ViewBuilder let fields: Fields
+
+    var body: some View {
+        NavigationStack {
+            SheetPage {
+                fields
+            }
+            .navigationTitle(PlaylistWords.newPlaylistTitle)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationBackground(SheetLook.ground)
+    }
+}
+
 /// New playlist's name (the web's NewPlaylistForm.tsx) - the picker's, in place of its row, and the Playlists screen's
 /// sheet: a Name field, Create and Cancel. Create waits while the name is blank and while it is out ("Creating…");
 /// refused, the form stays with why under it. The field takes focus as it opens; Return creates. `create` makes the
@@ -320,8 +385,12 @@ struct NewPlaylistFields: View {
     private var blank: Bool { PlaylistEdit.trimmed(name).isEmpty }
 
     var body: some View {
-        Group {
-            TextField(PlaylistWords.nameField, text: $name)
+        VStack(alignment: .leading, spacing: 10) {
+            // (R18) the name on the look's well on both devices (`.in`: the phone's square 36 at 16, the Mac's 24 at 13
+            // with its corners), its prompt in the third colour, the well's edge the accent's while it has the cursor -
+            // a tap on the well (or a finger's 44 round it) puts the cursor in it
+            TextField(PlaylistWords.nameField, text: $name,
+                      prompt: Text(PlaylistWords.nameField).foregroundStyle(DWPalette.t3))
                 .focused($focused)
                 .textInputAutocapitalization(.sentences)
                 .autocorrectionDisabled()
@@ -333,27 +402,36 @@ struct NewPlaylistFields: View {
                     if kept != typed { name = kept }
                 }
                 .accessibilityLabel(PlaylistWords.nameField)
+                .textFieldStyle(.plain)
+                .font(Typeface.Look.text(.field))
+                .foregroundStyle(DWPalette.fieldText)
+                .focusEffectDisabled()
+                .padding(.horizontal, 8)
+                .lookHeight(DWLook.here.fieldHeight)
+                .background {
+                    DWWell(focused: focused)
+                        .contentShape(DWTarget(face: DWCorners.buttonShape))
+                        .onTapGesture { focused = true }
+                }
             if let failure {
                 ErrorNote(failure)
             }
             // (R5) the shared buttons, the layout as it was: Create the purple one, Cancel the plain - (R5's review) one
             // over the other at the accessibility sizes, each across the row, as the other pages stack theirs, each word
-            // up to three lines there
+            // up to three lines there - (R18) each filling the row there (a button's words fill only when it does)
             let stacked = typeSize.isAccessibilitySize
             let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) : AnyLayout(HStackLayout())
             layout {
                 Button(action: send) {
                     words(busy ? PlaylistWords.creating : PlaylistWords.create)
-                        .frame(maxWidth: stacked ? .infinity : nil)
                 }
-                .buttonStyle(DWButtonStyle(kind: .pri))
+                .buttonStyle(DWButtonStyle(kind: .pri, fills: stacked))
                 .disabled(blank || busy || busyOutside)
                 if !stacked { Spacer() }
                 Button(role: .cancel, action: cancel) {
                     words(PlaylistWords.cancel)
-                        .frame(maxWidth: stacked ? .infinity : nil)
                 }
-                .buttonStyle(DWButtonStyle())
+                .buttonStyle(DWButtonStyle(fills: stacked))
                 .escapeCloses(escapes && blank)
             }
         }

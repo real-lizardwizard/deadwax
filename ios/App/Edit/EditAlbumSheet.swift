@@ -671,6 +671,9 @@ extension View {
 
     /// Edit album's line while deadwax can't be reached (phase8-managing.md 2): at the top of each of its pages, under
     /// the bar, amber as the offline banner - what is drawn is how it was, and nothing can change until it's back.
+    /// (R18 - notes/ios.md "The panel review, R18: sheets, faces and banners (2026-11-26)") On the offline banner's own
+    /// ground (BannerGround: solid, no material - the phone's black, the Mac's ground under the amber's tint - and the
+    /// amber's hairline), in its words and measures; a safe-area inset, so it covers nothing of the page under it.
     func editOutOfReach(_ shown: Bool) -> some View {
         safeAreaInset(edge: .top, spacing: 0) {
             if shown {
@@ -681,14 +684,11 @@ extension View {
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .font(Typeface.footnote.weight(.semibold))
-                .foregroundStyle(Palette.amber)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 6)
-                .background {
-                    Rectangle().fill(.bar)
-                        .overlay(Rectangle().fill(Palette.amberFill))
-                }
+                .font(SheetLook.small.weight(.semibold))
+                .foregroundStyle(DWPalette.amberText)
+                .padding(.horizontal, BannerLook.side)
+                .padding(.vertical, BannerLook.foot)
+                .background { BannerGround() }
                 .dynamicTypeSize(...DynamicTypeSize.accessibility2)
                 .accessibilityElement(children: .combine)
             }

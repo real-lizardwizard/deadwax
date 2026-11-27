@@ -240,7 +240,13 @@ def test_the_notice_is_measured_as_it_is_drawn_and_laid_where_its_words_fit():
                     ".map(String.init) ZStack { ForEach(words.indices, id: \\.self) { (index: Int) in Text(words[index]) "
                     "} } .font(Typeface.subheadline) .fixedSize() .dynamicTypeSize(...DynamicTypeSize.xxxLarge) "
                     ".hidden() .accessibilityHidden(true) } }"), word
-    assert "Text(text) .font(Typeface.subheadline)" in flat(bare(APP / "Shared" / "Notice.swift"))
+    # (R18) the notice draws the phone's own strip face, which is that very font - Libre Franklin at 15, scaled as the
+    # subheadline (tests/test_ios_sheets_look.py holds the two the same)
+    assert ("Text(text) .font(Platform.mac ? Typeface.Look.text(.field) : Typeface.Phone.text(.strip))"
+            in flat(bare(APP / "Shared" / "Notice.swift")))
+    typeface = (APP / "Shared" / "Typeface.swift").read_text(encoding="utf-8")
+    assert "case .strip: return (15, .subheadline)" in typeface
+    assert "static let subheadline = text(15, .subheadline)" in typeface
     assert "if let notice = player.notice { NoticeWord(text: notice) .onGeometryChange" in top
 
 

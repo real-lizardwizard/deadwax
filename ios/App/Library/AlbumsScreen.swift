@@ -467,7 +467,10 @@ struct LibraryLayoutSwitch: View {
 ///
 /// (R1c's review - notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") On the phone no face: a card
 /// of the page's (PhoneCard - 14 above and below, a hairline under it), Turn On the purple and Not Now a flat button's
-/// words in the accent. On the Mac's Downloaded page, which borrows it, the card as it was (its fill, the pill).
+/// words in the accent. (R18 - notes/ios.md "The panel review, R18: sheets, faces and banners (2026-11-26)") On the Mac's
+/// Downloaded page, which borrows it, a box (dw.css's `.box`: the raised ground, the line's edge, a box's corners - not
+/// the old toggled fill), its words in the Mac's sizes, Turn On the Mac's purple `.btn.pri` and Not Now its `.btn` - the
+/// look's buttons on both devices, PrimaryFace and SecondaryPill gone.
 struct FirstAskCard: View {
     /// (R9's review) Room round the card on the Mac - its Downloaded page's sides - drawn only with the card.
     var macRoom = EdgeInsets()
@@ -479,9 +482,10 @@ struct FirstAskCard: View {
         if !asked, downloads.isOpen, !downloads.follower.on {
             if Platform.mac {
                 ask
-                    .padding(14)
+                    .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Corners.cardShape.fill(Palette.toggledFill))
+                    .background(DWPalette.card, in: DWCorners.boxShape)
+                    .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line, lineWidth: 1))
                     .accessibilityElement(children: .contain)
                     .padding(.bottom, 12)
                     .padding(macRoom)
@@ -495,45 +499,46 @@ struct FirstAskCard: View {
         }
     }
 
-    /// The ask itself: its title, its line, its two buttons - side by side where they fit.
+    /// The ask itself: its title, its line, its two buttons - side by side where they fit, one over the other (each
+    /// across the card, its words up to three lines) at the largest text sizes.
     private var ask: some View {
         let scope = downloads.libraryScope
         return VStack(alignment: .leading, spacing: 10) {
             Text(AutoDownloadWords.askTitle(scope, device: Platform.device))
-                .font(Typeface.headline)
+                .font(SheetLook.title)
+                .foregroundStyle(DWPalette.text)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             Text(AutoDownloadWords.askLine(scope, limit: downloads.storageLimit, device: Platform.device))
-                .font(Typeface.subheadline)
-                .foregroundStyle(Palette.quiet)
+                .font(SheetLook.small)
+                .foregroundStyle(DWPalette.t2)
                 .fixedSize(horizontal: false, vertical: true)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) { buttons }
-                VStack(alignment: .leading, spacing: 10) { buttons }
+            SheetButtons { (stacked: Bool) in
+                buttons(stacked)
             }
         }
     }
 
     @ViewBuilder
-    private var buttons: some View {
-        Button(AutoDownloadWords.turnOn) {
+    private func buttons(_ stacked: Bool) -> some View {
+        Button {
             asked = true
             downloads.follower.on = true
+        } label: {
+            SheetButtonWords(AutoDownloadWords.turnOn)
         }
-        .buttonStyle(PrimaryFace())
-        if Platform.mac {
-            Button(AutoDownloadWords.notNow) { asked = true }
-                .buttonStyle(SecondaryPill())
-        } else {
-            // (R1c's review) a flat button: its words in the accent, no face
-            Button(AutoDownloadWords.notNow) { asked = true }
-                .buttonStyle(DWButtonStyle())
+        .buttonStyle(DWButtonStyle(kind: .pri, fills: stacked))
+        // (R1c's review) a flat button on the phone: its words in the accent, no face - (R18) the Mac's `.btn`
+        Button { asked = true } label: {
+            SheetButtonWords(AutoDownloadWords.notNow)
         }
+        .buttonStyle(DWButtonStyle(fills: stacked))
     }
 }
 
 /// One group of places (app/LibraryHome.tsx's groups): a header and its rows - since slice 3b only the Navidrome gate's
-/// On this phone, the switch and its ••• holding the rest.
+/// On this phone, the switch and its ••• holding the rest. (R18) The header a group's legend (SheetLook's: the phone's
+/// `.dw.ph .group > .legend`, the Mac's `.navh`), the rows on their hairlines.
 struct PlaceGroup<Rows: View>: View {
     let title: String
     @ViewBuilder let rows: () -> Rows
@@ -541,15 +546,18 @@ struct PlaceGroup<Rows: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(Typeface.title3.weight(.semibold))
+                .font(SheetLook.legend)
+                .foregroundStyle(SheetLook.legendColour)
                 .accessibilityAddTraits(.isHeader)
             rows()
         }
     }
 }
 
-/// A place's row: the accent mark, its name, a count (albums, quiet), the chevron and the divider - a page pushed on
-/// the tab's path (AppRoute), so the tab's tap pops it like any page.
+/// A place's row: the accent mark, its name, a count (albums, quiet), the chevron and the hairline - a page pushed on
+/// the tab's path (AppRoute), so the tab's tap pops it like any page. (R18) A row of the look's (SheetLook's words and
+/// its least height: the phone's 48, growing with the text; the Mac's 30) on the row's hairline, not the system's
+/// Divider.
 struct PlaceRow: View {
     let symbol: String
     let label: String
@@ -560,32 +568,34 @@ struct PlaceRow: View {
     var divider = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            NavigationLink(value: route) {
-                HStack(spacing: 12) {
-                    Image(systemName: symbol)
-                        .foregroundStyle(Palette.accent)
-                        .accessibilityHidden(true)
-                    Text(label)
-                    Spacer(minLength: 8)
-                    if let count {
-                        Text("\(count)")
-                            .foregroundStyle(Palette.quiet)
-                            .accessibilityHidden(true)
-                    }
-                    Image(systemName: "chevron.right")
-                        .font(Typeface.symbol(.footnote).weight(.semibold))
-                        .foregroundStyle(DWPalette.t3)
+        NavigationLink(value: route) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .foregroundStyle(DWPalette.acc)
+                    .accessibilityHidden(true)
+                Text(label)
+                    .foregroundStyle(DWPalette.text)
+                Spacer(minLength: 8)
+                if let count {
+                    Text("\(count)")
+                        .foregroundStyle(DWPalette.t2)
                         .accessibilityHidden(true)
                 }
-                .padding(.vertical, 10)
-                .contentShape(Rectangle())
+                Image(systemName: "chevron.right")
+                    .font(Typeface.symbol(.footnote).weight(.semibold))
+                    .foregroundStyle(DWPalette.t3)
+                    .accessibilityHidden(true)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(label)
-            .accessibilityValue(count.map(counted) ?? "")
-            if divider { Divider() }
+            .font(SheetLook.words)
+            .frame(maxWidth: .infinity, minHeight: SheetLook.rowHeight)
+            .overlay(alignment: .bottom) {
+                if divider { DWRule(colour: SheetLook.rule) }
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityValue(count.map(counted) ?? "")
     }
 }
 
@@ -617,27 +627,24 @@ private struct StoreAlbumsLink<Content: View>: View {
 
 /// Your library empty (EmptyLibrary): what is empty - `lead`, your albums' or (slice 4) your artists' - how to fill it,
 /// and See All music. (R1c's review) On the phone See All music is a flat button's words in the accent, no face (it was
-/// the system's bordered grey); on the Mac, should it ever be drawn there, the bordered button as before.
+/// the system's bordered grey). (R18 - notes/ios.md "The panel review, R18: sheets, faces and banners (2026-11-26)") On
+/// the Mac, should it ever be drawn there, the Mac's `.btn` - the look's button on both devices, the system's bordered
+/// one gone - and the words in the look's sizes and greys.
 struct EmptyLibraryNote: View {
     var lead = LibraryWords.emptyLibrary
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(lead)
+                .font(SheetLook.words)
+                .foregroundStyle(DWPalette.text)
             Text(LibraryWords.emptyLibraryHow)
-                .foregroundStyle(Palette.quiet)
-            if Platform.mac {
-                StoreAlbumsLink {
-                    Text(LibraryWords.seeAllMusic)
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(Corners.controlBorder)
-            } else {
-                StoreAlbumsLink {
-                    Text(LibraryWords.seeAllMusic)
-                }
-                .buttonStyle(DWButtonStyle())
+                .font(SheetLook.small)
+                .foregroundStyle(DWPalette.t2)
+            StoreAlbumsLink {
+                Text(LibraryWords.seeAllMusic)
             }
+            .buttonStyle(DWButtonStyle())
         }
         .fixedSize(horizontal: false, vertical: true)
         .padding(.top, 8)

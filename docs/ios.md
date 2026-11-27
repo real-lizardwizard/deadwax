@@ -7503,6 +7503,50 @@ the purple is as it was.
   white. The purple and white words, the hairlines and the buttons are as they were. On the Mac, the same greys lift
   (the sidebar's small headings and search prompt, a list's column headings, the status bar).
 
+### The panel review's fixes (617-648)
+
+The review on 26 Nov found screens the redesign hadn't reached yet: sheets still drawn as iOS's grey lists, the old
+rounded grey buttons, the system's frosted strips behind the notice and the offline strip, and a grey box round the
+full-screen cover's ✕. None of them had a drawing, so each is now built from the redesign's own pieces: flat on the
+phone, the Mac's boxes and buttons on the Mac. Nothing works any differently.
+
+#### Sheets, faces and banners (631-638)
+
+- **631 Add to a playlist and New playlist.** **Not done yet.** From an album's or a song's •••, **Add to a
+  playlist…**: the sheet is black, with no grey rows - **New playlist…** and your playlists down it, each a cover, its
+  name and its count over a thin line, as the Library's rows are. Only playlists you can change are there, as before.
+  Tap **New playlist…**: the name goes in a dark sunken box, its edge purple while you type, with **Create** purple
+  beside **Cancel** in purple words; a tap on the box puts the cursor in it. Add to a playlist that already has some of
+  the songs: the question's two answers are the purple button and purple words. Library > Playlists' **New playlist**
+  opens the same black sheet. On the Mac, the playlists sit in one bordered box, a row each, and the name in the Mac's
+  own sunken field, Create and Cancel the Mac's glossy buttons; Escape still cancels until you've typed a name.
+- **632 Downloaded playlists and Edit order.** **Not done yet.** Library > Downloaded > Playlists: the playlists down
+  the black page on thin lines, no grey list. The Library's ••• > **Edit order**: the pages on black over thin lines,
+  their handles to drag as before, the note under them in grey words.
+- **633 Choose the folder.** **Not done yet.** Settings > Manage > Edit an album: the folders down the black page,
+  each its cover, album, artist and path (in the typewriter face) over a thin line, the count above them in grey
+  words; the search field at the top is iOS's own, as before. Opened while deadwax can't be reached, it says so in
+  the app's own words and greys, not iOS's.
+- **634 The Navidrome gate and Can't reach deadwax.** **Not done yet.** If the Library shows **Can't reach Navidrome**
+  (or **Connect Navidrome**), its heading and lines are the app's words and greys and **Try again** (or **Set up
+  Navidrome**) is the purple button. With deadwax out of reach as the app starts (WireGuard off): **Try again** is
+  the large purple button, **Change address** large purple words under it, the address in the typewriter face, on
+  black.
+- **635 The old buttons.** **Not done yet.** Each is now the purple button or purple words, never the old grey
+  rounded one: Downloaded's question about downloading your library (**Turn On** purple, **Not Now** words), an empty
+  library's **See All music**, Library > Songs' **Shuffle** (its line under it in grey words when it can't), and an
+  album's **Add to my library** (purple) and **Remove from my library** (words). At the accessibility sizes, two
+  buttons side by side go one over the other, each across the page.
+- **636 The notice and the strips.** **Not done yet.** Play Next on a song: the notice over the mini player is black
+  inside a thin line - no frosted glass - and the list under it doesn't show through. It sits a little above the mini
+  player at every text size, and a tap where it lies still reaches what's under it. With WireGuard off, the offline
+  strip at the top of each page is solid black with its amber words over a thin amber line (on the Mac, the window's
+  ground with an amber tint); tap it, then **Try again** (purple words). Open Edit album and go out of reach: its
+  amber line at the top is drawn the same way. Neither covers anything on the page.
+- **637 The cover's ✕.** **Not done yet.** Tap Now Playing's cover for it full screen: the ✕ is a bare white glyph,
+  no grey box, and a tap near it still closes. On the Mac it is a round glossy key.
+- **638 Both phones.** **Not done yet.** On Green Anole, 631-637. On Ethan's phone, 631-637, or "not done yet".
+
 ## What it can't do yet
 
 These are the web app's for now - open deadwax's address in a browser for them, since nothing in the app takes you

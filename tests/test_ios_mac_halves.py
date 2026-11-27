@@ -165,6 +165,10 @@ def mac_halves() -> dict[str, str]:
 #? every other caller, so what the Mac drew there is unchanged (its digest before, f7d6bf161c90975f).
 #? (R11) DWCheckbox new, pinned as R11 left it: its Mac half MacCheckbox's (13, the tick's 8 heavy on checkFill, unticked
 #? sunk in the well with the line's edge, the words at the field's size beside it) - MacCheckbox kept for Settings.
+#? (R18, the panel review's) Two re-pinned on purpose: the first ask's Mac half a `.box` now (DWPalette.card with the
+#? line's edge, a box's corners) where the old toggled fill was, its title and line SheetLook's, Turn On and Not Now the
+#? look's buttons (its pin before, 63ad9fb3f0571d83); and See All music the look's button on both devices, its `.bordered`
+#? Mac half gone (72f1e022695aeff8).
 PINNED = {
     "Look/DWButtonStyle.swift": "05ac2b1f28675581",
     "Look/DWCheckbox.swift": "fde34df0a439b8bb",
@@ -182,8 +186,8 @@ PINNED = {
     "ArtistHeroPicture": "62b50dcf0400dac1",
     "LastfmCredit": "af492e61b5a3bda3",
     "ArtistTheirFoot": "f19dafdb6bb6738c",
-    "FirstAskCard": "63ad9fb3f0571d83",
-    "EmptyLibraryNote": "72f1e022695aeff8",
+    "FirstAskCard": "c7e1aaca1d094c1b",
+    "EmptyLibraryNote": "856096846aa8fcf2",
 }
 
 
