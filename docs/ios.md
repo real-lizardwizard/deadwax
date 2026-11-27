@@ -797,8 +797,10 @@ it, and the page goes back to its top.
 Under the top each page has its own quiet line, all words, nothing boxed: how many there are ("3012 albums"), then -
 on Albums and Artists - its order, in purple (tap it to choose another), or on Playlists **New playlist…**. At the
 end of Albums' line are its **grid** and **list** marks, and - with a library of your own - every page's line ends
-with **Yours | All** (below). On the line, white is where you are and purple is what a tap takes you to: the layout
-showing and the side you're on are white, the other of each purple. Where a line is too long for the phone's width
+with **Yours** and **All** (below). Each of those is grey until it's the one chosen: the layout showing and the side
+you're on are white over a short purple line, the same line the switch above marks its page with (and VoiceOver says
+"selected"). Purple words on the line are only ever something to tap that opens or goes somewhere: the order, with
+its little arrow, and **New playlist…**. Where a line is too long for the phone's width
 (a long order, a big count, Find's "12 of 140", a larger text size), the count gives way first - "140 · Recently
 added", the number without its word (VoiceOver still says "140 albums") - and only where even that is too long does
 the line's end move onto a line of its own under the words, at the right, the count saying its word again. The
@@ -6786,7 +6788,8 @@ pages, in the order you keep (Edit order), the page you're on white over a purpl
 row of buttons under it. Under the row each
 page has one quiet line of words: how many, its order (tap it to change it) or Playlists' **New playlist…**, and at its
 end Albums' grid and list marks, then **Yours | All** with a library of your own - white where you are, purple what a
-tap goes to. **All** shows the whole collection's albums, artists and songs as the pages, where the •••'s All music
+tap goes to (since 654, grey until chosen and the chosen one underlined). **All** shows the whole collection's albums,
+artists and songs as the pages, where the •••'s All music
 used to push them. The ••• is Shuffle, **Downloaded**, Refresh and Edit order.
 
 - **526 Albums as a list.** **Not done yet.** On the Mac, choose **List** in the Albums toolbar: every other row is
@@ -6815,11 +6818,11 @@ used to push them. The ••• is Shuffle, **Downloaded**, Refresh and Edit or
 - **530 The pages.** **Not done yet.** Tap each page in the switch: the page moves to it and it lights. Swipe between
   the pages: the lit page follows. **••• > Downloaded** opens Downloaded; turn WireGuard off on Yours and the ••• has
   **Your albums** in its place instead. The order on a page's line changes the order, the grid and list marks at the
-  end of Albums' line switch it (the one showing white, the other purple), and pulling a page down still shuffles.
-  With a library of your own, **All** at the end of a page's line shows the whole collection's Albums, Artists and
-  Songs, and **Yours** your own again - Songs never beside your own albums; the side you're on is white, the other
-  purple. On All's Songs, turn WireGuard off: All and its Songs stay; tap Yours, and Yours | All goes until deadwax is
-  back. The magnifying glass opens Find under the top; Cancel closes it.
+  end of Albums' line switch it (the one showing white, the other purple - grey since 654), and pulling a page down
+  still shuffles. With a library of your own, **All** at the end of a page's line shows the whole collection's Albums,
+  Artists and Songs, and **Yours** your own again - Songs never beside your own albums; the side you're on is white,
+  the other purple (grey since 654). On All's Songs, turn WireGuard off: All and its Songs stay; tap Yours, and
+  Yours | All goes until deadwax is back. The magnifying glass opens Find under the top; Cancel closes it.
 - **531 Both phones.** **Not done yet.** On Green Anole, the rest - the other tabs, the player, Now Playing, an album,
   Edit album and the EQ - are as before. On Ethan's phone, 529 and 530, or "not done yet". At the standard text size,
   Albums' line on Green Anole drops its count's word with a count in the thousands and **Year, newest first**, or
@@ -7719,6 +7722,29 @@ slice.
   Tags, a button).
 - **648 Both phones.** **Not done yet.** On Green Anole, 645-647. On Ethan's phone, 645-647, or "not done yet". On
   the Mac, 645, 646 and the full-screen cover.
+
+### The Library's line shows what is chosen (654)
+
+You said it wasn't clear which of Yours and All was chosen on the Library's line, nor which of the grid and list
+marks (27 Nov), and chose the underline. Each of the four is grey now until it's the chosen one, which is white over
+a short purple line, the same line the switch above it marks its page with; a chosen word is bold too. There's no
+thin line between Yours and All any more: the two words sit side by side. Purple words on the line are only what
+opens something or takes you somewhere, the order with its little arrow and **New playlist…**. The grid and list
+marks are a little smaller than before, the size the design draws them, and grow with the text size; otherwise
+nothing on the line has moved and nothing works any differently.
+
+- **654 Which one is chosen.** **Not done yet.** On each Library page - Albums, Artists, Playlists, and on All the
+  Songs page - say at a glance which of the grid and list marks (Albums only) and which of **Yours** and **All** is
+  chosen: the chosen one white over a short purple line, the other grey. Tap the other one: the white and the line
+  move to it. The order (Albums' and Artists', with its little arrow) and Playlists' **New playlist…** are still
+  purple, and still open their menu and their sheet. With VoiceOver on, the chosen one is read as "selected". Then
+  at the largest text size (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text, at its end): the
+  same, nothing cut short, and where a line is too long it still drops its count's word first, then puts the marks
+  and Yours and All on a line of their own under the words. Say if the grey reads too faint beside the white, if the
+  purple line is easy to miss under a small word like **All**, if the grid and list marks look too small beside the
+  words, and whether a tap just between two of them takes the nearer. On Ethan's phone too, or "not done yet". On the
+  Mac, the Library while deadwax can't be reached (its Downloaded albums) shows the grid and list marks this way too,
+  at the size they were; nothing else on the Mac changes.
 
 ## What it can't do yet
 

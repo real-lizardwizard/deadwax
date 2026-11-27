@@ -67,7 +67,10 @@ def mac_path(code: str) -> str:
 
 
 #? the phone's own parts of the shared pieces: what the phone's halves name and the Mac's never do - R1c's flat button,
-#? chip and switch, and (R2b) the switch's measure, the phone's Library row's alone (LibraryTop)
+#? chip and switch, and (R2b) the switch's measure, the phone's Library row's alone (LibraryTop). (27 Nov's review) Not
+#? DWChosenLine, the switch's lit line as a piece of its own: the Library's line draws it (LibraryLineEnd's LineChoice),
+#? and the Mac's Library draws that line offline - LibraryView passes no desk for `.downloaded`, so AlbumsScreen's phone
+#? page is the Mac's there - so the Mac reaches it, and it is pinned in DWSegmented's Mac half below
 PHONE_ONLY = {
     "Look/DWButtonStyle.swift": [r"private struct DWFlatButtonBody: View \{"],
     "Look/DWChip.swift": [r"private var flat: some View \{"],
@@ -169,6 +172,10 @@ def mac_halves() -> dict[str, str]:
 #? line's edge, a box's corners) where the old toggled fill was, its title and line SheetLook's, Turn On and Not Now the
 #? look's buttons (its pin before, 63ad9fb3f0571d83); and See All music the look's button on both devices, its `.bordered`
 #? Mac half gone (72f1e022695aeff8).
+#? (27 Nov's review) DWSegmented re-pinned on purpose: its Mac half now holds DWChosenLine, the switch's lit line made a
+#? piece of its own (an accent line DWFlat.chosenLine high at the foot of what is chosen, hidden from VoiceOver), which
+#? the Mac draws under Grid or List on its Library's offline Downloaded albums - the switch's own Mac half is unchanged
+#? (its pin before, 8d680fda0b85a713).
 PINNED = {
     "Look/DWButtonStyle.swift": "05ac2b1f28675581",
     "Look/DWCheckbox.swift": "fde34df0a439b8bb",
@@ -178,7 +185,7 @@ PINNED = {
     "Look/DWMeter.swift": "12f478f7c6fea571",
     "Look/DWPopUp.swift": "cbc9e3a3694aa415",
     "Look/DWRaised.swift": "77fc96aaa37dfee4",
-    "Look/DWSegmented.swift": "8d680fda0b85a713",
+    "Look/DWSegmented.swift": "a804e4bbec16c8f3",
     "Look/DWToggleStyle.swift": "1d0c62c233c1c4c6",
     "Look/DWWellField.swift": "24c48997e0b50edb",
     "RefreshProblemNote": "b1701810fad9be68",
