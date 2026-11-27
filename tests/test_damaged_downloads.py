@@ -21,6 +21,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -28,6 +29,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import organizer, poller  # noqa: E402
+from src.api.slskd_endpoint import slskd_down  # noqa: E402
 from src.config import Config  # noqa: E402
 from src.flac_check import OK as CHECKED_OK, Verdict, check_file  # noqa: E402
 from src.organizer import execute_plan, file_identity, find_local_file, plan_organization  # noqa: E402
@@ -69,11 +71,17 @@ def files_of(peer: str, extension: str = "flac", size: int = 30_000_000) -> list
     return [{"filename": remote(peer, n, extension), "size": size} for n in range(1, 4)]
 
 
+#? (review) when slskd finished writing what lay_down lays down: long enough ago that nothing is still arriving
+#? (organizer.ARRIVING_SECONDS) - the tests' reported sizes (files_of's) are never the files' own
+SETTLED = 600
+
+
 def lay_down(downloads: Path, peer: str, damaged: dict[int, bytes] | None = None, seed: int = 0,
              suffix: str = "", extras: dict[str, bytes] | None = None) -> dict[str, bytes]:
     """The peer's files as slskd leaves them: in a folder named after the peer's, each song's bytes - a damaged one
     in place of the clean one for each song number in `damaged` - `suffix` after each name's stem (slskd's
-    `_<ticks>` for a name that was taken), and any `extras` (a cover, a log) beside them."""
+    `_<ticks>` for a name that was taken), and any `extras` (a cover, a log) beside them, all last written SETTLED
+    seconds ago."""
     folder = downloads / FOLDERS[peer]
     folder.mkdir(parents=True, exist_ok=True)
     written = {}
@@ -85,6 +93,8 @@ def lay_down(downloads: Path, peer: str, damaged: dict[int, bytes] | None = None
     for name, data in (extras or {}).items():
         (folder / name).write_bytes(data)
         written[name] = data
+    for name in written:
+        os.utime(folder / name, (time.time() - SETTLED, time.time() - SETTLED))
     return written
 
 
@@ -95,11 +105,13 @@ def alternative(peer: str, quality: dict | None = None, extension: str = "flac",
 
 class Slskd:
     """slskd: every file of each peer named in `done` finished; asked to queue, it accepts unless the peer is in
-    `declines`. A transfer it is told to remove leaves its list, and a peer asked again starts new transfers."""
+    `declines` - or, `down`, fails for itself as the real client says it (slskd_down). A transfer it is told to
+    remove leaves its list, and a peer asked again starts new transfers."""
 
     def __init__(self, done: dict[str, list[dict]] | None = None, declines=()):
         self.done = dict(done or {})
         self.declines = set(declines)
+        self.down = False
         self.asked: list[str] = []
         self.removed: list[tuple[str, str]] = []
         self.attempt: dict[str, int] = {}
@@ -115,6 +127,8 @@ class Slskd:
 
     async def enqueue(self, username, files):
         self.asked.append(username)
+        if self.down:
+            return False, slskd_down("couldn't reach slskd to queue it: connection refused")
         if username in self.declines:
             return False, f"{username} refused"
         self.attempt[username] = self.attempt.get(username, 0) + 1
@@ -417,6 +431,154 @@ def test_a_later_move_replaces_the_notice(setup):
     assert run(store.get_job(job_id))["notice"]["from"] == "sofaking"
     run(store.move_to_peer(job_id, "fourth", "share\\x", files_of("glassbeads"), job["tried"]))
     assert run(store.get_job(job_id))["notice"] is None
+
+
+# --- a song slskd is still moving in (review) ----------------------------------------------------------------
+
+def test_a_song_slskd_is_still_moving_in_is_never_judged_and_the_next_poll_files_it(setup):
+    """
+    (review) slskd marks a transfer "Completed, Succeeded" before it moves the file out of its incomplete folder, and
+    between two mounts that move is a copy: the file grows in place. A poll then found the last song 60% there, read
+    it as cut short, and refused a good copy. Now a FLAC read as damaged, at another size than the peer reported and
+    written just now, is still arriving: nothing is judged, moved or refused, the job goes back to downloading, and
+    the next poll - the song whole - files it.
+    """
+    downloads, library, store = setup
+    songs = {n: song(n) for n in range(1, 4)}
+    files = [{"filename": remote("glassbeads", n), "size": len(songs[n])} for n in range(1, 4)]
+    job_id = run(store.create_job("glassbeads", f"share\\{FOLDERS['glassbeads']}", files, RELEASE, [alternative("sofaking")],
+                                  quality=FLAC_16, source={"has_free_slot": True, "queue_length": 0}))
+    folder = downloads / FOLDERS["glassbeads"]
+    lay_down(downloads, "glassbeads")
+    for n in (1, 2):
+        (folder / f"0{n} - {TITLES[n - 1]}.flac").write_bytes(songs[n])
+    last = folder / "03 - Static.flac"
+    #? the copy into slskd's folder 60% done, written a moment ago
+    last.write_bytes(songs[3][:len(songs[3]) * 6 // 10])
+    assert check_file(last).kind == "cut_short"
+    slskd = Slskd({"glassbeads": files})
+
+    run(poll_downloads_once(slskd, store, {}))
+    job = run(store.get_job(job_id))
+    assert (job["status"], job["error"], job["notice"], job["checking"]) == ("downloading", None, None, 0)
+    assert slskd.asked == [] and not run(store.refused_files()) and everything_under(library) == {}
+
+    last.write_bytes(songs[3])
+    run(poll_downloads_once(slskd, store, {}))
+    job = run(store.get_job(job_id))
+    assert job["status"] == "organized" and slskd.asked == []
+    assert library_names(library) == ["01 - Krakow.flac", "02 - Glass.flac", "03 - Static.flac"]
+
+
+def test_a_short_song_written_long_ago_is_judged_as_it_is(setup):
+    """(review) Not being written for ARRIVING_SECONDS, a size that isn't the reported one is no reason to wait: the
+    song is checked as it is - here cut short, and refused - so a size that never matches holds nothing up."""
+    downloads, _, store = setup
+    lay_down(downloads, "glassbeads", {3: song(3)[:-2000]})
+    job_id = queue(store)
+    run(poll_downloads_once(Slskd({"glassbeads": files_of("glassbeads")}), store, {}))
+    assert run(store.get_job(job_id))["error"].startswith("The copy from glassbeads was damaged (1 of 3 songs is cut short)")
+
+
+# --- it always moves on (review) ----------------------------------------------------------------------------
+
+def runner_up(peer: str) -> dict:
+    """A runner-up of a folder of its own, for a list longer than FOLDERS."""
+    return {"username": peer, "directory": f"share\\{peer}", "quality": FLAC_16, "has_free_slot": True,
+            "queue_length": 0, "files": [{"filename": f"share\\{peer}\\0{n} - {TITLES[n - 1]}.flac", "size": 30_000_000}
+                                         for n in range(1, 4)]}
+
+
+def test_a_damaged_download_keeps_moving_on_past_three_that_wont_send_it(setup):
+    """(review) Ten runners-up, the next three offline: the three are asked (RETRY_ASKS) and recorded, the notice says
+    so and stays `moving`, and the next poll asks the fourth - never failed with seven unasked."""
+    downloads, _, store = setup
+    lay_down(downloads, "glassbeads", {1: stale(song(1))})
+    peers = [f"peer{n}" for n in range(1, 11)]
+    job_id = queue(store, [runner_up(peer) for peer in peers])
+    slskd = Slskd({"glassbeads": files_of("glassbeads")}, declines=peers[:3])
+
+    run(poll_downloads_once(slskd, store, {}))
+    halfway = run(store.get_job(job_id))
+    assert slskd.asked == peers[:3] and halfway["status"] == "failed" and halfway["notice"]["moving"] is True
+    assert halfway["notice"]["text"].endswith("and the sources asked next wouldn't send it; asking the next.")
+    assert [entry.get("declined") for entry in halfway["tried"]] == [None, True, True, True]
+
+    run(poll_downloads_once(slskd, store, {}))
+    job = run(store.get_job(job_id))
+    assert slskd.asked == peers[:4] and (job["status"], job["username"]) == ("queued", "peer4")
+    assert "Now coming from peer4" in job["notice"]["text"] and "moving" not in job["notice"]
+
+
+def test_with_every_one_declining_it_stops_saying_so(setup):
+    downloads, _, store = setup
+    lay_down(downloads, "glassbeads", {1: stale(song(1))})
+    peers = [f"peer{n}" for n in range(1, 5)]
+    job_id = queue(store, [runner_up(peer) for peer in peers])
+    slskd = Slskd({"glassbeads": files_of("glassbeads")}, declines=peers)
+    for _ in range(3):
+        run(poll_downloads_once(slskd, store, {}))
+    job = run(store.get_job(job_id))
+    assert slskd.asked == peers and job["status"] == "failed" and "moving" not in job["notice"]
+    assert job["error"].endswith("and no other source would send it.")
+
+
+def test_slskd_unreachable_uses_up_no_runner_up_and_it_moves_on_once_slskd_is_back(setup):
+    """(review) slskd failing for itself (unreachable, not connected) says nothing of the peer: nobody is recorded as
+    tried or declined, nobody else is asked, the notice stays `moving` - and once slskd answers, the first runner-up
+    is the one asked."""
+    downloads, _, store = setup
+    lay_down(downloads, "glassbeads", {1: stale(song(1))})
+    job_id = queue(store, [alternative("sofaking"), alternative("thirdpeer")])
+    slskd = Slskd({"glassbeads": files_of("glassbeads")})
+    slskd.down = True
+    run(poll_downloads_once(slskd, store, {}))
+    run(poll_downloads_once(slskd, store, {}))
+    waiting = run(store.get_job(job_id))
+    assert slskd.asked == ["sofaking", "sofaking"]
+    assert [entry["username"] for entry in waiting["tried"]] == ["glassbeads"]
+    assert waiting["notice"]["moving"] is True and "slskd couldn't be reached" in waiting["notice"]["text"]
+
+    slskd.down = False
+    run(poll_downloads_once(slskd, store, {}))
+    job = run(store.get_job(job_id))
+    assert (job["status"], job["username"]) == ("queued", "sofaking")
+    assert [entry["username"] for entry in job["tried"]] == ["glassbeads", "sofaking"]
+
+
+def test_the_real_client_says_slskds_own_failures_are_its_own():
+    """(review) What the real enqueue answers when slskd fails for itself is marked so; a peer's refusal isn't."""
+    import requests
+    from src.api import slskd_endpoint
+    from src.api.slskd_endpoint import SlskdClient, is_slskd_down
+
+    class Session:
+        def __init__(self, answer):
+            self.answer = answer
+
+        def post(self, url, json=None):
+            if isinstance(self.answer, Exception):
+                raise self.answer
+            response = requests.Response()
+            response.status_code, response._content = self.answer
+            raise requests.exceptions.HTTPError(response=response)
+
+    def asked(answer):
+        client = SlskdClient()
+        transfers = type("Transfers", (), {"api_url": "http://slskd/api/v0", "session": Session(answer)})()
+
+        async def get_client():
+            return type("Client", (), {"transfers": transfers})()
+
+        client.get_client = get_client
+        return run(client.enqueue("sofaking", [{"filename": "a.flac", "size": 1}]))
+
+    down = asked(requests.exceptions.ConnectionError("refused"))
+    assert down[0] is False and is_slskd_down(down[1])
+    assert is_slskd_down(asked((409, b"not connected"))[1])
+    offline = asked((500, b"User sofaking appears to be offline"))
+    assert offline[0] is False and not is_slskd_down(offline[1]) and isinstance(offline[1], str)
+    assert slskd_endpoint.SLSKD_ITSELF >= {401, 403, 409}
 
 
 # --- stops ---------------------------------------------------------------------------------------------------

@@ -1219,6 +1219,27 @@ class JobStore:
             logger.error(f"failed to update job {job_id} to organizing")
             return False
 
+    async def still_arriving(self, job_id: int) -> bool:
+        """
+        (damaged downloads, review) A finished download whose songs slskd is still moving into its folder
+        (organizer.still_arriving): back to `downloading`, `checking` cleared, so the next poll finds every transfer
+        done and plans it again - nothing was checked or moved. Only from `organizing`. Whether written.
+        """
+        if not self.available:
+            return False
+
+        def write() -> bool:
+            with self._connect() as connection:
+                return connection.execute(
+                    "UPDATE jobs SET status = 'downloading', error = NULL, checking = 0, updated_at = ? "
+                    "WHERE id = ? AND status = 'organizing'", (_now(), job_id)).rowcount > 0
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception:
+            logger.error(f"failed to put job {job_id} back to downloading")
+            return False
+
     async def filing_began(self, job_id: int) -> None:
         """(damaged downloads, review) The check is over and the filing itself starts: `checking` cleared. Leaves
         updated_at alone - the status hasn't moved."""

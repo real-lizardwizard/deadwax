@@ -11,15 +11,15 @@ the whole album from that peer, and the job moves to its next source (poller.py)
 A FLAC is DAMAGED when one of these is certain:
 
 - STALE_TAIL, "extra data after the end": the frame holding the stream's last sample (STREAMINFO's total) checks
-  out - its CRC-16 comes to zero - before the end of the file, and what follows is not an ID3v1 or APEv2 tag. Three
-  or more zero bytes at the very end count as extra too, as flac_mp4 counts them (a frame ends in three only when
-  its CRC-16 is 0x0000 and the byte before it is zero).
+  out - its CRC-16 comes to zero - before the end of the file, and what follows is not an ID3v1 or APEv2 tag. Zero
+  bytes at the very end count as extra too, as flac_mp4 counts them, but only past what a silent last frame ends in
+  itself (review: digital silence is a CONSTANT subframe of zeros per channel, and with a CRC-16 of 0x0000 the frame
+  ends in a run of zeros - eight, for 16-bit stereo - that no sum can tell from zeros appended: UNCHECKED, _silent).
 - CUT_SHORT: the file ends before the stream holds every sample STREAMINFO counts - inside the last frame, or
   frames before it - or inside its own metadata.
 - DAMAGED_INSIDE: a frame fails its CRC-16 against the next frame's header, or no frame header follows a frame
-  where one must, or the last frame checks out nowhere a frame of this stream could end - or the first frame after
-  the metadata isn't frame 0 (numbered from 0, or from sample 0, as every encoder writes them: a file whose first
-  frame carries another number has lost its start, or was cut from a longer stream, and is refused as damaged).
+  where one must, or the last frame checks out nowhere a frame of this stream could end, or there is no valid frame
+  where the metadata ends.
 
 How the true end is found (the stale-tail report's "Detecting E safely", steps 1-4 - its step 5, an MD5 of the
 decoded audio, is for trimming, which is not done): STREAMINFO read; frame headers walked - sync code, CRC-8,
@@ -36,8 +36,10 @@ at the end with its "3DI" footer - in any order, ID3v1 written twice included. E
 certainty is UNCHECKED and filed as before too: not a FLAC at all (the tests' "fLaC"-less stand-ins, a macOS ._
 file), STREAMINFO not valid, more samples than STREAMINFO counts, far more sync codes than real FLAC has, far more
 summing than one pass over the file (SUM_BUDGET: a file built with thousands of copies of the next frame's header
-inside a frame would be summed from its start to every one), over 1 GiB. A refusal moves the download to another
-source, so it is said only when sure.
+inside a frame would be summed from its start to every one), over 1 GiB - and (review, App Design's ruling) a first
+frame numbered other than 0: a song cut from a longer stream with ffmpeg's stream copy keeps its frame numbers and
+plays everywhere, so it is not refused. A refusal moves the download to another source, so it is said only when
+sure.
 
 Every header is read by flac_mp4's own parser (_skip_id3v2, _read_metadata, _frame_header) and the last frame's
 zeros found by its _Checksums, all with its CRC-16; the tags behind the audio are found here (_tag_ends), since
@@ -46,9 +48,11 @@ whole frame's check is done another way here (_sums_to_zero): the same CRC as po
 about ten times flac_mp4's byte loop - this sums every frame of every song of an album, where the player sums only
 the last; tests/test_flac_check.py holds it to flac_mp4._crc16.
 
-Pure: bytes in, a verdict out - but check_file(), which reads one file and calls check().
+Pure: bytes in, a verdict out - but check_file(), which reads one file a window at a time (_Reader, review: never
+the whole file in memory) and calls check() on it.
 """
 
+import os
 import struct
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -195,12 +199,15 @@ class _Spend:
 
 def _walk(data, first: int, info) -> Verdict:
     """Frame by frame from the first, each checked by its CRC-16 against the next one's header, to the frame
-    holding the last sample STREAMINFO counts - or, when it counts none, the last frame there is. The first frame
-    must be frame 0: one numbered otherwise is DAMAGED_INSIDE (the module's docstring)."""
+    holding the last sample STREAMINFO counts - or, when it counts none, the last frame there is. A first frame
+    numbered other than 0 is UNCHECKED (the module's docstring: App Design's ruling)."""
     sync = bytes(data[first:first + 2])
     got = _frame_header(data, first, info) if sync in _SYNCS else None
-    if got is None or got[0] != 0:
+    if got is None:
         return Verdict(DAMAGED_INSIDE, "there is no valid audio frame where the metadata ends")
+    if got[0] != 0:
+        #? (review) cut from a longer stream - ffmpeg's stream copy keeps the numbers - and it plays: doubt never refuses
+        return Verdict(UNCHECKED, f"its first frame is numbered {got[0]}, not 0")
     fixed = sync == _SYNCS[0]
     #? the most bytes a frame of this stream can take up WHATEVER STREAMINFO says its largest is: every sample
     #? stored as it is (flac_mp4._reach with no largest frame given) - a refusal must not rest on an encoder's figure
@@ -277,7 +284,12 @@ def _ending(data, pos: int, length: int, reach: int, info, expected: int | None)
         if end == size and data[size - 3:] == bytes(3):
             #? zero bytes appended - a sum that has come to zero stays there through them. The audio ends somewhere
             #? in the run (its last two bytes may be the frame's own CRC-16), so at least all but two are extra.
-            run = size - len(data.rstrip(b"\0"))
+            run = _zero_run(data)
+            if run <= _silent(info):
+                #? (review) a silent last frame ends in its own run of zeros - every channel's CONSTANT subframe of 0,
+                #? then a CRC-16 of 0x0000: no sum can tell that from zeros appended, and doubt never refuses. (Only a
+                #? CONSTANT subframe's header byte is 0x00, so no other frame is zeros for longer than this.)
+                return Verdict(UNCHECKED, f"it ends in {run} zero bytes, which a silent last frame may end in itself")
             return Verdict(STALE_TAIL, f"{run} zero bytes at the end of the file", extra=run - 2)
         return Verdict(OK, "" if end == size else "a tag follows the audio")
     if not zeros:
@@ -301,6 +313,28 @@ def _ending(data, pos: int, length: int, reach: int, info, expected: int | None)
     end = max([at for at in zeros if not headers or at <= headers[0]])
     span = f"{size - end}" if end == zeros[0] else f"{size - end} to {size - zeros[0]}"
     return Verdict(STALE_TAIL, f"{span} bytes after the end of the audio", extra=size - end)
+
+
+def _silent(info) -> int:
+    """
+    The most zero bytes a frame of digital silence can end in (review): each channel's CONSTANT subframe - its
+    header byte, 0x00, and the one sample, 0, a bit wider in a stereo side channel - then its CRC-16, 0x0000 when it
+    comes to that. Eight for 16-bit stereo (channels x (1 + bytes per sample) + 2); a little more
+    here, for the side channel's extra bit and the padding to a byte, since a refusal must be sure.
+    """
+    return (info.channels * (8 + info.bits_per_sample + 1) + 7) // 8 + 2
+
+
+def _zero_run(data) -> int:
+    """How many zero bytes `data` ends in - read back from the end a stretch at a time, never the whole file."""
+    size, run = len(data), 0
+    while run < size:
+        stretch = data[max(0, size - run - READ_WINDOW):size - run]
+        kept = len(stretch.rstrip(b"\0"))
+        run += len(stretch) - kept
+        if kept:
+            break
+    return run
 
 
 def _tag_ends(data, start: int) -> list[int]:
@@ -356,17 +390,89 @@ def _syncs(data, start: int, end: int):
             at = data.find(sync, at + 1, end)
 
 
+#? (review) how much of a file the check holds in memory at once (_Reader): a window, slid along as the walk goes -
+#? bar one stretch longer than it that is asked for whole (a frame summed, a frame's reach)
+READ_WINDOW = 4 << 20
+#? ...and how much before what is asked for each window keeps, for the walk's looks back (the frame it is in, the
+#? copy loop's 6,144 bytes)
+READ_BEHIND = 256 << 10
+
+
+class _Reader:
+    """
+    (Damaged downloads, review) A file as check() reads it - bytes' len, indexing, slicing, find and startswith,
+    which is all the walk and flac_mp4's parsers ask of it - read a window at a time from an open file, so an album
+    of 24/192 FLACs is never in memory whole. A file that comes up shorter than it was when opened raises OSError
+    (check_file: UNCHECKED).
+    """
+
+    def __init__(self, handle, size: int):
+        self.handle, self.size = handle, size
+        self.low, self.window = 0, b""
+
+    def __len__(self) -> int:
+        return self.size
+
+    def _hold(self, start: int, end: int) -> None:
+        """Have data[start:end] in the window (both already within the file)."""
+        if start >= self.low and end <= self.low + len(self.window):
+            return
+        low = max(0, start - READ_BEHIND)
+        high = min(self.size, max(end, low + READ_WINDOW))
+        self.window = os.pread(self.handle.fileno(), high - low, low)
+        self.low = low
+        if len(self.window) < high - low:
+            self.window = b""
+            raise OSError("the file is shorter than it was when it was opened")
+
+    def __getitem__(self, key):
+        if isinstance(key, slice):
+            start, stop, step = key.indices(self.size)
+            if step != 1:
+                raise ValueError("only whole stretches are read")
+            if stop <= start:
+                return b""
+            self._hold(start, stop)
+            return self.window[start - self.low:stop - self.low]
+        if key < 0:
+            key += self.size
+        if not 0 <= key < self.size:
+            raise IndexError("past the end of the file")
+        self._hold(key, key + 1)
+        return self.window[key - self.low]
+
+    def startswith(self, prefix: bytes, start: int = 0) -> bool:
+        return self[start:start + len(prefix)] == prefix
+
+    def find(self, sub: bytes, start: int = 0, end: int | None = None) -> int:
+        end = self.size if end is None else min(end, self.size)
+        at = max(0, start)
+        while at + len(sub) <= end:
+            self._hold(at, min(end, at + len(sub)))
+            reach = min(end, self.low + len(self.window))
+            found = self.window.find(sub, at - self.low, reach - self.low)
+            if found >= 0:
+                return found + self.low
+            if reach >= end:
+                return -1
+            #? the next window from where a match could still start
+            at = reach - len(sub) + 1
+        return -1
+
+
 def check_file(path: Path | str) -> Verdict:
-    """check() of the file at `path` - UNCHECKED, read nowhere, for one over flac_mp4's 1 GiB, or one that can't be
-    read (filing it would fail the same way, and say so)."""
+    """check() of the file at `path`, read a window at a time (_Reader) - UNCHECKED, read nowhere, for one over
+    flac_mp4's 1 GiB, or one that can't be read or shrinks while it is (filing it would fail the same way, and say
+    so)."""
     path = Path(path)
     try:
-        if path.stat().st_size > MAX_INPUT_BYTES:
-            return Verdict(UNCHECKED, f"larger than {MAX_INPUT_BYTES >> 20} MiB")
-        data = path.read_bytes()
+        with path.open("rb") as handle:
+            size = os.fstat(handle.fileno()).st_size
+            if size > MAX_INPUT_BYTES:
+                return Verdict(UNCHECKED, f"larger than {MAX_INPUT_BYTES >> 20} MiB")
+            return check(_Reader(handle, size))
     except OSError as e:
         return Verdict(UNCHECKED, f"couldn't be read: {e}")
-    return check(data)
 
 
 # --- the words ----------------------------------------------------------------------------------------------

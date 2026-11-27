@@ -334,6 +334,36 @@ class SearchGate:
 SEARCH_GATE = SearchGate()
 
 
+class EnqueueRefusal(str):
+    """
+    (Damaged downloads, review) Why slskd didn't queue a download - a str, as every caller reads and shows it - and
+    whether the failure was slskd's OWN (`slskd_down`): slskd unreachable, its API key refused, not connected to
+    Soulseek. Then the peer was never asked, and a retry records nobody as declined - one outage must not use up
+    every runner-up (poller._move_to_next_peer).
+    """
+
+    slskd_down = False
+
+
+def slskd_down(text: str) -> EnqueueRefusal:
+    """`text` as a refusal that was slskd's own (EnqueueRefusal)."""
+    refusal = EnqueueRefusal(text)
+    refusal.slskd_down = True
+    return refusal
+
+
+def is_slskd_down(reason) -> bool:
+    """Whether an enqueue's reason says slskd failed for itself, not the peer (EnqueueRefusal) - False for any
+    plain string, a stand-in's included."""
+    return bool(getattr(reason, "slskd_down", False))
+
+
+#? (damaged downloads, review) the statuses slskd's enqueue answers with for ITSELF, not the peer: its API key
+#? refused (401, 403), not connected to Soulseek (409 - what it means by it, see SEARCH_REFUSALS), and a proxy in
+#? front of it with slskd not answering (502, 503, 504). Anything else - a 500 naming the peer offline - is the peer's
+SLSKD_ITSELF = frozenset({401, 403, 409, 502, 503, 504})
+
+
 class SlskdClient:
     def __init__(self):
         self.client: slskd_api.SlskdClient | None = None
@@ -606,17 +636,19 @@ class SlskdClient:
             refused = getattr(exc, "response", None)
             if refused is None:
                 logger.error(f"failed to queue download from {username}: {exc}", extra={"frontend": True, "src": "slskd"})
-                return False, f"couldn't reach slskd to queue it: {exc}"
+                return False, slskd_down(f"couldn't reach slskd to queue it: {exc}")
 
         except Exception as e:
             logger.error(f"failed to queue download from {username}", extra={"frontend": True, "src": "slskd"})
             logger.error(traceback.format_exc())
-            return False, f"couldn't reach slskd to queue it: {e}"
+            return False, slskd_down(f"couldn't reach slskd to queue it: {e}")
 
         said = slskd_said(SimpleNamespace(response=refused))
         reason = f"slskd couldn't queue it: {said}" if said else f"slskd refused the download ({refused.status_code})"
         logger.error(f"{reason} - from {username}", extra={"frontend": True, "src": "slskd"})
-        return False, reason
+        #? (damaged downloads, review) slskd answering for itself - its API key refused, not connected to Soulseek, a
+        #? proxy in front of it with nobody behind - says nothing of the peer
+        return False, slskd_down(reason) if refused.status_code in SLSKD_ITSELF else reason
 
 
     async def cancel_download(self, username: str, transfer_id: str, remove: bool = True) -> bool:

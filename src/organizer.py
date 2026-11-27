@@ -871,6 +871,8 @@ def plan_organization(job: dict, download_root: str, library_root: str, check_au
                                             job.get("directory", ""), library_root, skip,
                                             _positive(file_entry.get("size"))))
                for file_entry in files]
+    #? (damaged downloads, review) the size the peer reported for each file found - still_arriving's
+    reported = {str(source): _positive(file_entry.get("size")) for file_entry, source in located if source is not None}
 
     #? (2.1.38) A MANUAL search's download (the app's Search Soulseek) has no release behind it, only the
     #? typed artist and album. It is filed by its OWN tags: the folder from the commonest of them, by the
@@ -959,7 +961,7 @@ def plan_organization(job: dict, download_root: str, library_root: str, check_au
             "job_id": job.get("id"), "album_dir": None, "operations": [], "companion_count": 0,
             "source_dirs": [], "read_only_dirs": [], "overlap": overlap,
             "problems": problems, "matched_tracks": len(mapping), "total_tracks": len(tracks),
-            "same_release": False, "damaged": [], "songs": 0,
+            "same_release": False, "damaged": [], "arriving": [], "songs": 0,
         }
 
     album_dir = Path(operations[0]["target"]).parent if operations else None
@@ -1018,7 +1020,9 @@ def plan_organization(job: dict, download_root: str, library_root: str, check_au
     #? (damaged downloads) every song the download brought, checked whole - a duplicate's and one already at its
     #? target too, since the album comes from one source or none. Not while the filing is refused for its
     #? folders: refile_refused plans it again once they're put right, and the check is made then.
-    damaged = check_audio_files(operations) if check_audio and not read_only_dirs else []
+    #? (review) and never refused for a FLAC slskd may still be moving in (still_arriving): then nothing is judged yet,
+    #? and the poller plans it again at its next poll
+    damaged, arriving = check_audio_files(operations, reported) if check_audio and not read_only_dirs else ([], [])
 
     plan = {
         "job_id": job.get("id"),
@@ -1043,6 +1047,9 @@ def plan_organization(job: dict, download_root: str, library_root: str, check_au
         #? (damaged downloads) the songs found damaged (check_audio_files) - any at all, and nothing is filed - and
         #? how many songs the download brought, for "3 of 11 songs"
         "damaged": damaged,
+        #? (damaged downloads, review) FLAC songs that read as damaged while slskd may still be moving them into its
+        #? folder (still_arriving) - any at all, and nothing is judged or filed yet
+        "arriving": arriving,
         "songs": len(operations),
     }
     if manual:
@@ -1052,22 +1059,55 @@ def plan_organization(job: dict, download_root: str, library_root: str, check_au
     return plan
 
 
-def check_audio_files(operations: list[dict]) -> list[dict]:
+#? (damaged downloads, review) JUDGEMENT, not measured: how long since its last write a song whose size on disk isn't the
+#? size the peer reported is taken to be still arriving. slskd marks a transfer "Completed, Succeeded" BEFORE it moves
+#? the file out of its incomplete folder (DownloadService: SynchronizedUpdate, then Files.MoveFile), and between two
+#? mounts that move is a copy, the file growing in place - written all the while. Past this it isn't being written:
+#? checked as it is, so a size that never matches holds a download up this long and no longer.
+ARRIVING_SECONDS = 120
+
+
+def still_arriving(source: Path, reported: int | None, now: float | None = None) -> bool:
+    """
+    (Damaged downloads, review) Whether slskd may still be moving `source` into its folder: on disk at another size
+    than the `reported` one, and written in the last ARRIVING_SECONDS. A sharer's damaged file has the size it
+    reported, so a real refusal never waits here. Reads its size and time only.
+    """
+    if not reported:
+        return False
+    try:
+        status = source.stat()
+    except OSError:
+        return False
+    now = time.time() if now is None else now
+    return status.st_size != reported and now - status.st_mtime < ARRIVING_SECONDS
+
+
+def check_audio_files(operations: list[dict], reported: dict[str, int | None] | None = None,
+                      now: float | None = None) -> tuple[list[dict], list[str]]:
     """
     (Damaged downloads) Each FLAC among `operations` (a plan's songs - its sources in slskd's folder) checked whole by
-    src/flac_check.py, and those found damaged as [{file, source, kind, why, extra}] - `file` the name it came
-    with. Reads the files, writes nothing. Any other format, and a FLAC the check can't judge, passes as before.
+    src/flac_check.py: (those found damaged as [{file, source, kind, why, extra}] - `file` the name it came with -,
+    the names of those still arriving). A song found damaged that slskd may still be moving in (review:
+    still_arriving, by the sizes the peer `reported`, by source path) is not judged - part-copied, it reads as cut
+    short and would refuse a good copy - and while any is, none is (damaged is empty): the poller plans it all again
+    at its next poll. Reads the files, writes nothing. Any other format, and a FLAC the check can't judge, passes as
+    before.
     """
-    damaged = []
+    damaged, arriving = [], []
     for operation in operations:
         source = Path(operation["source"])
         if operation.get("companion") or source.suffix.lower() != ".flac":
             continue
         verdict = check_file(source)
-        if verdict.damaged:
+        if not verdict.damaged:
+            continue
+        if still_arriving(source, (reported or {}).get(str(source)), now):
+            arriving.append(source.name)
+        else:
             damaged.append({"file": source.name, "source": str(source), "kind": verdict.kind,
                             "why": verdict.why, "extra": verdict.extra})
-    return damaged
+    return ([], arriving) if arriving else (damaged, [])
 
 
 def _is_multi_disc(release: dict) -> bool:
@@ -1331,6 +1371,10 @@ def execute_plan(plan: dict, release: dict) -> dict:
     #? (damaged downloads) a song of the download is damaged: nothing of it is moved (plan_organization's damaged)
     if plan.get("damaged"):
         results["damaged"] = list(plan["damaged"])
+        return results
+    #? (review) a FLAC of it is still being moved into slskd's folder: nothing of it is moved yet
+    if plan.get("arriving"):
+        results["arriving"] = list(plan["arriving"])
         return results
 
     for operation in plan["operations"]:
@@ -1674,6 +1718,15 @@ async def organize_job(job: dict, download_root: str, library_root: str, on_plan
         )
         return {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
                 "read_only": list(plan["read_only_dirs"]), "plan": plan}
+
+    #? (damaged downloads, review) not yet: slskd is still moving a song into its folder (still_arriving). Nothing is
+    #? judged, marked, moved or cleaned up, and the poller plans it again at its next poll
+    if plan.get("arriving"):
+        logger.info(f"{label}: {len(plan['arriving'])} song(s) still being moved into slskd's folder "
+                    f"({', '.join(plan['arriving'][:DAMAGED_NAMED])}) - checked and filed once they are whole",
+                    extra={"src": "slskd"})
+        return {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
+                "arriving": list(plan["arriving"]), "plan": plan}
 
     #? (damaged downloads) refused whole, before anything is marked, moved or cleaned up: the poller says which
     #? songs and why, and moves the download to its next source (poller._refuse_damaged)

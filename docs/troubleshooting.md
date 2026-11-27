@@ -92,8 +92,12 @@ finish. The rest of the message says how the new source differs from the damaged
 - **"…and there is no other source."** Every source on the list has been tried. **Get** it again: a fresh
   search lists the sources sharing it now, and a good copy from one of them is filed even when its folder
   has the same name as the damaged one's (slskd writes it beside it, with digits added to each name).
-- **"…and no other source would send it."** / **"…the sources asked next wouldn't send it."** The next
-  ones on the list refused. **Another source** tries the rest, if any are left; otherwise **Get** it again.
+- **"…and the sources asked next wouldn't send it; asking the next."** Those refused, and the next ones on
+  the list are asked at the next check, three at a time - **there is nothing to do**.
+- **"…slskd couldn't be reached to ask the next source; it asks again shortly."** slskd isn't answering (or
+  isn't connected to Soulseek): nobody on the list is used up, and it moves on once slskd is back. If it
+  stays, see [Settings' Connections says slskd isn't connected](#settings-connections-says-slskd-isnt-connected).
+- **"…and no other source would send it."** Every source left on the list refused. **Get** it again.
 - **"…and it wasn't tried again: …"** The album has meanwhile been filed, or is coming, some other way.
 - The damaged files are still in slskd's download folder, as a cancelled download's are. deadwax remembers
   each one, and never files it later - not with the next source's download, a fresh **Get**, after a

@@ -1081,8 +1081,9 @@ def test_a_release_less_job_without_manual_is_planned_and_tagged_exactly_as_befo
              "exists": False}],
         "source_dirs": [str(root / "Dummy")], "read_only_dirs": [], "overlap": None, "problems": [],
         "matched_tracks": 0, "total_tracks": 0, "same_release": False,
-        #? (damaged downloads) every plan says which songs were found damaged, and how many it had
-        "damaged": [], "songs": 2,
+        #? (damaged downloads) every plan says which songs were found damaged, which are still arriving, and how many
+        #? it had
+        "damaged": [], "arriving": [], "songs": 2,
     }
 
     execute_plan(plan, release)

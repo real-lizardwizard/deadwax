@@ -674,11 +674,15 @@ next peer regardless". He chose "Stricter" for "as good a match".
 - **The verdicts.** OK: the end of the file, or the start of the tags behind the music, is a zero. The tags are
   stripped from the end repeatedly (`_tag_ends`, at most `TAGS_BEHIND` = 8): ID3v1 (128 bytes, 355 with TAG+), ID3v1
   written twice, APEv2 (by its footer's size), and ID3v2 appended with its "3DI" footer (review). A first frame
-  numbered other than 0 is DAMAGED_INSIDE, said in check_file's docstring (the reviewer's `ffcopy.flac`, frame 14
-  first, a stream cut from the middle). Otherwise, with no zero before it
+  numbered other than 0 is UNCHECKED (App Design's ruling, the third review - round 2 had it DAMAGED_INSIDE: the
+  reviewer's `ffcopy.flac`, frame 14 first, is ffmpeg's stream copy of a cut and plays everywhere). Otherwise, with
+  no zero before it
   that a frame header follows. STALE_TAIL: the last frame checks out before the end, and what follows is no tag. A
   stale whole frame or the copy loop's fingerprint (the bytes after E repeat the 6,144 before them) gives E exactly.
-  Three or more zero bytes at the end count too. CUT_SHORT: the file ends before the stream's last sample, or inside
+  Three or more zero bytes at the end count too - but only past `_silent(info)` of them (third review): a frame of
+  digital silence is each channel's CONSTANT subframe of 0, and with a CRC-16 of 0x0000 the file ends in that many
+  zeros itself (eight for 16-bit stereo), which no sum tells from zeros appended, so up to that it is UNCHECKED.
+  CUT_SHORT: the file ends before the stream's last sample, or inside
   its metadata. DAMAGED_INSIDE: a frame fails its CRC-16 against the next header, or no header follows a frame where
   one must. UNCHECKED (filed as before): not a FLAC, STREAMINFO invalid, more samples than it counts, far too many
   sync codes, over 1 GiB, unreadable. A refusal moves a download to another source, so damage is said only when sure.
@@ -689,7 +693,8 @@ next peer regardless". He chose "Stricter" for "as good a match".
   refuse the copy, so a wrong kind would only change the words. Measured on 70 real files (flac and libsndfile
   encodes, 16 and 24 bit, 44.1 to 192 kHz): whole, ID3v1, APEv2, ID3v2+v1 all OK; the copy loop at 807, 3,000 and
   6,140 bytes all STALE_TAIL with the exact count; cut by 1,000 and 30,000 bytes all CUT_SHORT; a flipped byte all
-  DAMAGED_INSIDE; one zero byte OK and three STALE_TAIL. 248 synthetic streams, plain and with APEv2, all OK. Those
+  DAMAGED_INSIDE; one zero byte OK and three STALE_TAIL (three are UNCHECKED since the third review, 64 STALE_TAIL).
+  248 synthetic streams, plain and with APEv2, all OK. Those
   scratch files are not in the repo. The tests use the test encoder's streams.
 - **Where it runs.** `organizer.plan_organization(..., check_audio=True)` checks every FLAC of the plan's songs. That
   includes a duplicate's and one already at its target, because the album comes from one source or none. Each damaged
@@ -781,11 +786,72 @@ next peer regardless". He chose "Stricter" for "as good a match".
   on the web: it is for the iPhone and Mac app.
 - **Fixture changed:** `tests/test_organizer.py`'s `write_minimal_flac` said 44,100 samples and held none, which now
   reads (rightly) as cut short. It says 0, "unknown", and mutagen still round-trips it. The test that holds a whole
-  plan to the dict it was at 2.1.37 gains the plan's two new keys, `damaged: []` and `songs`.
+  plan to the dict it was at 2.1.37 gains the plan's new keys, `damaged: []`, `songs` and (third review)
+  `arriving: []`.
 - **Tests:** `tests/test_flac_check.py` (the verdicts, the folded CRC against `_crc16`, the words; review: ID3v2
-  with its 3DI footer and ID3v1 twice OK, a first frame not 0 damaged, the summing budget) and
+  with its 3DI footer and ID3v1 twice OK, the summing budget; third review: a first frame not 0 UNCHECKED, the
+  silent last frame, a few zeros UNCHECKED and many extra, read a window at a time, a file shrinking as it's read)
+  and
   `tests/test_damaged_downloads.py` (the plan; the move with AUTO_RETRY_PEER off and on, once; the next source filed
   and never the refused files; the same folder names after a restart; a fresh Get; slskd's renamed siblings; weaker;
   none left; cut short and broken named; a later move replacing the notice; a stop before the move, and one during
   the check; the check off the loop; a refusal forgotten when its file changes; /jobs' fields, the declined peer,
-  server scores, a client's ignored, the cache key, one bad row; the four verdicts and the comparison's rules).
+  server scores, a client's ignored, the cache key, one bad row; the four verdicts and the comparison's rules; third
+  review: a song still being moved in, never judged and filed at the next poll; one short and settled, judged; ten
+  runners-up past three that won't send it; every one declining; slskd unreachable using up nobody; the real
+  client's marks).
+
+#### The third review: two ways a good copy was refused, and it always moves on
+
+App Design's reviewer read U2b placed on main's `speed` branch and found two ways it refused a good copy - both
+fixed before anything is pushed - and two of James's rules not yet kept.
+
+- **A song slskd is still moving in is never judged.** slskd marks a transfer "Completed, Succeeded" before it moves
+  the file out of its incomplete folder (DownloadService.cs on slskd's master, as the reviewer read it:
+  SynchronizedUpdate, then Files.MoveFile), and between two mounts .NET's move is a copy - the file grows in place.
+  A poll during the last song's copy read it cut short (their probe: the first 60% of a clean file reads
+  `cut_short`) and refused the album from a good peer. James's slskd sits behind a VPN container, so two mounts are
+  likely. `organizer.check_audio_files` now takes the sizes the peer reported (`file_entry["size"]`, by source
+  path): a FLAC read as damaged that is on disk at another size and was written within `ARRIVING_SECONDS` (120,
+  judgement: a copy writes all the while) is ARRIVING. While any is, nothing is judged (`damaged` empty - so no
+  half-copied file's identity is ever recorded as refused), `plan["arriving"]` names them, organize_job and
+  execute_plan file nothing, and the poller puts the job back to `downloading` (`store.still_arriving`, from
+  `organizing` only, `checking` cleared), so the next poll finds every transfer done and plans it again; "finished
+  downloading" is said once (`_ARRIVING`). A sharer's damaged file has the size it reported, so a real refusal never
+  waits; a size that never matches waits 120 s at most, then is judged as it is. **Judged first, not sized first**:
+  waiting on every FLAC whose size differs (the review's wording) held up 73 tests across 10 files, whose
+  fixtures' reported sizes were never the files' - only a song that would be refused is held, which is the only
+  harm a part-copied song could do here. Not watched on a real slskd; a clock skewed across an NFS mount would
+  move the 120 s.
+- **A valid silent last frame is not a stale tail.** A frame of digital silence is each channel's CONSTANT subframe
+  of 0 (its header byte is 0x00 too), and when its CRC-16 comes to 0x0000 - when the frame's header's does - the
+  file ends in eight zero bytes (16-bit stereo), which round 2 refused as `stale_tail`. `flac_check._silent(info)` is
+  the most a silent frame can end in - (channels x (8 + bits + 1) + 7) // 8 + 2, a little over channels x (1 +
+  bytes per sample) + 2 for a side channel's extra bit - and a run no longer is UNCHECKED. The test's file: frame
+  26, 937 samples (`SILENT_AT`), one of five headers with a CRC-16 of 0 among frame numbers to 39 and block sizes to
+  4,096. Zeros appended past a silent frame's own are still extra. Cost: an appended run that short is no longer
+  refused - three zero bytes after a whole file are UNCHECKED now.
+- **A first frame not numbered 0 is UNCHECKED** (App Design's ruling): a song cut with ffmpeg's stream copy keeps
+  its frame numbers and plays everywhere, and doubt never refuses. The docstring says so; the test is changed.
+- **It always moves on** (James's rule). Round 2's `_move_on` asked RETRY_ASKS (3) runners-up and, with all three
+  offline, cleared `moving` and left the job failed with the rest unasked. Now, while sources are left, the notice
+  says "…, and the sources asked next wouldn't send it; asking the next." and stays `moving`, and the next poll's
+  `resume_moves` asks the next three. First: **an unreachable slskd no longer marks runners-up declined** - before,
+  one outage used up three per ask, for a click or AUTO_RETRY_PEER too. `slskd_endpoint.enqueue` marks its own
+  failures - unreachable, or slskd answering for itself (`SLSKD_ITSELF`: 401, 403, 409, 502, 503, 504) - as an
+  `EnqueueRefusal`, a str (every caller reads and shows it as before) with `slskd_down`; `_move_to_next_peer`
+  records nobody for one, asks nobody else, and says `slskd_down` in its outcome (only when so - every other
+  outcome dict is as it was). The notice then says "…slskd couldn't be reached to ask the next source; it asks
+  again shortly." and stays `moving`. A 500 naming the peer offline is still the peer's. Assumed: which statuses
+  slskd's enqueue answers for itself (409 as its search does) - not read in slskd's source this round.
+- **Read a window at a time** (cost). `check_file` reads through `flac_check._Reader` - len, indexing, slicing,
+  find and startswith over a 4 MB window slid along the walk (`READ_WINDOW`, `READ_BEHIND` 256 KB behind for its
+  looks back), read with `os.pread`; `_zero_run` reads the end back a window at a time instead of `rstrip` on the
+  whole file. A file shorter than it was when opened raises OSError: UNCHECKED. Measured on the reviewer's 41 MB
+  `long.flac`: peak memory growth 4.2 MB, against 41 MB read whole; the same throughput as reading it whole (23
+  and 21 MB/s, 43 and 48 MB/s on `longlib.flac`, with other work on this Mac), and every one of the reviewer's 13
+  files reads the same both ways. **Not done: polling other jobs while one is checked.** The poll loop awaits each
+  filing, so a 3 GB 24/192 album still holds every other job for the 40-100 s of its check. Letting it run beside
+  the poll means filings as background tasks across polls - two filings into the library at once, shutdown
+  cancelling them mid-check, and the dozens of tests that expect `poll_downloads_once` to have filed by the time it
+  returns - a change of its own, left to follow separately.

@@ -86,14 +86,15 @@ def test_extra_data_behind_a_stripped_tag_is_still_found():
     assert check(data).kind == STALE_TAIL
 
 
-def test_a_first_frame_numbered_other_than_0_is_damaged_inside():
-    """A stream copied from the middle of another (ffmpeg -c copy of a cut, its first frame numbered 14 - the
-    review's real encode) has lost its start: it is refused, and the docstring says so."""
+def test_a_first_frame_numbered_other_than_0_is_unchecked():
+    """(App Design's ruling) A song cut with ffmpeg's stream copy keeps its frame numbers (the review's real encode
+    starts at 14) and plays everywhere: not refused - UNCHECKED, filed as before - and the docstring says so."""
     data, frames = encode(blocks=(4096,) * 4 + (1000,))
     start = frames[0][0]
     data = data[:start] + data[frames[1][0]:]
-    assert check(data).kind == DAMAGED_INSIDE
-    assert "isn't frame 0" in flac_check.__doc__
+    verdict = check(data)
+    assert verdict.kind == UNCHECKED and "numbered 1, not 0" in verdict.why
+    assert "a first\nframe numbered other than 0" in flac_check.__doc__
 
 
 def test_a_frame_planted_with_thousands_of_the_next_header_costs_a_bounded_walk():
@@ -155,9 +156,93 @@ def test_junk_after_the_end_is_extra_data():
     assert check(data + bytes(rng.randrange(256) for _ in range(2000))).kind == STALE_TAIL
 
 
-def test_three_zero_bytes_after_the_end_are_extra_data():
-    verdict = check(clean() + bytes(3))
-    assert verdict.kind == STALE_TAIL and verdict.extra >= 1
+def test_a_few_zero_bytes_after_the_end_are_unchecked_and_many_are_extra_data():
+    """(review) A silent last frame ends in zeros of its own, so a run no longer than that is UNCHECKED; past it the
+    zeros are extra."""
+    assert check(clean() + bytes(3)).kind == UNCHECKED
+    verdict = check(clean() + bytes(64))
+    assert verdict.kind == STALE_TAIL and verdict.extra >= 62
+
+
+#? (review) frame 26 of a 16-bit stereo stream at 44.1 kHz, 937 samples: its header's CRC-16 is 0x0000, so a frame of
+#? digital silence there - each channel a CONSTANT subframe of 0 - has a CRC-16 of 0x0000 too, and the file ends in
+#? eight zero bytes (found by searching every frame number to 39 and block size to 4096: five such headers)
+SILENT_AT = (26, 937)
+
+
+def silent_ending() -> bytes:
+    from tests.test_flac_mp4 import crc16, frame_header
+    number, block = SILENT_AT
+    data, frames = encode(blocks=(4096,) * number + (block,))
+    header = frame_header(number, block, rate=44100, channels=2, bps=16, variable=False, rate_style="table")
+    #? subframe header 0b0_000000_0 (CONSTANT) and the sample 0, for each channel; the CRC-16 they come to
+    body = header + (b"\x00" + bytes(2)) * 2
+    assert crc16(body) == 0
+    return data[:frames[-1][0]] + body + b"\x00\x00"
+
+
+def test_a_valid_file_ending_in_a_silent_frame_is_never_refused():
+    """(review) The reviewer's file: its last frame digital silence with a CRC-16 of 0x0000, ending in eight zero
+    bytes - read as a stale tail before, and refused. It is UNCHECKED; zeros appended past a silent frame's own are
+    still extra."""
+    data = silent_ending()
+    assert data.endswith(bytes(8)) and not data.endswith(bytes(9))
+    assert check(data).kind == UNCHECKED
+    assert check(data + bytes(64)).kind == STALE_TAIL
+
+
+# --- read a window at a time (review) -----------------------------------------------------------------------
+
+@pytest.fixture
+def small_windows(monkeypatch):
+    """Windows of 64 KB, 8 KB of them behind - so the files below are read in dozens of pieces - and the largest
+    window held, measured."""
+    monkeypatch.setattr(flac_check, "READ_WINDOW", 64 << 10)
+    monkeypatch.setattr(flac_check, "READ_BEHIND", 8 << 10)
+    held = []
+    hold = flac_check._Reader._hold
+
+    def measured(self, start, end):
+        hold(self, start, end)
+        held.append(len(self.window))
+
+    monkeypatch.setattr(flac_check._Reader, "_hold", measured)
+    return held
+
+
+def test_a_file_read_a_window_at_a_time_reads_as_it_does_whole(tmp_path, small_windows):
+    """check_file never holds the file in memory whole (review: a 3 GB 24/192 album on a container), and every
+    verdict it gives is check()'s on the whole file."""
+    whole = clean(blocks=(4096,) * 40 + (1000,))
+    cases = {"whole": whole, "copy loop": copy_loop(whole, 3000), "cut": whole[:-30_000], "zeros": whole + bytes(64),
+             "tagged": whole + ID3V1, "silent": silent_ending()}
+    broken = bytearray(whole)
+    broken[len(whole) // 2] ^= 0x10
+    cases["broken"] = bytes(broken)
+    for name, data in cases.items():
+        path = tmp_path / f"{name}.flac"
+        path.write_bytes(data)
+        assert check_file(path) == check(data), name
+    assert len(whole) > 10 * (64 << 10) and max(small_windows) <= 200 << 10
+
+
+def test_a_file_that_shrinks_while_it_is_read_is_unchecked(tmp_path, small_windows):
+    path = tmp_path / "01.flac"
+    data = clean(blocks=(4096,) * 40 + (1000,))
+    path.write_bytes(data)
+    hold = flac_check._Reader._hold
+
+    def shrinking(self, start, end):
+        if start > len(data) // 2:
+            os.truncate(path, len(data) // 2)
+        hold(self, start, end)
+
+    flac_check._Reader._hold = shrinking
+    try:
+        verdict = check_file(path)
+    finally:
+        flac_check._Reader._hold = hold
+    assert verdict.kind == UNCHECKED and "shorter than it was" in verdict.why
 
 
 def test_junk_after_an_id3v1_tag_is_not_taken_for_the_tag():

@@ -386,8 +386,16 @@ from that source:
   that's taken ("01 - Krakow_639001234567890123.flac") - and that copy is the one filed, under the song's own
   name; the refused copy's cover and other files are left behind with it;
 - the download moves to its **next source by itself**, whether `AUTO_RETRY_PEER` is on or off, and
-  whatever that source is like - once: it is the refusal's move, never a second one of the setting's. With no
-  source left, it stops there.
+  whatever that source is like - once: it is the refusal's move, never a second one of the setting's. It
+  keeps moving on: when the next sources asked won't send it, the next ones are asked at the next check of
+  downloads, three at a time, until one does; when slskd itself can't be reached, nobody is counted as
+  asked, and it asks again once slskd answers. Only with no source left does it stop.
+
+A song slskd is still moving into its download folder is never judged. slskd says a download has finished
+just before it moves the file there from its incomplete folder, and when the two folders are on different
+disks or mounts that move is a copy, so the file is still growing for a moment. A FLAC that reads as damaged,
+isn't yet the size the sharer said, and was written in the last two minutes waits: nothing is checked or
+moved, the row goes back to downloading, and the album is checked again a few seconds later.
 
 What happened is said in the event log and on the download's row in Requests, in amber under who it is from
 - while the next source is downloading, too:
@@ -399,6 +407,9 @@ What happened is said in the event log and on the download's row in Requests, in
 > match: MP3 320, was FLAC 16/44.1 · match 91%, was 100% (format 45, was 100).
 
 > The copy from glassbeads was damaged (2 of 11 songs are damaged inside) and there is no other source.
+
+> The copy from glassbeads was damaged (1 of 11 songs is cut short), and the sources asked next wouldn't
+> send it; asking the next.
 
 The reason in brackets is **"extra data after the end of N of M songs"** (bytes after the music that
 aren't a tag - what a sharer's program that writes the end of its buffer twice leaves), **"N of M songs
@@ -437,7 +448,10 @@ known for either", and the verdict is at best a different match.
 
 Only FLAC is checked: other formats, and a FLAC deadwax can't make sense of at all, are filed as before.
 A whole file, and one with an ID3 tag in front or ID3v1, APEv2 or ID3v2 tags behind, is filed exactly as
-before. Nothing is ever trimmed or repaired.
+before. So is one whose damage can't be certain: a song cut from a longer one (its first frame keeps its
+old number, as ffmpeg's stream copy leaves it, and it plays), and one ending in a few zero bytes, which a
+song ending in silence can end in by itself. Each file is read a few megabytes at a time, never held in
+memory whole. Nothing is ever trimmed or repaired.
 
 ### Cancelling
 

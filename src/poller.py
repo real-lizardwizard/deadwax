@@ -14,6 +14,7 @@ import asyncio
 import time
 from pathlib import Path
 
+from src.api.slskd_endpoint import is_slskd_down
 from src.config import Config
 from src.flac_check import damage_reason
 from src.library import note_library_changed
@@ -102,7 +103,9 @@ async def poll_downloads_once(
             )
 
         if summary["files_done"] >= summary["files_total"]:
-            logger.info(f"finished downloading {label}", extra={"frontend": True, "src": "slskd"})
+            #? said once, not at every poll while slskd is still moving its songs in (_ARRIVING)
+            if job_id not in _ARRIVING:
+                logger.info(f"finished downloading {label}", extra={"frontend": True, "src": "slskd"})
             await _settle_peer_speed(job, store, rate_samples)
             await store.update_status(job_id, "complete")
             await _organize_if_enabled(job, store, slskd_client)
@@ -232,6 +235,10 @@ def _is_manual(job: dict, plan: dict) -> bool:
     return bool((job.get("release") or {}).get("manual") or plan.get("manual"))
 
 
+#? (damaged downloads, review) jobs whose songs slskd was still moving into its folder at the last poll
+_ARRIVING: set[int] = set()
+
+
 async def _organize_if_enabled(job: dict, store, slskd_client=None) -> None:
     """
     Hand a finished download to the organizer.
@@ -266,6 +273,14 @@ async def _organize_if_enabled(job: dict, store, slskd_client=None) -> None:
         refused = await store.refused_files()
         results = await organize_job(job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, on_plan=plan_made,
                                      refused=refused)
+
+        if results.get("arriving"):
+            #? (review) slskd marks a transfer done before it moves the file into its folder, and between two mounts
+            #? the move is a copy: nothing was checked or moved, and the next poll plans it again
+            _ARRIVING.add(job["id"])
+            await store.still_arriving(job["id"])
+            return
+        _ARRIVING.discard(job["id"])
 
         if results.get("damaged"):
             #? refused before anything was marked or moved (organize_job): nothing to index or give anyone
@@ -422,8 +437,10 @@ async def _move_on(slskd_client, store, job: dict) -> None:
     """
     (Damaged downloads, review) A refused download moved to its next source: `job` failed with its notice still
     `moving` (store.refuse_copy). The notice is replaced by where it comes from now and how that source differs,
-    or the job's error by why it can't move; either way `moving` goes. Without `slskd_client` (nothing to ask) it
-    is left for the next poll's resume_moves. Never raises.
+    or the job's error by why it can't move - and while sources are left that weren't asked (RETRY_ASKS at a time;
+    slskd itself unreachable asks none), the notice says so and stays `moving`, so the next poll's resume_moves asks
+    the next ones: it always moves on. Without `slskd_client` (nothing to ask) it is left for the next poll's
+    resume_moves. Never raises.
     """
     notice = job.get("notice") or {}
     peer = notice.get("from") or job.get("username") or ""
@@ -449,15 +466,24 @@ async def _move_on(slskd_client, store, job: dict) -> None:
             #? a click moved it (which cleared the notice), or the row went, while it was being moved: nothing to say
             return
         before = len(untried_alternatives(job))
+        if before and (outcome.get("slskd_down") or 0 < outcome["left"] < before):
+            #? (review) James's rule: it always moves on. Sources are left - the ones asked wouldn't send it (each
+            #? recorded, so the next ones are asked), or slskd itself couldn't be reached (nobody recorded) - so the
+            #? notice stays `moving`, and the next poll's resume_moves asks again (RETRY_ASKS at a time)
+            waiting = (f"{said}. slskd couldn't be reached to ask the next source; it asks again shortly."
+                       if outcome.get("slskd_down") else
+                       f"{said}, and the sources asked next wouldn't send it; asking the next.")
+            if notice.get("text") != waiting:
+                await _say_damaged(store, job, {"kind": "damaged", "text": waiting, "from": peer, "to": None,
+                                                "reason": reason, "moving": True})
+            return
         if not before:
             text = f"{said} and there is no other source."
         elif outcome["left"] == before:
             #? nobody was asked: the album is filed, or coming, some other way meanwhile (already_have)
             text = f"{said}, and it wasn't tried again: {outcome['problem']}."
-        elif not outcome["left"]:
-            text = f"{said} and no other source would send it."
         else:
-            text = f"{said}, and the sources asked next wouldn't send it."
+            text = f"{said} and no other source would send it."
         await store.update_status(job["id"], "failed", text)
         await _say_damaged(store, job, {"kind": "damaged", "text": text, "from": peer, "to": None, "reason": reason})
         #? the refused attempt tidied as a cancelled one is - the move does the same when it moves
@@ -806,6 +832,7 @@ async def _move_to_next_peer(slskd_client, store, job: dict) -> dict:
     tried = list(job.get("tried") or [{"username": job["username"], "directory": job.get("directory")}])
     problem = None if candidates else NO_OTHER_PEERS
 
+    down = False
     for alternative in candidates[:RETRY_ASKS]:
         files = alternative.get("files") or []
         ok, reason = await slskd_client.enqueue(alternative["username"], files)
@@ -813,6 +840,12 @@ async def _move_to_next_peer(slskd_client, store, job: dict) -> dict:
 
         if not ok:
             problem = reason or f"{alternative['username']} refused"
+            if is_slskd_down(reason):
+                #? (damaged downloads, review) slskd failed for itself (unreachable, not connected): the peer was never
+                #? asked, so it isn't tried - and nor is anyone else, since slskd would fail the same way for them
+                tried.pop()
+                down = True
+                break
             #? (damaged downloads) asked and never a source: /jobs' earlier_sources leaves it out
             tried[-1]["declined"] = True
             continue
@@ -840,7 +873,9 @@ async def _move_to_next_peer(slskd_client, store, job: dict) -> dict:
 
     await store.record_tried(job["id"], tried)
     return {"moved": False, "username": None, "directory": None,
-            "left": len(untried_alternatives({**job, "tried": tried})), "problem": problem}
+            "left": len(untried_alternatives({**job, "tried": tried})), "problem": problem,
+            #? (review) slskd failed for itself, and nobody was asked: said only when so
+            **({"slskd_down": True} if down else {})}
 
 
 async def retry_same_peer(slskd_client, store, job: dict) -> dict:
