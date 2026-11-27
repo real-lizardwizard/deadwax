@@ -645,11 +645,14 @@ happening.
 
 ## A replaced cover still shows the old one
 
-Replacing a cover saves the release's cover as `cover.jpg` (or `.png`) and deletes the one cover file
-it replaces ([the library](library.md#release-matching-it-to-a-release)). deadwax picks a folder's
-cover by its name - `cover` first, then `folder`, `front`, `album`… - so when the folder held two, the
-one left can still come first, and deadwax says so in the editor after **Apply**, and in the
-**Event log** either way:
+Replacing a cover saves the release's cover as `cover.jpg` (`cover.png`, `cover.gif` or `cover.webp`
+for a full-size original that isn't a JPEG) and deletes the one cover file it replaces
+([the library](library.md#release-matching-it-to-a-release)). deadwax picks a folder's cover by its
+name - `cover` first, then `folder`, `front`, `album`… - and among several `cover.*` files the one that
+sorts first, so the only file that can still come before the new cover is another `cover.*`: a
+`cover.jpeg` beside the new `cover.jpg`, or a `Cover.jpg` on a disk that tells capitals apart. A
+`folder.jpg` or `front.png` left behind never does. When something is left, deadwax says so in the
+editor after **Apply**, and in the **Event log** either way:
 
 - *Saved cover.jpg, but cover.jpeg is still shown first - another cover in the album's folder, left as
   it was.* deadwax deletes only the cover it replaced, never a second one. If you don't want the other,
@@ -657,11 +660,21 @@ one left can still come first, and deadwax says so in the editor after **Apply**
 - *Saved cover.jpg, but the old folder.jpg is a link to somewhere else, which deadwax won't remove.* The
   old cover was a symbolic link; deadwax never deletes one, or what it points to. Remove the link
   yourself if it should go.
+- *Saved cover.jpg, but the old folder.jpg was left where it is - the folder holds no music of its own,
+  so it isn't taken for an album.* The folder has no audio files directly in it (an artist's folder, or
+  a disc's scans), so deadwax deletes nothing there. Delete the old picture yourself if it should go.
+- *Saved cover.jpg, but the old folder.jpg was left where it is - it changed while the new cover was
+  being fetched.* Something rewrote or replaced the old cover in the moments between deadwax choosing it
+  and saving the new one, so it may not be the file deadwax chose; it's left alone. Look at the folder,
+  and replace the cover again if the old one should still go.
 - *Saved cover.jpg, but the old folder.jpg couldn't be removed: …* The new cover is saved (and an
   **Apply**'s tags are written, and stay), but the user deadwax runs as isn't allowed to delete that
   file. Delete it yourself, or give the folder's files to that user.
 - *Saved cover.jpg - the old folder.jpg was already gone, so there was nothing to remove.* Something
-  else deleted it after the editor opened. Nothing to do.
+  else deleted it while the new cover was being fetched. Nothing to do.
+
+A folder's only picture under another name (`scan001.jpg`, `cdart.png`) is never deleted, and nothing
+is said about it: the new cover is shown before it anyway.
 
 ## Lyrics are missing, or land late
 

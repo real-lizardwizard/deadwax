@@ -439,42 +439,96 @@ replaced"): "This album already has a cover. With this on, Apply deletes it and 
 pressing's cover in its place. It can't be undone.", and after the cover alone "Replaced your cover
 (cover.png) with this pressing's." A review found the server never deleted anything: both writers
 only wrote `cover.<ext>`, and `execute_retag`'s comment admitted the old file stayed unless it had
-that name. So a `folder.jpg`, a `Cover.jpg` on a case-sensitive disk (James's server is
-OpenMediaVault) or a `cover.jpeg` beside a new `cover.jpg` (it sorts first) stayed, `find_cover_file`
-went on picking it, and the replace did nothing visible. Asked whether to delete the old file or soften
-the words, James chose: **"Delete the old file"**.
+that name. So the old cover always stayed on disk beside the new one, and when it was another `cover.*`
+sorting before the name written - `Cover.jpg` on a case-sensitive disk (James's server is
+OpenMediaVault), `cover.jpeg`, `cover.gif`, `cover.bmp`, `cover.JPG` beside a new `cover.jpg` -
+`find_cover_file` went on picking it, and the replace did nothing visible. (A `folder.jpg` or any other
+name was never shown over a new cover: `cover` comes first in COVER_BASENAMES. It only stayed.) Asked
+whether to delete the old file or soften the words, James chose: **"Delete the old file"**.
 
-- **The plan names the file: `art.removes`** (plan_retag's, from `plan_art`) and **`removes`**
-  (plan_cover_art's), the existing cover's name on every replace of a cover FILE, `None` otherwise -
-  a download, no art asked for, a merge into a folder with its own cover, or a cover only inside the
-  files (`find_cover_file` reads files alone, so `album.art === 'embedded'` plans a download). The
-  preview route answers it inside `plan.art`; the apply routes plan again from the folder as always,
-  and no request field names a file (`test_apply_removes_what_its_own_plan_names_never_what_was_sent`
-  sends `removes`, `art` and `plan` at both levels and pydantic drops them).
-- **Set on EVERY replace, even of a `cover.jpg`, rather than only "when it's another path"**: the name
-  written follows the image's type (`extension_for(mime)`), known only once it's fetched - a `full`
-  original can be a PNG - so the plan can't tell a `cover.jpg` that will be overwritten from one a new
-  `cover.png` leaves behind (which would still sort first). The write tells them apart instead:
-  the file it just wrote, by name or by `os.path.samefile` - on a case-insensitive disk (a Mac's)
-  `Cover.jpg` IS `cover.jpg`, and the write keeps the old entry's name - is overwritten, not removed.
+Built in two commits: the first deleted the cover the plan named; the review of it (asked for, 27 Nov)
+narrowed what is named, tied the removal to the very file the plan saw, gave the plan the covers that
+stay, and had a retag's plan say all of it with the cover off too. As it stands:
+
+- **The plan's cover fields**, laid by `plan_cover_removal()` on plan_retag's `art` (through `plan_art`)
+  and on plan_cover_art's plan itself - so the preview answers them in `plan.art`, the apply routes plan
+  again from the folder as always, and no request field names a file
+  (`test_apply_removes_what_its_own_plan_names_never_what_was_sent` sends `removes`, `removes_identity`,
+  `art` and `plan` at both levels, and pydantic drops them):
+  - `removes`: the existing cover's name when the write will delete it, else None. Only a file NAMED as a
+    cover - its stem one of COVER_BASENAMES (`cover`, `folder`, `front`, `album`, `albumart`,
+    `albumartsmall`, `thumb`), casefolded - and only a regular file, in a folder with audio directly in it.
+  - `removes_refused`: why the existing cover won't be deleted. `"link"`: a symbolic link, lstat'd at plan
+    time - the first commit named it in `removes` while the write always refused it, so the preview said
+    something untrue. `"not_a_cover_name"`: find_cover_file takes a folder's ONLY image for its cover
+    whatever it's called (cdart.png, scan001.jpg, fanart.jpg, spine.jpg, IMG_0042.jpg), and the first
+    commit deleted it for nothing - once a `cover.*` is written the `cover` stem comes first anyway. It is
+    kept. `"not_an_album"`: no audio directly in the folder, as delete_album requires. `/library/art/fetch`
+    takes any folder inside the library, and the review's probes deleted an artist folder's picture and a
+    `Scans/front.jpg` through it. None otherwise (a download; a cover that will be removed).
+  - `removes_identity`: `[st_dev, st_ino, st_size, st_mtime_ns]` of that file from lstat at plan time. The
+    write removes it only if that is unchanged, so it is the very file the plan named - between the two the
+    route fetches the new cover from the Archive, and anything may write the folder meanwhile; otherwise it
+    is left and said ("…it changed while the new cover was being fetched"). Each route plans at its own
+    request, so this guards the plan's moments before the write, not the preview's minutes before.
+  - `also_covers`: the folder's other images whose stem casefolds to `cover`, sorted, which the write leaves
+    alone - not `removes`, and not one that IS `cover.jpg` (samefile: on a case-insensitive disk
+    `COVER.jpg` is), which a JPEG write overwrites. A refused, linked `existing` named `cover.*` is among them.
+  - `still_shown_first`: those that will still be shown before the new cover, when its name is known. At 250,
+    500 or 1200 (THUMBNAIL_SIZES; an empty or unknown COVER_ART_SIZE is asked as the default 500, as
+    `fetch_front_why` does) the Archive sends its thumbnails, always JPEGs - the code takes that from the
+    Archive (the comment on FULL_SIZE_FALLBACK) and names the file after the Content-Type it gets, so it is a
+    prediction, not a guarantee - and the new cover is `cover.jpg`: they are the `also_covers` that sort
+    before it in Python's order. Before the name it will be LISTED under, strictly: overwriting `Cover.jpg`
+    on a case-insensitive disk keeps that entry's name, and `cover.jpeg` sorts after `Cover.jpg`. None at
+    `full`, whose original can be a PNG, a GIF or a WebP (MIME_EXTENSIONS), and when no size was given.
+    The check after the write is the final word either way. `cover_size` is passed into plan_retag and
+    plan_cover_art (Config.COVER_ART_SIZE, from the routes), so both stay pure.
+- **A retag's plan says what a replace WOULD do even when none is asked for** (asked for by the client side,
+  27 Nov): `plan_art` lays the five fields from `plan_cover_removal` over the same entries with the cover off
+  (`want_art` false), with no release id, and when a merge into a folder with a cover drops it - only `action`
+  (and `reason`) says what this Apply does, and `execute_retag` reads nothing else, so nothing is fetched,
+  written or removed (`test_with_the_cover_off_apply_removes_nothing_though_the_plan_names_a_file` hands it a
+  cover's bytes anyway). Without it the editor couldn't word its switch before it's ticked - a lone cdart.png
+  read "deletes it… can't be undone" - and Compare covers' "Replace your cover with this one" had no preview:
+  it is the cover alone (`/library/art/fetch`, plan_cover_art), which has no preview route of its own, so
+  the retag preview's `plan.art` is its preview. The two agree because both are `plan_cover_removal` over
+  the same sorted listing, the same `find_cover_file` choice and the same COVER_ART_SIZE - none of the five
+  depends on the release - pinned on seven folders at three sizes, the cover off and on
+  (`test_the_retag_plan_says_what_the_cover_alone_would_do_with_the_cover_off_or_on`), through a merge, and
+  end to end through both routes. The one place they can't be compared: a folder with no audio directly in
+  it, which plan_retag refuses outright ("no audio files in that folder", the empty plan), while the cover
+  alone plans it and refuses only the removal (`"not_an_album"`).
+- **`removes` is set on a replace of a `cover.jpg` too**, rather than only "when it's another path": the
+  name written follows the image's type (`extension_for(mime)`), known only once it's fetched - a `full`
+  original can be a PNG, and then the old `cover.jpg` would sort first and go on being shown - so the
+  write tells them apart: the file it just wrote, by name or `os.path.samefile` (a hard link, or `Cover.jpg`
+  on a case-insensitive disk, where the write keeps the old entry's name), is overwritten, not removed.
+  That check comes before the identity check, which the write itself has just changed.
 - **One remover, `remove_replaced_cover()`, called by both writers once their write has worked**:
-  `execute_retag` in a `try/except/else`'s `else`, `save_cover_art` after its `return` on failure. Its
-  guards, all checked again at the write (there is no undo): a bare name of a file directly in the
-  album's folder (never a path, `..`, `.` or a subfolder's file); the album's folder inside the library
-  and not the library itself; `lstat`, so a link is refused in words (`LINK_NOT_REMOVED`, "is a link to
-  somewhere else, which deadwax won't remove") and never followed; a regular file with an image
-  extension; still there (gone already is said - "…was already gone, so there was nothing to remove" -
-  and is no error); never the file just written; and the new cover there to see (a removal that ran
-  before the write, or after a failed one, finds none and refuses). A failed `unlink` is a problem in
-  words, never a crash and never a rollback of the tags.
-- **Then it checks the new cover is the one shown**: `find_cover_file` over the folder as it now is.
-  Another cover that still outranks it (`cover.jpeg` beside `cover.jpg`, `Cover.jpg` beside it on a
-  case-sensitive disk, a `cover.gif`) is said - "saved cover.jpg, but cover.jpeg is still shown first -
-  another cover in the album's folder, left as it was" - and never removed too: only the one file the
-  plan named is ever deleted.
+  `execute_retag` in a `try/except/else`'s `else`, `save_cover_art` after its `return` on failure, each
+  with its plan's cover (`save_cover_art(..., plan)`). It reads the folder once, after the write. Its
+  guards, all checked again at the write (there is no undo): a bare name of a file directly in the album's
+  folder (never a path, `..`, `.` or a subfolder's file); the album's folder inside the library and not the
+  library itself; audio directly in that folder (NOT_AN_ALBUM); `lstat`, so a link is refused in words
+  (`LINK_NOT_REMOVED`, "is a link to somewhere else, which deadwax won't remove") and never followed; a
+  regular file with an image extension; still there (gone already is said - "…was already gone, so there
+  was nothing to remove" - and is no error); never the file just written; the identity the plan saw; and
+  the new cover there to see (a removal that ran before the write, or after a failed one, finds none and
+  refuses). What the plan refused as `"link"` or `"not_an_album"` is said in the same words; a kept
+  `"not_a_cover_name"` needs none. A failed `unlink` is a problem in words, never a crash and never a
+  rollback of the tags.
+- **Then it checks the new cover is the one shown**: `find_cover_file` over that listing, without the file
+  removed. Another cover that still outranks it is said - "saved cover.jpg, but cover.jpeg is still shown
+  first - another cover in the album's folder, left as it was" - and never removed too: only the one file
+  the plan named is ever deleted. `test_still_shown_first_is_what_the_write_then_finds` holds the plan's
+  prediction to what this check then finds, case by case, on whichever disk it runs.
+- **The cover alone takes the album's `_apply_lock`**, the one an Apply of it takes, so two replaces - two
+  cover-alones, or one beside an Apply's cover - never plan against a folder the other is changing.
 - **The answers**: `results.art_removed` beside `art_written` on a retag; `/library/art/fetch` answers
   `removed` and `problems` beside `written` and `replaced` (unchanged: `replaced` is still the plan's
-  `existing`, so "Replaced your cover (cover.jpg)" stays true of a cover overwritten in place).
+  `existing`, so "Replaced your cover (cover.jpg)" stays true of a cover overwritten in place - and of a
+  lone `scan001.jpg` now kept, which the words may want to say differently: `removes_refused` tells them).
   `save_cover_art` returns `removed` and `problems` too; its `problem` is still a save that failed and
   wrote nothing (the route's 500). The event log has "removed the old cover folder.jpg from <album> -
   cover.jpg replaces it" and each of the remover's problems as a warning - which is where the web's
@@ -483,20 +537,26 @@ the words, James chose: **"Delete the old file"**.
 - **What Compare covers' button calls**: the web's "Replace with this cover" (the ios commit's
   "Replace your cover with this one") runs `saveArtOnly()` in MetadataEditor.tsx, the same function as
   "Replace cover only": `POST /library/art/fetch` with `replace: true` and the release being looked at
-  - plan_cover_art, then save_cover_art with its `removes`.
-- **A lone image of any name is a cover too**: `find_cover_file` takes a folder's only image (not a
-  disc or back scan by its name) as the cover, the editor shows it as yours, and a replace deletes it.
+  - plan_cover_art, then save_cover_art with that plan.
 - A dry run (`execute_retag(..., "dry_run")`, no route uses it) runs every check but the `unlink` and
   names what it would remove, looking at the folder as the write would leave it.
-- **Verified**: tests/test_cover_replace.py (both writers through every case - folder.jpg, Cover.jpg,
-  cover.jpeg, cover.png; a same-named cover.jpg; embedded only; links in the album and out of the
-  library, made before or after the plan; a failed write; gone before the write; two covers; each
-  guard alone; a failed unlink keeping the tags; the event log; the three routes), run on the Mac's
-  case-insensitive disk and on a case-sensitive APFS image, where `Cover.jpg` is removed rather than
-  overwritten. Seven mutations each failed them - removing before writing and on a failed write (each
-  writer), following a link, removing every cover-named file, deleting the same-named file after the
-  write. **Assumed**: OpenMediaVault's disks behave as the case-sensitive image did; not run against
-  James's library.
+- **Verified**: tests/test_cover_replace.py - both writers through every case (folder.jpg, Cover.jpg,
+  cover.jpeg, cover.png, FRONT.png, thumb.jpg; a same-named cover.jpg; a full-size PNG over a cover.jpg;
+  embedded only; a lone image of five other names, kept; a folder with no music, at the plan and at the
+  write; links in the album and out of the library, before and after the plan; a cover changed after the
+  plan, in contents or mtime; a failed write; gone before the write; two covers; the fields' prediction
+  against the write; each guard alone, a hard link among them; a failed unlink keeping the tags; the event
+  log; the plan with the cover off agreeing with the cover alone's; the routes and the lock) - run on the
+  Mac's case-insensitive disk and on a case-sensitive APFS image, where `Cover.jpg` is removed rather than
+  overwritten. Seventeen mutations each failed them on both, run against the second commit's code: the
+  first commit's seven (removing before writing and on a failed write, in each writer; following a link -
+  now caught by the link made after the plan, since the plan refuses one it sees; removing every
+  cover-named file; deleting the same-named file after the write), the review's seven (`removes` for a
+  lone odd-named image; the audio guard, at the plan, at the write and both; a link named in `removes`;
+  the identity check; `_same_file`, which on the case-sensitive disk only the hard-link test catches - as
+  on CI's ubuntu), and three for the cover off (its fields left empty again; a merge clearing them; Apply
+  acting on `removes` without an `action`). **Assumed**: OpenMediaVault's disks behave as the
+  case-sensitive image did; the Archive's thumbnails stay JPEGs; not run against James's library.
 
 ### Looking at a cover close up (v0.6.12)
 

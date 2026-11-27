@@ -657,7 +657,7 @@ async def retag_preview(body: RetagRequest):
     try:
         plan = await asyncio.to_thread(
             plan_retag, body.album_path, body.release.model_dump(),
-            Config.LIBRARY_PATH, body.fetch_art,
+            Config.LIBRARY_PATH, body.fetch_art, Config.COVER_ART_SIZE,
         )
 
         #? which size a cover would be fetched at, so the editor can say so. Laid on here rather
@@ -714,7 +714,7 @@ async def _retag_apply(request: Request, body: "RetagRequest"):
 
     try:
         plan = await asyncio.to_thread(
-            plan_retag, body.album_path, release, Config.LIBRARY_PATH, body.fetch_art
+            plan_retag, body.album_path, release, Config.LIBRARY_PATH, body.fetch_art, Config.COVER_ART_SIZE
         )
 
         if plan["source"] is None:
@@ -1078,9 +1078,18 @@ async def fetch_cover_art(request: Request, body: CoverArtRequest):
     if not Config.LIBRARY_PATH:
         raise HTTPException(status_code=400, detail="LIBRARY_PATH is not set")
 
+    #? (cover removal, 27 Nov) one at a time per album, under the lock an Apply of it takes: a replace deletes a
+    #? file, and two at once - two of these, or one beside an Apply's cover - would each plan against a folder the
+    #? other is changing
+    async with _apply_lock(body.album_path):
+        return await _save_cover_alone(request, body)
+
+
+async def _save_cover_alone(request: Request, body: "CoverArtRequest"):
     try:
         plan = await asyncio.to_thread(
-            plan_cover_art, body.album_path, Config.LIBRARY_PATH, body.replace, body.release_mbid
+            plan_cover_art, body.album_path, Config.LIBRARY_PATH, body.replace, body.release_mbid,
+            Config.COVER_ART_SIZE,
         )
 
         if plan["problem"]:
@@ -1106,7 +1115,7 @@ async def fetch_cover_art(request: Request, body: CoverArtRequest):
         #? (cover removal, 27 Nov) the cover a replace deletes once the new one is written is the plan's own,
         #? made just above from the folder - never a name from the request
         results = await asyncio.to_thread(
-            save_cover_art, body.album_path, Config.LIBRARY_PATH, art, plan["removes"]
+            save_cover_art, body.album_path, Config.LIBRARY_PATH, art, plan
         )
 
         if results["problem"]:

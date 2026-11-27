@@ -161,17 +161,22 @@ matched to MusicBrainz** (point at the first for the release id). You:
    everything. With a second library in Navidrome, or an admin scanning some other folder at
    that moment, the rename can come before this album has been scanned.
 
-**Replacing a cover deletes the one it replaces.** When the folder already has a cover file,
-replacing it - with the cover on when you **Apply**, or the cover alone, from beside the two covers -
-saves the release's cover as `cover.jpg` (or `.png`) and only then deletes the cover file the folder
-had, whatever it was called (`folder.jpg`, `Cover.jpg`, `cover.png`…), so the new one is the one
-shown. One already called `cover.jpg` is overwritten instead. It can't be undone. If saving the new
-cover fails, the old one stays. Only that one file is ever deleted: if another cover in the folder
-would still be shown first - a `cover.jpeg` beside the new `cover.jpg` - it's left as it is, and
-deadwax says so (*Saved cover.jpg, but cover.jpeg is still shown first…*) in the editor after
-**Apply**, and in the **Event log** either way ([troubleshooting](troubleshooting.md#a-replaced-cover-still-shows-the-old-one)).
-A cover file that's a link to somewhere else is never deleted, and a cover only inside the files
-isn't touched.
+**Replacing a cover deletes the one it replaces.** Replacing the folder's cover - with the cover on
+when you **Apply**, or the cover alone, from beside the two covers - saves the release's cover as
+`cover.jpg` (at the 250, 500 and 1200 sizes the Cover Art Archive always sends a JPEG; at `full` the
+original can be a PNG, GIF or WebP, saved as `cover.png`, `cover.gif` or `cover.webp`), and only then
+deletes the cover file the folder had, so the new one is the one shown. That's a file named as a cover -
+`cover`, `folder`, `front`, `album`, `albumart`, `albumartsmall` or `thumb`, in any case, such as
+`folder.jpg`, `Cover.jpg` or `cover.png`. When it has the very name the new cover is saved under
+(`cover.jpg` over `cover.jpg`), it's overwritten instead; a full-size PNG saved as `cover.png` deletes a
+`cover.jpg`. It can't be undone. If saving the new cover fails, the old one stays, and so does one that
+changed while the new one was being fetched. Only that one file is ever deleted: if another `cover.*` in the
+folder would still be shown first - a `cover.jpeg` beside the new `cover.jpg` - it's left as it is, and
+deadwax says so (*Saved cover.jpg, but cover.jpeg is still shown first…*) in the editor after **Apply**,
+and in the **Event log** either way ([troubleshooting](troubleshooting.md#a-replaced-cover-still-shows-the-old-one)).
+Never deleted: a folder's only picture under another name (`scan001.jpg`, `cdart.png` - the new cover is
+shown before it anyway), a cover that's a link to somewhere else, a picture in a folder with no music of
+its own (an artist's folder, a `Scans` folder), and a cover only inside the files.
 
 **Cancel** closes the panel; nothing is written until **Apply**, which then says what it did (*Updated
 the tags in 12 files, saved cover.jpg, moved the folder to match its tags.*), or what it couldn't. For
@@ -250,7 +255,8 @@ the Release tab.*). While one works its button says so (*Getting the cover…*),
 said in a line **under the button** - on a phone too, which shows no tooltips.
 
 - **Get cover** fetches the cover of the release the album's tags name, from the Cover Art
-  Archive, at `COVER_ART_SIZE`, and saves it as `cover.jpg` (or `.png`). It only appears on albums
+  Archive, at `COVER_ART_SIZE`, and saves it as `cover.jpg` (`cover.png`, `.gif` or `.webp` for a
+  full-size original that isn't a JPEG). It only appears on albums
   that have a release id and no cover, and it never replaces one. To replace a cover, use
   **Release**, where you can compare the two. *The Cover Art Archive has no front cover for that
   release.* and a failure (*The Cover Art Archive couldn't be reached - try again.*) are told apart,

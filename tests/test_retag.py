@@ -238,7 +238,9 @@ def test_art_is_not_fetched_unless_asked(tmp_path):
 def test_art_is_downloaded_when_the_album_has_none(tmp_path):
     seed(tmp_path)
     plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path), want_art=True)
-    assert plan["art"] == {"action": "download", "reason": "", "existing": None, "removes": None}
+    assert plan["art"] == {"action": "download", "reason": "", "existing": None, "removes": None,
+                           "removes_refused": None, "removes_identity": None, "also_covers": [],
+                           "still_shown_first": None}
 
 
 def test_existing_art_is_a_replacement_not_a_download(tmp_path):
@@ -248,7 +250,11 @@ def test_existing_art_is_a_replacement_not_a_download(tmp_path):
     write_image(directory / "cover.jpg")
 
     plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path), want_art=True)
-    assert plan["art"] == {"action": "replace", "reason": "", "existing": "cover.jpg", "removes": "cover.jpg"}
+    info = (directory / "cover.jpg").lstat()
+    assert plan["art"] == {"action": "replace", "reason": "", "existing": "cover.jpg", "removes": "cover.jpg",
+                           "removes_refused": None,
+                           "removes_identity": [info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns],
+                           "also_covers": [], "still_shown_first": None}
 
 
 def test_art_needs_a_release_id_and_says_so(tmp_path):

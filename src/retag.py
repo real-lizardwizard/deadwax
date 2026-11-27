@@ -29,10 +29,11 @@ from pathlib import Path
 
 from src.editions import resolve_edition_label
 from src.logger import logger
-from src.library import IMAGE_EXTENSIONS, find_cover_file
+from src.config import COVER_ART_SIZES
+from src.library import COVER_BASENAMES, IMAGE_EXTENSIONS, find_cover_file
 from src.matching import AUDIO_EXTENSIONS, file_extension, match_tracks_to_files
 from src.tagkeys import easy_file
-from src.api.coverart_endpoint import extension_for
+from src.api.coverart_endpoint import DEFAULT_SIZE, extension_for
 from src.organizer import (LINK_REFUSED, build_album_dirname, country_in_folder, filed_artist, is_within,
                            read_album_mbid, sanitize_filename, tag_values, write_tags)
 
@@ -75,7 +76,7 @@ def current_tags_of(audio) -> dict:
     return current
 
 
-def plan_art(entries: list[Path], release: dict, want_art: bool) -> dict:
+def plan_art(entries: list[Path], release: dict, want_art: bool, cover_size: str | None = None) -> dict:
     """
     Whether this retag would put a cover in the folder, and if not, why not.
 
@@ -88,26 +89,111 @@ def plan_art(entries: list[Path], release: dict, want_art: bool) -> dict:
     clobber a file it didn't put there.
 
     Asked, a replace REMOVES the cover file it replaces (cover removal, 27 Nov - James: "Delete the
-    old file"), and the plan names that file as `removes`, for the preview and the write alike. Only
-    writing `cover.<ext>` left a `folder.jpg`, a `Cover.jpg` (on a case-sensitive disk) or a
-    `cover.jpeg` beside the new one, and find_cover_file went on showing the old cover. The name to be
-    written follows the image's type, known only once it's fetched, so the write itself sees whether
-    it landed on that very file (cover.jpg over cover.jpg): then it was overwritten, and nothing is
-    removed - see remove_replaced_cover. A cover only inside the files is no file: nothing to remove.
+    old file") - see plan_cover_removal for the fields that say which, and remove_replaced_cover for
+    the write. `cover_size` is COVER_ART_SIZE, passed in so this stays pure: it says which name the
+    new cover will most likely take.
+
+    Those fields say what a replace of this folder's cover WOULD do whether or not one is asked for -
+    with the cover off, with no release id, and when a merge drops the cover - so the editor can word
+    its switch before it's ticked, and Compare covers' button (the cover alone, plan_cover_art over the
+    same entries) has its preview here: the two agree. Only `action` says whether this Apply fetches,
+    writes or removes anything, and execute_retag reads nothing else.
     """
     existing = find_cover_file(entries)
+    removal = plan_cover_removal(entries, existing, cover_size)
+    existing_name = existing.name if existing else None
 
     if not want_art:
-        return {"action": "", "reason": "", "existing": existing.name if existing else None, "removes": None}
+        return {"action": "", "reason": "", "existing": existing_name, **removal}
 
     if not (release.get("release_mbid") or "").strip():
         return {"action": "", "reason": "this release has no MusicBrainz id to look art up by",
-                "existing": existing.name if existing else None, "removes": None}
+                "existing": existing_name, **removal}
 
     if existing is not None:
-        return {"action": "replace", "reason": "", "existing": existing.name, "removes": existing.name}
+        return {"action": "replace", "reason": "", "existing": existing_name, **removal}
 
-    return {"action": "download", "reason": "", "existing": None, "removes": None}
+    return {"action": "download", "reason": "", "existing": None, **removal}
+
+
+def _no_removal() -> dict:
+    """A plan's cover fields when there is no folder to look at (a plan that failed, a cover alone that can't run)."""
+    return {"removes": None, "removes_refused": None, "removes_identity": None,
+            "also_covers": [], "still_shown_first": None}
+
+#? The sizes the Cover Art Archive answers as its own thumbnails, which it always serves as JPEGs (the comment on
+#? coverart_endpoint's FULL_SIZE_FALLBACK) - so a cover asked at one is written as cover.jpg. `full` is the original
+#? upload, which can be a PNG, a GIF or a WebP (MIME_EXTENSIONS), so its name isn't known until it's fetched.
+THUMBNAIL_SIZES = ("250", "500", "1200")
+
+
+def plan_cover_removal(entries: list[Path], existing: Path | None, cover_size: str | None = None) -> dict:
+    """
+    What replacing this folder's cover would delete, and what would still be there (cover removal, 27 Nov).
+
+    `entries` are the folder's files as the plan read them, `existing` the cover find_cover_file picks among them
+    (None for a download). Writes nothing. Both plans lay these on their cover, for the preview and the write:
+
+    - `removes`: the existing cover's name when the write will delete it, else None. Only a file named as a cover -
+      its stem one of COVER_BASENAMES, in any case - and only a regular file in a folder with music directly in it.
+      Named even when it's a `cover.jpg` the write may simply overwrite: the name written follows the image's type,
+      known once it's fetched, so the write itself sees whether it landed on that very file.
+    - `removes_refused`: why the existing cover won't be deleted - "link" (a link to somewhere else: never removed,
+      never followed), "not_a_cover_name" (a folder's only image under another name - cdart.png, scan001.jpg -
+      which find_cover_file shows only for want of a cover: the new `cover.*` comes before it, so it's kept) or
+      "not_an_album" (no audio directly in the folder, as delete_album requires - an artist's folder, a Scans
+      folder). None otherwise.
+    - `removes_identity`: [st_dev, st_ino, st_size, st_mtime_ns] of the file `removes` names, from lstat now; the
+      write removes it only if that is unchanged, so it is the very file this plan named.
+    - `also_covers`: the folder's other images named `cover.*` in any case (sorted), which the write leaves alone -
+      not `removes`, and not one that IS `cover.jpg` (on a case-insensitive disk `COVER.JPG` is), which a JPEG
+      write overwrites. A refused, linked `existing` named `cover.*` is among them.
+    - `still_shown_first`: those of them that will still be shown before the new cover, when its name is known -
+      at 250, 500 or 1200 it is `cover.jpg` (listed under the old name when it overwrites `Cover.jpg` on a
+      case-insensitive disk), and they are the ones that sort before it. None at `full`, or when the size wasn't
+      given: not known until the image is. The check after the write is the final word either way.
+    """
+    removes = refused = identity = None
+
+    if existing is not None:
+        try:
+            info = existing.lstat()
+        except OSError:
+            info = None
+
+        if info is not None and stat.S_ISLNK(info.st_mode):
+            refused = "link"
+        elif existing.stem.casefold() not in COVER_BASENAMES:
+            refused = "not_a_cover_name"
+        elif not _holds_audio(entries):
+            refused = "not_an_album"
+        elif info is not None and stat.S_ISREG(info.st_mode):
+            removes, identity = existing.name, _identity_of(info)
+
+    also_covers = sorted(
+        p.name for p in entries
+        if p.stem.casefold() == "cover" and file_extension(p.name) in IMAGE_EXTENSIONS and p.name != removes
+        and ((existing is not None and p == existing and refused == "link") or not _same_file(p, p.parent / "cover.jpg"))
+    )
+
+    still_shown_first = None
+    size = None if cover_size is None else str(cover_size or DEFAULT_SIZE)
+    if size is not None and (size in THUMBNAIL_SIZES or size not in COVER_ART_SIZES):
+        #? (an unknown size is asked as DEFAULT_SIZE, a thumbnail - fetch_front_why)
+        listed_as = existing.name if existing is not None and _same_file(existing, existing.parent / "cover.jpg") \
+            else "cover.jpg"
+        still_shown_first = [name for name in also_covers if name < listed_as]
+
+    return {"removes": removes, "removes_refused": refused, "removes_identity": identity,
+            "also_covers": also_covers, "still_shown_first": still_shown_first}
+
+
+def _holds_audio(entries) -> bool:
+    return any(file_extension(p.name) in AUDIO_EXTENSIONS for p in entries)
+
+
+def _identity_of(info: os.stat_result) -> list[int]:
+    return [info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns]
 
 
 def plan_cover_art(
@@ -115,6 +201,7 @@ def plan_cover_art(
     library_root: str,
     replace: bool = False,
     release_mbid: str | None = None,
+    cover_size: str | None = None,
 ) -> dict:
     """
     Whether a cover could be saved into this album, and which release to ask for. Writes nothing.
@@ -133,20 +220,20 @@ def plan_cover_art(
     directory = root / album_path
 
     if not album_path or not is_within(directory, root) or not directory.is_dir():
-        return {"release_mbid": None, "existing": None, "action": "", "removes": None,
+        return {"release_mbid": None, "existing": None, "action": "", **_no_removal(),
                 "problem": "that album is not inside the library"}
 
     try:
         entries = sorted(p for p in directory.iterdir() if p.is_file())
     except OSError as e:
-        return {"release_mbid": None, "existing": None, "action": "", "removes": None,
+        return {"release_mbid": None, "existing": None, "action": "", **_no_removal(),
                 "problem": f"could not read the album folder: {e}"}
 
     existing = find_cover_file(entries)
     existing_name = existing.name if existing else None
 
     if existing is not None and not replace:
-        return {"release_mbid": None, "existing": existing_name, "action": "", "removes": None,
+        return {"release_mbid": None, "existing": existing_name, "action": "", **_no_removal(),
                 "problem": f"this album already has {existing_name}"}
 
     #? Normally read from the files: the point of the plain "get art" path is that it needs no
@@ -160,7 +247,7 @@ def plan_cover_art(
     release_mbid = (release_mbid or "").strip() or read_album_mbid(directory)
 
     if not release_mbid:
-        return {"release_mbid": None, "existing": existing_name, "action": "", "removes": None,
+        return {"release_mbid": None, "existing": existing_name, "action": "", **_no_removal(),
                 "problem": "this album isn't tagged with a MusicBrainz release, so there's "
                            "nothing to look a cover up by - match it to a release first"}
 
@@ -168,13 +255,14 @@ def plan_cover_art(
         "release_mbid": release_mbid,
         "existing": existing_name,
         "action": "replace" if existing is not None else "download",
-        #? the cover file save_cover_art deletes once the new one is written - plan_art's `removes`
-        "removes": existing_name,
+        #? what save_cover_art deletes once the new one is written, and what stays - plan_cover_removal's fields,
+        #? which a retag's plan lays on its cover too
+        **plan_cover_removal(entries, existing, cover_size),
         "problem": None,
     }
 
 
-def save_cover_art(album_path: str, library_root: str, art: tuple[bytes, str], removes: str | None = None) -> dict:
+def save_cover_art(album_path: str, library_root: str, art: tuple[bytes, str], plan: dict | None = None) -> dict:
     """
     Write a cover into an album folder, and touch nothing else.
 
@@ -186,9 +274,10 @@ def save_cover_art(album_path: str, library_root: str, art: tuple[bytes, str], r
     Containment is re-checked here rather than trusted from the plan, for the reason the retag
     endpoint recomputes its plan: a path that arrived over the wire is not evidence.
 
-    `removes` is plan_cover_art's own (cover removal, 27 Nov): the cover a replace deletes once this
-    one is written, so the new one is the one shown - see remove_replaced_cover. `problem` is a save
-    that failed, and wrote nothing; `problems` what a save that worked has to say about the old cover.
+    `plan` is plan_cover_art's own, made by the caller from the folder (cover removal, 27 Nov): its
+    `removes` is the cover a replace deletes once this one is written - see remove_replaced_cover.
+    Without one nothing is removed. `problem` is a save that failed, and wrote nothing; `problems` what
+    a save that worked has to say about the old cover.
     """
     root = Path(library_root)
     directory = root / album_path
@@ -209,55 +298,79 @@ def save_cover_art(album_path: str, library_root: str, art: tuple[bytes, str], r
         return {"written": None, "removed": None, "problem": f"could not save the cover: {e}", "problems": []}
 
     logger.info(f"saved {name} into {directory.name}", extra={"frontend": True})
-    removed, problems = remove_replaced_cover(directory, directory / name, removes, library_root)
+    removed, problems = remove_replaced_cover(directory, directory / name, plan, library_root)
     return {"written": name, "removed": removed, "problem": None, "problems": problems}
 
 
-def remove_replaced_cover(directory: Path, written: Path, removes: str | None, library_root: str | Path | None,
+#? Why a cover was left in a folder with no music directly in it: an artist's folder, a Scans folder
+NOT_AN_ALBUM = "the folder holds no music of its own, so it isn't taken for an album"
+
+
+def remove_replaced_cover(directory: Path, written: Path, plan: dict | None, library_root: str | Path | None,
                           dry_run: bool = False) -> tuple[str | None, list[str]]:
     """
     After a cover is written into `directory` as `written`: delete the cover file the plan said it
     replaces, then check the new one is the cover now shown. (The name removed or None, problems.)
 
-    Both writers call it once their write has worked, and only then - a write that failed has returned
-    before it, so the old cover stays. Every guard is checked again here, at the write, rather than
-    trusted from the plan, as delete_album's are (there is no undo):
+    `plan` is the plan's cover (plan_cover_removal's fields, beside `existing`). Both writers call it
+    once their write has worked, and only then - a write that failed has returned before it, so the old
+    cover stays. Every guard is checked again here, at the write, rather than trusted from the plan, as
+    delete_album's are (there is no undo):
 
     - a bare name of a file directly in the album's folder: never a path, a subfolder's file or the
       folder itself;
     - the album's folder inside LIBRARY_PATH, and not the library itself;
+    - audio directly in that folder, as delete_album requires (NOT_AN_ALBUM);
     - a regular file with an image extension, read with lstat: a link is refused and said
       (LINK_NOT_REMOVED), never followed;
     - still there: one already gone is said, and is no error;
-    - never the file just written - the same name, or the same file under another case on a
-      case-insensitive disk (`Cover.jpg` IS `cover.jpg` on macOS): that one was overwritten;
+    - never the file just written - the same name, or the same file under another name (a hard link,
+      or `Cover.jpg` on a case-insensitive disk, where it IS `cover.jpg`): that one was overwritten;
+    - the very file the plan saw: its `removes_identity` (device, inode, size, mtime) unchanged;
     - with the new cover there to see.
+
+    What the plan refused (`removes_refused` "link" or "not_an_album") is said here too, in the same
+    words; "not_a_cover_name" needs no words - the new cover is shown before that image, and it stays.
 
     Only the one file named is ever removed. Another cover that still outranks the new one in
     find_cover_file (a `cover.jpeg` beside a new `cover.jpg`) is reported, never removed as well. A
     failed removal is a problem in words, never a crash and never a reason to undo the tags. A dry run
     makes every check but the unlink, and looks at the folder as the write would leave it.
     """
+    plan = plan or {}
     said = f"{written.name} would be saved" if dry_run else f"saved {written.name}"
-    removed, problem = (_remove_one(directory, written, removes, library_root, said, dry_run)
-                        if removes else (None, None))
+
+    try:
+        entries = [p for p in directory.iterdir() if p.is_file()]
+    except OSError:
+        entries = None
+
+    removed, problem = None, None
+    removes, refused, existing = plan.get("removes"), plan.get("removes_refused"), plan.get("existing")
+    if removes:
+        removed, problem = _remove_one(directory, written, removes, plan.get("removes_identity"), entries,
+                                       library_root, said, dry_run)
+    elif refused == "link" and existing:
+        problem = f"{said}, but the old {existing} {LINK_NOT_REMOVED}"
+    elif refused == "not_an_album" and existing:
+        problem = f"{said}, but the old {existing} was left where it is - {NOT_AN_ALBUM}"
     problems = [problem] if problem else []
 
-    shown = _shown_instead(directory, written, removed, dry_run)
+    shown = _shown_instead(entries, written, removed, dry_run)
     if shown:
         problems.append(f"{said}, but {shown} is still shown first - another cover in the album's folder, "
                         f"left as it was")
 
     #? in the event log too: the cover alone's answer is drawn as one line, which may not show these
     if not dry_run:
-        for problem in problems:
-            logger.warning(f"{directory.name}: {problem}", extra={"frontend": True})
+        for line in problems:
+            logger.warning(f"{directory.name}: {line}", extra={"frontend": True})
 
     return removed, problems
 
 
-def _remove_one(directory: Path, written: Path, name: str, library_root: str | Path | None, said: str,
-                dry_run: bool) -> tuple[str | None, str | None]:
+def _remove_one(directory: Path, written: Path, name: str, identity, entries: list[Path] | None,
+                library_root: str | Path | None, said: str, dry_run: bool) -> tuple[str | None, str | None]:
     """remove_replaced_cover's one removal, behind every guard it lists. (The name removed or None, a problem.)"""
     left = f"{said}, but the old {name} was left where it is"
     old = directory / name
@@ -273,6 +386,11 @@ def _remove_one(directory: Path, written: Path, name: str, library_root: str | P
     if not inside:
         return None, f"{left} - the album isn't inside the library"
 
+    if entries is None:
+        return None, f"{left} - the album's folder couldn't be read"
+    if not _holds_audio(entries):
+        return None, f"{left} - {NOT_AN_ALBUM}"
+
     try:
         info = old.lstat()
     except FileNotFoundError:
@@ -285,9 +403,12 @@ def _remove_one(directory: Path, written: Path, name: str, library_root: str | P
     if not stat.S_ISREG(info.st_mode) or file_extension(name) not in IMAGE_EXTENSIONS:
         return None, f"{left} - it isn't an image file"
 
-    #? overwritten in place, so it IS the new cover now
+    #? overwritten in place, so it IS the new cover now - asked before the identity, which the write just changed
     if old == written or _same_file(old, written):
         return None, None
+
+    if identity is None or list(identity) != _identity_of(info):
+        return None, f"{left} - it changed while the new cover was being fetched"
 
     if dry_run:
         return name, None
@@ -310,16 +431,18 @@ def _remove_one(directory: Path, written: Path, name: str, library_root: str | P
     return name, None
 
 
-def _shown_instead(directory: Path, written: Path, removed: str | None, dry_run: bool) -> str | None:
-    """The cover find_cover_file shows instead of the one just written, if it isn't that one."""
-    try:
-        entries = [p for p in directory.iterdir() if p.is_file()]
-    except OSError:
+def _shown_instead(entries: list[Path] | None, written: Path, removed: str | None, dry_run: bool) -> str | None:
+    """
+    The cover find_cover_file shows instead of the one just written, if it isn't that one - over the folder's
+    listing taken after the write and before the removal, so without the file removed.
+    """
+    if entries is None:
         return None
 
+    entries = [p for p in entries if p.name != removed]
     if dry_run:
         #? nothing was written or removed: the folder as the write would leave it
-        entries = [p for p in entries if p.name not in (removed, written.name)] + [written]
+        entries = [p for p in entries if p.name != written.name] + [written]
 
     shown = find_cover_file(sorted(entries))
     if shown is None or shown == written or _same_file(shown, written):
@@ -334,7 +457,8 @@ def _same_file(a: Path, b: Path) -> bool:
         return False
 
 
-def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool = False) -> dict:
+def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool = False,
+               cover_size: str | None = None) -> dict:
     """
     Everything applying `release` to the album at `album_path` would change. Touches nothing.
 
@@ -439,9 +563,11 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
     if move_problem:
         problems.append(move_problem)
 
-    art = plan_art(entries, release, want_art)
+    art = plan_art(entries, release, want_art, cover_size)
     if merge and merge["ok"] and merge["detail"]["has_cover"] and art["action"]:
-        art = {**art, "action": "", "reason": "", "removes": None}
+        #? the cover is dropped, so nothing is fetched or removed - and the removal fields stay, saying (as with the
+        #? cover off) what replacing this folder's cover would do: the cover alone still can (cover removal, 27 Nov)
+        art = {**art, "action": "", "reason": ""}
     if art["reason"]:
         problems.append(art["reason"])
 
@@ -483,7 +609,7 @@ def _empty_plan(album_path: str, problem: str) -> dict:
         "moves": False, "merge": False, "merge_detail": None,
         "edition_label": "", "files": [], "changed_file_count": 0,
         "file_count": 0, "matched_tracks": 0, "expected_tracks": 0,
-        "art": {"action": "", "reason": "", "existing": None, "removes": None},
+        "art": {"action": "", "reason": "", "existing": None, **_no_removal()},
         "problems": [problem], "empty": True,
     }
 
@@ -715,7 +841,7 @@ def execute_retag(
         elif results["dry_run"]:
             results["art_written"] = name
             results["art_removed"], problems = remove_replaced_cover(
-                source, source / name, art_plan.get("removes"), plan.get("library_root"), dry_run=True)
+                source, source / name, art_plan, plan.get("library_root"), dry_run=True)
             results["problems"].extend(problems)
 
         else:
@@ -731,7 +857,7 @@ def execute_retag(
                 logger.info(f"wrote {name} into {source.name}", extra={"frontend": True})
                 #? only here, with the new cover on disk: a write that failed has removed nothing
                 results["art_removed"], problems = remove_replaced_cover(
-                    source, source / name, art_plan.get("removes"), plan.get("library_root"))
+                    source, source / name, art_plan, plan.get("library_root"))
                 results["problems"].extend(problems)
 
     elif art_action and art is None and not results["dry_run"]:
