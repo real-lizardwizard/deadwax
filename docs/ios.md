@@ -7644,6 +7644,16 @@ slice.
 - **648 Both phones.** **Not done yet.** On Green Anole, 645-647. On Ethan's phone, 645-647, or "not done yet". On
   the Mac, 645, 646 and the full-screen cover.
 
+### Faster (649-655)
+
+The app asks deadwax for less of what it already had, so pages you've seen before open sooner. Nothing plays any
+differently.
+
+- **649 Covers after a restart.** **Not done yet.** Scroll your Albums, quit the app (swipe it away), open it and
+  scroll the same albums: the covers are there at once, not grey squares filling in. Quit again, turn WireGuard off and
+  open it: the covers you'd seen still show, where they were grey. Replace an album's cover in Edit album: once
+  Navidrome has scanned, its page and its tile show the new one.
+
 ## What it can't do yet
 
 These are the web app's for now - open deadwax's address in a browser for them, since nothing in the app takes you

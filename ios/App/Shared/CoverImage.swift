@@ -74,6 +74,10 @@ struct CoverImage: View {
     }
 }
 
+/// (Speed A, fix 1) Under these, the bytes are kept on disk by the transport's cover session as deadwax's headers say
+/// (URLSessionTransport.coverCache, Core's CoverDisk), so a cold launch draws a cover still fresh without asking, and a
+/// cover kept there draws while deadwax can't be reached (`onDisk`).
+///
 /// Covers kept in memory by server, cover id and size: one fetch per cover at a time, a failure not asked again for
 /// a minute under the same session (a sign-in again, or the app coming back to the front, asks again at once).
 /// Held to `costLimit` bytes of decoded pixels (a 400 px tile is 640 KB, so about 150 of them), the least recently
@@ -158,8 +162,16 @@ final class CoverCache {
                     self?.landed(key, flight, image, called: false)
                     return image
                 }
-                // nothing that needs deadwax is asked while it can't be reached: a failure, forgotten when it is back
+                // nothing that needs deadwax is asked while it can't be reached: a failure, forgotten when it is back -
+                // unless (Speed A) the covers' disk cache holds it, which draws with nothing asked
                 if self?.offline == true {
+                    let request = archive.map { (cover: ArchiveCoverID) -> HTTPRequest in
+                        client.archiveCoverRequest(cover, size: size)
+                    } ?? client.coverRequest(coverID: id, size: size)
+                    if let image = await Task.detached(priority: .userInitiated, operation: { Self.onDisk(request) }).value {
+                        self?.landed(key, flight, image, called: false)
+                        return image
+                    }
                     self?.landed(key, flight, nil, called: false, reached: false)
                     return nil
                 }
@@ -205,6 +217,14 @@ final class CoverCache {
                                         kCGImageSourceThumbnailMaxPixelSize: max(size, 1)]
         guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
         return UIImage(cgImage: image)
+    }
+
+    /// (Speed A) A cover the covers' disk cache holds (URLSessionTransport.coverCache), decoded - however old: read only
+    /// while deadwax can't be reached, when nothing could say whether it still stands.
+    nonisolated static func onDisk(_ request: HTTPRequest) -> UIImage? {
+        guard let held = URLSessionTransport.coverCache?.cachedResponse(for: URLRequest(request)),
+              let raw = UIImage(data: held.data) else { return nil }
+        return raw.preparingForDisplay() ?? raw
     }
 
     /// The app came back to the front (a WireGuard tunnel up again, say): covers that failed are asked again the next

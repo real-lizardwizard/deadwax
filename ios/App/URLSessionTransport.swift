@@ -7,14 +7,35 @@ import Foundation
 /// No cache of its own either (`urlCache` nil): a request sent with If-None-Match gets deadwax's 304 back as it
 /// came, for DeadwaxClient.fetch to say "unchanged" - the app keeps the answers worth keeping itself.
 ///
+/// (Speed A, fix 1 - notes/ios.md "Speed A: what's asked again") Except covers: a request Core's CoverDisk takes
+/// (Navidrome's covers and the Cover Art Archive's fronts, never the viewer's full size) goes through a session of its
+/// own whose cache is on disk - Caches/deadwax-covers, CoverDisk.diskBytes at most - kept and asked again as deadwax's
+/// headers say (Cache-Control's max-age, then revalidated with the ETag the cache holds). The JSON and the audio stay
+/// exactly as they were: ephemeral and uncached. A cover the cache answered without asking is not deadwax answering:
+/// Reachability hears of a cover only when it came over the network (`NetworkUsed`).
+///
 /// One URLSession per time to answer: 8 seconds for every route but the few `Routes.timeouts` gives longer (the
 /// album index, 30). The request's own timeoutInterval says the same, so whichever of the two URLSession heeds,
 /// the route gets its time.
 final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
     static let standardTimeout: Double = 8
 
+    /// (Speed A) The covers' cache on disk, in the app's Caches - nil only with no Caches to put it in (the covers are
+    /// then kept in memory alone, as before).
+    static let coverCache: URLCache? = {
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        let folder = caches.appendingPathComponent(CoverDisk.folder, isDirectory: true)
+        return URLCache(memoryCapacity: 0, diskCapacity: CoverDisk.diskBytes, directory: folder)
+    }()
+
+    /// A session's kind: its time to answer, and whether it is the covers' (kept on disk) or every other route's.
+    private struct Kind: Hashable {
+        let timeout: Double
+        let covers: Bool
+    }
+
     private let lock = NSLock()
-    private var sessions: [Double: URLSession] = [:]
+    private var sessions: [Kind: URLSession] = [:]
     private var listener: (@Sendable (_ answered: Bool) -> Void)?
 
     init() {}
@@ -39,13 +60,30 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         return configuration
     }
 
-    private func session(waiting timeout: Double) -> URLSession {
+    /// (Speed A) The covers' session: cookies off as every other's, its cache the one on disk, used as each answer's
+    /// headers say (`.useProtocolCachePolicy`: fresh within max-age, else asked again with the ETag held - a 304 is the
+    /// cover kept). Not ephemeral: an ephemeral session keeps nothing on disk.
+    private static func coverConfiguration(waiting timeout: Double) -> URLSessionConfiguration {
+        guard let cache = coverCache else { return configuration(waiting: timeout) }
+        let configuration = URLSessionConfiguration.default
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieAcceptPolicy = .never
+        configuration.httpCookieStorage = nil
+        configuration.urlCredentialStorage = nil
+        configuration.requestCachePolicy = .useProtocolCachePolicy
+        configuration.urlCache = cache
+        configuration.timeoutIntervalForRequest = timeout
+        return configuration
+    }
+
+    private func session(waiting timeout: Double, covers: Bool = false) -> URLSession {
         lock.lock()
         defer { lock.unlock() }
-        if let session = sessions[timeout] { return session }
-        let session = URLSession(configuration: Self.configuration(waiting: timeout), delegate: SameOriginRedirects.shared,
-                                 delegateQueue: nil)
-        sessions[timeout] = session
+        let kind = Kind(timeout: timeout, covers: covers)
+        if let session = sessions[kind] { return session }
+        let configuration = covers ? Self.coverConfiguration(waiting: timeout) : Self.configuration(waiting: timeout)
+        let session = URLSession(configuration: configuration, delegate: SameOriginRedirects.shared, delegateQueue: nil)
+        sessions[kind] = session
         return session
     }
 
@@ -55,10 +93,16 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         sent.timeoutInterval = timeout
         let data: Data
         let response: URLResponse
+        // (Speed A) whether deadwax answered: always - but a cover the disk cache answered without asking
+        var answered = true
         do {
             if let most = request.mostBytes {
                 (data, response) = try await CappedRead.read(sent, most: most,
                                                              configuration: Self.configuration(waiting: timeout))
+            } else if CoverDisk.takes(request) {
+                let used = NetworkUsed()
+                (data, response) = try await session(waiting: timeout, covers: true).data(for: sent, delegate: used)
+                answered = used.overNetwork
             } else {
                 (data, response) = try await session(waiting: timeout).data(for: sent)
             }
@@ -70,7 +114,7 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
             heard(true)
             throw error
         }
-        heard(true)
+        if answered { heard(true) }
         guard let http = response as? HTTPURLResponse else {
             throw APIFailure.other("The answer wasn't http.")
         }
@@ -192,6 +236,30 @@ final class SameOriginRedirects: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
         completionHandler(Redirects.follows(from: task.originalRequest?.url, to: request.url) ? request : nil)
+    }
+}
+
+/// (Speed A) A cover's task's own delegate: whether its answer came over the network (a transaction loaded from it - a
+/// 304 revalidating the copy kept is one) or from the disk cache alone. URLSession hands a task its metrics before it
+/// completes; metrics that never came say the cache, so a cover never tells Reachability that deadwax answered when it
+/// may not have. A redirect is the session's own rule, asked here as the session's delegate would be.
+private final class NetworkUsed: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var network = false
+
+    var overNetwork: Bool { lock.withLock { network } }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        let loaded = metrics.transactionMetrics.contains { (each: URLSessionTaskTransactionMetrics) -> Bool in
+            each.resourceFetchType == .networkLoad
+        }
+        lock.withLock { network = loaded }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        SameOriginRedirects.shared.urlSession(session, task: task, willPerformHTTPRedirection: response,
+                                              newRequest: request, completionHandler: completionHandler)
     }
 }
 

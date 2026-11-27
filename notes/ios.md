@@ -23838,3 +23838,63 @@ which compares both Mac About views whole; `..._more_opens_the_whole_words_besid
   album page's row doing nothing (borderless); VoiceOver reading the words as one element with its More / Less and link
   actions, and the headings rotor stopping on About (its heading a header now).
 - Offline: a page opened before drawing its kept About, one not opened since the app started drawing none (504).
+
+## Speed A: what's asked again (2026-11-27)
+
+James, 27 Nov: "let's leave navidrome and just try to make those speed optimizations". The audit
+(`~/Desktop/Code/deadwax-plans/audit-code-speed.md`, read from the code at ios 8696ce8a, nothing measured) found most of
+the app's waits came from asking for the same thing again; the brief is `speed-app.md` in the same folder. Six fixes,
+one commit each, each cause first confirmed in the code. Nothing the app plays changed (no diff to DeadwaxAudio,
+AudioSessionController, QueueController or UpNext), no route was added and Routes.swift's endpoints are as they were.
+Core's parts are SpeedATests.swift's, the app's wiring tests/test_ios_speed_a.py's.
+
+### 1. Covers kept on disk
+
+**Confirmed:** URLSessionTransport made every session ephemeral with `urlCache = nil` and
+`.reloadIgnoringLocalCacheData`, and covers went through those sessions like any JSON; CoverCache kept the decoded
+pictures in 96 MB of memory and nothing else. So every cold launch fetched every cover scrolled past again, though
+deadwax sends Navidrome's own Cache-Control (a year and immutable for an id carrying the picture's hash, `no-cache` to
+revalidate otherwise, `no-store` for a placeholder - notes/player.md) and `private, max-age=604800` with an ETag for the
+Cover Art Archive's fronts.
+
+**Now:** Core's `CoverDisk.takes` says which requests are covers - a GET of `Routes.cover` or `Routes.archiveCover`,
+read whole, so never the viewer's full size (`mostBytes`, its own capped read). The transport sends only those through a
+session of their own (`Kind(timeout:covers:)`, one `URLSession` made per kind with the redirect rule as before), whose
+configuration is `.default` with cookies off, `.useProtocolCachePolicy` and a `URLCache` on disk in
+`Caches/deadwax-covers`, at most `CoverDisk.diskBytes` (256 MB), nothing of it in memory (CoverCache holds the decoded
+ones). URLCache keeps and asks again exactly as the headers say: a hashed Navidrome id is drawn from disk with no
+request for its year, a `no-cache` one is revalidated with its ETag (a 304, no body), a placeholder is never stored, an
+Archive front is kept its week. **Chosen over files of our own** because Navidrome's `no-cache` covers need
+revalidation, which URLCache does from the headers it stored and files of our own would have had to rebuild (and
+DeadwaxClient's cover calls hand back no Cache-Control to rebuild it from, with no diff allowed there). Everything else -
+the JSON, the stream, the downloads' background session, the full-size cover - is exactly as it was: ephemeral,
+uncached. Two parts beside it:
+
+- **Reachability stays truthful.** A cover the cache answered without asking is not deadwax answering: a cover's task
+  carries its own delegate (`NetworkUsed`, the redirect asked of `SameOriginRedirects.shared` as the session's would
+  be) that reads the task's metrics, and the transport tells the listener `heard(true)` only when a transaction was a
+  `.networkLoad` (a 304 revalidation is one). A failure still says `heard(false)`.
+- **Offline is better.** While deadwax can't be reached CoverCache asks nothing, as before - but a cover the disk cache
+  holds now draws (`CoverCache.onDisk`, URLCache's `cachedResponse(for:)` read off the main thread, however old: nothing
+  could say whether it still stands), where it was the empty square. Downloaded albums' covers are as they were.
+
+**What drops a kept cover, and a cover Edit replaced:** the headers alone. An Edit's new cover reaches the page as a
+new answer for the album (fix 2's kept answers are dropped on `albumWrites`), and Navidrome's cover id for an album
+carries the picture's hash, so the new picture is a new URL the cache has never held; an id without the hash is
+`no-cache`, revalidated every time it is asked, so the new picture's ETag brings it. The memory cache above it
+(NSCache by server, id and size) is unchanged - a cover whose id stayed the same is held there until the app ends, as
+before. Covers aren't per person: they are the collection's pictures, the same for everyone the server lets in, and the
+memory cache never keyed them by person either; the URL holds the server.
+
+**Tests:** SpeedATests `onlyTheCoversAreKeptOnDisk` (the cover and Archive requests DeadwaxClient builds are taken; the
+full size, a stream, disc art, an album, the scan, a folder's art and a POST are not) and
+`aTemplatesPartsAreEachOneSegment`; test_ios_speed_a.py `test_covers_alone_go_through_a_session_whose_cache_is_on_disk`
+(both configurations compared whole, the cache's place and bound, the order of `send`'s branches, `heard(true)` only
+over the network) - seen failing with the cover branch made `else if false` - and
+`test_a_cover_kept_on_disk_draws_while_deadwax_cant_be_reached`.
+
+**Not verified (a device or the server log):** that URLCache stores these answers at all (they carry a hand-set
+`Cookie:` and `private`; the server log across two cold launches should show the second asking only the `no-cache`
+covers, each a 304); that a task's metrics come before its end, so Reachability hears covers that did go out; the 256 MB
+bound holding (CFNetwork evicts on its own schedule); that Navidrome 0.64.2's album cover ids carry the hash, so an Edit's
+new cover is a new URL (check 649).
