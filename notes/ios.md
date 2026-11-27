@@ -23971,3 +23971,34 @@ version and garbage are no record; the cookie is never in the bytes; the 304's h
 **Not verified (a device or the server log):** the first Edit of a launch answered by a 304 (the server log shows
 `/library/albums` 304 with no body; check 651, and the audit's "finding the folder" timed on a cold launch against a
 second open); how long a big library's copy takes to read and decode off the main actor.
+
+### 4. Artists' one-minute rule
+
+**Confirmed:** ArtistsScreen's `.task` and its scene-phase hook called `ask()` every time the screen showed or the app
+came back in front on it, and MacArtistsPage's `.task` the same - each switch between Albums, Artists and Songs asked
+`/navidrome/artists` for the whole list again ("as the web's, which keeps no list from one look to the next"), drawing
+the old one meanwhile, so it cost data and a redraw rather than a blank screen. The album index has kept its list for
+a minute since Phase 4 (AlbumIndexState.refreshIfOld, INDEX_FRESH_MS).
+
+**Now:** both screens, as they show, call `ArtistsModel.askIfOld(writes:)`, which asks only when Core's
+`ListFreshness.asks` says - the album index's rule applied the same way: no list in hand, or the one in hand landed
+over `freshMs` (the index's own 60 s) ago, and never while one asked under the same writes is on its way (the index
+waits for the ask of its own generation). The index's generation moves on a write; the artists' "generation" is the
+count of writes deadwax was told of (KeptAlbumAnswers.stamp's `writes`: Edit album's albumWrites and managingWrites -
+an apply, a delete, a re-file, a Get, a mark), noted with when it moved: a list asked under other writes is asked
+again at once, and so is one asked within `AlbumEdit.settleMs` of them moving, since Navidrome's scan of a re-file is
+seconds behind it - for those seconds each show asks afresh, as before. A last ask that failed is asked again at the
+next show too (offline and back is as before). The pull, the failure notes' Try again and the Library's Refresh still
+ask at once (`ask()`); the artist page's and Similar Artists' asks are only for a list not in hand, unchanged.
+
+**What drops what's kept:** the list is the same one in memory it always was; what's new is only its age. A write told
+of, a failure, a minute, a pull or Refresh ask again; another person (`reset()`) drops the list and its age together,
+and the app opening starts with none.
+
+**Tests:** SpeedATests `theArtistsAreAskedAgainAsTheyShowOnlyOnceTheListIsOverAMinuteOld` (the minute's edge set beside
+the album index's own refreshIfOld, the writes, the settle, a failure, one on its way); test_ios_speed_a.py
+`test_the_artists_are_asked_as_they_show_by_the_album_indexs_rule`, seen failing with the screen's show asking at once
+again.
+
+**Not verified (a device or the server log):** one `/navidrome/artists` per minute while switching sections (check
+652); the re-file's new name on Artists when going back to it after Navidrome's scan has taken longer than the settle.

@@ -7661,6 +7661,11 @@ differently.
 - **651 Edit album after a restart.** **Not done yet.** Quit the app, open it, and open Edit album on an album (or
   Settings > Manage > Edit an album): the folder is found sooner than it was on the first try after a restart. Change
   something in it, quit, open it again and edit it: it shows the change.
+- **652 Artists, switching back and forth.** **Not done yet.** In the Library, switch between Albums, Artists and
+  Songs a few times within a minute: Artists doesn't flicker or redraw each time you come back to it (the server's log
+  shows one `/navidrome/artists` for the minute, not one per switch). Wait over a minute and switch again, or pull
+  down on Artists: it asks again. Move an artist's albums under their current name, then go back to Artists: the new
+  name shows once Navidrome has scanned the move (a few seconds; go back to Artists again if it hasn't yet).
 
 ## What it can't do yet
 

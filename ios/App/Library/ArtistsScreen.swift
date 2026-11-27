@@ -108,14 +108,15 @@ struct ArtistsScreen: View {
         }
         .task(id: AskKey(person: server.person, online: reachability.online, current: current,
                          generation: yours ? library.generations[.yours] ?? 0 : 0)) {
-            // shown (and shown again): asked afresh - nothing while deadwax can't be reached
+            // shown (and shown again): asked - (Speed A) the artists only once the list in hand is over a minute old;
+            // nothing while deadwax can't be reached
             guard reachability.online, current else { return }
-            await ask()
+            await ask(fresh: false)
         }
         .onChange(of: scenePhase) { _, phase in
-            // the app back in front is the screen shown again (the web's): asked afresh
+            // the app back in front is the screen shown again (the web's): asked, by the same rule
             guard phase == .active, shown, current, reachability.online else { return }
-            Task { await ask() }
+            Task { await ask(fresh: false) }
         }
         .onAppear {
             shown = true
@@ -128,16 +129,19 @@ struct ArtistsScreen: View {
         }
     }
 
-    /// The artists asked - and, for Your artists, your albums with them (the web's Promise.all of the two).
-    private func ask() async {
+    /// The artists asked - and, for Your artists, your albums with them (the web's Promise.all of the two). (Speed A,
+    /// fix 4) As the screen shows, the artists only when the list in hand is over a minute old or a write was told of
+    /// since it was asked (ArtistsModel.askIfOld); `fresh`, a pull, at once.
+    private func ask(fresh: Bool) async {
         let artists = self.artists
+        let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation).writes
         guard yours else {
-            await artists.ask()
+            if fresh { await artists.ask() } else { await artists.askIfOld(writes: writes) }
             return
         }
         let library = self.library
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await artists.ask() }
+            group.addTask { if fresh { await artists.ask() } else { await artists.askIfOld(writes: writes) } }
             group.addTask { await library.load(.yours) }
         }
     }
@@ -148,7 +152,7 @@ struct ArtistsScreen: View {
             reachability.tryNow()
             return
         }
-        await ask()
+        await ask(fresh: true)
     }
 
     /// The list drawn: Your artists or the collection's, from what is in hand - or, offline with none, the artists of
@@ -269,7 +273,7 @@ struct ArtistsScreen: View {
                     .padding(.bottom, 4)
             }
             if online, let failure = artists.failure {
-                RefreshProblemNote(failure: failure) { Task { await ask() } }
+                RefreshProblemNote(failure: failure) { Task { await ask(fresh: true) } }
                     .padding(.vertical, 8)
             }
             if drawn.artists.isEmpty {
@@ -292,7 +296,7 @@ struct ArtistsScreen: View {
             VStack(alignment: .leading, spacing: 10) {
                 ErrorNote(failure, retry: true)
                 Button(LibraryWords.tryAgain) {
-                    if reachability.online { Task { await ask() } } else { reachability.tryNow() }
+                    if reachability.online { Task { await ask(fresh: true) } } else { reachability.tryNow() }
                 }
                 .disabled(reachability.probing)
             }

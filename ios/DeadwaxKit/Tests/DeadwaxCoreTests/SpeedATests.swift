@@ -155,4 +155,40 @@ import Testing
         await #expect(throws: APIFailure.self) { _ = try await deadwax.libraryScanKeeping(ifNoneMatch: nil) }
     }
 
+    // MARK: fix 4 - Artists' one-minute rule
+
+    @Test func theArtistsAreAskedAgainAsTheyShowOnlyOnceTheListIsOverAMinuteOld() {
+        typealias Landed = ListFreshness.Landed
+        // the album index's own minute
+        #expect(ListFreshness.freshMs == AlbumIndexState.freshMs && ListFreshness.freshMs == 60_000)
+        // none in hand: asked
+        #expect(ListFreshness.asks(landed: nil, writes: 0, failed: false, onItsWay: nil, now: 1_000))
+        // landed under a minute ago: drawn as it is, nothing asked - a minute exactly is still fresh, as the index's
+        let landed = Landed(at: 1_000, writes: 3, settled: true)
+        #expect(!ListFreshness.asks(landed: landed, writes: 3, failed: false, onItsWay: nil, now: 1_000 + 30_000))
+        #expect(!ListFreshness.asks(landed: landed, writes: 3, failed: false, onItsWay: nil, now: 1_000 + 60_000))
+        #expect(ListFreshness.asks(landed: landed, writes: 3, failed: false, onItsWay: nil, now: 1_000 + 60_001))
+        // the same edge as the album index's refreshIfOld
+        var index = AlbumIndexState()
+        index.restore(.store, answer: AlbumIndexAnswer(albums: []), etag: nil, at: 1_000)
+        let atAMinute = index.refreshIfOld(.store, now: 1_000 + 60_000)
+        let pastIt = index.refreshIfOld(.store, now: 1_000 + 60_001)
+        #expect(!atAMinute && pastIt)
+        // a write told of since it was asked (an Edit's apply, a delete, a re-file): asked at once, as a new generation
+        #expect(ListFreshness.asks(landed: landed, writes: 4, failed: false, onItsWay: nil, now: 1_000 + 1))
+        // and one asked within the settle of the writes moving may be from before Navidrome scanned them: asked again at
+        // each show until one asked after it has landed
+        #expect(!ListFreshness.settled(askedAt: 5_000 + 9_999, writesMovedAt: 5_000))
+        #expect(ListFreshness.settled(askedAt: 5_000 + 10_000, writesMovedAt: 5_000) && AlbumEdit.settleMs == 10_000)
+        #expect(ListFreshness.settled(askedAt: 5_000, writesMovedAt: nil))
+        let early = Landed(at: 1_000, writes: 4, settled: false)
+        #expect(ListFreshness.asks(landed: early, writes: 4, failed: false, onItsWay: nil, now: 1_000 + 1))
+        #expect(!ListFreshness.asks(landed: early, writes: 4, failed: false, onItsWay: 4, now: 1_000 + 1))
+        // the last ask failed: asked again as the screen shows (offline and back, a sign-in that ended)
+        #expect(ListFreshness.asks(landed: landed, writes: 3, failed: true, onItsWay: nil, now: 1_000 + 1))
+        // never while one asked under the same writes is on its way - one asked before a write is no answer to it
+        #expect(!ListFreshness.asks(landed: nil, writes: 3, failed: false, onItsWay: 3, now: 1_000))
+        #expect(!ListFreshness.asks(landed: landed, writes: 3, failed: true, onItsWay: 3, now: 1_000 + 120_000))
+        #expect(ListFreshness.asks(landed: landed, writes: 4, failed: false, onItsWay: 3, now: 1_000 + 1))
+    }
 }

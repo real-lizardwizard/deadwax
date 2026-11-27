@@ -231,3 +231,45 @@ def test_a_pages_first_read_asks_with_the_scan_kept_on_disk():
     assert "head.server.utf16.elementsEqual(server.utf16), head.who.utf16.elementsEqual(who(session).utf16)" in rules
     assert "return SessionFile.fnv1a(session)" in rules
     assert "FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)" in rules
+
+
+# ---------------------------------------------------------------------------- fix 4: Artists' one-minute rule
+
+
+def test_the_artists_are_asked_as_they_show_by_the_album_indexs_rule():
+    model = code(APP / "Models" / "ArtistsModel.swift")
+    # the screen showing asks only when Core's rule says - none in hand, over a minute old, a write told of, a failure
+    # - and nothing asked under the same writes is on its way
+    # (the writes noted, and when they moved - the settle that follows is Navidrome's scan of them)
+    assert flat(func(model, "askIfOld")) == (
+        "if writes != told { told = writes toldMoved = Int64(Self.now) }"
+        " guard ListFreshness.asks(landed: landed, writes: writes, failed: failure != nil, onItsWay: asking,"
+        " now: Int64(Self.now)) else { return } await ask()")
+    ask = flat(func(model, "ask"))
+    # every ask - a pull's too - says what it was asked under, and the newest one landing stamps the list in hand
+    assert ("failure = nil let writes = told"
+            " let settled = ListFreshness.settled(askedAt: Int64(Self.now), writesMovedAt: toldMoved)"
+            " asking = writes defer { if asked == asks { asking = nil } }") in ask
+    assert ("guard asked == asks, epoch == self.epoch else { return }"
+            " landed = ListFreshness.Landed(at: Int64(Self.now), writes: writes, settled: settled)") in ask
+    # another person starts with nothing kept
+    assert "landed = nil told = 0 toldMoved = nil asking = nil" in flat(func(model, "reset"))
+    # the phone's Artists: shown, or the app back in front on it, by the rule (the task's and the scene's); a pull,
+    # and a failure's Try again (the note over the list, the one in its place), at once
+    screen = code(APP / "Library" / "ArtistsScreen.swift")
+    assert screen.count("await ask(fresh: false)") == 2 and "Task { await ask(fresh: false) }" in screen
+    assert "await ask(fresh: true)" in flat(func(screen, "pulled"))
+    assert "RefreshProblemNote(failure: failure) { Task { await ask(fresh: true) } }" in screen
+    assert "if reachability.online { Task { await ask(fresh: true) } } else { reachability.tryNow() }" in screen
+    asking = flat(func(screen, "ask"))
+    assert asking.count("if fresh { await artists.ask() } else { await artists.askIfOld(writes: writes) }") == 2
+    assert "let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation).writes" in asking
+    assert "await ask()" not in screen and "artists.ask()" not in screen.replace("if fresh { await artists.ask() }", "")
+    # the Mac's Artists page, by the same rule
+    page = code(APP / "Mac" / "Library" / "MacArtistsPage.swift")
+    assert "group.addTask { await artists.askIfOld(writes: writes) }" in page and "artists.ask()" not in page
+    assert "let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation).writes" in page
+    # the Library's Refresh still asks at once
+    assert "Task { await artists.ask() }" in code(APP / "Library" / "LibraryView.swift")
+    # Core's minute is the album index's own
+    assert "public static let freshMs: Int64 = AlbumIndexState.freshMs" in code(CORE / "ListFreshness.swift")
