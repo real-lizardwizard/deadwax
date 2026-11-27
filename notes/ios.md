@@ -20334,6 +20334,26 @@ back in the action, `keeps` without `finding`; the unsigned iPhone and Mac Catal
 phone - the check is James's (check 615 in docs/ios.md): Find opens, types, Cancels, and the row's controls work after;
 and Debug's line while Find is open reads "kept, Find open".
 
+## The greys lifted (2026-11-26)
+
+James: "legibility isn't great with some of this purple and grey on black". Measured on the phone's black (WCAG 2's
+contrast): every word colour already passed 4.5:1 - t2 #a3a3b8 8.5, label #9d9db2 7.9, t3 #8e8ea3 6.6, the tab bar's
+unchosen #8a8a9c 6.2, the purple `acc` #c084fc 8.0 - so the faintness is size and weight: the app's 11-13 pt words, and
+the numbers in Courier Prime, a thin typewriter face. Offered three ways (greys and purple words, greys only, show the
+worst spots first), James chose **"Lift the greys only"**.
+
+Lifted in DWPalette and in the canvas's dw.css (the repo's ios/design copy and the plans folder's
+mac-redesign/dw.css, identical after): t2 **#bcbccf** (11.2:1), label **#b0b0c4** (9.9), t3 **#a8a8bc** (9.0), tabItemText
+**#a6a6b8** (8.8) - each above where t2 was, the order kept, each the same blue-violet tint (red = green, blue above).
+The purple, white, head and every hairline, fill and button are untouched. The Mac shares DWPalette, so its greys lift
+too. Not lifted: the older `Palette`'s text2, textTertiary and label - they mirror the web app's theme.css (and its
+tests), and only the Mac's Get rows (StoreLineView) and the EQ's lines still draw them; the panel review the same day
+judges those.
+
+**Verified**: test_the_greys_read_on_black (each grey at least 8.5:1, the order, the tint, dw.css the same, the purple
+as it was) fails with t3 put back; test_ios_palette, phone_look, mac_look, search_look and test_type pass. **Not
+verified**: how it reads - check 616.
+
 ## The redesign, slice R7: Search, Get and Sources (2026-11-25)
 
 The plan is ~/Desktop/Code/deadwax-plans/mac-redesign-build.md 3.4, "R7 - Search, Get and Sources", and the drawings

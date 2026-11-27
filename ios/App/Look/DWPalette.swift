@@ -41,9 +41,9 @@ enum DWPalette {
     static let rowline = hex(0x17161e)           // --rowline
     static let text = hex(0xffffff)              // --text
     static let head = hex(0xe4e4ec)              // --head
-    static let t2 = hex(0xa3a3b8)                // --t2
-    static let t3 = hex(0x8e8ea3)                // --t3
-    static let label = hex(0x9d9db2)             // --label
+    static let t2 = hex(0xbcbccf)                // --t2
+    static let t3 = hex(0xa8a8bc)                // --t3
+    static let label = hex(0xb0b0c4)             // --label
     static let acc = hex(0xc084fc)               // --acc
     static let acct = hex(0xd8b4fe)              // --acct
     static let selt = hex(0xe9d5ff)              // --selt
@@ -137,7 +137,7 @@ enum DWPalette {
     static let seekFill = horizontal(hex(0x9333ea), hex(0xc084fc))    // dw.ph: .mini > .prog > i background
     static let tabBarFace = hex(0x000000)                             // dw.ph: .tabbar background
     static let tabBarEdge = hex(0x1c1b22)                             // dw.ph: .tabbar border-top
-    static let tabItemText = hex(0x8a8a9c)                            // dw.ph: .tabbar > a color
+    static let tabItemText = hex(0xa6a6b8)                            // dw.ph: .tabbar > a color
     // (R1c) .foot2 has no fill (`background: none`): drawn in the page's own black, so what scrolls under it
     // doesn't show through - the same black as the page's
     static let footFace = hex(0x000000)                               // dw.ph: .dw background

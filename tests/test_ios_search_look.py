@@ -458,7 +458,7 @@ def test_the_phones_numbers_are_the_drawings():
     assert phone_look.px(phone_look.css(".key.bare", "width")) == 28 and "static let play: CGFloat = 28" in look
     assert phone_look.px(phone_look.css(".key.bare svg", "width")) == 14 and phone_look.nearest(14) == "footnote"
     assert "SharpSymbol(.play) .font(Typeface.symbol(.footnote)) .foregroundStyle(DWPalette.t3)" in screen
-    assert phone_look.css(".key.bare", "color") == "var(--t3)" or phone_look.css(".key.bare", "color") == "#8e8ea3"
+    assert phone_look.css(".key.bare", "color") in ("var(--t3)", "#a8a8bc")  # t3, lifted 26 Nov (test_the_greys_read_on_black)
     # a heading's row: 38 tall, its words at its foot 6 up, 15 semibold in the heading's colour (subheadline's)
     assert phone_look.px(phone_look.css(".row.grp", "height")) == 38
     assert phone_look.px(phone_look.css(".row.grp", "padding-bottom")) == 6

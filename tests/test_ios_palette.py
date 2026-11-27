@@ -285,14 +285,14 @@ def test_the_apps_own_bars_are_the_webs():
         assert not re.search(rf"\bstatic let {gone}\b", palette), gone
     #? (the redesign, R4) the tab bar is dw.css's `.dw.ph .tabbar` now, not the web's .app-tabbar: (R1c, the phone flat)
     #? on the page's black under a #1c1b22 hairline, the tabs 6 under it side to side with no room at either end, each
-    #? 49 tall at least, its symbol's box 24 and 3 over its words, 11 and medium, #8a8a9c - the shown one the accent.
+    #? 49 tall at least, its symbol's box 24 and 3 over its words, 11 and medium, #a6a6b8 (26 Nov, lifted - test_the_greys_read_on_black) - the shown one the accent.
     #? DWPalette's lines and PhoneLook's sizes say which rule each is (test_ios_phone_look.py holds every one to it);
     #? these are the bar's own draws
     look = _phone_look()
     lines = look.palette_lines()
     for name, source, value in (("tabBarFace", "dw.ph: .tabbar background", "#000"),
                                 ("tabBarEdge", "dw.ph: .tabbar border-top", "#1c1b22"),
-                                ("tabItemText", "dw.ph: .tabbar > a color", "#8a8a9c")):
+                                ("tabItemText", "dw.ph: .tabbar > a color", "#a6a6b8")):
         assert lines[name][1] == source, name
         selector, prop = source[len("dw.ph: "):].rsplit(" ", 1)
         assert look.css(selector, prop) == value, source
@@ -705,6 +705,41 @@ def test_find_never_freezes_the_librarys_top():
     # what `finding` is: LibraryView's Find, open from the glass until Cancel (test_ios_library_look holds both)
     library = (APP / "Library" / "LibraryView.swift").read_text(encoding="utf-8")
     assert "LibraryTop(finding: finding, findLabel: findPrompt(shownPage), openFind: { openFind() }," in library
+
+
+def test_the_greys_read_on_black():
+    # 26 Nov, James: "legibility isn't great with some of this purple and grey on black" - and, asked, "Lift the greys
+    # only". The new look's greys for words all passed WCAG's 4.5:1 on the phone's black (t3 6.6, the tab bar's 6.2), but
+    # read faint at its small sizes, so each is lifted to at least 8.5:1 - every one at or above where t2, the brightest,
+    # was - keeping its tint and the order t2, label, t3, then the tab bar's unchosen tabs. The purple is as it was. The
+    # canvas copy (ios/design/dw.css) says the same, and the Mac, on the same palette, lifts with it.
+    def wcag(hex_value: str) -> float:
+        def channel(c: int) -> float:
+            v = c / 255
+            return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+        r, g, b = (int(hex_value[i:i + 2], 16) for i in (0, 2, 4))
+        return (0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b) + 0.05) / 0.05
+
+    source = (APP / "Look" / "DWPalette.swift").read_text(encoding="utf-8")
+
+    def dw(name: str) -> str:
+        found = re.search(rf"static let {name} = hex\(0x([0-9a-f]{{6}})\)", source)
+        assert found, name
+        return found.group(1)
+
+    assert dw("page") == "000000"
+    greys = {name: dw(name) for name in ("t2", "label", "t3", "tabItemText")}
+    assert greys == {"t2": "bcbccf", "label": "b0b0c4", "t3": "a8a8bc", "tabItemText": "a6a6b8"}
+    ratios = {name: wcag(value) for name, value in greys.items()}
+    assert all(ratio >= 8.5 for ratio in ratios.values()), ratios
+    assert ratios["t2"] > ratios["label"] > ratios["t3"] > ratios["tabItemText"], ratios
+    assert all(value[0:2] == value[2:4] and int(value[4:6], 16) > int(value[0:2], 16) for value in greys.values())
+    css = (REPO / "ios" / "design" / "dw.css").read_text(encoding="utf-8")
+    for name in ("t2", "t3", "label"):
+        assert f"  --{name}: #{greys[name]};\n" in css, name
+    assert _phone_look().css(".tabbar > a", "color") == "#" + greys["tabItemText"]
+    # the purple left as drawn
+    assert dw("acc") == "c084fc" and "  --acc: #c084fc;\n" in css
 
 
 def test_the_tab_bar_comes_down_into_the_home_indicators_room():

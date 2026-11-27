@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A tab bar's item, and Now Playing's bottom row's (dw.css's .tabbar > a - the redesign, slice R1b, notes/ios.md "The
 /// redesign, slice R1b: the shared look, and the phone's pieces"): its icon over its words, 49 tall at least, the
-/// accent's while shown, #8a8a9c otherwise - and lit, the lit line over it on the bar's top edge. The icons are the
+/// accent's while shown, #a6a6b8 otherwise - and lit, the lit line over it on the bar's top edge. The icons are the
 /// caller's, the app's own (filled SF Symbols and the squared Library stack - the build plan's section 8), 24 at least.
 /// The bar is R4's, drawn nowhere until then; the row is R3's, Now Playing's.
 ///

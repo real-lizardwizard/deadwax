@@ -162,7 +162,7 @@ struct MainTabs: View {
 /// The app's tab bar (the squared look; since the redesign's slice R4 dw.css's `.dw.ph .tabbar` - notes/ios.md "The
 /// redesign, slice R4: the player bar, the mini player and the tab bar"): the tabs side by side, each its symbol (24)
 /// over its words (11) - the one shown in the accent with the lit line over it, 24 x 2 and square, on the bar's top
-/// edge; the others #8a8a9c - (R1c, notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") on the
+/// edge; the others #a6a6b8 - (R1c, notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") on the
 /// page's black, full width, flush to the bottom edge (its fill runs under the home indicator), a #1c1b22 hairline
 /// along the top, the tabs 6 under it. A tap is AppNavigation's select: another tab shown,
 /// or the tab shown back at its root and then its top.

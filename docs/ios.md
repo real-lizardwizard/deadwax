@@ -7485,17 +7485,23 @@ them in 612.
   has changed: the buttons glossy and raised, the chips tinted, the segmented controls in their wells - say if
   anything looks different.
 
-### Find in the Library, fixed (615)
+### Find in the Library, fixed, and the greys lifted (615-616)
 
 The Library's magnifying glass froze the app on 26 Nov's builds: Find's field and keyboard set off the code that keeps
 the Library's top clear of the Dynamic Island, and the app stopped answering. Now the top stays exactly where it is
-while Find is open.
+while Find is open. And the grey words were faint on the black at the app's small sizes, so every grey is brighter now;
+the purple is as it was.
 
 - **615 Find.** **Not done yet.** On the phone, from a fresh start: tap the magnifying glass - the field comes up under
   the top with the keyboard, and the app keeps answering. Type a few letters (the page narrows), switch pages, then
   **Cancel**. Then the magnifying glass, the page switch and the ••• each work again, and the top hasn't moved at any
   point. With Find open, You > Debug's Library top line ends its reasons with "kept, Find open"; after Cancel it says
   "nothing presented" again. On Ethan's phone too, or "not done yet".
+- **616 The greys.** **Not done yet.** Every grey word is brighter - a page's quiet line, a row's second line, the
+  headings' small words, the tab bar's other tabs, a field's prompt - and still a step down from white, the brightest
+  greys above the dimmer ones as before. Say where a grey still reads faint, and whether any now looks too close to
+  white. The purple and white words, the hairlines and the buttons are as they were. On the Mac, the same greys lift
+  (the sidebar's small headings and search prompt, a list's column headings, the status bar).
 
 ## What it can't do yet
 

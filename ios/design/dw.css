@@ -8,9 +8,9 @@
   --rowline: #17161e;
   --text: #fff;
   --head: #e4e4ec;
-  --t2: #a3a3b8;
-  --t3: #8e8ea3;
-  --label: #9d9db2;
+  --t2: #bcbccf;
+  --t3: #a8a8bc;
+  --label: #b0b0c4;
   --acc: #c084fc;
   --acct: #d8b4fe;
   --selt: #e9d5ff;
@@ -232,7 +232,7 @@
 .dw.ph .mini { height: 60px; background: #1c1b22; }
 .dw.ph .mini .cover { width: 59px; height: 59px; }
 .dw.ph .tabbar { height: 83px; gap: 0; padding: 6px 0 0; background: #121117; border-top: 1px solid #2c2a36; box-shadow: none; }
-.dw.ph .tabbar > a { height: 49px; flex-direction: column; gap: 3px; border: 0; border-radius: 0; background: none; box-shadow: none; color: #8a8a9c; font-size: 11px; font-weight: 500; }
+.dw.ph .tabbar > a { height: 49px; flex-direction: column; gap: 3px; border: 0; border-radius: 0; background: none; box-shadow: none; color: #a6a6b8; font-size: 11px; font-weight: 500; }
 .dw.ph .tabbar > a.on { background: none; color: var(--acc); }
 .dw.ph .tabbar > a.on::before { top: -7px; width: 24px; height: 2px; margin-left: -12px; border-radius: 0 0 2px 2px; }
 .dw.ph .tabbar svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
