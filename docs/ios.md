@@ -7521,13 +7521,15 @@ slice.
   plays**, the Engine log with **Copy** and **Share**, Downloads, Your library, Library, and how long this install
   runs. Every measurement (times, counts, sizes, the clock of what plays, the log's lines) is in the typewriter face,
   on its label's line; the words stay in the app's face. Check, the test songs, **Record 20 s**, Copy, Share and both
-  switches work as before, and Muffle still goes off when you leave the page. On the Mac (Settings > Debug), each
+  switches work as before, and Muffle still goes off when you leave the page. At the larger text sizes two buttons that
+  don't fit side by side (the recording's two, or Download all and Remove the downloads) sit one over the other, each
+  across the page. On the Mac (Settings > Debug), each
   section is a box with its name set into its top edge, each label right-aligned at the left: say if anything reads
   cramped.
 - **646 An artist's sheets.** **Not done yet.** From an artist's •••: **Artist images**, **Move albums to …** and
   **Which artist is this?** are each black with no grey rows. Each search field is a dark sunken box, its edge purple
   while you type. In Artist images, **Use another picture** opens the grid, the chosen picture has a square purple
-  outline, **Replace pictures that are already there** is a switch, and **Save** is the purple button. In Move albums,
+  outline, **Replace pictures that are already there** is a switch (on the Mac a checkbox), and **Save** is the purple button. In Move albums,
   where every album goes is still shown first, **Move N albums** is the purple button under it, and nothing moves until
   you tap it. On the Mac the same, in boxes.
 - **647 Release's pages.** **Not done yet.** Edit album > Release, then each page it opens. **Choose a release** is a

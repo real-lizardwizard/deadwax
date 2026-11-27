@@ -911,22 +911,43 @@ struct HoldoutLine: View {
 }
 
 /// (R20) A row of buttons in a group: DWButtonStyle's small - flat accent words on the phone, the Mac's faced buttons -
-/// side by side, and on the phone at the accessibility sizes one over another, each the row's width. A button that is
-/// another kind (the red) says so itself.
+/// side by side, and on the phone one over another, each the row's width, at the accessibility sizes and wherever side
+/// by side they don't fit (R20's review: Debug's "Save the recording (1.2 MB)" and "Record 20 s again" are 368 at xLarge
+/// on a 375 phone's 343) - RequestCards' ButtonPair's rule. Stacked, 12 apart, so no button's 44 reaches over the next's
+/// face. A button that is another kind (the red) says so itself.
 struct HoldoutButtons<Content: View>: View {
     @ViewBuilder let content: Content
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        let stacked = !Platform.mac && typeSize.isAccessibilitySize
-        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
-            : AnyLayout(HStackLayout(spacing: Platform.mac ? HoldoutLook.macButtonGap : HoldoutLook.buttonGap))
-        layout {
-            content
+        Group {
+            if Platform.mac {
+                side
+            } else if typeSize.isAccessibilitySize {
+                stack
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    side
+                    stack
+                }
+            }
         }
-        .buttonStyle(DWButtonStyle(size: .small, fills: stacked))
         .frame(maxWidth: .infinity, alignment: .leading)
         .holdoutRow()
+    }
+
+    private var side: some View {
+        HStack(spacing: Platform.mac ? HoldoutLook.macButtonGap : HoldoutLook.buttonGap) {
+            content
+        }
+        .buttonStyle(DWButtonStyle(size: .small))
+    }
+
+    private var stack: some View {
+        VStack(alignment: .leading, spacing: HoldoutLook.buttonGap) {
+            content
+        }
+        .buttonStyle(DWButtonStyle(size: .small, fills: true))
     }
 }
 
@@ -1033,7 +1054,8 @@ struct HoldoutUnavailable: View {
 
 /// (R20) A field you type in, on the look's well on either device: on the phone DWWellField (its focus the page's own);
 /// on the Mac `.in` - the plain field in the field's type on DWWell, 24 tall, the accent's edge while it has the cursor
-/// (DWWellField draws nothing on the Mac: the page's own field, which a List boxed until now).
+/// (DWWellField draws nothing on the Mac: the page's own field, which a List boxed until now) - and (R20's review) a
+/// click on the well's room either side of the words puts the cursor in it, as DWField's does.
 struct HoldoutField<Field: Hashable>: ViewModifier {
     let focus: FocusState<Field?>.Binding
     let field: Field
@@ -1050,6 +1072,10 @@ struct HoldoutField<Field: Hashable>: ViewModifier {
                 .lookHeight(DWLook.here.fieldHeight)
                 .background {
                     DWWell(focused: focus.wrappedValue == field)
+                        .contentShape(DWTarget(face: DWCorners.buttonShape))
+                        .onTapGesture {
+                            focus.wrappedValue = field
+                        }
                 }
         } else {
             content

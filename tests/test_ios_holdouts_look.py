@@ -145,7 +145,26 @@ def test_the_macs_groups_are_the_macs():
             ".padding(.horizontal, HoldoutLook.macLegendSide) .frame(height: HoldoutLook.macLegendHeight) "
             ".background(DWPalette.bg) .offset(x: HoldoutLook.macLegendIn, y: HoldoutLook.macLegendUp) "
             ".accessibilityAddTraits(.isHeader)") in mac
+    # (R20's review) and the box whole is MacGroupBox's own, its names put back - a fill, an edge or a padding added to
+    # either fails: a shared file can't name MacGroupBox, so the two are held together here
+    box = mac[mac.index("{ ") + 2:mac.index(" if let note")]
+    for name, value in (("HoldoutLook.macGroup", "EdgeInsets(top: 14, leading: 12, bottom: 12, trailing: 12)"),
+                        ("Typeface.Look.text(.chip)", "Typeface.Mac.text(.label)"),
+                        ("HoldoutLook.macLegendSide", "6"), ("HoldoutLook.macLegendHeight", "16"),
+                        ("DWPalette.bg", "ground"), ("HoldoutLook.macLegendIn", "10"), ("HoldoutLook.macLegendUp", "-8")):
+        box = box.replace(name, value)
+    box = re.sub(r"\{ if let legend \{ (.*?) \} \}", r"{ \1 }", box)
+    macs = flat(bare(body(bare((APP / "Mac" / "Components" / "MacGroupBox.swift").read_text(encoding="utf-8")),
+                          "var body: some View {")))
+    assert f"var body: some View {{ {box} }}" == macs, (box, macs)
+    # the page: a scroll of the groups 24 apart, padded as Settings' page, on --bg
+    page = flat(bare(body(bare(source(DEBUG)), "struct HoldoutPage<Content: View>: View {")))
+    mac_page, _ = phone_look.halves(page, "if Platform.mac {")
+    assert mac_page == (" ScrollView { VStack(alignment: .leading, spacing: HoldoutLook.macGroupGap) { content } "
+                        ".padding(HoldoutLook.macPage) .frame(maxWidth: .infinity, alignment: .leading) } "
+                        ".background(DWPalette.bg) "), mac_page
     look = source(DEBUG)
+    assert "static let macPage = EdgeInsets(top: 28, leading: 22, bottom: 22, trailing: 22)" in look
     for said in ("static let macGroup = EdgeInsets(top: 14, leading: 12, bottom: 12, trailing: 12)",
                  "static let macLegendSide: CGFloat = 6", "static let macLegendHeight: CGFloat = 16",
                  "static let macLegendIn: CGFloat = 10", "static let macLegendUp: CGFloat = -8",
@@ -253,6 +272,9 @@ def test_every_place_you_type_is_on_the_looks_well():
     assert phone == " content .modifier(DWWellField(focus: focus, field: field)) ", phone
     assert ".textFieldStyle(.plain)" in mac and "DWWell(focused: focus.wrappedValue == field)" in mac
     assert ".lookHeight(DWLook.here.fieldHeight)" in mac and ".font(Typeface.Look.text(.field))" in mac
+    # (R20's review) a click on the well's room beside the words puts the cursor in it, as DWField's does
+    assert (".background { DWWell(focused: focus.wrappedValue == field) .contentShape(DWTarget(face: "
+            "DWCorners.buttonShape)) .onTapGesture { focus.wrappedValue = field } }") in mac
     # each field its own focus, which the well reads
     for name in (IMAGES, MOVE):
         code = flat(bare(source(name)))
@@ -262,22 +284,39 @@ def test_every_place_you_type_is_on_the_looks_well():
 
 def test_buttons_rows_and_voiceover():
     debug = bare(source(DEBUG))
-    # a button's words take three lines at the accessibility sizes; stacked buttons fill the width
+    # a button's words take three lines at the accessibility sizes; stacked buttons fill the width - (R20's review) on
+    # the phone side by side only while they fit (ButtonPair's rule: Debug's recording pair is 368 at xLarge, on a 375
+    # phone's 343), always stacked at the accessibility sizes, 12 apart so no 44 reaches over the next button's face;
+    # the Mac's side by side
     assert ".lineLimit(typeSize.isAccessibilitySize ? 3 : 1)" in body(debug, "struct HoldoutWords: View {")
     buttons = flat(body(debug, "struct HoldoutButtons<Content: View>: View {"))
-    assert "let stacked = !Platform.mac && typeSize.isAccessibilitySize" in buttons
-    assert ".buttonStyle(DWButtonStyle(size: .small, fills: stacked))" in buttons
+    assert buttons == (
+        "struct HoldoutButtons<Content: View>: View { @ViewBuilder let content: Content "
+        "@Environment(\\.dynamicTypeSize) private var typeSize var body: some View { Group { if Platform.mac { side } "
+        "else if typeSize.isAccessibilitySize { stack } else { ViewThatFits(in: .horizontal) { side stack } } } "
+        ".frame(maxWidth: .infinity, alignment: .leading) .holdoutRow() } private var side: some View { "
+        "HStack(spacing: Platform.mac ? HoldoutLook.macButtonGap : HoldoutLook.buttonGap) { content } "
+        ".buttonStyle(DWButtonStyle(size: .small)) } private var stack: some View { VStack(alignment: .leading, "
+        "spacing: HoldoutLook.buttonGap) { content } .buttonStyle(DWButtonStyle(size: .small, fills: true)) } }"), buttons
+    assert "static let buttonGap: CGFloat = 12" in source(DEBUG)
+    widths = _load("ios_fonts")
+    small = 13.5 * 15 / 13  # .btn.sm at xLarge (the footnote's 13 to 15)
+    pair = sum(widths.words(said, small, "medium") + 2 * 6 for said in ("Save the recording (1.2 MB)", "Record 20 s again"))
+    assert pair + 12 > 375 - 2 * 16, "the case the fit is for"
     # every button R20 drew is the look's (flat on the phone, its target 44 by 44 - DWFlatButtonBody's) or a row
     for name in (DEBUG, IMAGES, MOVE):
         code = bare(source(name))
         styles = re.findall(r"\.buttonStyle\(([^\n]*?)\)\n", code)
         assert set(styles) <= {"DWButtonStyle(size: .small)", "DWButtonStyle()", ".plain",
                                "DWButtonStyle(kind: .danger, size: .small)", "DWButtonStyle(kind: .pri, size: .small)",
-                               "DWButtonStyle(size: .small, fills: stacked)"}, (name, styles)
-    # a fact, a control's row and the out-of-reach page are one element each; a match row is its button
-    for piece in ("struct HoldoutFact: View {", "struct HoldoutControlRow<Control: View>: View {",
-                  "struct HoldoutUnavailable: View {"):
-        assert ".accessibilityElement(children: .combine)" in body(debug, piece), piece
+                               "DWButtonStyle(size: .small, fills: true)"}, (name, styles)
+    # a fact, a control's row and the out-of-reach page are one element each - (R20's review) on each device: a fact
+    # and a control's row end their Mac half and their phone half in it; a match row is its button
+    for piece in ("struct HoldoutFact: View {", "struct HoldoutControlRow<Control: View>: View {"):
+        mac, phone = phone_look.halves(flat(body(debug, piece)), "if Platform.mac {")
+        for half in (mac, phone):
+            assert half.endswith(" .accessibilityElement(children: .combine) "), (piece, half)
+    assert ".accessibilityElement(children: .combine)" in body(debug, "struct HoldoutUnavailable: View {")
     match = flat(body(bare(source(IMAGES)), "struct ArtistMatchRow: View {"))
     assert ".buttonStyle(.plain) .accessibilityElement(children: .combine)" in match
     # the Mac's switch is the checkbox, the phone's Settings' own

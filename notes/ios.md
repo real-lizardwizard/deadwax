@@ -20451,6 +20451,35 @@ Each of these mutations was applied, failed a test, and was put back:
 
 No Mac smoke run: James's app was running.
 
+**After review** (one review, read from the diff - nothing run on a device). Behaviour held: Debug's `.task` check and
+its `.onDisappear` (Muffle off, the record engine stopped), every line in order, the 26 readouts; Move albums under its
+plan, gated by `canMove`, one call to `move()` (there was never a dialog - the preview is the confirmation, rightly
+read); Save and Replace cover only on their old conditions; Choose a release's tap only `pick` and the pop; Changes and
+Compare covers drawing what they drew. HoldoutGroup's Mac half is MacGroupBox's body name for name (redrawn because a
+shared file can't name App/Mac), App/Look and App/Phone untouched. Judged sound: ArtistWhoSheet flattened with the
+others (it shares ArtistMatchRow, whose row now draws its own hairline - left in a List it would have doubled); the
+Mac's field on DWWell (the drawing's `.in`, as DWField draws it there); the full cover's Close as DWButtonStyle. Fixed:
+- **HoldoutButtons drew past the page on the phone** above the default size and below the accessibility sizes: side
+  by side always, each button one line at its full width. Debug's recording pair ("Save the recording (1.2 MB)" and
+  "Record 20 s again") is 368 at xLarge and 456 at xxxLarge against a 375 phone's 343; Download all and Remove the
+  downloads 373 at xxLarge (ios_fonts, the small button's 13.5 scaled with the footnote). Now side by side only while
+  they fit (ViewThatFits, RequestCards' ButtonPair's rule), else stacked across the row - and always at the
+  accessibility sizes - 12 apart where the stack had 0, so a 32-tall flat button's 44 never reaches over the next
+  one's face.
+- **HoldoutField's Mac well took no click** beside the words (8 either side): it does now, as DWField's.
+- **The tests held two things by substring that a mutation got past**: a fill added to the Mac's group box passed, and
+  so did the phone's fact losing its one VoiceOver element (the Mac half's `.combine` satisfied the file-wide check).
+  test_ios_holdouts_look now compares HoldoutGroup's Mac box to MacGroupBox's own body with the names put back, and
+  HoldoutPage's Mac half, HoldoutButtons and each half's `.combine` whole; both mutations fail now, as do "always side
+  by side" and the Mac page on the panel's ground.
+- docs 645 says the stacking; 646 says the Mac's Replace is a checkbox.
+
+Left, for James or a later slice: Debug's song row is still two VoiceOver elements (the row's play, the download
+glyph), as it was in the Form, not one with the download as a named action, and its play target is its two lines
+(about 36), not the row's 42; every group's poller now runs while Debug is open, where the Form built only the rows
+near the screen (cheap, admin-only, the scene-phase guard kept); the Mac's legends are one line with no `.help`, as
+MacGroupBox's are.
+
 ## The redesign, slice R7: Search, Get and Sources (2026-11-25)
 
 The plan is ~/Desktop/Code/deadwax-plans/mac-redesign-build.md 3.4, "R7 - Search, Get and Sources", and the drawings
