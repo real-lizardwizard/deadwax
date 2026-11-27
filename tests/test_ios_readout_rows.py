@@ -131,6 +131,14 @@ ALONE = [
     ("Shared/SheetLook.swift",
      "static var mono: Font { Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small) }",
      "the folder's path and the address unreached, each a line of its own in a VStack"),
+    # (27 Nov) Now Playing's readout between the scrubber's times: TimesAndReadout (a Layout of its own) sets its foot
+    # on the slider's, whose last row is the times' - one line each in the one face and size, so one baseline; or a
+    # line of its own under them. tests/test_ios_now_playing_look.py holds each part
+    ("Player/ScrubberView.swift",
+     "readout\n                .font(Typeface.readout(.caption))\n                .foregroundStyle(DWPalette.t3)",
+     "the readout on the times' line, its foot on theirs in their face and size - or a line of its own under them"),
+    ("Player/ScrubberView.swift", "        .font(Typeface.readout(.caption))\n        .fixedSize()\n        .hidden()",
+     "the times at their widest, measured for the readout's fit and never seen"),
 ]
 
 

@@ -19783,7 +19783,8 @@ opens Now Playing, and no file under App/Mac or of the Mac's frame changed. The 
   between the looks, so the turntable's byline went purple and its title took the tracking - and the turntable keeps
   no diff, mac-redesign-build.md 3.6). `titles` and `byline` are 31cab12d's, byte for byte in code (a digest pins them),
   and the turntable alone calls them, centred: the byline quiet, no tracking, nothing beside them.
-- **The readout** beside the title (`.col.mono.xs.q3`): "3 of 11" over "FLAC 16/44.1", Core's BarDisplay's -
+- **The readout** beside the title (`.col.mono.xs.q3`) - **moved between the scrubber's times on 27 Nov, see "Now
+  Playing's readout under the scrubber (27 Nov)"; what follows is how R4b built it**: "3 of 11" over "FLAC 16/44.1", Core's BarDisplay's -
   `BarDisplay.place(queue).map(BarDisplay.Words.place)` and `queue.current.flatMap(BarDisplay.format)`, the Mac bar's
   words - never counted in the view. In Courier Prime at the phone's xs (Typeface.Phone.mono(.extraSmall), 12 relative
   to caption), the third colour, right-aligned, 4 between the lines; on the title's first baseline, 10 from it
@@ -19893,6 +19894,135 @@ way:
   own material face behind it); no jump as it appears (its word is measured as it comes, under the opacity's fade in);
   at AX5 no bigger than at xxxLarge. The Large Content Viewers on Close, the look button and the •••.
 - The Mac: built for Mac Catalyst; Now Playing is never opened there; not looked at.
+
+
+## Now Playing's readout under the scrubber (27 Nov)
+
+James, of R4b's readout beside the title: "where it says '2 of 13 flac' etc. in the play screen needs to be arranged
+better. It's kinda not in the way of the song title but it kinda is, it looks bad". App Design redrew it
+(deadwax-plans/iphone-redesign.md "Changed 27 Nov: Now Playing's readout moves under the scrubber", on
+iNowPlaying.dc.html); shown the new placement, he said "Send it". The phone alone. The app is still 0.13 (13),
+`__version__` untouched; the engine files, the turntable (App/Player/Turntable) and App/Mac have no diff.
+
+### What was built (ios/App/Player/NowPlayingView.swift, ScrubberView.swift; Core's TimesReadout.swift)
+
+- **The title's row is the title's alone**: coverTitles is the failure's line over coverNames (the title, "Artist —
+  Album"), the column's whole width at every size. R4b's switch between HStackLayout on the title's baseline and
+  VStackLayout at the accessibility sizes went, with `readoutGap` and NowPlayingReadout's `under`.
+- **The readout is one line between the scrubber's times**: "0:51", "3 of 11 · FLAC 16/44.1", "-2:50". Its words are
+  Core's `BarDisplay.readout` - the Mac player bar's own: the place and the format joined with DiscHeadings.dot (" · "),
+  either alone with no dot, nil with neither - where R4b drew the place and the format as two Texts. NowPlayingReadout
+  is still the one place Now Playing reads `player.queue`: `Text(readout)`, one element to VoiceOver saying
+  `BarDisplay.readoutSpoken` ("3 of 11, FLAC, 16-bit, 44.1 kHz"), as before, and no face of its own.
+- **ScrubberView draws it and never knows the queue**: `ScrubberView<Readout: View>(visible:readout:)`, Now Playing
+  passing `NowPlayingReadout()` on both faces (after review - below). The readout is drawn in the times' face and size -
+  `Typeface.readout(.caption)`, ScrubberClocks' very font - in `DWPalette.t3` where the times are `t2` (the drawing's
+  `.q3` inside `.q`), centred (`.multilineTextAlignment(.center)`). Generic, its sizes are computed statics now
+  (`private static var barHeight: CGFloat { 12 }`): a generic type keeps no stored statics, which the first build said
+  of all six; each is read as `Self.` as before.
+- **TimesAndReadout**, a Layout: the slider - the VStack of the bar and ScrubberClocks with its accessibility element,
+  exactly as it was - at the row's top, the row's whole width, so the times stay at the bar's two ends; the readout
+  centred on the row (its middle), its foot on the slider's foot (one line of the times' face: the same baseline); and
+  WidestTimes, the times at their widest for the song (`TimesReadout.widest`: the time played at the song's end, the
+  time left at its start, at the longer of the song's two lengths), in the times' face, hidden and heard by no one. Its
+  parts are found by a LayoutValueKey (TimesPartKey), never by position: Now Playing's readout is no view at all with
+  nothing to say.
+- **The fold, measured**: the readout goes between while `readout + 2 * (time + clear) <= width`
+  (`TimesReadout.fitsBetween`), the readout measured on one line (its ideal size) and the wider time at its widest,
+  `clear` 10 (the title row's gap, where it stood). Else it goes on a line of its own 4 under the times (its two lines'
+  old gap), centred, offered the row's width so it wraps where it must. Asked its ideal size - no width proposed (a
+  `.fixedSize()`, a ViewThatFits, an ImageRenderer) - the readout goes between on one line and the row is as wide as
+  the three need (`TimesReadout.oneLine`). Nothing in the scrubber, the readout or its row reads a text size. Worked out with Courier Prime's real widths (tests/ios_fonts.py): the drawn "3 of 11 · FLAC
+  16/44.1" with a 3:41 song is between the times through xxLarge and under them from xxxLarge, on a 375 and a 393 alike;
+  a library shuffle's "1,612 of 2,100 · FLAC 24/176.4" is under from xLarge; at accessibility1 a lone "MP3", "3 of 11"
+  or "FLAC 24/192" still fits between.
+- **VoiceOver**: the layout adds no element and hides nothing. The slider's element is the VStack's, as it was; the
+  readout is its sibling in the layout - laid on the clocks' line, inside the slider's frame but not among its children
+  (which `.accessibilityElement(children: .ignore)` would swallow) - and is read after it. Its words are unchanged.
+
+### Choices made here, and why
+
+- **Centred on the row, not in the gap the times leave**: the drawing's two `.grow`s centre it between the times' inner
+  edges, half a figure off the row's middle whenever the two times differ in figures - about 3.6 pt at the default
+  size, and the time left nearly always has one more, its "-". On the row's middle it stands over Play and never moves
+  as a clock gains or loses one. Check 655 says so.
+- **Decided once a song**: the fit is measured against the times at their widest for the song, so the readout never
+  jumps between its two places mid-song as "-10:00" becomes "-9:59" - and (after review) at the longer of the song's
+  two lengths, `max(listed, playing)` (`TimesReadout.widest(listed:playing:)`): `player.duration` is Navidrome's whole
+  seconds until the engine's first tick swaps in the decoded length, and a song whose two straddle a figure (600 and
+  599.98) would have changed line half a second in.
+- **On both faces (after review)**: Now Playing passes the readout on the turntable too, where the whole scrubber is
+  unseen, untouchable and unheard (`.opacity(0)`, `.allowsHitTesting(false)`, `.accessibilityHidden(true)`), so the
+  two faces' scrubber rows are one height at every size and nothing jumps at the swap (check 3). The first build passed
+  it on the cover alone: where it folds - xxxLarge, a standard size; a long shuffle's from xLarge - the cover's row was
+  a line taller than the turntable's, and the room above being the column's one flexible child, the titles and all
+  above them moved about 23 pt at each swap, Lyrics on or off. **The cost**: at the fold sizes alone, the turntable's
+  room - its plinth - is a line shorter, and its time line sits centred in the taller row. The turntable's own files
+  keep no diff (mac-redesign-build.md 3.6), and the design leaves its own readout out of this.
+- **In ScrubberView's row rather than under it in Now Playing**: the fold's line is part of the scrubber's row, so it
+  is laid out once, with the times it is measured against, and the row keeps its height under a sheet.
+
+### What the Mac gets
+
+Nothing. The Mac's frame (DesktopFrame - MacFrame.drawsDesktop) never opens Now Playing, and ScrubberView is drawn only
+there; the Mac's player bar keeps its own readout (BarDisplay.readout in PlayerBar.swift, beside BarScrubber), the words
+this one now shares, unchanged. No file under App/Mac changed. The phone is portrait only (Info.plist's one
+orientation), so Now Playing has no landscape or compact form; the turntable is its one other face, kept as it was.
+
+### The tests
+
+tests/test_ios_now_playing_look.py (27), read from the source: the title's row exact, nothing beside it at any size,
+`readoutGap` gone, the readout drawn once, passed into ScrubberView in the scrubber's row; both faces' rows passed the
+same readout, reading nothing of the face, the scrubber hidden whole on the turntable (after review); the
+readout's whole view exact (BarDisplay.readout, its one element and words), nothing counted, joined or dotted in Now
+Playing, the queue read in its view alone and nowhere in the scrubber; Core's join exact (DiscHeadings.dot, either
+alone) and VoiceOver's words exact; the scrubber's body - the slider, then the readout in the times' face and t3, then
+the widest times - and its init; the colours (the times t2, the readout t3, one each); TimesAndReadout's whole code
+exact and Core's rule exact, no text size read anywhere in the scrubber, the readout or its row; the fit worked out on a
+375, a 390 and a 393 with real widths; with no width proposed, one line between and the row as wide as the three
+(after review); the widest times at the song's longer length (after review); VoiceOver - the slider's element as it
+was, the readout outside it, the layout adding none; no face on the layout or the widest times; nothing of it in App/Mac, ScrubberView nowhere else, the Mac
+bar's readout as it was. Core: TimesReadoutTests (10) - the join, the place alone, the format alone, neither, VoiceOver's
+words, the times at their widest (and no clock ever wider, every second of a song), no length at all and the decoded
+length coming in (after review), the row on one line, the rule at its edge and a worked fold. tests/test_ios_readout_rows.py, which follows every readout in the app to what lays it out, can't read a Layout of
+the app's own: its ALONE list says the two here, with why - the readout's foot set on the slider's, whose last row is
+the times' (the look test pins the clocks as that row, nothing under them), and the widest times, never seen.
+
+### Mutations, each made, seen failing and put back
+
+- The readout back beside the title (an HStack on the first baseline round coverNames and NowPlayingReadout, in
+  coverTitles): the title's row test.
+- The readout taken out of the scrubber's row (ScrubberView's closure empty): the title's row test and the both faces'
+  test.
+- The times' colour on the readout (`DWPalette.t2` on the readout's slot): the colours test and the scrubber's body.
+- " · " lost when both are present - in Core (`parts.joined(separator: " ")` in BarDisplay.readout): the join's source
+  test, and in swift-testing TimesReadoutTests.bothJoinWithADot and BarDisplayTests.theReadoutJoinsThePlaceAndTheFormat;
+  and joined in the view instead of Core's (`[place, format]...joined(separator: " ")`): the readout's exact test.
+- A text-size threshold in place of measuring (`clear: typeSize.isAccessibilitySize ? .infinity : ...`, reading
+  `\.dynamicTypeSize`): the fold test and the scrubber's body.
+- The measuring dropped (`let words = CGFloat(0)` in `measured`): the fold test (the layout exact) and the ideal-size
+  test.
+- (after review) The readout passed on the cover alone again (`if !turntable { NowPlayingReadout() }`): the title's row
+  test and the both faces' test. No width proposed judged against the slider's ideal width again (the `guard
+  proposal.width != nil` dropped): the ideal-size test and the fold test; or placed by it (`proposal.width == nil ||`
+  dropped): those two and the centring test. The widest times on the length playing alone
+  (`TimesReadout.widest(length: length)`): the song's length test and the scrubber's body. Core's song length the
+  shorter of the two (`.min()`): the song's length test, and in swift-testing
+  TimesReadoutTests.theDecodedLengthComingInNeverShrinksTheWidestTimes.
+
+### Not verified - only a phone can say (check 655)
+
+- Anything on a screen: no Simulator, phone or Mac run.
+- The readout's foot on the times' foot - one line in the same face, so the same baseline by construction, never seen.
+- How it reads between the times at the default size on the 375-pt phone (at 12 pt the readout is 158 of the row's
+  327, about 48 clear of "-2:50"), and whether t3 against the times' t2 reads as quieter rather than lost over a bright
+  cover's wash.
+- The fold from xxxLarge: the readout's own line 4 under the times, the row a line taller - the row and everything
+  above it (the bar, its times, the titles) rising by that line, the room above them that line shorter, the transport
+  and everything under it where they were; its wrapping at the largest accessibility sizes, centred.
+- VoiceOver's order: the slider, then the readout (the readout's frame inside the slider's).
+- A swap to the turntable at the fold sizes moving nothing, the turntable's room a line shorter there and its time
+  line centred in the taller row.
 
 
 ## The redesign, slice R6: an artist (2026-11-25)

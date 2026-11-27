@@ -45,12 +45,12 @@ import SwiftUI
 /// the phone alone, the Mac's frame never opens Now Playing): the top is the compact top (PhoneTop, `.topbar`) - Close
 /// at its left, the look button named at its right (NamedLookButton: Turntable, or Cover on the turntable) and the •••,
 /// each the accent's words or glyph with no face, at the top's own 12 from the screen's edges; the cover 24 either side;
-/// the title (22, bold, its letters drawn closer) over "Artist — Album" in the accent, a link to the album; beside them
-/// the readout, "3 of 11" over "FLAC 16/44.1" in Courier Prime - Core's BarDisplay's, as the Mac's bar says them
-/// (NowPlayingReadout) - on the title's baseline, under them at the accessibility sizes; the scrubber sunken
-/// (ScrubberView). The transport, the bottom row, Lyrics in the cover's place, the turntable (its titles too) and every
-/// gesture are as they were. The phone stays flat (R1c): only the cover, the scrubber's track, the speed chip and the notice keep a
-/// face here, each as it was.
+/// the title (22, bold, its letters drawn closer) over "Artist — Album" in the accent, a link to the album, the row the
+/// title's alone (27 Nov); the scrubber sunken (ScrubberView), and between its two times the readout, "3 of 11 · FLAC
+/// 16/44.1" in their Courier Prime - Core's BarDisplay's, as the Mac's bar says it (NowPlayingReadout) - or on a line of
+/// its own under them where the three don't fit. The transport, the bottom row, Lyrics in the cover's place, the
+/// turntable (its titles too) and every gesture are as they were. The phone stays flat (R1c): only the cover, the
+/// scrubber's track, the speed chip and the notice keep a face here, each as it was.
 struct NowPlayingView: View {
     @Environment(PlayerModel.self) private var player
     @Environment(AppNavigation.self) private var navigation
@@ -80,9 +80,8 @@ struct NowPlayingView: View {
 
     /// The cover's scale while paused (--pl-paused-scale).
     private static let pausedScale: CGFloat = 0.82
-    /// (R4b) The title's letters drawn closer, and between the title's two lines and the readout beside them.
+    /// (R4b) The title's letters drawn closer.
     private static let titleTracking: CGFloat = -0.3     // drawn: iNowPlaying's title letter-spacing
-    private static let readoutGap: CGFloat = 10          // drawn: iNowPlaying's title row gap
 
     init() {}
 
@@ -213,7 +212,8 @@ struct NowPlayingView: View {
             // the titles crossfade between the looks (leading on the cover, centred on the turntable) - a fade, not a
             // slide; in a ZStack, so the two share their place through it
             ZStack {
-                // (R4b) the cover's titles and the readout (coverTitles); the turntable's exactly as they were (titles)
+                // (R4b) the cover's titles, their row the title's alone since 27 Nov (coverTitles); the turntable's
+                // exactly as they were (titles)
                 if turntable {
                     titles(track, centred: true)
                         .transition(.opacity)
@@ -233,13 +233,19 @@ struct NowPlayingView: View {
             }
             .padding(.bottom, 12)
 
-            // the scrubber's row either way: the scrubber on the cover, the time line centred in it on the turntable,
-            // so the swap moves no row (2.1) - and hidden there or under a sheet, no frames drawn for it (review, 15 Nov)
+            // the scrubber's row either way, the readout in it on both faces: the scrubber on the cover, hidden on the
+            // turntable with the time line centred in it, so the swap moves no row (2.1) at any size - and hidden there
+            // or under a sheet, no frames drawn for it (review, 15 Nov)
             ZStack {
-                ScrubberView(visible: !turntable && !sheetOver)
-                    .opacity(turntable ? 0 : 1)
-                    .allowsHitTesting(!turntable)
-                    .accessibilityHidden(turntable)
+                ScrubberView(visible: !turntable && !sheetOver) {
+                    // (27 Nov, after review) the readout between its times, passed on the turntable too - unseen and
+                    // unheard there with the scrubber, so where it folds under the times both faces' rows are a line
+                    // taller and nothing jumps at the swap; the plinth's room is that line shorter, at those sizes alone
+                    NowPlayingReadout()
+                }
+                .opacity(turntable ? 0 : 1)
+                .allowsHitTesting(!turntable)
+                .accessibilityHidden(turntable)
                 if turntable {
                     TurntableTimeLine()
                         .transition(.opacity)
@@ -292,10 +298,9 @@ struct NowPlayingView: View {
         .frame(maxWidth: .infinity, alignment: centred ? .center : .leading)
     }
 
-    /// (R4b) The cover's titles: the failure's line above the title, in the flow; the title and "Artist — Album"; and the
-    /// readout beside them (iNowPlaying's title row) - on the title's first baseline, its words in the readout's face -
-    /// and under them at the accessibility sizes, where beside them it would leave the title too little room
-    /// (tests/test_ios_now_playing_look.py works it out).
+    /// (R4b) The cover's titles: the failure's line above the title, in the flow; the title and "Artist — Album". (27 Nov)
+    /// The title's row is the title's alone, at the column's whole width: the readout that stood beside it is between
+    /// the scrubber's times now (NowPlayingReadout, in ScrubberView).
     private func coverTitles(_ track: QueueTrack) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             if let error = player.errorLine, !error.isEmpty {
@@ -304,13 +309,7 @@ struct NowPlayingView: View {
                     .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            let under = dynamicTypeSize.isAccessibilitySize
-            let layout = under ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
-                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Self.readoutGap))
-            layout {
-                coverNames(track)
-                NowPlayingReadout(under: under)
-            }
+            coverNames(track)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -721,33 +720,23 @@ private struct NamedLookButton: View {
     }
 }
 
-/// (R4b) The readout beside the title (iNowPlaying's `.mono.xs.q3`): the song's place in what was queued, "3 of 11", over
-/// its format, "FLAC 16/44.1" - each Core's BarDisplay's, as the Mac's player bar says them, never counted here: a song
-/// added with Play Next has no place, a song naming no format no format, and with neither there is no readout. In
-/// Courier Prime (the drawing sets it mono), the third colour, each line whole beside the title - or, under it at the
-/// accessibility sizes (`under`), as many lines as it needs. One element for VoiceOver: "3 of 11, FLAC, 16-bit, 44.1
-/// kHz". A view of its own, so the place and the format are worked out here alone, never in Now Playing's body - which
-/// reads `player.current` (the queue's index and entries) as it always has, so it is drawn again as the song changes
-/// either way.
+/// (R4b; under the scrubber since 27 Nov - notes/ios.md "Now Playing's readout under the scrubber (27 Nov)") The
+/// readout between the scrubber's times (iNowPlaying's `.q3`): the song's place in what was queued and its format, joined
+/// - "3 of 11 · FLAC 16/44.1" - Core's BarDisplay.readout, the Mac player bar's own words, never counted here: a song
+/// added with Play Next has no place, a song naming no format no format, either alone without the dot, and with neither
+/// there is no readout. ScrubberView draws it in the times' face, the third colour, centred, and decides its line. One
+/// element for VoiceOver, as before: "3 of 11, FLAC, 16-bit, 44.1 kHz". A view of its own, so the queue is read here
+/// alone, never in Now Playing's body - which reads `player.current` (the queue's index and entries) as it always has,
+/// so it is drawn again as the song changes either way.
 private struct NowPlayingReadout: View {
-    let under: Bool
     @Environment(PlayerModel.self) private var player
 
     var body: some View {
         let queue = player.queue
-        let place = BarDisplay.place(queue).map(BarDisplay.Words.place)
-        let format = queue.current.flatMap(BarDisplay.format)
-        if place != nil || format != nil {
-            VStack(alignment: under ? .leading : .trailing, spacing: 4) {
-                if let place { Text(place) }
-                if let format { Text(format) }
-            }
-            .font(Typeface.Phone.mono(.extraSmall))
-            .foregroundStyle(DWPalette.t3)
-            .lineLimit(under ? nil : 1)
-            .fixedSize(horizontal: !under, vertical: true)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(BarDisplay.readoutSpoken(queue) ?? "")
+        if let readout = BarDisplay.readout(queue) {
+            Text(readout)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(BarDisplay.readoutSpoken(queue) ?? "")
         }
     }
 }

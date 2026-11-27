@@ -24,12 +24,22 @@ import SwiftUI
 /// its 1 pt line, the shade along its top, square - and the part played is the meter's grey fill inside the line. Its
 /// 12 and 16 points are James's (the drawing's 8 is the download meter's), its target, its drag, its timelines and its
 /// VoiceOver as they were; the clocks under it in Courier Prime, in the second colour (`.mono.xs.q`).
-struct ScrubberView: View {
+///
+/// The readout between the times (27 Nov - notes/ios.md "Now Playing's readout under the scrubber (27 Nov)";
+/// iNowPlaying's `.f.mono.xs.q`, its `.q3` between the times): what Now Playing passes in - "3 of 11 · FLAC 16/44.1" -
+/// drawn on the times' line, centred, in their face and size and the third colour; where it doesn't clear them (the
+/// largest text sizes, a long readout), on a line of its own under them, centred - measured (TimesAndReadout). The
+/// times stay at the bar's two ends, where they were. Passed in, so the scrubber never knows the queue; its own element
+/// to VoiceOver, beside the slider's, never inside it.
+struct ScrubberView<Readout: View>: View {
     @Environment(PlayerModel.self) private var player
     /// The scrubber can be seen: on the cover, with no sheet over Now Playing. The turntable keeps its row (hidden, the
     /// time line in its place) and Up Next's, Info's, the EQ's and the playlist picker's sheets cover it - and no
     /// frame is drawn for a bar no one sees (review, 15 Nov).
     let visible: Bool
+    /// (27 Nov) What goes between the times: Now Playing's readout - on both faces, unseen with the scrubber on the
+    /// turntable, so the two faces' rows are one height (after review).
+    let readout: Readout
     /// The finger on the bar (one: a phone's bar takes one touch).
     @State private var drag: Scrub.Drag?
     /// True while the drag gesture is live - SwiftUI puts it back to false however the gesture ends, so a drag still
@@ -39,64 +49,91 @@ struct ScrubberView: View {
     /// it) stays dropped until the finger is lifted.
     @State private var pressed = false
 
-    /// The bar's own height, and the tap target's around it.
-    private static let barHeight: CGFloat = 12
-    private static let heldHeight: CGFloat = 16
-    private static let target: CGFloat = 44
+    /// The bar's own height, and the tap target's around it. (27 Nov) Computed, every size here: a generic view keeps
+    /// no stored statics.
+    private static var barHeight: CGFloat { 12 }
+    private static var heldHeight: CGFloat { 16 }
+    private static var target: CGFloat { 44 }
     /// (R4b) The track's line, which the fill sits inside (`.meter`'s border, `.meter > i` inside it).
-    private static let edge: CGFloat = 1
+    private static var edge: CGFloat { 1 }
+    /// (27 Nov) The least room between the readout and either time (the title row's gap, where it was), and between the
+    /// times and the readout's own line (its two lines' gap, beside the title).
+    private static var readoutClear: CGFloat { 10 }  // drawn: iNowPlaying's `.f` gap, the title row's
+    private static var readoutUnder: CGFloat { 4 }   // drawn: iNowPlaying's `.col` gap, the readout's two lines'
+
+    init(visible: Bool, @ViewBuilder readout: () -> Readout) {
+        self.visible = visible
+        self.readout = readout()
+    }
 
     var body: some View {
         let track = player.current?.track.id ?? ""
         let length = player.duration
+        // (after review) the song's listed length, Navidrome's: the widest times are taken at the longer of the two,
+        // so the decoded one coming in at the first tick never shrinks them (TimesReadout.widest(listed:playing:))
+        let listed = player.current?.track.duration
         let held = Scrub.dragFor(drag, track: track)
         // VoiceOver's value and its swipes: the ticker's, never the frames'
         let shown = Scrub.shownTime(held, position: player.shownPosition, length: length)
         // no frames hidden or covered (the turntable's look, a sheet over Now Playing), paused, loading or under the
         // finger - and none once Now Playing has closed, the view gone with it
         let runs = visible && player.barsRun && held == nil
-        VStack(spacing: 6) {
-            GeometryReader { (bar: GeometryProxy) in
-                let width = bar.size.width
-                ZStack(alignment: .leading) {
-                    // (R4b) the sunken track, DWMeter's: the well with the shade along its top, inside its line
-                    DWCorners.meterShape
-                        .fill(DWPalette.well.shadow(.inner(color: DWPalette.meterShade, radius: 1, x: 0, y: 1)))
-                        .overlay { DWCorners.meterShape.strokeBorder(DWPalette.line, lineWidth: Self.edge) }
-                    TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
-                        (_: TimelineViewDefaultContext) in
-                        // the part played, the meter's grey, inside the track's line as `.meter > i` is
-                        DWCorners.meterFillShape.fill(DWPalette.meterFill)
-                            .frame(width: max(0, width - 2 * Self.edge) * Self.part(drawn(held, length: length), length: length))
+        // (27 Nov) the slider - the bar and its two times, as they were - and beside it in the layout the readout,
+        // between the times or under them, and the times at their widest for the song, measured unseen
+        TimesAndReadout(clear: Self.readoutClear, under: Self.readoutUnder) {
+            VStack(spacing: 6) {
+                GeometryReader { (bar: GeometryProxy) in
+                    let width = bar.size.width
+                    ZStack(alignment: .leading) {
+                        // (R4b) the sunken track, DWMeter's: the well with the shade along its top, inside its line
+                        DWCorners.meterShape
+                            .fill(DWPalette.well.shadow(.inner(color: DWPalette.meterShade, radius: 1, x: 0, y: 1)))
+                            .overlay { DWCorners.meterShape.strokeBorder(DWPalette.line, lineWidth: Self.edge) }
+                        TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
+                            (_: TimelineViewDefaultContext) in
+                            // the part played, the meter's grey, inside the track's line as `.meter > i` is
+                            DWCorners.meterFillShape.fill(DWPalette.meterFill)
+                                .frame(width: max(0, width - 2 * Self.edge)
+                                    * Self.part(drawn(held, length: length), length: length))
+                        }
+                        .padding(Self.edge)
                     }
-                    .padding(Self.edge)
+                    .frame(height: drag == nil ? Self.barHeight : Self.heldHeight)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .animation(.easeOut(duration: 0.15), value: drag == nil)
+                    .gesture(press(track: track, width: width, length: length))
                 }
-                .frame(height: drag == nil ? Self.barHeight : Self.heldHeight)
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .animation(.easeOut(duration: 0.15), value: drag == nil)
-                .gesture(press(track: track, width: width, length: length))
+                .frame(height: Self.target)
+                TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
+                    (_: TimelineViewDefaultContext) in
+                    let time = drawn(held, length: length)
+                    ScrubberClocks(elapsed: PlayerWords.elapsed(shown: time),
+                                   remaining: PlayerWords.remaining(shown: time, length: length))
+                        .equatable()
+                }
             }
-            .frame(height: Self.target)
-            TimelineView(.animation(minimumInterval: PlayClock.frame, paused: !runs)) {
-                (_: TimelineViewDefaultContext) in
-                let time = drawn(held, length: length)
-                ScrubberClocks(elapsed: PlayerWords.elapsed(shown: time),
-                               remaining: PlayerWords.remaining(shown: time, length: length))
-                    .equatable()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(PlayerWords.scrubberName)
+            .accessibilityValue(PlayerWords.scrubberValue(shown: shown, length: length))
+            .accessibilityAdjustableAction { direction in
+                let increment: Bool
+                switch direction {
+                case .increment: increment = true
+                case .decrement: increment = false
+                @unknown default: return
+                }
+                if let target = Scrub.adjusted(increment: increment, from: shown, length: length) { player.seek(to: target) }
             }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(PlayerWords.scrubberName)
-        .accessibilityValue(PlayerWords.scrubberValue(shown: shown, length: length))
-        .accessibilityAdjustableAction { direction in
-            let increment: Bool
-            switch direction {
-            case .increment: increment = true
-            case .decrement: increment = false
-            @unknown default: return
-            }
-            if let target = Scrub.adjusted(increment: increment, from: shown, length: length) { player.seek(to: target) }
+            .layoutValue(key: TimesPartKey.self, value: .scrubber)
+            // (27 Nov) in the times' face and size, in the third colour (theirs is the second)
+            readout
+                .font(Typeface.readout(.caption))
+                .foregroundStyle(DWPalette.t3)
+                .multilineTextAlignment(.center)
+                .layoutValue(key: TimesPartKey.self, value: .readout)
+            WidestTimes(words: TimesReadout.widest(listed: listed, playing: length))
+                .layoutValue(key: TimesPartKey.self, value: .widest)
         }
         .onChange(of: track) { _, now in drag = Scrub.dragFor(drag, track: now) }
         .onChange(of: touching) { _, live in
@@ -158,6 +195,103 @@ private struct ScrubberClocks: View, Equatable {
         }
         .font(Typeface.readout(.caption))
         .foregroundStyle(DWPalette.t2)
+        .accessibilityHidden(true)
+    }
+}
+
+/// (27 Nov) Which of TimesAndReadout's views a view is: the slider (the bar and its two times), the readout, or the
+/// times at their widest. A view not marked is the readout: what Now Playing passes in, whatever it is made of.
+private enum TimesPart {
+    case scrubber, readout, widest
+}
+
+private struct TimesPartKey: LayoutValueKey {
+    static let defaultValue = TimesPart.readout
+}
+
+/// (27 Nov - notes/ios.md "Now Playing's readout under the scrubber (27 Nov)") The slider as it was, its two times at
+/// the bar's two ends, and the readout centred on the row, on the times' line - or, where it doesn't clear the wider
+/// time on both sides by `clear` (TimesReadout.fitsBetween: the largest text sizes, a long readout), on a line of its
+/// own `under` them, centred, its words wrapping as they need. Decided by measuring what is drawn - the readout's words
+/// on one line, the times at their widest for the song (WidestTimes, in the times' face) - never by a text size; and
+/// once for the song, so it never jumps as a clock loses a figure. Nothing to say, nothing under the times: the row is
+/// the slider's alone. (after review) Asked its ideal size - no width proposed: a fixedSize, a ViewThatFits, an
+/// ImageRenderer - the three go on one line, the row as wide as they need (TimesReadout.oneLine), never the readout
+/// judged against the slider's own ideal width and wrapped to it.
+private struct TimesAndReadout: Layout {
+    let clear: CGFloat
+    let under: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let scrubber = part(.scrubber, of: subviews) else { return .zero }
+        let slider = scrubber.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        guard let readout = part(.readout, of: subviews) else { return slider }
+        guard proposal.width != nil else {
+            // no width proposed: the readout on one line between the times, the row as wide as the three need
+            return CGSize(width: max(slider.width, CGFloat(oneLine(subviews))), height: slider.height)
+        }
+        if between(slider.width, subviews) { return slider }
+        let own = readout.sizeThatFits(ProposedViewSize(width: slider.width, height: nil))
+        return CGSize(width: slider.width, height: slider.height + under + own.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard let scrubber = part(.scrubber, of: subviews) else { return }
+        let slider = scrubber.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
+        scrubber.place(at: bounds.origin, anchor: .topLeading,
+                       proposal: ProposedViewSize(width: bounds.width, height: slider.height))
+        // placed, never seen or heard
+        part(.widest, of: subviews)?.place(at: bounds.origin, anchor: .topLeading, proposal: .unspecified)
+        guard let readout = part(.readout, of: subviews) else { return }
+        if proposal.width == nil || between(bounds.width, subviews) {
+            // one line on the times' line: their face and size, so its foot is theirs
+            readout.place(at: CGPoint(x: bounds.midX, y: bounds.minY + slider.height), anchor: .bottom,
+                          proposal: .unspecified)
+        } else {
+            readout.place(at: CGPoint(x: bounds.midX, y: bounds.minY + slider.height + under), anchor: .top,
+                          proposal: ProposedViewSize(width: bounds.width, height: nil))
+        }
+    }
+
+    /// The readout goes between the times in a row `width` wide: its words on one line, and the wider time at its
+    /// widest, measured as they are drawn.
+    private func between(_ width: CGFloat, _ subviews: Subviews) -> Bool {
+        let (words, time) = measured(subviews)
+        return TimesReadout.fitsBetween(readout: words, time: time, width: Double(width), clear: Double(clear))
+    }
+
+    /// The row the readout and the two times need on one line.
+    private func oneLine(_ subviews: Subviews) -> Double {
+        let (words, time) = measured(subviews)
+        return TimesReadout.oneLine(readout: words, time: time, clear: Double(clear))
+    }
+
+    /// The readout's words on one line, and the wider time at its widest, as they are drawn (none, none to draw).
+    private func measured(_ subviews: Subviews) -> (words: Double, time: Double) {
+        let words = part(.readout, of: subviews)?.sizeThatFits(.unspecified).width ?? 0
+        let time = part(.widest, of: subviews)?.sizeThatFits(.unspecified).width ?? 0
+        return (Double(words), Double(time))
+    }
+
+    private func part(_ which: TimesPart, of subviews: Subviews) -> LayoutSubview? {
+        subviews.first { (subview: LayoutSubview) -> Bool in subview[TimesPartKey.self] == which }
+    }
+}
+
+/// (27 Nov) The two times at their widest for the song (TimesReadout.widest), in the times' own face - what the readout
+/// must clear at either end, the wider setting the width - drawn unseen, heard by no one.
+private struct WidestTimes: View {
+    let words: [String]
+
+    var body: some View {
+        ZStack {
+            ForEach(words.indices, id: \.self) { (index: Int) in
+                Text(words[index])
+            }
+        }
+        .font(Typeface.readout(.caption))
+        .fixedSize()
+        .hidden()
         .accessibilityHidden(true)
     }
 }

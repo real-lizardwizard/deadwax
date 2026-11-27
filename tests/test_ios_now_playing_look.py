@@ -4,11 +4,12 @@ face on the phone, as iNowPlaying.dc.html draws it - the model the whole flat ph
 
 The top is the compact top (PhoneTop, `.topbar`): Close where the chevron was (the drag down still closes), the look
 button named (Turntable, Cover on the turntable) and the •••, each the accent's words or glyph with no face. The cover
-is 24 either side. The title, with "Artist — Album" in the accent, and beside it the readout - "3 of 11" over "FLAC
-16/44.1" in Courier Prime, Core's BarDisplay's, never counted in the view - on the title's baseline, under it at the
-accessibility sizes. The scrubber is sunken (a sunken track keeps its face on the flat phone), its times in Courier
-Prime under it, its drag, its VoiceOver and its seek as they were. The transport, the bottom row, Lyrics in the cover's
-place (James's answer 2: the bottom row's Lyrics turns them on and off) and the turntable are as they were.
+is 24 either side. The title, with "Artist — Album" in the accent, its row its own (27 Nov: notes/ios.md "Now Playing's
+readout under the scrubber (27 Nov)"). The scrubber is sunken (a sunken track keeps its face on the flat phone), its
+times in Courier Prime under it, its drag, its VoiceOver and its seek as they were - and between the times the readout,
+"3 of 11 · FLAC 16/44.1" in their face, Core's BarDisplay's, never counted in the view; where the three don't fit, on
+a line of its own under them, measured. The transport, the bottom row, Lyrics in the cover's place (James's answer 2:
+the bottom row's Lyrics turns them on and off) and the turntable are as they were.
 
 The Mac has nothing of it: its frame never opens Now Playing (tests/test_ios_mac.py holds its cover-only look).
 
@@ -72,8 +73,8 @@ def flat(text: str) -> str:
 
 
 #? Dynamic Type at each size, Apple's tables (the HIG's "Specifications"): footnote (the small button's 13.5 scales
-#? with it), caption (the readout's 12, `.dw.ph .xs`) and title2 (the title's 22). PhoneTop is capped at xxxLarge;
-#? the readout and the title grow on, so their table runs on to the first accessibility size.
+#? with it), caption (the times' and the readout's 12, `.dw.ph .xs`) and title2 (the title's 22). PhoneTop is capped
+#? at xxxLarge; the times, the readout and the title grow on, so their table runs on to the first accessibility size.
 FOOTNOTE = {"xSmall": 12, "small": 12, "medium": 12, "large": 13, "xLarge": 15, "xxLarge": 17, "xxxLarge": 19}
 CAPTION = {"xSmall": 11, "small": 11, "medium": 11, "large": 12, "xLarge": 13, "xxLarge": 15, "xxxLarge": 17,
            "accessibility1": 20}
@@ -391,83 +392,317 @@ def test_the_turntables_titles_are_as_they_were():
 def test_the_readout_is_bar_displays_and_nothing_is_counted_in_the_view():
     now = bare(NOW_PLAYING)
     readout = flat(member(now, "struct NowPlayingReadout: View"))
-    # the whole view, exactly: BarDisplay's place and format, each line drawn as BarDisplay says it (`Text(place)`,
-    # `Text(format)`), one element saying BarDisplay's spoken readout - nothing else to count with
-    assert readout == ("{ let under: Bool @Environment(PlayerModel.self) private var player var body: some View { "
-                       "let queue = player.queue let place = BarDisplay.place(queue).map(BarDisplay.Words.place) "
-                       "let format = queue.current.flatMap(BarDisplay.format) if place != nil || format != nil { "
-                       "VStack(alignment: under ? .leading : .trailing, spacing: 4) { if let place { Text(place) } "
-                       "if let format { Text(format) } } .font(Typeface.Phone.mono(.extraSmall)) "
-                       ".foregroundStyle(DWPalette.t3) .lineLimit(under ? nil : 1) .fixedSize(horizontal: !under, "
-                       "vertical: true) .accessibilityElement(children: .ignore) "
+    # the whole view, exactly: BarDisplay's readout - the place and the format joined in Core - drawn as Core says it
+    # (`Text(readout)`), one element saying BarDisplay's spoken readout, as before; nothing else to count with, and no
+    # face of its own (ScrubberView draws it in the times' face)
+    assert readout == ("{ @Environment(PlayerModel.self) private var player var body: some View { "
+                       "let queue = player.queue if let readout = BarDisplay.readout(queue) { Text(readout) "
+                       ".accessibilityElement(children: .ignore) "
                        '.accessibilityLabel(BarDisplay.readoutSpoken(queue) ?? "") } } }'), readout
     # nothing counted, numbered or formatted anywhere in Now Playing: no index, no count, no grouping, no " of "
     source = code(NOW_PLAYING)
     for counted in (r"\.count\b", r"\+ 1\b", r"\bqueue\.(index|tracks|upNext)\b", r"\bUpNextWords\.grouped\b",
-                    r'" of "', r"\bplayer\.(index|tracks)\b", r"\bbitDepth\b", r"\bsampleRate\b", r"\bsuffix\b"):
+                    r'" of "', r'" · "', r"\bDiscHeadings\b", r"\bjoined\(", r"\bplayer\.(index|tracks)\b",
+                    r"\bbitDepth\b", r"\bsampleRate\b", r"\bsuffix\b"):
         assert not re.search(counted, source), counted
-    # the place and the format are worked out in the readout's own view alone (Now Playing's body reads
-    # `player.current` as it always has, so it is drawn again as the song changes either way)
+    # the queue is read in the readout's own view alone (Now Playing's body reads `player.current` as it always has,
+    # so it is drawn again as the song changes either way) - and the scrubber never knows the queue
     assert len(re.findall(r"\bplayer\.queue\b", now)) == 1 and "player.queue" in readout
-    # Core's words: "3 of 11", "FLAC 16/44.1"
+    assert not re.search(r"\bqueue\b|\bBarDisplay\b", bare(SCRUBBER))
+
+
+def test_the_readout_joins_the_place_and_the_format_with_a_dot_either_alone():
+    """Core's BarDisplay.readout, the Mac player bar's own words (tests/test_ios_bar_look.py): "3 of 11 · FLAC 16/44.1"
+    - the place and the format joined with " · " when both are known, either alone with no dot, nil with neither (the
+    swift tests, TimesReadoutTests and BarDisplayTests, hold each case)."""
     words = code(CORE / "BarDisplay.swift")
+    readout = flat(member(words, "public static func readout"))
+    assert readout == ("{ let parts = [place(queue).map(Words.place), queue.current.flatMap(format)].compactMap { $0 } "
+                       "return parts.isEmpty ? nil : parts.joined(separator: DiscHeadings.dot) }"), readout
+    assert 'public static let dot = " · "' in code(CORE / "DiscTitles.swift")
     assert '"\\(UpNextWords.grouped(place.number)) of \\(UpNextWords.grouped(place.of))"' in words
     assert 'return "\\(format) \\(bits)/\\(rate)"' in words
+    # VoiceOver's words, unchanged: "3 of 11, FLAC, 16-bit, 44.1 kHz"
+    spoken = flat(member(words, "public static func readoutSpoken"))
+    assert spoken == ("{ let parts = [place(queue).map(Words.place), queue.current.flatMap(formatSpoken)].compactMap "
+                      '{ $0 } return parts.isEmpty ? nil : parts.joined(separator: ", ") }'), spoken
+    tests = (IOS / "DeadwaxKit" / "Tests" / "DeadwaxCoreTests" / "TimesReadoutTests.swift").read_text(encoding="utf-8")
+    for case in ('#expect(BarDisplay.readout(album(format: true)) == "3 of 11 · FLAC 16/44.1")',
+                 '#expect(BarDisplay.readout(queue) == "3 of 11")', '#expect(BarDisplay.readout(queue) == "MP3")',
+                 "#expect(BarDisplay.readout(queue) == nil)",
+                 '#expect(BarDisplay.readoutSpoken(album(format: true)) == "3 of 11, FLAC, 16-bit, 44.1 kHz")'):
+        assert case in tests, case
 
 
-def test_the_readout_is_drawn_mono_xs_q3_beside_the_title_on_its_baseline():
+def test_the_titles_row_is_the_titles_alone():
+    """27 Nov (James: "It's kinda not in the way of the song title but it kinda is, it looks bad"): the song and, under
+    it, "Artist — Album" at the column's whole width, nothing beside them at any size - the readout is between the
+    scrubber's times."""
     now = bare(NOW_PLAYING)
-    readout = flat(member(now, "struct NowPlayingReadout: View"))
-    # `.col.mono.xs.q3`, `align-items: flex-end; gap: 4px`: Courier Prime at the phone's xs, the third colour
-    assert "VStack(alignment: under ? .leading : .trailing, spacing: 4)" in readout
-    assert ".font(Typeface.Phone.mono(.extraSmall)) .foregroundStyle(DWPalette.t3)" in readout
-    typeface = (APP / "Shared" / "Typeface.swift").read_text(encoding="utf-8")
-    assert re.search(r"case \.extraSmall: return \((\d+), \.caption\)\s*// dw\.ph: \.xs font-size", typeface)
-    assert px(css(".xs", "font-size")) == 12
-    # on the title's first baseline (a readout beside words), 10 from it (`.f` gap 10); under it at the accessibility
-    # sizes; never on the turntable, whose titles are centred over the record with nothing beside them
     titles = flat(member(now, "func coverTitles"))
     assert titles == ("{ VStack(alignment: .leading, spacing: 4) { if let error = player.errorLine, !error.isEmpty { "
                       "Text(error) .font(Typeface.footnote) .foregroundStyle(DWPalette.t2) .fixedSize(horizontal: false, "
-                      "vertical: true) } let under = dynamicTypeSize.isAccessibilitySize let layout = under ? "
-                      "AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(alignment: "
-                      ".firstTextBaseline, spacing: Self.readoutGap)) layout { coverNames(track) "
-                      "NowPlayingReadout(under: under) } } .frame(maxWidth: .infinity, alignment: .leading) }"), titles
-    assert "NowPlayingReadout" not in member(now, "func titles")
-    assert one(code(NOW_PLAYING), r"private static let readoutGap: CGFloat = (\d+)") == 10
-    # beside the title each line is whole (fixed), the title giving way with its ellipsis; under it, as many lines
-    assert ".lineLimit(under ? nil : 1) .fixedSize(horizontal: !under, vertical: true)" in readout
+                      "vertical: true) } coverNames(track) } .frame(maxWidth: .infinity, alignment: .leading) }"), titles
     assert ".frame(maxWidth: .infinity, alignment: .leading)" in member(now, "func coverNames")
+    for gone in ("NowPlayingReadout", "Layout", "firstTextBaseline", "isAccessibilitySize", "readoutGap"):
+        assert gone not in titles and gone not in member(now, "func coverNames"), gone
+    assert "readoutGap" not in now
+    # the readout drawn once: in the scrubber's row, passed into ScrubberView (on both faces - the next test) - the
+    # turntable's titles have nothing beside them either
+    assert len(re.findall(r"\bNowPlayingReadout\(", now)) == 1
+    content = flat(member(now, "func content"))
+    assert ("ZStack { ScrubberView(visible: !turntable && !sheetOver) { NowPlayingReadout() } "
+            ".opacity(turntable ? 0 : 1) .allowsHitTesting(!turntable) .accessibilityHidden(turntable) if turntable { "
+            "TurntableTimeLine() .transition(.opacity) } }") in content
+    assert "NowPlayingReadout" not in member(now, "func titles")
+
+
+def test_both_faces_scrubber_rows_pass_the_same_readout():
+    """(27 Nov, after review) Nothing jumps at the swap (check 3): one ScrubberView is both faces' row, and it is passed
+    the readout on both - on the turntable unseen and unheard with the hidden scrubber - so where the readout folds
+    under the times (xxxLarge, a long shuffle's from xLarge) both faces' rows are that line taller and the titles and
+    everything above them stay where they were. Passed on the cover alone, the cover's row was a line taller than the
+    turntable's and the titles moved about 23 pt at every swap. The cost, at those sizes alone: the plinth's room is a
+    line shorter."""
+    now = bare(NOW_PLAYING)
+    assert len(re.findall(r"\bScrubberView\(", now)) == 1
+    content = flat(member(now, "func content"))
+    row = content[content.index("ZStack { ScrubberView("):content.index("transport .padding(.top, 12)")]
+    # what is passed reads nothing of the face: the same readout either way
+    opened = row.index("ScrubberView(visible: !turntable && !sheetOver) {") + len("ScrubberView(visible: "
+                                                                                    "!turntable && !sheetOver) ")
+    passed = row[opened:reader.closing(row, opened) + 1]
+    assert passed == "{ NowPlayingReadout() }", passed
+    assert "turntable" not in passed and "turntable" not in member(now, "struct NowPlayingReadout: View")
+    # on the turntable the whole scrubber - its readout with it - is unseen, untouchable and unheard, the time line
+    # in its row
+    assert (".opacity(turntable ? 0 : 1) .allowsHitTesting(!turntable) .accessibilityHidden(turntable) "
+            "if turntable { TurntableTimeLine() .transition(.opacity) } }") in row
+    assert "maxHeight" not in row
+
+
+#? (27 Nov) the scrubber's body: the slider - its bar and its two times, its VoiceOver as it was - then the readout in
+#? the times' face and the third colour, then the times at their widest, each marked for TimesAndReadout
+SCRUBBER_PARTS = (".accessibilityAdjustableAction { direction in", ".layoutValue(key: TimesPartKey.self, value: .scrubber) "
+                  "readout .font(Typeface.readout(.caption)) .foregroundStyle(DWPalette.t3) "
+                  ".multilineTextAlignment(.center) .layoutValue(key: TimesPartKey.self, value: .readout) "
+                  "WidestTimes(words: TimesReadout.widest(listed: listed, playing: length)) "
+                  ".layoutValue(key: TimesPartKey.self, value: .widest) } .onChange(of: track)")
+
+
+def scrubber_body() -> str:
+    return member(member(bare(SCRUBBER), "struct ScrubberView<Readout: View>: View"), "var body: some View")
+
+
+def test_the_readout_is_one_line_centred_between_the_times():
+    """The drawing's `.f.mono.xs.q`: "0:51", the readout, "-2:50" - the times where they were, at the bar's two ends
+    (ScrubberClocks, exact, below), and the readout centred on their row, on their line, one line."""
+    scrubber = bare(SCRUBBER)
+    body = flat(scrubber_body())
+    assert body.count("TimesAndReadout(clear: Self.readoutClear, under: Self.readoutUnder) { VStack(spacing: 6) {") == 1
+    assert SCRUBBER_PARTS[1] in body, body
+    assert body.index(SCRUBBER_PARTS[0]) < body.index(SCRUBBER_PARTS[1])
+    # passed in, never made here: Now Playing's readout comes through the init, so the scrubber never knows the queue
+    view = flat(member(scrubber, "struct ScrubberView<Readout: View>: View"))
+    assert "let readout: Readout" in view
+    assert ("init(visible: Bool, @ViewBuilder readout: () -> Readout) { self.visible = visible self.readout = readout() }"
+            in view)
+    assert re.findall(r"(?<![.\w])readout\b", body) == ["readout"], body
+    # on the times' line: one line (its own ideal size), centred on the row, its foot the times' foot - the times'
+    # face and size, so its baseline is theirs
+    layout = flat(member(scrubber, "struct TimesAndReadout: Layout"))
+    assert ("if proposal.width == nil || between(bounds.width, subviews) { readout.place(at: CGPoint(x: bounds.midX, "
+            "y: bounds.minY + slider.height), anchor: .bottom, proposal: .unspecified) }") in layout
+    # the slider's foot is the times' foot: the clocks its last row, nothing under them (test_ios_readout_rows says so)
+    assert ("ScrubberClocks(elapsed: PlayerWords.elapsed(shown: time), remaining: PlayerWords.remaining(shown: time, "
+            "length: length)) .equatable() } } .accessibilityElement(children: .ignore)") in body
+    # the slider placed whole at the row's top, as wide as the row: the times at its two ends, as before
+    assert ("scrubber.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, "
+            "height: slider.height))") in layout
+    for raw, value in (("readoutClear", 10), ("readoutUnder", 4)):
+        assert one(code(SCRUBBER), rf"private static var {raw}: CGFloat \{{ (\d+) \}}") == value
     assert ".monospacedDigit()" not in code(NOW_PLAYING) and ".monospacedDigit()" not in code(SCRUBBER)
 
 
-def test_beside_the_title_the_readout_leaves_it_room_through_xxxlarge_and_goes_under_past_it():
-    """Worked out on a 375 pt phone, whose column is 327: the widest readout a library's shuffle says ("1,612 of 2,100"
-    - wider than any format, "FLAC 24/176.4") leaves the title at least half the column, and the drawing's title ("One
-    Wing", 22 and bold, its letters drawn closer) whole, at every standard size - and at the first accessibility size
-    neither, so the readout goes under the title there (`dynamicTypeSize.isAccessibilitySize`)."""
-    column = NARROW - 48
-    gap = 10
-    widest = ("1,612 of 2,100", "FLAC 24/176.4", "FLAC 16/44.1", "3 of 11")
+def test_the_readout_is_quieter_than_the_times_in_their_face():
+    """The times in the second colour (`.q`), the readout in the third (`.q3`), both Courier Prime at the phone's xs:
+    the very font the times are drawn in."""
+    scrubber = bare(SCRUBBER)
+    clocks = flat(member(scrubber, "struct ScrubberClocks: View, Equatable"))
+    assert ".font(Typeface.readout(.caption)) .foregroundStyle(DWPalette.t2)" in clocks
+    body = flat(scrubber_body())
+    assert "readout .font(Typeface.readout(.caption)) .foregroundStyle(DWPalette.t3) " in body
+    # one colour each: the readout's never the times', and nothing in Now Playing colours it over the scrubber's
+    assert body.count(".foregroundStyle(") == 1 and "DWPalette.t2" not in body
+    assert ".foregroundStyle(" not in member(bare(NOW_PLAYING), "struct NowPlayingReadout: View")
+    assert "DWPalette.t3" not in clocks
+    # and the times at their widest are measured in that same face
+    widest = flat(member(scrubber, "struct WidestTimes: View"))
+    assert widest == ("{ let words: [String] var body: some View { ZStack { ForEach(words.indices, id: \\.self) { "
+                      "(index: Int) in Text(words[index]) } } .font(Typeface.readout(.caption)) .fixedSize() .hidden() "
+                      ".accessibilityHidden(true) } }"), widest
+    typeface = (APP / "Shared" / "Typeface.swift").read_text(encoding="utf-8")
+    assert re.search(r"case \.caption: size = 12", typeface) and px(css(".xs", "font-size")) == 12
+    palette = code(APP / "Look" / "DWPalette.swift")
+    assert re.search(r"static let t2 = hex\(0x\w+\)", palette) and re.search(r"static let t3 = hex\(0x\w+\)", palette)
 
-    def room(size: str) -> float:
-        return column - gap - max(fonts.readout(words, CAPTION[size]) for words in widest)
 
-    def title(size: str) -> float:
-        return fonts.words("One Wing", TITLE2[size], "bold") - 0.3 * (len("One Wing") - 1)
+def test_where_the_three_dont_fit_the_readout_takes_a_line_of_its_own_measured():
+    """Decided by measuring what is drawn - the readout's words on one line, the times at their widest for the song in
+    their own face - against the row (TimesReadout.fitsBetween), never by a text size; under the times, centred, its
+    words wrapping as they need. Once for the song, so it never jumps as a clock loses a figure."""
+    scrubber = bare(SCRUBBER)
+    layout = flat(member(scrubber, "struct TimesAndReadout: Layout"))
+    assert layout == (
+        "{ let clear: CGFloat let under: CGFloat func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, "
+        "cache: inout ()) -> CGSize { guard let scrubber = part(.scrubber, of: subviews) else { return .zero } "
+        "let slider = scrubber.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil)) "
+        "guard let readout = part(.readout, of: subviews) else { return slider } "
+        "guard proposal.width != nil else { return CGSize(width: max(slider.width, CGFloat(oneLine(subviews))), "
+        "height: slider.height) } if between(slider.width, subviews) { return slider } "
+        "let own = readout.sizeThatFits(ProposedViewSize(width: slider.width, height: nil)) "
+        "return CGSize(width: slider.width, height: slider.height + under + own.height) } "
+        "func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) { "
+        "guard let scrubber = part(.scrubber, of: subviews) else { return } "
+        "let slider = scrubber.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil)) "
+        "scrubber.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, "
+        "height: slider.height)) part(.widest, of: subviews)?.place(at: bounds.origin, anchor: .topLeading, "
+        "proposal: .unspecified) guard let readout = part(.readout, of: subviews) else { return } "
+        "if proposal.width == nil || between(bounds.width, subviews) { readout.place(at: CGPoint(x: bounds.midX, "
+        "y: bounds.minY + slider.height), anchor: .bottom, proposal: .unspecified) } else { readout.place(at: "
+        "CGPoint(x: bounds.midX, y: bounds.minY + slider.height + under), anchor: .top, proposal: "
+        "ProposedViewSize(width: bounds.width, height: nil)) } } "
+        "private func between(_ width: CGFloat, _ subviews: Subviews) -> Bool { let (words, time) = "
+        "measured(subviews) return TimesReadout.fitsBetween(readout: words, time: time, width: Double(width), "
+        "clear: Double(clear)) } private func oneLine(_ subviews: Subviews) -> Double { let (words, time) = "
+        "measured(subviews) return TimesReadout.oneLine(readout: words, time: time, clear: Double(clear)) } "
+        "private func measured(_ subviews: Subviews) -> (words: Double, time: Double) { "
+        "let words = part(.readout, of: subviews)?.sizeThatFits(.unspecified).width ?? 0 "
+        "let time = part(.widest, of: subviews)?.sizeThatFits(.unspecified).width ?? 0 "
+        "return (Double(words), Double(time)) } "
+        "private func part(_ which: TimesPart, of subviews: Subviews) -> LayoutSubview? { "
+        "subviews.first { (subview: LayoutSubview) -> Bool in subview[TimesPartKey.self] == which } } }"), layout
+    # Core's rule: the readout centred on the row clears the wider time by `clear` on both sides - the row the three
+    # need on one line; the times at their widest are the time played at the song's end and the time left at its start
+    core = code(CORE / "TimesReadout.swift")
+    rule = flat(member(core, "public static func fitsBetween"))
+    assert rule == "{ oneLine(readout: readout, time: time, clear: clear) <= width }", rule
+    assert flat(member(core, "public static func oneLine")) == "{ readout + 2 * (time + clear) }"
+    widest = flat(member(core, "public static func widest(length"))
+    assert widest == "{ [PlayerWords.elapsed(shown: length), PlayerWords.remaining(shown: 0, length: length)] }", widest
+    # never a text size: nothing in the scrubber, the readout or the scrubber's row reads one
+    sizes = re.compile(r"(?i)dynamicTypeSize|isAccessibilitySize|sizeCategory|ContentSizeCategory|DynamicTypeSize")
+    assert not sizes.search(scrubber), sizes.findall(scrubber)
+    now = bare(NOW_PLAYING)
+    assert not sizes.search(member(now, "struct NowPlayingReadout: View"))
+    row = flat(member(now, "func content"))
+    row = row[row.index("ZStack { ScrubberView("):row.index("transport .padding(.top, 12)")]
+    assert not sizes.search(row), row
+    # a text size where the Layout decides would be a threshold: what it asks of Core is measured widths alone, and
+    # the only figures in it are the nothing measured with nothing to measure
+    assert "fitsBetween(readout: words, time: time, width: Double(width)" in layout
+    assert "Typeface" not in layout and re.findall(r"\b\d+(?:\.\d+)?\b", layout) == ["0", "0"], layout
 
-    for size in STANDARD:
-        assert room(size) >= column / 2, (size, room(size))
-        assert title(size) <= room(size), (size, title(size), room(size))
-    assert room("accessibility1") < column / 2 and title("accessibility1") > room("accessibility1")
-    assert not fonts.lacks("".join(widest), "CourierPrime-Regular")
+
+def test_asked_its_ideal_size_the_readout_goes_between_on_one_line():
+    """(after review) With no width proposed - a `.fixedSize()`, a ViewThatFits, an ImageRenderer asking the row's ideal
+    size - the fold was judged against the slider's own ideal width and the readout measured wrapped to it, about three
+    lines: now the readout is measured on one line and goes between the times, the row as wide as the three need
+    (TimesReadout.oneLine), no taller than the slider - and placed between however the row is then laid out."""
+    layout = flat(member(bare(SCRUBBER), "struct TimesAndReadout: Layout"))
+    fits = layout[layout.index("func sizeThatFits"):layout.index("func placeSubviews")]
+    assert fits.index("guard proposal.width != nil else {") < fits.index("if between(slider.width, subviews)")
+    assert ("guard proposal.width != nil else { return CGSize(width: max(slider.width, CGFloat(oneLine(subviews))), "
+            "height: slider.height) }") in fits
+    place = layout[layout.index("func placeSubviews"):layout.index("private func between")]
+    assert "if proposal.width == nil || between(bounds.width, subviews) { readout.place(" in place
+    # measured on one line: the readout's own ideal size, never offered the slider's width to wrap in, until it folds
+    assert layout.count("sizeThatFits(.unspecified)") == 2
+    assert layout.count("readout.sizeThatFits(ProposedViewSize(width: slider.width, height: nil))") == 1
+
+
+def test_the_widest_times_are_the_songs_longer_length():
+    """(after review) Decided once a song: `player.duration` is Navidrome's whole-second length until the engine's first
+    tick swaps in the decoded one, and a song whose two straddle a figure (600 listed, 599.98 decoded) changed line half
+    a second in. The widest times are taken at the longer of the song's listed length and the one playing, so they
+    never shrink within the song (TimesReadoutTests holds the switch and no length at all)."""
+    body = flat(scrubber_body())
+    assert "let length = player.duration let listed = player.current?.track.duration " in body
+    assert "WidestTimes(words: TimesReadout.widest(listed: listed, playing: length))" in body
+    assert "TimesReadout.widest(length:" not in body
+    core = code(CORE / "TimesReadout.swift")
+    assert (flat(member(core, "public static func widest(listed"))
+            == "{ widest(length: songLength(listed: listed, playing: playing)) }")
+    assert (flat(member(core, "public static func songLength"))
+            == "{ [listed ?? 0, playing].filter { (length: Double) -> Bool in length.isFinite && length > 0 }.max() ?? 0 }")
+    tests = (CORE.parents[1] / "Tests" / "DeadwaxCoreTests" / "TimesReadoutTests.swift").read_text(encoding="utf-8")
+    for case in ("noLengthYetIsTheClocksOwnWordsForNone", "theDecodedLengthComingInNeverShrinksTheWidestTimes",
+                 "oneLineIsTheReadoutAndBothTimesClear"):
+        assert f"@Test func {case}()" in tests, case
+
+
+def test_between_at_the_default_size_and_under_at_the_largest():
+    """Worked out with Courier Prime's real widths (tests/ios_fonts.py) on a 375 and a 393 pt phone, whose columns are
+    327 and 345 (24 either side): the drawn readout, "3 of 11 · FLAC 16/44.1", with a 3:41 song's times, is between
+    them at every size through xxLarge and under them from xxxLarge; a library's shuffle's widest ("1,612 of 2,100 ·
+    FLAC 24/176.4", a song past ten minutes) is between them at the default size; at the first accessibility size the
+    longer readouts are under them - an album's on one line of its own, the shuffle's wrapping - and a lone "3 of 11",
+    "MP3" or "FLAC 24/192" still fits between."""
+    clear = one(code(SCRUBBER), r"private static var readoutClear: CGFloat \{ (\d+) \}")
+
+    def between(readout: str, length: str, size: str, phone: int) -> bool:
+        points = CAPTION[size]
+        time = max(fonts.readout(words, points) for words in (length, "-" + length))
+        return fonts.readout(readout, points) + 2 * (time + clear) <= phone - 48
+
+    drawn, widest = "3 of 11 · FLAC 16/44.1", "1,612 of 2,100 · FLAC 24/176.4"
+    for phone in (NARROW, WIDER):
+        assert [size for size in CAPTION if not between(drawn, "3:41", size, phone)] == ["xxxLarge", "accessibility1"]
+        assert between(widest, "10:12", "large", phone), phone
+        for readout in (drawn, widest, "12 of 13 · FLAC 24/96"):
+            assert not between(readout, "3:41", "accessibility1", phone), readout
+        # under them, its own line: an album's whole on one line, the shuffle's wider than the column - it wraps
+        for readout in (drawn, "12 of 13 · FLAC 24/96"):
+            assert fonts.readout(readout, CAPTION["accessibility1"]) <= phone - 48, readout
+        assert fonts.readout(widest, CAPTION["accessibility1"]) > phone - 48
+        for alone in ("MP3", "3 of 11", "FLAC 24/192"):
+            assert between(alone, "3:41", "accessibility1", phone), alone
+    # the drawing's own: on its 390 phone, "0:51", the readout and "-2:50" with room between
+    assert between(drawn, "3:41", "large", DRAWN)
+    assert not fonts.lacks(drawn + widest + "-:0123456789", "CourierPrime-Regular")
+
+
+def test_voiceover_hears_the_readout_as_before_beside_the_slider():
+    """VoiceOver's words for the readout are unchanged ("3 of 11, FLAC, 16-bit, 44.1 kHz", one element), and the
+    slider's are its own: the readout is laid beside the slider's element, never inside it, so neither swallows the
+    other; the times at their widest are heard by no one."""
+    body = scrubber_body()
+    # the slider: the VStack of the bar and its times, one element as it was, its words, value and swipes
+    slider = body[body.index("VStack(spacing: 6) {"):]
+    slider = slider[:reader.closing(slider, slider.index("{")) + 1]
+    assert "readout" not in slider and "WidestTimes" not in slider
+    after = flat(body[body.index(slider) + len(slider):])
+    assert after.startswith(".accessibilityElement(children: .ignore) .accessibilityLabel(PlayerWords.scrubberName) "
+                            ".accessibilityValue(PlayerWords.scrubberValue(shown: shown, length: length)) "
+                            ".accessibilityAdjustableAction { direction in"), after
+    assert after.index(".layoutValue(key: TimesPartKey.self, value: .scrubber)") < after.index("readout .font(")
+    # the layout itself joins nothing for VoiceOver: no element, label or hidden over the row
+    layout = member(bare(SCRUBBER), "struct TimesAndReadout: Layout")
+    assert "accessibility" not in layout
+    outer = flat(body)
+    assert outer.count(".accessibilityElement(") == 1 and ".accessibilityHidden(" not in outer
+    # the readout's own element and words, as before (the readout's exact test holds the view)
+    readout = flat(member(bare(NOW_PLAYING), "struct NowPlayingReadout: View"))
+    assert ('Text(readout) .accessibilityElement(children: .ignore) '
+            '.accessibilityLabel(BarDisplay.readoutSpoken(queue) ?? "")') in readout
+    assert ".accessibilityHidden(true)" in member(bare(SCRUBBER), "struct WidestTimes: View")
 
 
 # ----------------------------------------------------------------------------- the scrubber
 
 def test_the_scrubber_is_sunken_as_the_meter_is():
     scrubber = bare(SCRUBBER)
-    body = flat(member(member(scrubber, "struct ScrubberView: View"), "var body: some View"))
+    body = flat(member(member(scrubber, "struct ScrubberView<Readout: View>: View"), "var body: some View"))
     # DWMeter's track: the well, the shade along its top, its 1 pt line, square on the phone - the fill the meter's
     # grey, inside the line (`.meter`, `.meter > i`)
     assert ("ZStack(alignment: .leading) { DWCorners.meterShape .fill(DWPalette.well.shadow(.inner(color: "
@@ -478,13 +713,13 @@ def test_the_scrubber_is_sunken_as_the_meter_is():
     meter = flat(bare(APP / "Look" / "DWMeter.swift"))
     assert (".fill(DWPalette.well.shadow(.inner(color: DWPalette.meterShade, radius: 1, x: 0, y: 1))) "
             ".overlay { DWCorners.meterShape.strokeBorder(DWPalette.line, lineWidth: 1) }") in meter
-    assert one(code(SCRUBBER), r"private static let edge: CGFloat = (\d+)") == 1
+    assert one(code(SCRUBBER), r"private static var edge: CGFloat \{ (\d+) \}") == 1
     assert ".dw.ph .meter" in (IOS / "design" / "dw.css").read_text(encoding="utf-8")
     # its sizes as James chose them (14 Nov, "a squared off thicker bar"): 12, 16 while held, in a 44 pt target
     source = code(SCRUBBER)
-    assert one(source, r"private static let barHeight: CGFloat = (\d+)") == 12
-    assert one(source, r"private static let heldHeight: CGFloat = (\d+)") == 16
-    assert one(source, r"private static let target: CGFloat = (\d+)") == 44
+    assert one(source, r"private static var barHeight: CGFloat \{ (\d+) \}") == 12
+    assert one(source, r"private static var heldHeight: CGFloat \{ (\d+) \}") == 16
+    assert one(source, r"private static var target: CGFloat \{ (\d+) \}") == 44
     assert ".frame(height: drag == nil ? Self.barHeight : Self.heldHeight)" in body
     # tokens alone: no colour of its own, no corner of its own
     for raw in (r"\bColor\.", r"\.opacity\(", r"cornerRadius:", r"\bPalette\.quiet\b", r"\bRectangle\(\)\.fill"):
@@ -501,13 +736,16 @@ def test_the_scrubber_draws_no_face_but_its_track():
     """The flat rule past the track: nothing behind the bar's 44 pt target or round the column, and no face on the
     clocks - a face anywhere in the scrubber but the sunken track's two shapes fails."""
     scrubber = bare(SCRUBBER)
-    body = flat(member(member(scrubber, "struct ScrubberView: View"), "var body: some View"))
+    body = flat(member(member(scrubber, "struct ScrubberView<Readout: View>: View"), "var body: some View"))
     for shape in SCRUBBER_TRACK:
         assert body.count(shape) == 1, shape
         body = body.replace(shape, "")
     assert not [m.group(0) for m in FACES.finditer(body)], body
-    clocks = member(scrubber, "struct ScrubberClocks: View, Equatable")
-    assert not [m.group(0) for m in FACES.finditer(clocks)], clocks
+    # nor on the clocks, nor (27 Nov) round the readout or the times at their widest
+    for declaration in ("struct ScrubberClocks: View, Equatable", "struct TimesAndReadout: Layout",
+                        "struct WidestTimes: View"):
+        part = member(scrubber, declaration)
+        assert not [m.group(0) for m in FACES.finditer(part)], (declaration, part)
 
 
 def test_now_playing_reads_no_position():
@@ -529,7 +767,7 @@ def test_the_scrubbers_times_are_courier_prime_under_it():
                       "Spacer() Text(remaining) } .font(Typeface.readout(.caption)) .foregroundStyle(DWPalette.t2) "
                       ".accessibilityHidden(true) } }"), clocks
     # under the bar (`.f.mono.xs.q`): the bar's target, then the clocks, in one column
-    body = member(member(scrubber, "struct ScrubberView: View"), "var body: some View")
+    body = member(member(scrubber, "struct ScrubberView<Readout: View>: View"), "var body: some View")
     assert body.index("VStack(spacing: 6) {") < body.index("GeometryReader {") < body.index("ScrubberClocks(elapsed:")
     assert px(css(".xs", "font-size")) == 12
     assert re.search(r"case \.caption: size = 12", code(APP / "Shared" / "Typeface.swift"))
@@ -537,7 +775,7 @@ def test_the_scrubbers_times_are_courier_prime_under_it():
 
 def test_the_scrubbers_drag_voiceover_and_seek_are_as_they_were():
     scrubber = bare(SCRUBBER)
-    body = flat(member(member(scrubber, "struct ScrubberView: View"), "var body: some View"))
+    body = flat(member(member(scrubber, "struct ScrubberView<Readout: View>: View"), "var body: some View"))
     for part in (".accessibilityElement(children: .ignore) .accessibilityLabel(PlayerWords.scrubberName) "
                  ".accessibilityValue(PlayerWords.scrubberValue(shown: shown, length: length))",
                  "if let target = Scrub.adjusted(increment: increment, from: shown, length: length) { "
@@ -557,10 +795,17 @@ def test_the_scrubbers_drag_voiceover_and_seek_are_as_they_were():
 
 def test_the_mac_has_none_of_it():
     """The Mac's frame never opens Now Playing: no Mac file names the new pieces, and Now Playing's look stays the
-    cover there (tests/test_ios_mac.py)."""
+    cover there (tests/test_ios_mac.py). (27 Nov) Nor the readout between the times: the Mac's bar keeps its own
+    readout (BarDisplay.readout in PlayerBar, its scrubber BarScrubber), as it was."""
     for path in sorted((APP / "Mac").rglob("*.swift")):
         text = bare(path)
-        for piece in ("NamedLookButton", "NowPlayingReadout", "ScrubberView", "NowPlayingView"):
+        for piece in ("NamedLookButton", "NowPlayingReadout", "ScrubberView", "NowPlayingView", "TimesReadout",
+                      "TimesAndReadout"):
             assert piece not in text, (path.name, piece)
+    # the one other drawing of these words, the Mac bar's, untouched - and no ScrubberView anywhere but Now Playing
+    for path in sorted(APP.rglob("*.swift")):
+        if path not in (NOW_PLAYING, SCRUBBER):
+            assert not re.search(r"\bScrubberView\b|\bTimesReadout\b", bare(path)), path.name
+    assert "let readout = BarDisplay.readout(player.queue)" in bare(APP / "Player" / "PlayerBar.swift")
     now = bare(NOW_PLAYING)
     assert "private var look: TurntableSettings.Look { Platform.mac ? .cover : switched ?? deck.opensAs }" in now
