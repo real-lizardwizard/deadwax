@@ -151,6 +151,9 @@ def test_filing_an_album_marks_the_library_changed(tmp_path, monkeypatch):
     class Store:
         async def update_status(self, *a): pass
         async def record_albums_seen(self, *a, **k): pass
+        async def begin_filing_check(self, *a): pass
+        async def filing_began(self, *a): pass
+        async def refused_files(self): return []
 
     async def organized(*a, **k):
         return {"organized": 2, "failed": 0, "skipped": 0, "plan": {"album_dir": str(tmp_path / ALBUM)}}

@@ -664,10 +664,18 @@ next peer regardless". He chose "Stricter" for "as good a match".
   CRC-16 must sum to zero against the next header with the next number. It stops at the frame holding STREAMINFO's
   last sample, and that frame's zeros are read as flac_mp4 reads them. A whole frame is summed by `_sums_to_zero`:
   the same CRC worked as division by the CRC-16 polynomial on Python integers, folded at powers of two. That is about
-  ten times flac_mp4's byte loop, because this sums every frame of every song. A test holds it to `_crc16`. A real
-  2.7 MB CD-rate FLAC checked at about 146 MB/s on the Mac under load, so a 30 MB song takes about a fifth of a
-  second. It runs on a worker thread (organize_job's to_thread), never on the loop.
-- **The verdicts.** OK: the end of the file, or the start of an ID3v1 / APEv2 tag, is a zero, with no zero before it
+  ten times flac_mp4's byte loop, because this sums every frame of every song. A test holds it to `_crc16`. Measured (corrected in
+  review - round 1 said 146 MB/s, from a 2.7 MB file): the review saw 29-48 MB/s on two 41 MB CD-length FLACs, and
+  here they checked at 53-84 MB/s with the sims running beside them, ~100 MB/s on 2.8 MB hi-res ones. So a 41 MB
+  song takes half a second to about 1.4 s, an album tens of seconds. It runs on a worker thread (organize_job's
+  `asyncio.to_thread`, held by a test), never on the loop. The summing has a budget (`SUM_BUDGET`, 4 MB plus twice
+  the file's size): a file planted with thousands of chance zeros inside one frame was quadratic (the review's
+  8,000 in a 131 KB frame took over a second); past the budget it is UNCHECKED, filed as before, never refused.
+- **The verdicts.** OK: the end of the file, or the start of the tags behind the music, is a zero. The tags are
+  stripped from the end repeatedly (`_tag_ends`, at most `TAGS_BEHIND` = 8): ID3v1 (128 bytes, 355 with TAG+), ID3v1
+  written twice, APEv2 (by its footer's size), and ID3v2 appended with its "3DI" footer (review). A first frame
+  numbered other than 0 is DAMAGED_INSIDE, said in check_file's docstring (the reviewer's `ffcopy.flac`, frame 14
+  first, a stream cut from the middle). Otherwise, with no zero before it
   that a frame header follows. STALE_TAIL: the last frame checks out before the end, and what follows is no tag. A
   stale whole frame or the copy loop's fingerprint (the bytes after E repeat the 6,144 before them) gives E exactly.
   Three or more zero bytes at the end count too. CUT_SHORT: the file ends before the stream's last sample, or inside
@@ -690,52 +698,94 @@ next peer regardless". He chose "Stricter" for "as good a match".
   itself. It is plan/execute as ever, and no byte of any file changes. The check is skipped while the filing is
   refused for its folders (read-only, overlap). `refile_refused`'s pre-plan passes `check_audio=False`, and the filing
   it hands on checks.
-- **The refusal** (`poller._refuse_damaged`). The job is marked `failed` with the reason, inside the same
-  retry_pending bracket `_fail` uses. The source's `tried` entry gains `damaged` (the reason) and `refused`: every
-  file of the plan as `organizer.file_identity` (path, size, mtime_ns). Then `retry_next_peer` runs whatever
-  AUTO_RETRY_PEER says, under its usual lock and `already_have` check. If it moves, the job's `notice` is set (store
-  `notice_json`, cleared by any move) and the same words are logged. If it doesn't, the error becomes the final
-  sentence, and the refused attempt is tidied as a cancel's is (transfers out of slskd's list, partials with
-  SLSKD_INCOMPLETE_PATH). The completed files stay in slskd's folder. Grants are skipped: nothing was filed.
-- **Never filed later.** The job leaves `complete` (failed, or queued for the next source), so neither
-  `refile_refused` nor `settle_interrupted_filing` sees it. Every filing checks again, so **Same source again**
-  finds the same files and refuses them again. `find_local_file(..., skip=)` passes over files that other sources'
-  refusals recorded, and so do the companions (`refused_identities`, read from `tried`). Otherwise the next source's
-  filing could take the refused files for its own, when slskd put its same-named files beside them under other
-  names. Assumed, not seen: slskd renames a download that collides with a file already there. If it overwrites, the
-  identity no longer matches, and the new file is found and checked.
+- **The refusal** (`poller._refuse_damaged`, review). One transaction, `store.refuse_copy`: the job `failed` with
+  the reason, its `tried` entry gaining `damaged`, the notice with `moving: True`, and every file of the plan
+  (`organizer.file_identity`: path, size, mtime_ns) into the store's own `refused_files` table - not the job's
+  `tried` (round 1), so every job consults it. Then `_move_on` asks `retry_next_peer` to move, whatever
+  AUTO_RETRY_PEER says - once: the job is no longer `failed` when the setting's own move would look (a test, the
+  setting on). If it moves, the notice becomes the sentence and `moving` goes; if not, the error becomes the final
+  sentence and the attempt is tidied as a cancel's is (transfers out of slskd's list, partials with
+  SLSKD_INCOMPLETE_PATH). A stop between the two (the transaction written, the move not made) leaves `moving`, and
+  `resume_moves` at the start of every poll makes the move (a test stops it with a CancelledError there). The
+  completed files stay in slskd's folder. Grants are skipped: nothing was filed.
+- **Never filed later, by any job (review).** The round-1 claim ("never filed later - not by the next source's
+  download, even one whose files have the same names") was false: **slskd renames.** Read in slskd's source
+  (FileService.MoveFile, and `Transfers.Download.Destination.Exists`, "rename" by default, overwrite only when set): a
+  finished file whose name is taken is moved to `{stem}_{DateTime.UtcNow.Ticks}{ext}` - eighteen digits now. Round
+  1's `find_local_file` matched the exact basename only, so with the refused copy's files skipped, the next source's
+  renamed songs were never found and the album never filed (its test asserted one song of three filed). Now
+  `organizer.SLSKD_RENAMED` (`_` and six or more digits before the extension) lets `find_local_file` take slskd's
+  siblings of a name; of every candidate not refused, the one whose size is the size the peer reported wins, then the
+  newest (st_mtime_ns). A name's own short digits ("Live_1999") stay other files. Companions renamed so
+  (`cover_<ticks>.jpg`) are filed under their plain name, and a refused copy's companions are never filed with
+  another source's album. `refused_files` is read once per filing (`plan_organization(refused=)`), so a fresh Get
+  of the album, which never knew of the refusal, passes over them too. Each row is forgotten on start when its file
+  is gone or changed (`forget_gone_refusals`): a changed file is a new one, and is checked. Every filing checks
+  again, so **Same source again** (slskd writes the copy beside the first) is refused again when the damage is the
+  sharer's. Tests: the same folder names after a restart (every song of the new source filed, the refused copy left
+  byte for byte, its cover not filed, the new cover filed as cover.jpg), a fresh Get, the newest-not-refused rule.
 - **The words.** `flac_check.damage_reason`: "extra data after the end of N of M songs", "N of M songs is|are cut
   short", "... damaged inside", joined by "; ". The messages are "The copy from X was damaged (R). Now coming from Y,
-  as good a match: same quality, songs and edition.", "..., a weaker match: MP3 320, was FLAC 16/44.1 · match 81%,
-  was 96%.", "The copy from X was damaged (R) and there is no other source.", "... and no other source would send
+  as good a match: same quality, songs and edition.", "..., a weaker match: MP3 320, was FLAC 16/44.1 · match 91%,
+  was 100% (format 45, was 100).", "The copy from X was damaged (R) and there is no other source.", "... and no other source would send
   it.", "..., and the sources asked next wouldn't send it." and "..., and it wasn't tried again: <already_have's
   reason>.". They are f-strings, so `ui/test/errors.sim.cjs` (which reads literals) doesn't ask JOB_ERRORS for them.
   The web app's `jobErrorWords` shows them as they are (safeWords: no plumbing in them).
-- **The comparison** (`src/source_compare.py`, pure). `source_facts` covers quality words (the app's qualityText
-  without the "k"), songs held and missing (matching's pairing), extra files, edition words (`detect_edition_tags` on
-  the whole remote path, as the candidate's are), size, score and signals, start (the app's Starts words) and the
-  measured speed. `compare` gives the differences in that order, each {what, now, was, words}. Size counts only at
-  10% or more apart. A moved part of the score counts at more than 5 points. Speed counts only when both were measured
-  and one is 1.5 times the other. **Stricter**: the same quality words, every song, the same edition words and a
-  score at least as high. A better quality is "a weaker match" too: by the rule it isn't the same match. A score
-  that can't be compared (a job from before) is left out and noted. Start, size and speed never decide it.
+- **The comparison** (`src/source_compare.py`, pure; rewritten in review). `source_facts(source, release, speed)`
+  covers quality words (the app's qualityText without the "k"), songs held and missing (matching's pairing), extra
+  files, edition words (`detect_edition_tags` on the whole remote path, as the candidate's are), size, deadwax's own
+  score and its parts, start (the app's Starts words) and the measured speed. `compare` lists the differences in that
+  order, each {what, now, was, kind, words}, and **the verdict is computed from that list alone** - one source of
+  truth, so never "weaker" with nothing named (a test across cases, and a mutation). App Design's four verdicts,
+  first that applies, the deciding differences first: **a weaker match** (anything `worse`: lossy for lossless, a
+  lower depth or rate, songs missing, a lower score), **a different match** (nothing worse; other edition words,
+  extra files, a quality or score known on one side only - "a different match: folder says Deluxe, the first said
+  nothing · match 100%, was 85% (edition 100, was 25)"), **a better match** (a higher quality or score - "a better
+  match: FLAC 24/96, was FLAC 16/44.1"), **as good a match** (James's "Stricter": same quality, every song, same
+  edition words, a score at least as high). Size, start and speed are listed but decide nothing. Scores compare at
+  the whole percent shown (`_half_up`, so 95.5 against 96 is equal); the same song missing from both is no
+  difference; no quality words on either side is none (noted). The thresholds are judgement, named constants
+  commented so: **`SIZE_SHARE` 10%** of the smaller, **`SPEED_FACTOR` 1.5x**, **`SIGNAL_MOVED` 5 points** of 100.
+- **The score is deadwax's own (review).** The iPhone and Mac apps send no score with a Get, so round 1 compared
+  nothing for their jobs. `match_score(source, release)` runs `matching.score_candidate` on the job's stored release
+  (`store.next_source_inputs` gives it whole) and the source's files, with an empty response, and blends without
+  the `peer` signal (`matching.blend`, factored out of score_candidate, renormalizing as it always did): availability
+  isn't the folder's match, and the start is said apart. Stored files carry only name and size, so `duration_match`
+  is None and drops out - the score here is titles, count, edition and format. A client's score is kept
+  (`source_json`) but never compared. No release (or no files): None, "match not known for either", a `different`
+  difference - an unknown score never allows "as good" or "better" (a test, and a mutation that trusts the
+  client's).
 - **What a job keeps now.** `source_json` holds the picked card's score, signals, free slot and queue
-  (`store.job_source`). Alternatives may carry `signals`, `has_free_slot`, `queue_length` (declared on the pydantic
-  models, and stored only when sent). The web app's Get sends them (`perPerson.cardFacts`). `move_to_peer` takes the
-  next source's (`poller.job_source_of`). Peers asked who refused are marked `declined` in `tried`.
+  (`store.job_source`); alternatives may carry `signals`, `has_free_slot`, `queue_length` (declared on the pydantic
+  models, stored only when sent; the web app's Get sends them, `perPerson.cardFacts`). Only the free slot and queue
+  are compared now. `move_to_peer` takes the next source's (`poller.job_source_of`). Peers asked who refused are
+  marked `declined` in `tried`. A `checking` column (review): `begin_filing_check` sets the row `organizing` with
+  `checking = 1` while only the check runs, `filing_began` clears it as the plan is handed on. A stop during the check
+  leaves nothing moved, so `settle_interrupted_filing` passes such a row over and `check_again` files it at start -
+  never INTERRUPTED_FILING, which can't be retried (a test).
 - **/jobs** gives every row `quality` (the kept dict plus `words`), `total_size`, `earlier_sources` ([{username,
-  directory, damaged?}], the current source and declined asks left out) and `notice` when there is one. A row "try
-  the next peer" could move (`retryable`) with a runner-up left also gets `next_source`: {username, directory,
-  replaces, lead, verdict, match, differences, detail, summary, notes, facts, was}. It is read by
-  `store.next_source_inputs` (json_extract of the one runner-up and the tracklist, so neither column is decoded
-  whole) and cached on (store, job, updated_at, peer, index, speeds). Open rows don't get it: list_jobs still reads
-  runners-up only for retryable rows (the v0.9.24 cost, and `test_store`'s "nothing reads them").
-- **Web UI: none new.** The Requests row already draws a failed row's error, so "…and there is no other source."
-  shows. A moved row's notice and `next_source` are not drawn on the web. They are for the iPhone and Mac app.
+  directory, damaged?}], the current source and declined asks left out - a test) and `notice` when there is one:
+  {text, from, to, reason, verdict?, match?, differences?, summary?, lead?, facts?, was?} - the move's comparison
+  with `lead` and `facts` as next_source has them (review), `moving` only while a move is owed. A later damaged
+  move replaces it, any move by hand clears it (a test). A row "try the next peer" could move (`retryable`) with a
+  runner-up left also gets `next_source`: {username, directory, replaces, lead, verdict, match, differences, detail,
+  summary, notes, facts, was}, read by `store.next_source_inputs` (json_extract of the one runner-up and the
+  release, so neither column is decoded whole) and cached on `next_source_key` (store, job, updated_at, peer,
+  index, both speeds - a test that it moves with a move). One row that can't be described is a row without it,
+  never every row's (a per-row try, a test). Open rows don't get it: list_jobs still reads runners-up only for
+  retryable rows (the v0.9.24 cost, and `test_store`'s "nothing reads them").
+- **Web UI (review): the notice is drawn.** Requests' row (`lib/requestsView.ts noticeWords`, `RequestRow.notice`)
+  carries the server's own sentence, through `safeWords`, on a row downloading, waiting or needing attention, and
+  `app/JobCard.tsx` draws it as one `app-job-line is-warning` line under who it's from - on the attention card above
+  the reason. None where it is the error already (no source left), none on a filed row. `next_source` is not drawn
+  on the web: it is for the iPhone and Mac app.
 - **Fixture changed:** `tests/test_organizer.py`'s `write_minimal_flac` said 44,100 samples and held none, which now
   reads (rightly) as cut short. It says 0, "unknown", and mutagen still round-trips it. The test that holds a whole
   plan to the dict it was at 2.1.37 gains the plan's two new keys, `damaged: []` and `songs`.
-- **Tests:** `tests/test_flac_check.py` (the verdicts, the folded CRC against `_crc16`, the words) and
-  `tests/test_damaged_downloads.py` (the plan, the poller's move with AUTO_RETRY_PEER off, the next source filed and
-  never the refused files, same-named files passed over, weaker, none left, cut short and broken named, never filed
-  after a restart or when asked again, /jobs's fields, the comparison's rules).
+- **Tests:** `tests/test_flac_check.py` (the verdicts, the folded CRC against `_crc16`, the words; review: ID3v2
+  with its 3DI footer and ID3v1 twice OK, a first frame not 0 damaged, the summing budget) and
+  `tests/test_damaged_downloads.py` (the plan; the move with AUTO_RETRY_PEER off and on, once; the next source filed
+  and never the refused files; the same folder names after a restart; a fresh Get; slskd's renamed siblings; weaker;
+  none left; cut short and broken named; a later move replacing the notice; a stop before the move, and one during
+  the check; the check off the loop; a refusal forgotten when its file changes; /jobs' fields, the declined peer,
+  server scores, a client's ignored, the cache key, one bad row; the four verdicts and the comparison's rules).

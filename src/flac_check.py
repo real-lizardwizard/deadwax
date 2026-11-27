@@ -17,7 +17,9 @@ A FLAC is DAMAGED when one of these is certain:
 - CUT_SHORT: the file ends before the stream holds every sample STREAMINFO counts - inside the last frame, or
   frames before it - or inside its own metadata.
 - DAMAGED_INSIDE: a frame fails its CRC-16 against the next frame's header, or no frame header follows a frame
-  where one must, or the last frame checks out nowhere a frame of this stream could end.
+  where one must, or the last frame checks out nowhere a frame of this stream could end - or the first frame after
+  the metadata isn't frame 0 (numbered from 0, or from sample 0, as every encoder writes them: a file whose first
+  frame carries another number has lost its start, or was cut from a longer stream, and is refused as damaged).
 
 How the true end is found (the stale-tail report's "Detecting E safely", steps 1-4 - its step 5, an MD5 of the
 decoded audio, is for trimming, which is not done): STREAMINFO read; frame headers walked - sync code, CRC-8,
@@ -27,26 +29,32 @@ inside the real frame (one byte in 65,536) is never taken for the end while the 
 also checks out, so a whole file always reads as whole; and a zero followed by a frame header (a whole stale frame
 after the real end sums to zero too) is a frame's end with another after it, so the tail is extra.
 
-A clean file, and one with ID3v2 in front or ID3v1 / APEv2 behind (the report's Daft Punk files), reads OK and is
-filed exactly as before. Everything this can't judge with certainty is UNCHECKED and filed as before too: not a
-FLAC at all (the tests' "fLaC"-less stand-ins, a macOS ._ file), STREAMINFO not valid, more samples than STREAMINFO
-counts, far more sync codes than real FLAC has, over 1 GiB. A refusal moves the download to another source, so it
-is said only when sure.
+A clean file, and one with ID3v2 in front or tags behind (the report's Daft Punk files), reads OK and is filed
+exactly as before. The tags behind are stripped from the end one at a time, again and again (_tag_ends), each an
+end the audio may have: ID3v1 (with its "TAG+" extension), APEv2 (with or without its header), and ID3v2 written
+at the end with its "3DI" footer - in any order, ID3v1 written twice included. Everything this can't judge with
+certainty is UNCHECKED and filed as before too: not a FLAC at all (the tests' "fLaC"-less stand-ins, a macOS ._
+file), STREAMINFO not valid, more samples than STREAMINFO counts, far more sync codes than real FLAC has, far more
+summing than one pass over the file (SUM_BUDGET: a file built with thousands of copies of the next frame's header
+inside a frame would be summed from its start to every one), over 1 GiB. A refusal moves the download to another
+source, so it is said only when sure.
 
-Every header is read by flac_mp4's own parser (_skip_id3v2, _read_metadata, _frame_header), the tags behind the
-audio found by its _audio_ends and the last frame's zeros by its _Checksums, all with its CRC-16. Only a whole
-frame's check is done another way here (_sums_to_zero): the same CRC as polynomial division on Python integers,
+Every header is read by flac_mp4's own parser (_skip_id3v2, _read_metadata, _frame_header) and the last frame's
+zeros found by its _Checksums, all with its CRC-16; the tags behind the audio are found here (_tag_ends), since
+flac_mp4's _audio_ends - the player's - takes only one ID3v1 and one APEv2, and the player is left as it is. Only a
+whole frame's check is done another way here (_sums_to_zero): the same CRC as polynomial division on Python integers,
 about ten times flac_mp4's byte loop - this sums every frame of every song of an album, where the player sums only
 the last; tests/test_flac_check.py holds it to flac_mp4._crc16.
 
 Pure: bytes in, a verdict out - but check_file(), which reads one file and calls check().
 """
 
+import struct
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 from src.flac_mp4 import (FALSE_SYNC_BUDGET, HEADER_MAX, MAX_INPUT_BYTES, NotFlac, Truncated, Unsupported, _Checksums,
-                          _audio_ends, _crc16, _frame_header, _reach, _read_metadata, _skip_id3v2)
+                          _crc16, _frame_header, _reach, _read_metadata, _skip_id3v2)
 
 OK = "ok"
 STALE_TAIL = "stale_tail"
@@ -58,6 +66,16 @@ DAMAGED = (STALE_TAIL, CUT_SHORT, DAMAGED_INSIDE)
 
 #? both sync codes - the fixed-block stream's and the variable-block one's (flac_mp4's _SYNCS)
 _SYNCS = (b"\xff\xf8", b"\xff\xf9")
+
+#? (review) How much the walk may sum, in bytes: a floor and so many times the file. A whole file sums each frame
+#? once - one pass - and a false header carrying the next frame's number (one in many millions of bytes) a frame
+#? more; a file planted with thousands of them inside one frame would be summed from the frame's start to each,
+#? quadratic in the frame (8,000 in a 131 KB frame took over a second). Past this it is UNCHECKED - filed as before,
+#? never refused - so the walk stays linear in the file's size, capped.
+SUM_BUDGET = (4 << 20, 2)
+#? the most tags stripped from the end of a file (_tag_ends): more than any tagger writes, fewer than a file of
+#? nothing but "TAG"s could make it try
+TAGS_BEHIND = 8
 
 
 @dataclass(frozen=True)
@@ -163,9 +181,22 @@ def check(data: bytes) -> Verdict:
         return Verdict(UNCHECKED, str(e))
 
 
+class _Spend:
+    """The walk's summing, counted against SUM_BUDGET: Unsupported once it is spent."""
+
+    def __init__(self, size: int):
+        self.left = SUM_BUDGET[0] + SUM_BUDGET[1] * size
+
+    def __call__(self, count: int) -> None:
+        self.left -= count
+        if self.left < 0:
+            raise Unsupported("far too much summing for a file of its size")
+
+
 def _walk(data, first: int, info) -> Verdict:
     """Frame by frame from the first, each checked by its CRC-16 against the next one's header, to the frame
-    holding the last sample STREAMINFO counts - or, when it counts none, the last frame there is."""
+    holding the last sample STREAMINFO counts - or, when it counts none, the last frame there is. The first frame
+    must be frame 0: one numbered otherwise is DAMAGED_INSIDE (the module's docstring)."""
     sync = bytes(data[first:first + 2])
     got = _frame_header(data, first, info) if sync in _SYNCS else None
     if got is None or got[0] != 0:
@@ -176,6 +207,7 @@ def _walk(data, first: int, info) -> Verdict:
     reach = _reach(replace(info, max_framesize=0))
     total = info.total_samples
     budget = FALSE_SYNC_BUDGET[0] + len(data) // FALSE_SYNC_BUDGET[1]
+    spend = _Spend(len(data))
     pos, index, samples = first, 0, 0
     number, block, length = got
     while True:
@@ -184,7 +216,7 @@ def _walk(data, first: int, info) -> Verdict:
                 return Verdict(UNCHECKED, f"its frames hold more samples than the {total} STREAMINFO counts")
             return _ending(data, pos, length, reach, info, _expected(pos - first, samples, block))
         wanted = number + 1 if fixed else number + block
-        at, seen, budget = _next_frame(data, pos, length, sync, wanted, info, budget)
+        at, seen, budget = _next_frame(data, pos, length, sync, wanted, info, budget, spend)
         if at is None:
             if seen:
                 return Verdict(DAMAGED_INSIDE, f"frame {index} fails its checksum")
@@ -199,16 +231,17 @@ def _walk(data, first: int, info) -> Verdict:
         number, block, length = _frame_header(data, at, info)
 
 
-def _next_frame(data, pos: int, length: int, sync: bytes, wanted: int, info, budget: int):
+def _next_frame(data, pos: int, length: int, sync: bytes, wanted: int, info, budget: int, spend: _Spend):
     """(where the frame after the one at `pos` begins or None, whether a header carrying its number was seen at
     all, the budget left). A header counts only when it is right in every particular (_frame_header), carries the
-    next number, and the frame before it checks out to it."""
+    next number, and the frame before it checks out to it - each sum counted against `spend` (SUM_BUDGET)."""
     seen = False
     at = data.find(sync, pos + length)
     while at >= 0:
         got = _frame_header(data, at, info)
         if got is not None and got[0] == wanted:
             seen = True
+            spend(at - pos)
             if _sums_to_zero(data, pos, at):
                 return at, seen, budget
         else:
@@ -238,7 +271,7 @@ def _ending(data, pos: int, length: int, reach: int, info, expected: int | None)
     zeros = sorted(_Checksums(data).zeros(pos, list(range(pos + length + 1, limit + 1)))) if limit > pos + length else []
     #? a zero with a frame header after it is a frame's end with another after it - a whole stale frame sums to zero
     framed = [at for at in zeros if at < size and _header_at(data, at, info)]
-    for end in _audio_ends(data, pos):
+    for end in _tag_ends(data, pos):
         if end not in zeros or any(at < end for at in framed):
             continue
         if end == size and data[size - 3:] == bytes(3):
@@ -268,6 +301,45 @@ def _ending(data, pos: int, length: int, reach: int, info, expected: int | None)
     end = max([at for at in zeros if not headers or at <= headers[0]])
     span = f"{size - end}" if end == zeros[0] else f"{size - end} to {size - zeros[0]}"
     return Verdict(STALE_TAIL, f"{span} bytes after the end of the audio", extra=size - end)
+
+
+def _tag_ends(data, start: int) -> list[int]:
+    """
+    Where the audio could end, last first: the end of the file, then before each tag found behind it - stripped
+    from the end one at a time, again and again (TAGS_BEHIND at most), each the end of what is left: ID3v1 (with
+    "TAG+" before it), APEv2 (its footer last, its header when it says it has one), ID3v2 with a "3DI" footer.
+    Each is only a candidate, as in flac_mp4's _audio_ends: the last frame's CRC-16 decides, so a frame whose last
+    bytes happen to spell "TAG" is not cut short by it. Nothing is taken from before `start`, the last frame.
+    """
+    end = len(data)
+    ends = [end]
+    for _ in range(TAGS_BEHIND):
+        size = _tag_before(data, start, end)
+        if not size:
+            break
+        end -= size
+        ends.append(end)
+    return ends
+
+
+def _tag_before(data, start: int, end: int) -> int:
+    """The size of the tag ending at `end`, or 0 for none - one that would reach back to `start` included."""
+    if end - 128 > start and data[end - 128:end - 125] == b"TAG":
+        if end - 355 > start and data[end - 355:end - 351] == b"TAG+":
+            return 355
+        return 128
+    if end - 32 > start and data[end - 32:end - 24] == b"APETAGEX":
+        size, flags = struct.unpack("<I4xI", data[end - 20:end - 8])
+        ape = size + (32 if flags & 0x80000000 else 0)
+        return ape if 32 <= ape < end - start else 0
+    if end - 20 > start and data[end - 10:end - 7] == b"3DI":
+        sizes = data[end - 4:end]
+        if any(b & 0x80 for b in sizes):
+            return 0
+        whole = 20 + ((sizes[0] << 21) | (sizes[1] << 14) | (sizes[2] << 7) | sizes[3])
+        if whole < end - start and data[end - whole:end - whole + 3] == b"ID3":
+            return whole
+    return 0
 
 
 def _header_at(data, at: int, info) -> bool:

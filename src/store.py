@@ -547,6 +547,21 @@ CREATE TABLE IF NOT EXISTS lastfm_kept (
     used_at     REAL NOT NULL,
     size        INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS refused_files (
+    -- (damaged downloads, review) Every file a download refused as damaged left in slskd's folder, by what it is
+    -- there - its path, size and modified time in ns (organizer.file_identity) - so no filing of ANY job ever takes
+    -- it: not the job's next source, whose file slskd wrote beside it as `name_<ticks>.flac` or in its place, nor a
+    -- fresh Get of the album, a job that never knew. Written in the refusal's own transaction (refuse_copy); a row
+    -- whose file is gone or has changed is forgotten (forget_refused_files). Kept when the job is cleared.
+    path      TEXT NOT NULL,
+    size      INTEGER NOT NULL,
+    mtime_ns  INTEGER NOT NULL,
+    job_id    INTEGER,
+    username  TEXT,
+    at        TEXT NOT NULL,
+    PRIMARY KEY (path, size, mtime_ns)
+) WITHOUT ROWID;
 """
 
 #? (2.0.0-player.51) the states a library entry is held in - waiting or starred - beside `removed`
@@ -583,8 +598,13 @@ JOB_COLUMNS = {
     "source_json": "TEXT NOT NULL DEFAULT '{}'",
     #? (damaged downloads) what a listener is told happened to the download beyond its status - the copy from a
     #? source refused as damaged, and where it is coming from now (poller._refuse_damaged): {kind, text, from,
-    #? to, reason, verdict, differences, at}. NULL for none; any move to a source clears it (move_to_peer).
+    #? to, reason, verdict, match, differences, summary, lead, facts, was, at} - and `moving` while the move to the
+    #? next source is still to be made (resume_moves makes it after a stop). NULL for none; any move clears it.
     "notice_json": "TEXT",
+    #? (damaged downloads, review) 1 while `organizing` means only that the download's songs are being CHECKED - nothing
+    #? moved yet (begin_filing_check) - and 0 from the moment the filing itself starts (filing_began). A stop
+    #? caught in the check is checked again at start (poller.check_again), never settled as INTERRUPTED_FILING.
+    "checking": "INTEGER NOT NULL DEFAULT 0",
 }
 
 #? (2.0.0-player.61) Columns added to `sessions` since it shipped (2.0.0-player.48), as JOB_COLUMNS are to jobs.
@@ -1113,12 +1133,132 @@ class JobStore:
         except Exception:
             logger.error(f"failed to record what happened to job {job_id}")
 
+    async def refuse_copy(self, job_id: int, error: str, tried: list[dict], notice: dict,
+                          refused: list[tuple[str, int, int]], username: str | None) -> bool:
+        """
+        (damaged downloads, review) A download refused as damaged, in ONE transaction: the job failed with `error`,
+        its `tried` list (the refused source's entry saying why), its `notice` (`moving`: the move to the next
+        source still to be made), and every file the copy left in slskd's folder in refused_files, for every job's
+        filings to pass over. A stop after it finds the job as it says, and moves it on (poller.resume_moves).
+        Whether it was written.
+        """
+        if not self.available:
+            return False
+
+        def write() -> bool:
+            now = _now()
+            with self._connect() as connection:
+                cursor = connection.execute(
+                    "UPDATE jobs SET status = 'failed', error = ?, tried_json = ?, notice_json = ?, checking = 0, "
+                    "updated_at = ? WHERE id = ?",
+                    (error, json.dumps(tried), json.dumps(notice), now, job_id))
+                connection.executemany(
+                    "INSERT OR IGNORE INTO refused_files (path, size, mtime_ns, job_id, username, at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    [(str(path), int(size), int(written), job_id, username, now) for path, size, written in refused])
+                return cursor.rowcount > 0
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception:
+            logger.error(f"failed to record job {job_id}'s refused copy")
+            return False
+
+    async def refused_files(self) -> frozenset:
+        """(damaged downloads) Every refused file's identity (path, size, mtime_ns) - what every filing passes over."""
+        if not self.available:
+            return frozenset()
+
+        def read():
+            with self._connect() as connection:
+                return frozenset((row["path"], row["size"], row["mtime_ns"]) for row in
+                                 connection.execute("SELECT path, size, mtime_ns FROM refused_files"))
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception:
+            logger.error("failed to read the refused files")
+            return frozenset()
+
+    async def forget_refused_files(self, identities) -> int:
+        """(damaged downloads) Forget these refused files - gone, or no longer what was refused. How many."""
+        rows = [(str(path), int(size), int(written)) for path, size, written in identities]
+        if not self.available or not rows:
+            return 0
+
+        def write():
+            with self._connect() as connection:
+                before = connection.total_changes
+                connection.executemany(
+                    "DELETE FROM refused_files WHERE path = ? AND size = ? AND mtime_ns = ?", rows)
+                return connection.total_changes - before
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception:
+            logger.error("failed to forget refused files")
+            return 0
+
+    async def begin_filing_check(self, job_id: int) -> bool:
+        """
+        (damaged downloads, review) The job `organizing` with `checking` set, in one statement: its songs are being
+        checked and nothing has moved. filing_began() clears it when the filing itself starts. Whether written.
+        """
+        if not self.available:
+            return False
+
+        def write() -> bool:
+            with self._connect() as connection:
+                return connection.execute(
+                    "UPDATE jobs SET status = 'organizing', error = NULL, checking = 1, updated_at = ? WHERE id = ?",
+                    (_now(), job_id)).rowcount > 0
+
+        try:
+            return await asyncio.to_thread(write)
+        except Exception:
+            logger.error(f"failed to update job {job_id} to organizing")
+            return False
+
+    async def filing_began(self, job_id: int) -> None:
+        """(damaged downloads, review) The check is over and the filing itself starts: `checking` cleared. Leaves
+        updated_at alone - the status hasn't moved."""
+        if not self.available:
+            return
+
+        def write():
+            with self._connect() as connection:
+                connection.execute("UPDATE jobs SET checking = 0 WHERE id = ?", (job_id,))
+
+        try:
+            await asyncio.to_thread(write)
+        except Exception:
+            logger.error(f"failed to record that job {job_id}'s filing began")
+
+    async def jobs_moving_on(self) -> list[dict]:
+        """(damaged downloads, review) Failed jobs whose move to the next source is still to be made - a refusal's
+        notice still `moving` - oldest first."""
+        if not self.available:
+            return []
+
+        def read():
+            with self._connect() as connection:
+                rows = connection.execute(
+                    "SELECT * FROM jobs WHERE status = 'failed' AND notice_json IS NOT NULL AND json_valid(notice_json) "
+                    "AND json_extract(notice_json, '$.moving') = 1 ORDER BY id").fetchall()
+                return [self._row_to_job(r) for r in rows]
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception:
+            logger.error("failed to read the downloads still to move on")
+            return []
+
     async def next_source_inputs(self, job_id: int, index: int) -> dict | None:
         """
-        (damaged downloads) The runner-up at `index` of a job's list, whole - files, quality, score and all - and the
-        release's tracklist, for /jobs' next source (src/source_compare.py). Read by SQLite out of the two JSON
-        columns, as list_jobs reads the usernames, so neither is decoded whole for a row that wants one of each.
-        None when there is no such runner-up, or nothing can be read.
+        (damaged downloads) The runner-up at `index` of a job's list, whole - files, quality and all - and the
+        job's release, for /jobs' next source (src/source_compare.py scores both against it). Read by SQLite out of
+        the JSON columns, so the list is never decoded whole for a row that wants one of it. None when there is no
+        such runner-up, or nothing can be read.
         """
         if not self.available:
             return None
@@ -1127,16 +1267,15 @@ class JobStore:
             with self._connect() as connection:
                 row = connection.execute(
                     """
-                    SELECT json_extract(alternatives_json, '$[' || ? || ']') AS alternative,
-                           CASE WHEN json_valid(release_json) THEN json_extract(release_json, '$.tracks') END AS tracks
+                    SELECT json_extract(alternatives_json, '$[' || ? || ']') AS alternative, release_json
                       FROM jobs WHERE id = ?
                     """, (int(index), job_id)).fetchone()
                 if row is None or row["alternative"] is None:
                     return None
                 alternative = json.loads(row["alternative"])
-                tracks = json.loads(row["tracks"]) if row["tracks"] else []
+                release = json.loads(row["release_json"]) if row["release_json"] else {}
                 return {"alternative": alternative if isinstance(alternative, dict) else {},
-                        "tracks": tracks if isinstance(tracks, list) else []}
+                        "release": release if isinstance(release, dict) else {}}
 
         try:
             return await asyncio.to_thread(read)

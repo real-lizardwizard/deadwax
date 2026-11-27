@@ -230,7 +230,7 @@ def test_the_messages_the_poller_writes_read_back_as_their_outcome(store, monkey
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path / "music"))
     monkeypatch.setattr(Config, "FETCH_LYRICS", "off")
 
-    async def organize(job, download_root, library_root, on_plan=None):
+    async def organize(job, download_root, library_root, on_plan=None, refused=frozenset()):
         return {"plan": {}, **results}
 
     monkeypatch.setattr(poller, "organize_job", organize)

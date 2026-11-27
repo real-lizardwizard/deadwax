@@ -138,6 +138,26 @@ export interface DownloadJob {
    * given), null for nothing (still going, failed, nothing filed).
    */
   library?: LibraryGrant | null
+
+  /**
+   * (damaged downloads) What deadwax did of itself to this download, said in the server's own sentence: a copy
+   * refused as damaged and the next source asked - "The copy from glassbeads was damaged (extra data after the end
+   * of 2 of 3 songs). Now coming from sofaking, as good a match: same quality, songs and edition." - or none left
+   * (then it is the error too). Any move by hand clears it; null or absent for none.
+   */
+  notice?: JobNotice | null
+}
+
+/** A download's notice (src/poller.py _move_on): the sentence, and the move it tells of. */
+export interface JobNotice {
+  text: string
+  /** the source refused, and the one asked in its place - null when there was none to ask */
+  from: string
+  to: string | null
+  /** 'weaker' | 'different' | 'better' | 'as_good' (src/source_compare.py), with a move */
+  verdict?: string
+  /** "Next: sofaking · FLAC 16/44.1 · 95%", with a move */
+  lead?: string
 }
 
 export type LibraryGrant = 'added' | 'incomplete' | 'flagged' | 'looked'

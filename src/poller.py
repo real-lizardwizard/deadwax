@@ -53,6 +53,9 @@ async def poll_downloads_once(
     do not care about measurement keep working unchanged; when it is omitted, nothing is
     measured and nothing is recorded.
     """
+    #? (damaged downloads, review) first, any refused copy whose move to its next source a stop cut off
+    await resume_moves(store, slskd_client)
+
     open_jobs = await store.open_jobs()
 
     if not open_jobs:
@@ -245,17 +248,24 @@ async def _organize_if_enabled(job: dict, store, slskd_client=None) -> None:
     if not Config.organizing_enabled():
         return
 
-    await store.update_status(job["id"], "organizing")
+    #? (damaged downloads, review) `organizing` with `checking` set while the songs are checked - nothing moved, so a
+    #? stop here is checked again at start (check_again), never settled as INTERRUPTED_FILING
+    await store.begin_filing_check(job["id"])
 
     #? the album folder being filed, from the moment the plan names it until the index has it: a
     #? scan landing mid-copy must not pair it with some other copy's tombstone (store_index)
     filing: list[str | None] = []
 
-    def plan_made(plan: dict) -> None:
+    async def plan_made(plan: dict) -> None:
         filing.append(filing_started(Config.LIBRARY_PATH or "", plan.get("album_dir")))
+        #? the songs checked out and the filing itself starts: from here a stop is an interrupted filing
+        await store.filing_began(job["id"])
 
     try:
-        results = await organize_job(job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, on_plan=plan_made)
+        #? (damaged downloads, review) every refused copy's files, whichever job refused them, passed over
+        refused = await store.refused_files()
+        results = await organize_job(job, Config.SLSKD_DOWNLOAD_PATH, Config.LIBRARY_PATH, on_plan=plan_made,
+                                     refused=refused)
 
         if results.get("damaged"):
             #? refused before anything was marked or moved (organize_job): nothing to index or give anyone
@@ -367,18 +377,18 @@ async def _refuse_damaged(slskd_client, store, job: dict, results: dict) -> None
     message, on the row (the job's notice, or its error when it can't move) and in the event log, saying what was
     wrong and how the new source differs (src/source_compare.py).
 
-    The refused files stay in slskd's folder, as a cancelled download's do: its transfers leave slskd's list and its
-    partials go where SLSKD_INCOMPLETE_PATH is set (the move's own tidy, or the same here). Each is recorded on the
-    source's `tried` entry by identity (organizer.file_identity), so no later source's filing takes it for its own.
-
-    The job counts as still coming while it moves (retry_pending), as _fail's does. Never raises.
+    The refusal is ONE transaction (store.refuse_copy, review): the job failed with the reason, the source's
+    `tried` entry saying why, the notice `moving`, and every file the copy left in slskd's folder in the store's
+    refused_files - which every job's filings pass over, the next source's and a fresh Get's alike. The refused
+    files stay in slskd's folder, as a cancelled download's do: its transfers leave slskd's list and its partials
+    go where SLSKD_INCOMPLETE_PATH is set (the move's own tidy, or the same here). Then the move (_move_on); a stop
+    between the two finds the notice still `moving`, and the next poll makes the move (resume_moves). Never raises.
     """
     plan = results.get("plan") or {}
     damaged = results.get("damaged") or []
     peer = job.get("username") or ""
-    label = f"{job.get('artist')} - {job.get('album')}"
     reason = damage_reason([d.get("kind") for d in damaged], plan.get("songs") or len(job.get("files") or []))
-    said = f"The copy from {peer} was damaged ({reason})"
+    said = _said(peer, reason)
     try:
         refused = await asyncio.to_thread(_identities, plan)
     except Exception:
@@ -386,37 +396,59 @@ async def _refuse_damaged(slskd_client, store, job: dict, results: dict) -> None
     tried = [dict(entry) for entry in job.get("tried") or [{"username": peer, "directory": job.get("directory")}]]
     for entry in reversed(tried):
         if entry.get("username") == peer:
-            entry.update({"damaged": reason, "refused": refused})
+            entry["damaged"] = reason
             break
     else:
-        tried.append({"username": peer, "directory": job.get("directory"), "damaged": reason, "refused": refused})
-
-    pending = slskd_client is not None
-    if pending:
-        retry_pending_started(job["id"])
+        tried.append({"username": peer, "directory": job.get("directory"), "damaged": reason})
+    notice = {"kind": "damaged", "text": f"{said}.", "from": peer, "to": None, "reason": reason, "moving": True,
+              "at": time.time()}
     try:
-        #? failed first - what "try the next peer" moves on from - with the reason alone until it's known where to
-        await store.update_status(job["id"], "failed", f"{said}.")
-        await store.record_tried(job["id"], tried)
-        refused_job = {**job, "status": "failed", "tried": tried}
-        if slskd_client is None:
-            await _say_damaged(store, job, {"kind": "damaged", "text": f"{said}.", "from": peer, "to": None,
-                                            "reason": reason})
-            return
-        outcome = await retry_next_peer(slskd_client, store, refused_job)
+        written = await store.refuse_copy(job["id"], f"{said}.", tried, notice, [tuple(i) for i in refused], peer)
+    except Exception as e:
+        written = False
+        logger.error(f"couldn't record the damaged copy of job {job.get('id')}: {e}")
+    if not written:
+        return
+    await _move_on(slskd_client, store, {**job, "status": "failed", "error": f"{said}.", "tried": tried,
+                                         "notice": notice})
+
+
+def _said(peer: str, reason: str) -> str:
+    """ "The copy from glassbeads was damaged (extra data after the end of 3 of 11 songs)" - every message's start."""
+    return f"The copy from {peer} was damaged ({reason})"
+
+
+async def _move_on(slskd_client, store, job: dict) -> None:
+    """
+    (Damaged downloads, review) A refused download moved to its next source: `job` failed with its notice still
+    `moving` (store.refuse_copy). The notice is replaced by where it comes from now and how that source differs,
+    or the job's error by why it can't move; either way `moving` goes. Without `slskd_client` (nothing to ask) it
+    is left for the next poll's resume_moves. Never raises.
+    """
+    notice = job.get("notice") or {}
+    peer = notice.get("from") or job.get("username") or ""
+    reason = notice.get("reason") or ""
+    said = _said(peer, reason)
+    label = f"{job.get('artist')} - {job.get('album')}"
+    if slskd_client is None:
+        logger.warning(f"{label}: {said}. It moves to its next source at the next poll.",
+                       extra={"frontend": True, "src": "slskd"})
+        return
+    retry_pending_started(job["id"])
+    try:
+        outcome = await retry_next_peer(slskd_client, store, job)
         if outcome["moved"]:
             compared = await _compare_move(store, job, outcome)
             text = f"{said}. {moved_words(compared)}" if compared else f"{said}. Now coming from {outcome['username']}."
             await _say_damaged(store, job, {
                 "kind": "damaged", "text": text, "from": peer, "to": outcome["username"], "reason": reason,
-                **({"verdict": compared["verdict"], "match": compared["match"],
-                    "differences": compared["differences"], "summary": compared["summary"]} if compared else {}),
+                **({key: compared[key] for key in NOTICE_KEYS} if compared else {}),
             })
             return
         if outcome["problem"] in (MOVED_ON, CLEARED):
-            #? a click moved it, or the row went, while it was being moved: nothing more to say
+            #? a click moved it (which cleared the notice), or the row went, while it was being moved: nothing to say
             return
-        before = len(untried_alternatives(refused_job))
+        before = len(untried_alternatives(job))
         if not before:
             text = f"{said} and there is no other source."
         elif outcome["left"] == before:
@@ -430,7 +462,7 @@ async def _refuse_damaged(slskd_client, store, job: dict, results: dict) -> None
         await _say_damaged(store, job, {"kind": "damaged", "text": text, "from": peer, "to": None, "reason": reason})
         #? the refused attempt tidied as a cancelled one is - the move does the same when it moves
         try:
-            await tidy_cancelled_transfers(slskd_client, [refused_job])
+            await tidy_cancelled_transfers(slskd_client, [job])
             await asyncio.to_thread(remove_incomplete_downloads, Config.SLSKD_INCOMPLETE_PATH or "",
                                     job.get("files") or [], job.get("directory") or "")
         except Exception as e:
@@ -439,8 +471,29 @@ async def _refuse_damaged(slskd_client, store, job: dict, results: dict) -> None
         logger.error(f"couldn't move {label} on from the damaged copy from {peer}: {e}",
                      extra={"frontend": True, "src": "slskd"})
     finally:
-        if pending:
-            retry_pending_finished(job["id"])
+        retry_pending_finished(job["id"])
+
+
+#? (damaged downloads, review) what the moved notice carries of the comparison - as /jobs' next_source does
+NOTICE_KEYS = ("verdict", "match", "differences", "summary", "lead", "facts", "was")
+
+
+async def resume_moves(store, slskd_client) -> int:
+    """
+    (Damaged downloads, review) Downloads refused as damaged whose move to the next source a stop cut off - failed,
+    the notice still `moving` (store.refuse_copy wrote both, and the refused files, in one transaction) - moved on
+    now, at the start of every poll. How many were found. Never raises.
+    """
+    if slskd_client is None:
+        return 0
+    try:
+        waiting = await store.jobs_moving_on()
+    except Exception as e:
+        logger.error(f"couldn't read the downloads still to move on: {e}")
+        return 0
+    for job in waiting:
+        await _move_on(slskd_client, store, job)
+    return len(waiting)
 
 
 def _identities(plan: dict) -> list[list]:
@@ -454,7 +507,8 @@ def _identities(plan: dict) -> list[list]:
 
 
 async def _compare_move(store, job: dict, outcome: dict) -> dict | None:
-    """The source a damaged download moved to, against the one it was refused from (source_compare.next_source)."""
+    """The source a damaged download moved to, against the one it was refused from (source_compare.next_source) -
+    both scored by deadwax against the job's release, never by a score a client sent."""
     try:
         alternative = next((a for a in job.get("alternatives") or []
                             if a.get("username") == outcome["username"]
@@ -462,9 +516,9 @@ async def _compare_move(store, job: dict, outcome: dict) -> dict | None:
         if alternative is None:
             return None
         speeds = await store.peer_speeds([job.get("username"), outcome["username"]])
-        tracks = (job.get("release") or {}).get("tracks") or []
-        old = source_facts(job_as_source(job), tracks, (speeds.get(job.get("username")) or {}).get("avg_bytes_sec"))
-        new = source_facts(alternative, tracks, (speeds.get(outcome["username"]) or {}).get("avg_bytes_sec"))
+        release = job.get("release") or {}
+        old = source_facts(job_as_source(job), release, (speeds.get(job.get("username")) or {}).get("avg_bytes_sec"))
+        new = source_facts(alternative, release, (speeds.get(outcome["username"]) or {}).get("avg_bytes_sec"))
         return next_source(new, old)
     except Exception as e:
         logger.debug(f"couldn't compare the next source of job {job.get('id')}: {e}")
@@ -1002,7 +1056,9 @@ async def settle_interrupted_filing(store) -> int:
     row says where to look instead. Never raises: a start-up nicety must not stop the poller.
     """
     try:
-        stuck = await store.jobs_with_status(("organizing",))
+        #? (damaged downloads, review) not one caught while its songs were checked: nothing had moved, and
+        #? check_again checks and files it
+        stuck = [job for job in await store.jobs_with_status(("organizing",)) if not job.get("checking")]
         for job in stuck:
             await store.update_status(job["id"], "complete", INTERRUPTED_FILING)
         if stuck:
@@ -1015,6 +1071,32 @@ async def settle_interrupted_filing(store) -> int:
     except Exception as e:
         logger.error(f"couldn't settle downloads interrupted while filing: {e}")
         return 0
+
+
+async def check_again(store, slskd_client=None) -> int:
+    """
+    (Damaged downloads, review) Once, on start, after settle_interrupted_filing: downloads a stop caught while their
+    songs were being checked - `organizing` with `checking` still set (store.begin_filing_check), nothing moved -
+    checked and filed again, just as when they finished downloading (a damaged one refused and moved on, with
+    `slskd_client`). The check reads, and writes nothing; it isn't filing. With organizing turned off since, each is
+    left `complete`, where a download ends with it off. How many. Never raises.
+    """
+    try:
+        caught = [job for job in await store.jobs_with_status(("organizing",)) if job.get("checking")]
+    except Exception as e:
+        logger.error(f"couldn't read the downloads caught being checked: {e}")
+        return 0
+    for job in caught:
+        try:
+            if Config.organizing_enabled():
+                logger.info(f"checking {job.get('artist')} - {job.get('album')} again: deadwax stopped while it was "
+                            f"being checked", extra={"frontend": True, "src": "slskd"})
+                await _organize_if_enabled(job, store, slskd_client)
+            else:
+                await store.update_status(job["id"], "complete")
+        except Exception as e:
+            logger.error(f"couldn't check {job.get('artist')} - {job.get('album')} again: {e}")
+    return len(caught)
 
 
 #? (2.1.13, review) every fifteen minutes at the poll interval: a refused download is tried again by itself
@@ -1062,6 +1144,21 @@ async def refile_refused(store, slskd_client=None) -> int:
     return handed
 
 
+async def forget_gone_refusals(store) -> int:
+    """
+    (Damaged downloads, review) Once, on start: refused files (store.refused_files) that are no longer in slskd's
+    folder as they were refused - removed, or another file written under the name - forgotten, so the table holds
+    only what is still there to pass over. How many. Never raises.
+    """
+    try:
+        refused = await store.refused_files()
+        gone = await asyncio.to_thread(lambda: [i for i in refused if file_identity(i[0]) != tuple(i)])
+        return await store.forget_refused_files(gone) if gone else 0
+    except Exception as e:
+        logger.error(f"couldn't tidy the refused files: {e}")
+        return 0
+
+
 #? every ten minutes at the poll interval - the empty-folder sweep is a walk of slskd's
 #? incomplete folder, cheap but not free, and nothing about it is urgent
 EMPTY_DIR_SWEEP_POLLS = 120
@@ -1092,6 +1189,8 @@ async def run_download_poller(slskd_client, store) -> None:
     rate_samples: dict[int, RateAccumulator] = {}
 
     await settle_interrupted_filing(store)
+    await check_again(store, slskd_client)
+    await forget_gone_refusals(store)
     await refile_refused(store, slskd_client)
     await tidy_cancelled_on_start(slskd_client, store)
     await sweep_empty_incomplete_dirs()

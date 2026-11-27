@@ -652,6 +652,25 @@ def name_match(directory: str, files: list[dict], artist: str, album: str) -> fl
     return max(0.0, min(1.0, fit))
 
 
+def blend(signals: dict[str, float | None], manual: bool = False) -> float:
+    """
+    One score from a candidate's signals: WEIGHTS over the signals it has, renormalized - and for a MANUAL search
+    (2.1.37) the folder's fit to the words first. score_candidate's, and (damaged downloads) src/source_compare.py's,
+    which scores a job's two sources from their files alone and so leaves availability ("peer") out.
+    """
+    #? when a release has no tracklist (release-group level search) the tracklist-dependent
+    #? signals are None. Renormalize over whatever we do have rather than scoring those
+    #? candidates as though they'd failed.
+    active = {k: v for k, v in signals.items() if v is not None and k in WEIGHTS}
+    total_weight = sum(WEIGHTS[k] for k in active)
+    score = sum(WEIGHTS[k] * v for k, v in active.items()) / total_weight if total_weight else 0.0
+
+    if manual:
+        #? the usual blend is what sorts folders that fit equally: FLAC before MP3, a free slot before a queue
+        score = MANUAL_NAME_WEIGHT * (signals.get("name_match") or 0.0) + (1 - MANUAL_NAME_WEIGHT) * score
+    return score
+
+
 def score_candidate(candidate: dict, expected: dict, format_preference: str = "prefer_lossless") -> dict:
     """Score one (user, directory) candidate against the picked release. Returns it enriched."""
     files = candidate["files"]
@@ -676,16 +695,7 @@ def score_candidate(candidate: dict, expected: dict, format_preference: str = "p
     signals["format"] = score_format(files, format_preference)
     signals["peer"] = score_peer(candidate["response"])
 
-    #? when a release has no tracklist (release-group level search) the tracklist-dependent
-    #? signals are None. Renormalize over whatever we do have rather than scoring those
-    #? candidates as though they'd failed.
-    active = {k: v for k, v in signals.items() if v is not None and k in WEIGHTS}
-    total_weight = sum(WEIGHTS[k] for k in active)
-    score = sum(WEIGHTS[k] * v for k, v in active.items()) / total_weight if total_weight else 0.0
-
-    if manual:
-        #? the usual blend is what sorts folders that fit equally: FLAC before MP3, a free slot before a queue
-        score = MANUAL_NAME_WEIGHT * signals["name_match"] + (1 - MANUAL_NAME_WEIGHT) * score
+    score = blend(signals, manual)
 
     response = candidate["response"]
 

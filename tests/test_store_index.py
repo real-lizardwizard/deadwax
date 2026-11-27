@@ -1243,7 +1243,7 @@ def test_filing_that_partly_failed_still_indexes_what_landed(tmp_path, store, mo
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
     landed = on_disk(tmp_path, tracks=1)
 
-    async def organize(job, download_root, library_root, on_plan=None):
+    async def organize(job, download_root, library_root, on_plan=None, refused=frozenset()):
         return {"organized": 1, "skipped": 0, "failed": 1, "plan": {"album_dir": str(landed)}}
 
     monkeypatch.setattr(poller, "organize_job", organize)
@@ -1367,9 +1367,10 @@ def test_the_poller_marks_the_folder_being_filed_until_it_is_indexed(tmp_path, s
     monkeypatch.setattr(Config, "LIBRARY_PATH", str(tmp_path))
     seen = []
 
-    async def organize(job, download_root, library_root, on_plan=None):
+    async def organize(job, download_root, library_root, on_plan=None, refused=frozenset()):
         landed = on_disk(tmp_path)
-        on_plan({"album_dir": str(landed)})
+        #? (damaged downloads, review) the poller's on_plan is a coroutine now: it marks the filing begun
+        await on_plan({"album_dir": str(landed)})
         seen.append(("copying", store_index.being_filed(DUMMY)))
         if job["album"] == "broken":
             raise OSError("disk full")

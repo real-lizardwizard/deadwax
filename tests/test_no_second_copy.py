@@ -148,6 +148,16 @@ class FakeStore:
     async def update_status(self, job_id, status, error=None):
         self.statuses.append((status, error))
 
+    #? (damaged downloads, review) the filing's start: `organizing` while the songs are checked, then the filing
+    async def begin_filing_check(self, job_id):
+        self.statuses.append(("organizing", None))
+
+    async def filing_began(self, job_id):
+        pass
+
+    async def refused_files(self):
+        return []
+
 
 def test_the_job_says_it_was_already_in_the_store(monkeypatch):
     monkeypatch.setattr(Config, "SLSKD_DOWNLOAD_PATH", "/downloads")

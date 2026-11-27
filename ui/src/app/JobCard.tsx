@@ -131,6 +131,7 @@ export function DownloadingCard({ row, onCancel, asking = false, onKeep, onConfi
         <span class="app-job-title" dir="auto">{row.title}</span>
         <span class="app-job-line" dir="auto">{row.line}</span>
         {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
+        {row.notice && <span class="app-job-line is-warning" dir="auto">{row.notice}</span>}
         <JobBar progress={row.progress} />
         <span class="app-job-data">{row.data}</span>
       </div>
@@ -153,6 +154,7 @@ export function WaitingCard({ row, onCancel, asking = false, onKeep, onConfirm }
         <span class="app-job-title" dir="auto">{row.title}</span>
         <span class={`app-job-line${toneClass(row)}`} dir="auto">{row.line}</span>
         {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
+        {row.notice && <span class="app-job-line is-warning" dir="auto">{row.notice}</span>}
       </div>
       <CancelButton row={row} onCancel={onCancel} asking={question} />
       {question && <CancelConfirm row={row} onKeep={onKeep} onConfirm={onConfirm} />}
@@ -189,6 +191,8 @@ export function AttentionCard({
           <span class="app-job-title" dir="auto">{row.title}</span>
           {row.line && <span class="app-job-line" dir="auto">{row.line}</span>}
           {row.askedBy && <span class="app-job-line" dir="auto">{row.askedBy}</span>}
+          {/* (damaged downloads) what deadwax did of itself before it stopped - a damaged copy refused - in amber */}
+          {row.notice && <span class="app-job-line is-warning" dir="auto">{row.notice}</span>}
           {row.reason &&
             errorLine(row.reasonTell && !runs ? `${row.reason} ${TELL}` : row.reason, runs ? row.reasonDetail : null, { as: 'span', class: 'app-job-reason' })}
           {row.problem && errorLine(row.problem, runs ? row.problemDetail : null, { as: 'span', class: 'app-job-reason' })}

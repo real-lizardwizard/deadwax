@@ -59,6 +59,75 @@ def test_a_file_tagged_at_either_end_reads_ok(front, back):
     assert verdict.kind == OK and not verdict.damaged
 
 
+def id3v2_behind(size: int = 300) -> bytes:
+    """An ID3v2.4 tag written at the END of a file, as the spec allows: its footer flag set, "3DI" closing it."""
+    sizes = bytes([(size >> 21) & 0x7F, (size >> 14) & 0x7F, (size >> 7) & 0x7F, size & 0x7F])
+    return b"ID3\x04\x00\x10" + sizes + bytes(size) + b"3DI\x04\x00\x10" + sizes
+
+
+@pytest.mark.parametrize("back", [
+    ID3V1 + ID3V1,
+    id3v2_behind(),
+    id3v2_behind() + ID3V1,
+    APEV2 + id3v2_behind() + ID3V1,
+    b"TAG+" + bytes(223) + ID3V1,
+], ids=["id3v1 twice", "id3v2 behind", "id3v2 behind then id3v1", "apev2, id3v2, id3v1", "id3v1 with TAG+"])
+def test_every_known_tag_behind_the_audio_is_stripped_however_many(back):
+    """(review) The tags behind are taken off the end one at a time, again and again: an ID3v1 written twice, an
+    ID3v2 written at the end with its "3DI" footer, and any of them behind another, are all tags."""
+    data, _ = encode(trailer=back)
+    verdict = check(data)
+    assert verdict.kind == OK, verdict
+
+
+def test_extra_data_behind_a_stripped_tag_is_still_found():
+    """The stripping is only of tags: junk after the audio, with a tag after the junk, is still extra data."""
+    data, _ = encode(trailer=bytes(range(256)) * 4 + ID3V1 + ID3V1)
+    assert check(data).kind == STALE_TAIL
+
+
+def test_a_first_frame_numbered_other_than_0_is_damaged_inside():
+    """A stream copied from the middle of another (ffmpeg -c copy of a cut, its first frame numbered 14 - the
+    review's real encode) has lost its start: it is refused, and the docstring says so."""
+    data, frames = encode(blocks=(4096,) * 4 + (1000,))
+    start = frames[0][0]
+    data = data[:start] + data[frames[1][0]:]
+    assert check(data).kind == DAMAGED_INSIDE
+    assert "isn't frame 0" in flac_check.__doc__
+
+
+def test_a_frame_planted_with_thousands_of_the_next_header_costs_a_bounded_walk():
+    """(review) 8,000 copies of frame 1's header inside frame 0 each carry the next number, so each was summed from
+    the frame's start: quadratic, over a second for a 131 KB frame. The walk's summing is capped (SUM_BUDGET) - the
+    file is UNCHECKED, filed as before - and a whole file's walk sums each frame about once."""
+    blocks = (32768, 4096, 4096, 100)
+    data, _ = encode(blocks=blocks, plant={0: (0, lambda heads: heads[1] * 8000)})
+    spent = []
+    real_spend = flac_check._Spend
+
+    class Counting(real_spend):
+        def __call__(self, count):
+            spent.append(count)
+            super().__call__(count)
+
+    flac_check._Spend = Counting
+    try:
+        verdict = check(data)
+    finally:
+        flac_check._Spend = real_spend
+    assert verdict.kind == UNCHECKED and "summing" in verdict.why
+    assert sum(spent) <= flac_check.SUM_BUDGET[0] + flac_check.SUM_BUDGET[1] * len(data) + len(data)
+
+    whole, _ = encode(blocks=blocks)
+    spent.clear()
+    flac_check._Spend = Counting
+    try:
+        assert check(whole).kind == OK
+    finally:
+        flac_check._Spend = real_spend
+    assert sum(spent) <= len(whole)
+
+
 def test_one_or_two_zero_bytes_after_the_audio_are_not_called_damage():
     """They can't be told from the last frame's own CRC-16 ending in zeros, as flac_mp4 reads it too."""
     data = clean()

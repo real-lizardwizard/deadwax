@@ -114,6 +114,9 @@ export interface RequestRow {
   /** what the ✕ asks first, and its answer: a user's on a shared download leaves it, an admin's on one
    *  somebody else waits for cancels it for everyone (lib/perPerson.ts cancelWords) */
   cancelWords: CancelWords
+  /** (damaged downloads) what deadwax did of itself - a damaged copy refused and the next source asked - in the
+   *  server's own sentence, drawn where the row's error line is; null for none, and where it is the error already */
+  notice: string | null
 }
 
 export interface RequestsInput {
@@ -298,7 +301,7 @@ const blank = (key: string, jobId: number | null, section: Section, title: strin
   key, jobId, section, title, artist, cover: null, line: '', lineTone: 'plain', reason: null, reasonTell: false,
   reasonDetail: null, problem: null, problemDetail: null,
   progress: 0, data: null, brief: '', cancel: null, nextPeer: null, askAgain: null, busy: false, dimmed: false,
-  arriving: false, album, release: null, plays: false, askedBy: null, cancelWords: CANCEL_WORDS,
+  arriving: false, album, release: null, plays: false, askedBy: null, cancelWords: CANCEL_WORDS, notice: null,
 })
 
 /** The endings whose album is in the library (2.0.0-player.17): a Done row of one opens it... */
@@ -312,6 +315,7 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
   row.cover = jobCoverUrl(job.release_mbid)
   row.askedBy = askedByText(job)
   row.cancelWords = cancelWords(job)
+  row.notice = noticeWords(job)
   const cancelling = input.cancelling.has(job.id)
   //? (2.0.0-player.49) a cancel that only withdraws your request says so while it is out
   const going = row.cancelWords.leaves ? 'leaving…' : 'cancelling…'
@@ -391,6 +395,16 @@ function jobRow(job: DownloadJob, input: RequestsInput, now: number): RequestRow
     row.plays = FILED.has(job.outcome)
   }
   return row
+}
+
+/**
+ * (damaged downloads) A row's notice: the server's own sentence (src/poller.py _move_on), as safeWords lets a listener
+ * see it, on a row still going or stopped - none on a finished one, and none where the error says the same.
+ */
+export function noticeWords(job: Pick<DownloadJob, 'notice' | 'error' | 'status'>): string | null {
+  const text = (job.notice?.text ?? '').trim()
+  if (!text || text === (job.error ?? '').trim() || job.status === 'organized') return null
+  return safeWords(text, '').text || null
 }
 
 function pendingRow(pending: PendingDownload, personal = false): RequestRow {

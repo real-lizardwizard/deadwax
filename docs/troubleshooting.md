@@ -90,13 +90,15 @@ none of that copy was filed, and the download moved to its next source by itself
 finish. The rest of the message says how the new source differs from the damaged one.
 
 - **"…and there is no other source."** Every source on the list has been tried. **Get** it again: a fresh
-  search lists the sources sharing it now.
+  search lists the sources sharing it now, and a good copy from one of them is filed even when its folder
+  has the same name as the damaged one's (slskd writes it beside it, with digits added to each name).
 - **"…and no other source would send it."** / **"…the sources asked next wouldn't send it."** The next
   ones on the list refused. **Another source** tries the rest, if any are left; otherwise **Get** it again.
 - **"…and it wasn't tried again: …"** The album has meanwhile been filed, or is coming, some other way.
-- The damaged files are still in slskd's download folder, as a cancelled download's are. They are never
-  filed later - not by the next source, a restart or **Same source again** (which only finds the same
-  damaged files again) - so they are safe to delete from there.
+- The damaged files are still in slskd's download folder, as a cancelled download's are. deadwax remembers
+  each one, and never files it later - not with the next source's download, a fresh **Get**, after a
+  restart, or with **Same source again** (which fetches the copy again and checks it again: the same damage
+  refuses it again) - so they are safe to delete from there.
 - **If every download says it**, the files are probably being damaged on your side: check the disk and the
   `/downloads` mount, and slskd's own folders, before blaming the people sharing them. The event log names
   each song and what was wrong with it ("2000 bytes after the end of the audio", "the file ends inside the

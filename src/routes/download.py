@@ -899,29 +899,38 @@ async def _next_sources(store, jobs: list[dict], logins: bool) -> dict[int, dict
         return (speeds.get(name) or {}).get("avg_bytes_sec")
 
     async def one(job, index, other):
-        #? the store's file too (a second store - a test's - numbers its jobs from 1 again), and the peer: a move
-        #? changes the peer and the index in the same second updated_at can't tell apart
-        key = (getattr(store, "path", None), job["id"], job.get("updated_at"), job["username"], index,
-               rate(job["username"]), rate(other))
-        if key in _NEXT_SOURCES:
-            return job["id"], _NEXT_SOURCES[key]
-        inputs = await store.next_source_inputs(job["id"], index)
-        if not inputs:
-            return job["id"], None
-        tracks = inputs["tracks"]
-        described = next_source(source_facts(inputs["alternative"], tracks, rate(other)),
-                                source_facts(job_as_source(job), tracks, rate(job["username"])))
+        #? (review) one row that can't be described is a row without it - never every row's
+        try:
+            key = next_source_key(store, job, index, rate(job["username"]), rate(other))
+            if key in _NEXT_SOURCES:
+                return job["id"], _NEXT_SOURCES[key]
+            inputs = await store.next_source_inputs(job["id"], index)
+            if not inputs:
+                return job["id"], None
+            #? both scored by deadwax against the job's release (source_compare.match_score), never a client's score
+            release = inputs["release"]
+            described = next_source(source_facts(inputs["alternative"], release, rate(other)),
+                                    source_facts(job_as_source(job), release, rate(job["username"])))
+        except Exception as e:
+            logger.debug(f"couldn't describe job {job.get('id')}'s next source: {e}")
+            return job.get("id"), None
         if len(_NEXT_SOURCES) >= NEXT_SOURCES_KEPT:
             _NEXT_SOURCES.clear()
         _NEXT_SOURCES[key] = described
         return job["id"], described
 
-    try:
-        answers = await asyncio.gather(*(one(job, index, other) for job, index, other in wanted))
-    except Exception as e:
-        logger.debug(f"couldn't describe the next sources: {e}")
-        return {}
+    answers = await asyncio.gather(*(one(job, index, other) for job, index, other in wanted))
     return {job_id: described for job_id, described in answers if described}
+
+
+def next_source_key(store, job: dict, index: int, rate: float | None, other_rate: float | None) -> tuple:
+    """
+    (damaged downloads) What a next_source answer is made from, as its cache key: the store's file (a second store -
+    a test's - numbers its jobs from 1 again), the job, when its row last moved, its peer and the runner-up's place
+    - a move changes the peer and the place in the same second updated_at can't tell apart - and both measured
+    speeds.
+    """
+    return (getattr(store, "path", None), job["id"], job.get("updated_at"), job["username"], index, rate, other_rate)
 
 
 async def _filed_as(store, jobs: list[dict]) -> dict[int, dict]:

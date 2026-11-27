@@ -212,7 +212,8 @@ def test_filing_has_no_mode_any_more():
     """2.1.13: execute_plan and organize_job take no mode - off, dry run and copy are gone - and their results
     say nothing of one."""
     assert list(inspect.signature(execute_plan).parameters) == ["plan", "release"]
-    assert list(inspect.signature(organize_job).parameters) == ["job", "download_root", "library_root", "on_plan"]
+    assert list(inspect.signature(organize_job).parameters) == ["job", "download_root", "library_root", "on_plan",
+                                                                  "refused"]
     import src.organizer as organizer
     assert not hasattr(organizer, "ORGANIZE_MODES")
 

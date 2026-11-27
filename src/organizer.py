@@ -17,6 +17,7 @@ its clean-up never deletes past audio (cleanup_source_dirs).
 
 import asyncio
 import fnmatch
+import inspect
 import os
 import re
 import shutil
@@ -223,8 +224,15 @@ def folders_under(root: Path, library: Path | None):
         pending.extend(reversed(subfolders))
 
 
+#? (damaged downloads, review) slskd's name for a finished file whose name is taken: its FileService.MoveFile, with
+#? the default Destination.Exists = rename, moves it to `{stem}_{DateTime.UtcNow.Ticks}{ext}` - eighteen digits
+#? today. Six or more are taken for it, so a "Track_2" or a "Live_1999" is never read as one.
+SLSKD_RENAMED = re.compile(r"^(.+)_\d{6,}(\.[^.]*)?$")
+
+
 def find_local_file(download_root: str, remote_filename: str, remote_directory: str = "",
-                    library_root: str = "", skip: frozenset | set = frozenset()) -> Path | None:
+                    library_root: str = "", skip: frozenset | set = frozenset(),
+                    size: int | None = None) -> Path | None:
     """
     Locate what slskd actually wrote to disk for a given remote file.
 
@@ -247,9 +255,12 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
     release, and its album folder removed. The library's folder is never entered (folders_under) and a hit that
     leads into it anyway (a link) is passed over (in_library).
 
-    (Damaged downloads, 27 Nov) Nor a file another source's refused download left behind: `skip` holds their
-    identities (file_identity - where, how big, when written), and a hit with one is passed over. A refused album
-    stays in slskd's folder, as a cancelled one does, and the next source's files are usually named as its were.
+    (Damaged downloads, 27 Nov) Nor a file a refused download left behind: `skip` holds their identities
+    (file_identity - where, how big, when written; the store's refused_files, every job's), and a hit with one is
+    passed over. A refused album stays in slskd's folder, as a cancelled one does, and the next source's files are
+    usually named as its were - so slskd, finding the name taken, wrote the new one beside it as
+    `01 - Krakow_<ticks>.flac` (SLSKD_RENAMED), which is found as `01 - Krakow.flac` is. Of the hits left, the one
+    agreeing on the most folders wins, then one of the `size` the peer reported, then the newest written.
     """
     root = Path(download_root)
     if not root.is_dir():
@@ -261,11 +272,18 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
 
     library = Path(library_root) if library_root else None
     wanted = _name_matcher(basename)
+
+    def found(name: str) -> bool:
+        if wanted(name):
+            return True
+        renamed = SLSKD_RENAMED.match(name)
+        return bool(renamed) and wanted(renamed.group(1) + (renamed.group(2) or ""))
+
     matches = [
         folder / name
         for folder, names in folders_under(root, library)
         for name in names
-        if wanted(name)
+        if found(name)
     ]
     if library is not None:
         matches = [path for path in matches if not in_library(path, library)]
@@ -285,8 +303,15 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
             count += 1
         return count
 
+    def written(path: Path) -> tuple[bool, int]:
+        try:
+            status = path.stat()
+        except OSError:
+            return False, 0
+        return size is not None and status.st_size == size, status.st_mtime_ns
+
     #? max() keeps the first of equals, which is what this always returned with nothing to go on
-    return max(matches, key=agreement)
+    return max(matches, key=lambda path: (agreement(path), *written(path)))
 
 
 def file_identity(path: Path | str) -> tuple[str, int, int] | None:
@@ -300,25 +325,6 @@ def file_identity(path: Path | str) -> tuple[str, int, int] | None:
     except (OSError, ValueError):
         return None
     return str(path), status.st_size, status.st_mtime_ns
-
-
-def refused_identities(tried: list[dict] | None, username: str | None) -> frozenset:
-    """
-    (Damaged downloads) Every file the refused downloads of OTHER sources left behind, as file_identity()s - what
-    the job's `tried` entries recorded when each was refused (poller._refuse_damaged). The current source's own are
-    not passed over: asking it again finds its files, and they are checked, and refused, again.
-    """
-    found = set()
-    for entry in tried or []:
-        if not isinstance(entry, dict) or entry.get("username") == username:
-            continue
-        for identity in entry.get("refused") or []:
-            try:
-                path, size, written = identity
-                found.add((str(path), int(size), int(written)))
-            except (TypeError, ValueError):
-                continue
-    return frozenset(found)
 
 
 #? (2.0.0-player.65, the 2.0.0 release review) what a writer of a picture or a .lrc says of a name in the album's
@@ -821,7 +827,8 @@ def _positive(value) -> int | None:
     return value if isinstance(value, int) and value > 0 else None
 
 
-def plan_organization(job: dict, download_root: str, library_root: str, check_audio: bool = True) -> dict:
+def plan_organization(job: dict, download_root: str, library_root: str, check_audio: bool = True,
+                      refused: frozenset | set = frozenset()) -> dict:
     """
     Work out every file operation this job implies. Touches nothing.
 
@@ -834,7 +841,8 @@ def plan_organization(job: dict, download_root: str, library_root: str, check_au
     it, never changing it - and any found damaged is listed in `damaged`, which refuses the whole filing
     (organize_job, execute_plan): one damaged song refuses the album from that source. `check_audio` False
     leaves the check out, for a plan made only to see whether a refusal still holds (poller.refile_refused).
-    Files another source's refused download left behind are never found (refused_identities).
+    Files a refused download left behind are never found: `refused` holds their identities (file_identity), the
+    store's refused_files - every job's, so a fresh Get of the album can't take them either.
     """
     release = job.get("release") or {}
     tracks = release.get("tracks") or []
@@ -856,11 +864,12 @@ def plan_organization(job: dict, download_root: str, library_root: str, check_au
         entry["file"]["filename"]: entry["track"] for entry in mapping.values()
     }
 
-    #? every file found first, once: a manual search's download is named by what they carry - and never one another
-    #? source's refused download left in slskd's folder (damaged downloads)
-    skip = refused_identities(job.get("tried"), job.get("username"))
+    #? every file found first, once: a manual search's download is named by what they carry - and never one a
+    #? refused download left in slskd's folder (damaged downloads: the store's refused_files, any job's)
+    skip = frozenset(refused)
     located = [(file_entry, find_local_file(download_root, file_entry.get("filename", ""),
-                                            job.get("directory", ""), library_root, skip))
+                                            job.get("directory", ""), library_root, skip,
+                                            _positive(file_entry.get("size"))))
                for file_entry in files]
 
     #? (2.1.38) A MANUAL search's download (the app's Search Soulseek) has no release behind it, only the
@@ -977,6 +986,14 @@ def plan_organization(job: dict, download_root: str, library_root: str, check_au
                 if skip and file_identity(companion) in skip:
                     continue
                 target = album_dir / sanitize_filename(companion.name, companion.name)
+                #? (damaged downloads, review) a sidecar slskd renamed beside a refused copy's - `cover_<ticks>.jpg`
+                #? (SLSKD_RENAMED) - is filed under the name it came with, where that is free: Navidrome looks for
+                #? a cover.*, and the ticks are slskd's, not the album's
+                renamed = SLSKD_RENAMED.match(companion.name)
+                if renamed:
+                    plain = album_dir / sanitize_filename(renamed.group(1) + (renamed.group(2) or ""), companion.name)
+                    if plain not in used_targets:
+                        target = plain
                 if target in used_targets:
                     continue
                 used_targets.add(target)
@@ -1616,14 +1633,16 @@ def remove_incomplete_downloads(
 DAMAGED_NAMED = 5
 
 
-async def organize_job(job: dict, download_root: str, library_root: str, on_plan=None) -> dict:
+async def organize_job(job: dict, download_root: str, library_root: str, on_plan=None,
+                       refused: frozenset | set = frozenset()) -> dict:
     """
     Plan then execute - a move - with the logging the UI's event log surfaces. `on_plan(plan)`,
     when given, is told the plan before anything is written - the poller marks the album folder as
     being filed, so a scan landing mid-move doesn't take it for an album moved there by hand.
     """
     label = f"{job.get('artist')} - {job.get('album')}"
-    plan = await asyncio.to_thread(plan_organization, job, download_root, library_root)
+    #? in a worker thread, the audio check with it (damaged downloads): an album's FLACs are read whole
+    plan = await asyncio.to_thread(plan_organization, job, download_root, library_root, True, refused)
 
     for problem in plan["problems"]:
         logger.warning(f"{label}: {problem}", extra={"frontend": True, "src": "slskd"})
@@ -1670,7 +1689,10 @@ async def organize_job(job: dict, download_root: str, library_root: str, on_plan
                 "damaged": list(plan["damaged"]), "plan": plan}
 
     if on_plan is not None:
-        on_plan(plan)
+        #? (damaged downloads) the poller's is a coroutine: it records that the filing itself starts now
+        told = on_plan(plan)
+        if inspect.isawaitable(told):
+            await told
     results = await asyncio.to_thread(execute_plan, plan, job.get("release") or {})
 
     results["removed_dirs"] = await asyncio.to_thread(
