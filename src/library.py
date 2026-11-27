@@ -98,6 +98,33 @@ def written_at(directory: str) -> float | None:
 def library_is_behind() -> bool:
     return _behind
 
+#? The scan cache's GENERATION (2.1.47): a number that moves every time _album_cache's contents do - a
+#? folder read afresh or dropped by a walk, forgotten by a writer, seeded from the saved scan, the whole
+#? cache cleared. A scan and a snapshot each say which generation their albums are (`generation` on the
+#? result, None when they can't be sure - see _walk and snapshot_library), so the route can keep the
+#? answer it encoded for as long as the albums are the very same, and answer an unchanged library
+#? without encoding it again (routes/library.py _library_response). Never a clock: a retag moves it
+#? at once (forget_cached_album), and nothing else does.
+#?
+#? Moved AFTER the change it counts, under a lock of its own (`+= 1` is a read and a write, and a
+#? writer's thread and the scan's can both be here): a reader that saw the same number before and
+#? after it copied the cache copied a cache nothing was changing.
+_generation = 0
+_generation_lock = threading.Lock()
+
+
+def _moved() -> None:
+    """The scan cache's contents just changed: the next generation."""
+    global _generation
+    with _generation_lock:
+        _generation += 1
+
+
+def generation() -> int:
+    """The scan cache's generation, as it stands - see _generation."""
+    return _generation
+
+
 #? Serialises scans. Two at once would both re-read every changed folder, and the tidy-up
 #? loop at the end of one iterates the cache while the other mutates it. Snapshots do NOT take
 #? it: they exist to answer while a slow scan is running, and dict.copy() is atomic.
@@ -724,6 +751,7 @@ def clear_scan_cache() -> None:
     _dirty.clear()
     _removed.clear()
     _written_at.clear()
+    _moved()
 
 
 def forget_cached_album(directory: str) -> None:
@@ -744,6 +772,7 @@ def forget_cached_album(directory: str) -> None:
     _dirty.discard(directory)
     _removed.add(directory)
     _written_at[directory] = time.time()
+    _moved()
     note_library_changed()
 
 
@@ -765,6 +794,8 @@ def seed_cache(entries: list[tuple[str, float, dict]]) -> int:
             wrote = album.get("written_at")
             if isinstance(wrote, (int, float)) and wrote > _written_at.get(path, 0):
                 _written_at[path] = float(wrote)
+    if taken:
+        _moved()
     return taken
 
 
@@ -847,15 +878,19 @@ def snapshot_library(library_root: str) -> dict | None:
     prefix = root.rstrip(os.sep) + os.sep
     #? copied first: a scan may be running in another thread, and dict.copy() is atomic where
     #? iterating the live dict is not
+    before = _generation
     entries = [album for path, (_, album) in _album_cache.copy().items()
                if path == root or path.startswith(prefix)]
+    #? which generation these albums are - None when the cache moved while it was copied (a walk
+    #? under way, a writer forgetting a folder), so nothing is kept of an answer that fell between two
+    stamp = before if _generation == before else None
 
     if not entries:
         return None
 
     albums = [dict(album) for album in entries]
     return _assemble(albums, library_root, scanned_at=None, scan_seconds=0.0,
-                     cached=len(albums), stale=True)
+                     cached=len(albums), stale=True, generation=stamp)
 
 
 def scan_library(library_root: str, force: bool = False) -> dict:
@@ -878,7 +913,12 @@ def scan_library(library_root: str, force: bool = False) -> dict:
         )
 
     with _scan_lock:
-        albums, reused = _walk(root, force)
+        before = _generation
+        albums, reused, moves = _walk(root, force)
+        #? which generation these albums are: the cache as this walk left it - unless something else
+        #? moved it meanwhile (a writer forgetting a folder the walk had already passed), when the
+        #? albums in hand may be of no generation at all, and say None
+        stamp = _generation if _generation == before + moves else None
 
     return _assemble(
         albums, library_root,
@@ -886,17 +926,27 @@ def scan_library(library_root: str, force: bool = False) -> dict:
         scan_seconds=round(time.perf_counter() - started, 3),
         cached=reused,
         stale=False,
+        generation=stamp,
     )
 
 
-def _walk(root: Path, force: bool) -> tuple[list[dict], int]:
-    """Every album under root, reusing cached folders whose mtime hasn't moved. Hold _scan_lock."""
+def _walk(root: Path, force: bool) -> tuple[list[dict], int, int]:
+    """
+    Every album under root, reusing cached folders whose mtime hasn't moved. Hold _scan_lock.
+
+    Returns the albums, how many came from the cache, and how many times THIS walk moved the cache's
+    generation - once per change, as it makes it, so a snapshot taken mid-walk never shares a number
+    with one taken later in it.
+    """
+    moves = 0
     if force:
         #? everything goes, persisted rows included - a forced rescan is the escape hatch for
         #? not trusting the cache, so it must not quietly keep trusting the saved copy of it
         _removed.update(list(_album_cache))
         _album_cache.clear()
         _dirty.clear()
+        _moved()
+        moves += 1
 
     albums = []
     reused = 0
@@ -931,6 +981,8 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int]:
         _album_cache[current] = (mtime, album)
         _dirty.add(current)
         _removed.discard(current)
+        _moved()
+        moves += 1
         albums.append(dict(album))
         seen.add(current)
 
@@ -943,11 +995,13 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int]:
         _album_cache.pop(path, None)
         _dirty.discard(path)
         _removed.add(path)
+        _moved()
+        moves += 1
 
     global _behind
     _behind = False
 
-    return albums, reused
+    return albums, reused, moves
 
 
 def split_disc_folders(group: list[dict]) -> list[list[dict]]:

@@ -260,6 +260,27 @@ def outstanding(issues: list[str], ignored: list[str]) -> list[str]:
     return [code for code in issues if code not in muted]
 
 
+#? Every field attach_issues() puts on an album - what it decorates a scan's albums with, and so
+#? (2.1.47) what tells two decorated scans of the same albums apart: decorations() below, which the
+#? scan's route keeps its encoded answer by. A field added to attach_issues is added here
+#? (tests/test_metadata_health.py holds the two together).
+DECORATIONS = ("issues", "ignored_issues", "needs_attention", "severity", "first_seen", "imported", "reviewed")
+
+
+def decorations(albums: list[dict]) -> tuple:
+    """
+    What attach_issues() said of each album, in the albums' order, as a value to compare: its path and
+    every DECORATIONS field. Two scans of the same albums (library.generation) are the same answer
+    exactly when this is equal - whatever the reviews, Navidrome's listing or a setting did to get there.
+    """
+    return tuple(
+        (album.get("path"), tuple(album.get("issues") or ()), tuple(album.get("ignored_issues") or ()),
+         album.get("needs_attention"), album.get("severity"), album.get("first_seen"),
+         album.get("imported"), album.get("reviewed"))
+        for album in albums
+    )
+
+
 def attach_issues(albums: list[dict], reviews: dict[str, dict] | None = None,
                   unlisted: set[str] | frozenset[str] | None = None) -> dict:
     """

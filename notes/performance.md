@@ -49,6 +49,72 @@ things it found, each fixed:
   and what is still asked about), app-rules.sim (the deferred Library, the three sizes), and the real
   page before and after with the request log above.
 
+### The speed fixes of 2.1.47 on (the code audit of 27 Nov 2026)
+
+An audit read the code for waits and measured nothing (`deadwax-plans/audit-code-speed.md`). James: "just try
+to make those speed optimizations". Each one below was confirmed in the code and measured before it was
+changed, on generated libraries of 1,060 and 5,000 albums of 12 tracks (album dicts shaped as
+`read_album_dir` makes them, seeded straight into the scan cache - no files; the generated titles are long, so
+a body is about twice a real library's of the same count). The measure that matters for the first two is **how
+long the event loop stands still**: a task that sleeps 1 ms at a time records its longest gap between two
+wake-ups while the request is served on the same loop (httpx's ASGI transport, no network). On one loop that
+gap is how late every other request is - a playing song's next byte range among them.
+
+#### The scan's answer, kept (2.1.47)
+
+**The cause, confirmed.** `/library/albums` (and `/rescan`) scanned in a worker thread and then did everything
+else on the event loop, on every ask: `attach_issues` over every album (40 ms on 1,060 albums), then
+`_library_response` - `compact_for_wire` (81 ms), `json.dumps` (38 ms, 3.8 MB), the ETag's hash (11 ms) - and,
+for a 200, `CompressText`'s gzip (57 ms). The ETag saved the download and none of the work: a 304 was built
+whole, then thrown away. The app asks twice a visit (the saved scan, then the real one).
+
+**The fix.**
+- **The scan cache has a generation** (`src/library.py` `generation()`): a number that moves each time
+  `_album_cache`'s contents do - a folder a walk reads afresh or drops, one a writer forgets
+  (`forget_cached_album`: every retag, art fetch, delete and move), a seeding from the saved scan, a clear.
+  A scan and a snapshot each carry the generation of the albums they return, or **None when they can't be
+  sure**: a snapshot whose copy of the cache straddled a change, and a walk that something else cut across
+  (it counts its own moves; any other is a writer's). Never a clock.
+- **The route keeps the encoded answer** (`routes/library.py` `_kept_answers`): the ETag and the body
+  gzipped (only gzipped - a twentieth of the JSON, and a 304 needs neither), one per form asked (saved scan
+  or real, with tracks or without). It is kept BY everything the body is made of: the generation; the
+  albums' paths in order with what this request's `attach_issues` said of each
+  (`metadata_health.decorations()`, by value); and the rest of the body by value. So a review ignored, an
+  import looked at, Navidrome's listing or the folder template changing each make another answer with
+  nothing having to remember to drop the kept one - and a result with no generation keeps nothing.
+- **Off the loop when it must be built**: `attach_issues` and `_pack_scan` (compact, encode, hash, gzip)
+  run through `asyncio.to_thread`. The route answers the gzip itself (`json_etag.answer_packed`:
+  `Content-Encoding: gzip`, `Vary: Accept-Encoding`, which Starlette's GZipMiddleware passes through
+  untouched), so a 200 of a kept body costs no compression either; an asker that doesn't accept gzip gets it
+  unpacked in a worker thread. The ETag is of the same bytes as before, so a browser's stored copy from
+  2.1.46 still answers 304.
+
+**Measured** (`/library/albums?snapshot=true`, no store, the same machine and run):
+
+| | 1,060 albums, before | after | 5,000 albums, before | after |
+| --- | --- | --- | --- | --- |
+| a 304: loop stood still (median of 7) | 82 ms | **13 ms** | 362 ms | **36 ms** |
+| a 304: answered in | 82 ms | **26 ms** | 450 ms | **132 ms** |
+| a 200 of an unchanged library: loop stood still | 102 ms | **13 ms** | 514 ms | **19 ms** |
+| the first 200 (nothing kept): loop stood still | 111 ms | **19 ms** | 471 ms | **87 ms** |
+
+What is left of the loop's gap is not work on the loop - there, an unchanged answer is `decorations()` and a
+comparison, 0.2 ms on 1,060 albums - but the worker threads holding the interpreter's lock in turns of up
+to 5 ms (the snapshot's assembly, `attach_issues`). What is left of the answer's time is those two.
+
+**Don't**: put a per-request value in the body (it was already a rule: the ETag; now it would also defeat
+the kept answer, silently); add a field to `attach_issues` without adding it to `DECORATIONS`
+(tests/test_metadata_health.py holds them together - a field missed is a stale answer); change
+`_album_cache` anywhere without `_moved()`.
+
+**Not verified**: on a real library, a real disk, or James's server - only the generated one. A real scan
+(not the snapshot) still walks and stats every folder in its thread, which this does not change. `/owned`
+still encodes its smaller answer (ten fields an album) on the loop.
+
+**Tests**: tests/test_library_cache.py "the scan's answer, kept" (ten: the generation and what moves it, a
+walk cut across, an unchanged library not encoded again, never on the loop, each form's own answer, a retag
+in place, a review changing, gzip once and only when accepted), tests/test_metadata_health.py (one).
+
 ## Known performance problems (profiled, not guessed)
 
 Measured with 148 releases × 12 tracks:

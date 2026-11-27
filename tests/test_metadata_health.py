@@ -439,3 +439,25 @@ def test_an_album_filed_under_its_artists_current_name_is_not_misfiled():
     album = {"path": "Ye/Donda (2021)", "artist": "Ye", "album": "Donda", "year": "2021",
              "release_mbid": "donda", "track_count": 1}
     assert "misfiled" not in inspect_album(album)
+
+
+# ---------------------------------------------------------------- decorations (2.1.47)
+
+def test_decorations_hold_every_field_attach_issues_adds():
+    """The scan's kept answer is kept by them: a field attach_issues adds and they miss would go stale."""
+    from src.metadata_health import DECORATIONS, decorations
+
+    album = make_album()
+    before = set(album)
+    attach_issues([album])
+    assert set(album) - before == set(DECORATIONS)
+
+    #? and each one changing changes the value compared
+    base = decorations([album])
+    for field, other in (("issues", ["no_art"]), ("ignored_issues", ["no_art"]), ("needs_attention", True),
+                         ("severity", 3), ("first_seen", 12.5), ("imported", True), ("reviewed", True)):
+        assert field in DECORATIONS
+        assert decorations([{**album, field: other}]) != base, field
+    assert decorations([{**album, "path": "Elsewhere/Album"}]) != base
+    assert decorations([album, album]) != base
+    assert decorations([dict(album)]) == base

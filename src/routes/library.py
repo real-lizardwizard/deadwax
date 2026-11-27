@@ -23,7 +23,7 @@ from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, albums_without_tracks, 
                          read_album_details, read_artist_mbid, scan_library, seed_cache,
                          snapshot_library, summarize_for_deletion)
 from src.logger import logger
-from src.metadata_health import ISSUE_TYPES, attach_issues
+from src.metadata_health import ISSUE_TYPES, attach_issues, decorations
 from src.navidrome_listing import LISTING_FRESH_SECONDS, LISTING_STALE_SECONDS, navidrome_listing
 from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.organizer import is_within
@@ -32,7 +32,7 @@ from src.api.lrclib_endpoint import lrclib
 from src.lyrics import fetch_album_lyrics, read_track_lyrics
 from src.retag import (changes_player_ids, execute_retag, hold_back_rename, move_retagged, plan_cover_art,
                        plan_retag, save_cover_art)
-from src.api.json_etag import json_with_etag
+from src.api.json_etag import answer_packed, json_with_etag, pack
 from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, SignedOut, client_for, navidrome
 from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_SECONDS,
                            SCAN_WAIT_CAP_SECONDS, ScanStatus, WaitState, begin, read_status,
@@ -251,12 +251,17 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
     #? a real scan prunes the verdicts of folders it didn't find (unlisted() keeps them when it found
     #? none); a snapshot never does - it lacks a folder a writer has just forgotten
     unlisted = navidrome_listing.unlisted(result["albums"], prune=not result["stale"] and not result["problem"])
-    result["queue"] = attach_issues(result["albums"], reviews, unlisted)
-    result["issue_types"] = ISSUE_TYPES
     #? whether the albums could be checked against Navidrome, read in the same moment as the verdicts
-    #? (a refresh can land while the walk or the reviews are awaited) - no time in it, so an
-    #? unchanged library is still an unchanged body (the ETag's 304)
-    result["navidrome_check"] = navidrome_listing.check()
+    #? (a refresh can land while the walk or the reviews are awaited - or, since 2.1.47, while the
+    #? issues are worked out) - no time in it, so an unchanged library is still an unchanged body
+    #? (the ETag's 304)
+    check = navidrome_listing.check()
+    #? in a worker thread (2.1.47): every album inspected is 40 ms on a thousand albums, and on the
+    #? event loop that was 40 ms of every other request - the audio's byte ranges too - standing still.
+    #? The albums are this request's own copies (library.py), so nothing else reads them meanwhile.
+    result["queue"] = await asyncio.to_thread(attach_issues, result["albums"], reviews, unlisted)
+    result["issue_types"] = ISSUE_TYPES
+    result["navidrome_check"] = check
     #? so the interface can say "your ignores aren't being saved" rather than silently
     #? forgetting them, exactly as the downloads panel does for job tracking
     result["review_tracking_enabled"] = bool(store and store.available)
@@ -287,13 +292,50 @@ _SCAN_HEADERS = {"scanned_at": "X-Scanned-At", "scan_seconds": "X-Scan-Seconds",
                  "cached": "X-Scan-Cached", "stale": "X-Scan-Stale"}
 
 
-def _library_response(request: Request, result: dict, tracks: bool = True) -> Response:
+#? What a scan's result carries that is no part of its body: the headers above, and which generation
+#? of the scan cache its albums are (library.generation - what the kept answer below is kept by).
+_NOT_IN_BODY = (*_SCAN_HEADERS, "generation")
+
+#? The scan's answer as it was last encoded (2.1.47), one per form it is asked in - (the saved scan or
+#? a real one, with tracks or without) -> (what it is the answer TO, its ETag, its body gzipped). See
+#? _library_response.
+_kept_answers: dict[tuple[bool, bool], tuple[tuple, str, bytes]] = {}
+
+
+def _pack_scan(result: dict, tracks: bool) -> tuple[str, bytes]:
+    """A scan's body - compact tracks, or none - encoded, hashed and gzipped. A worker thread's work."""
+    body = {k: v for k, v in result.items() if k not in _NOT_IN_BODY}
+    body["albums"] = compact_for_wire(result["albums"]) if tracks else albums_without_tracks(result["albums"])
+    return pack(body)
+
+
+async def _library_response(request: Request, result: dict, tracks: bool = True) -> Response:
     """
     A scan as the interface is sent it: compact tracks, the volatile fields as headers.
 
     `tracks=False` (2.1.28) leaves each album's tracks and track_defaults out and changes nothing
     else - the scan, the queue, the headers - so its ETag is of a different body and the two forms
     never answer each other's If-None-Match.
+
+    (2.1.47) The body is encoded in a worker thread, and KEPT until the scan it answers is another
+    one. Building it - the tracks compacted, megabytes of JSON, its hash, gzip - was 170 ms of the
+    event loop on a thousand albums (measured; notes/performance.md "The scan's answer, kept"), on
+    every visit to the library, paid even to say "nothing changed": every other request waited
+    behind it, a playing song's next byte range among them.
+
+    What the kept answer is kept BY is everything the body is made of, and no clock:
+     - `generation`: which scan cache these albums are (src/library.py) - it moves when a folder is
+       read afresh, dropped, or forgotten by a writer (a retag, an art fetch, a delete, a move), so
+       an edit is never answered from before it. A result that can't say (None) keeps nothing;
+     - the form: the answers with and without tracks are two, and a saved scan's and a real one's
+       are kept apart so that neither pushes the other out where their albums tie-break in another
+       order (they are nearly always the same bytes, held once);
+     - metadata_health.decorations(): the albums' paths in their order, and what THIS request's
+       attach_issues said of each, by value - so a review ignored, an import looked at, Navidrome's
+       listing or a folder template changing each make another answer without anything having to
+       remember to say so;
+     - everything else in the body (the queue's counts, the Navidrome check, the path, the problem),
+       by value.
     """
     def header(key: str) -> str:
         value = result.get(key)
@@ -302,9 +344,27 @@ def _library_response(request: Request, result: dict, tracks: bool = True) -> Re
         return str(int(value)) if key == "stale" else str(value)
 
     headers = {name: header(key) for key, name in _SCAN_HEADERS.items()}
-    body = {k: v for k, v in result.items() if k not in _SCAN_HEADERS}
-    body["albums"] = compact_for_wire(result["albums"]) if tracks else albums_without_tracks(result["albums"])
-    return json_with_etag(request, body, headers)
+
+    form = (bool(result.get("stale")), bool(tracks))
+    answers = None
+    if result.get("generation") is not None:
+        rest = {k: v for k, v in result.items() if k not in _NOT_IN_BODY and k not in ("albums", "artists")}
+        answers = (result["generation"], decorations(result["albums"]), rest)
+
+    kept = _kept_answers.get(form)
+    if answers is not None and kept is not None and kept[0] == answers:
+        _, etag, packed = kept
+    else:
+        etag, packed = await asyncio.to_thread(_pack_scan, result, tracks)
+        if answers is not None:
+            #? the saved scan and the real one are nearly always the same bytes: hold them once
+            for _, other_etag, other_packed in _kept_answers.values():
+                if other_etag == etag:
+                    packed = other_packed
+                    break
+            _kept_answers[form] = (answers, etag, packed)
+
+    return await answer_packed(request, etag, packed, headers)
 
 
 @router.get("/albums")
@@ -345,7 +405,7 @@ async def albums(request: Request, snapshot: bool = False, tracks: bool = True):
                 extra={"frontend": True},
             )
 
-        return _library_response(request, result, tracks)
+        return await _library_response(request, result, tracks)
 
     except Exception as e:
         logger.error(f"Exception in /albums endpoint: {e}")
@@ -417,7 +477,7 @@ async def rescan(request: Request, tracks: bool = True):
     `?tracks=false` answers as /albums' does (2.1.28).
     """
     try:
-        return _library_response(request, await _scan_with_queue(request, True), tracks)
+        return await _library_response(request, await _scan_with_queue(request, True), tracks)
 
     except Exception as e:
         logger.error(f"Exception in /rescan endpoint: {e}")

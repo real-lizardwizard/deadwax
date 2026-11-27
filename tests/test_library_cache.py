@@ -636,3 +636,190 @@ def test_a_rescan_without_its_tracks(tmp_path, monkeypatch, store):
     assert lean.json() == without_tracks(full.json())
     assert lean.json() == lean_scan, "a forced read of an unchanged library is the same answer"
     assert all(album["tracks"] for album in full.json()["albums"]), "rescan's default is untouched"
+
+
+# ---------------------------------------------------------------- the scan's answer, kept (2.1.47)
+
+def test_the_scan_cache_says_which_generation_it_is(tmp_path):
+    """It moves when the cache's contents do, and only then - what a kept answer is kept by."""
+    directory = seed_album(tmp_path)
+    first = scan_library(str(tmp_path))
+    assert first["generation"] == library.generation()
+
+    again = scan_library(str(tmp_path))
+    assert again["generation"] == first["generation"], "an unchanged library is the same generation"
+    assert snapshot_library(str(tmp_path))["generation"] == first["generation"]
+
+    #? a retag leaves the folder's mtime alone - forgetting the folder is what says it changed
+    forget_cached_album(str(directory))
+    assert library.generation() > first["generation"]
+    reread = scan_library(str(tmp_path))
+    assert reread["generation"] > first["generation"]
+
+    shutil.rmtree(directory)
+    assert scan_library(str(tmp_path))["generation"] > reread["generation"], "a folder gone is another one"
+
+
+def test_a_forced_rescan_and_a_seeding_are_each_another_generation(tmp_path):
+    seed_album(tmp_path)
+    first = scan_library(str(tmp_path))
+    forced = scan_library(str(tmp_path), force=True)
+    assert forced["generation"] > first["generation"]
+
+    saved, _ = drain_cache_changes()
+    library.clear_scan_cache()
+    cleared = library.generation()
+    assert cleared > forced["generation"]
+    assert seed_cache(saved) == 1 and library.generation() > cleared
+    assert seed_cache(saved) == 0 and library.generation() == cleared + 1, "nothing taken, nothing moved"
+
+
+def test_a_scan_a_writer_cut_across_says_no_generation(tmp_path, monkeypatch):
+    """
+    A folder forgotten while a walk is under way - after the walk passed it - leaves albums in hand that
+    are no generation of the cache at all. Nothing may be kept by them.
+    """
+    first = seed_album(tmp_path)
+    seed_album(tmp_path, artist="Portishead", folder="Dummy (1994)", album="Dummy")
+    scan_library(str(tmp_path))
+    forget_cached_album(str(tmp_path / "Portishead" / "Dummy (1994)"))
+
+    real = library.read_album_dir
+
+    def read_and_cut_across(directory, root):
+        #? the walk is re-reading Portishead; Tame Impala's cached copy is already in its list
+        forget_cached_album(str(first))
+        return real(directory, root)
+
+    monkeypatch.setattr(library, "read_album_dir", read_and_cut_across)
+    cut = scan_library(str(tmp_path))
+    assert cut["album_count"] == 2 and cut["generation"] is None
+
+    monkeypatch.setattr(library, "read_album_dir", real)
+    assert scan_library(str(tmp_path))["generation"] == library.generation()
+
+
+def count_packs(monkeypatch):
+    """Counts every encoding of a scan's body, and notes whether any ran on the event loop."""
+    from src.routes import library as library_route
+    real = library_route._pack_scan
+    seen = {"packs": 0, "on_the_loop": 0}
+
+    def counted(result, tracks):
+        seen["packs"] += 1
+        try:
+            asyncio.get_running_loop()
+            seen["on_the_loop"] += 1
+        except RuntimeError:
+            pass
+        return real(result, tracks)
+
+    monkeypatch.setattr(library_route, "_pack_scan", counted)
+    return seen
+
+
+def test_an_unchanged_library_is_answered_without_encoding_it_again(tmp_path, monkeypatch, store):
+    client = warm_client(tmp_path, monkeypatch, store)
+    first = client.get("/deadwax/library/albums")
+    seen = count_packs(monkeypatch)
+
+    again = client.get("/deadwax/library/albums", headers={"If-None-Match": first.headers["etag"]})
+    assert again.status_code == 304 and seen["packs"] == 0
+
+    #? and a 200 of it - another browser, with no copy - is the kept body, the same bytes
+    whole = client.get("/deadwax/library/albums")
+    assert whole.status_code == 200 and seen["packs"] == 0
+    assert whole.content == first.content and whole.headers["etag"] == first.headers["etag"]
+    assert float(whole.headers["x-scanned-at"]) >= float(first.headers["x-scanned-at"]), "the headers are fresh"
+
+
+def test_the_scans_body_is_never_encoded_on_the_event_loop(tmp_path, monkeypatch, store):
+    seed_album(tmp_path)
+    client = make_client(tmp_path, monkeypatch, store)
+    seen = count_packs(monkeypatch)
+
+    assert client.get("/deadwax/library/albums").status_code == 200
+    assert client.get("/deadwax/library/albums", params={"snapshot": "true", "tracks": "false"}).status_code == 200
+    assert client.post("/deadwax/library/rescan").status_code == 200
+    assert seen["packs"] >= 3 and seen["on_the_loop"] == 0
+
+
+def test_each_form_keeps_its_own_answer(tmp_path, monkeypatch, store):
+    client = warm_client(tmp_path, monkeypatch, store)
+    forms = [{}, {"tracks": "false"}, {"snapshot": "true"}, {"snapshot": "true", "tracks": "false"}]
+    firsts = [client.get("/deadwax/library/albums", params=form) for form in forms]
+    seen = count_packs(monkeypatch)
+
+    for form, first in zip(forms, firsts):
+        again = client.get("/deadwax/library/albums", params=form)
+        assert again.content == first.content and again.headers["etag"] == first.headers["etag"]
+    assert seen["packs"] == 0
+    assert "tracks" in firsts[0].json()["albums"][0] and "tracks" not in firsts[1].json()["albums"][0]
+
+
+def test_a_retag_in_place_is_never_answered_from_before_it(tmp_path, monkeypatch, store):
+    """The folder's mtime doesn't move for a retag: the forget is all that says so, and it is enough."""
+    import os
+    directory = seed_album(tmp_path)
+    client = make_client(tmp_path, monkeypatch, store)
+    client.get("/deadwax/library/albums")
+    before = client.get("/deadwax/library/albums")
+    kept = os.stat(directory).st_mtime
+
+    audio = FLAC(str(directory / "01 - Track 1.flac"))
+    audio["title"] = "Retitled"
+    audio.save()
+    os.utime(directory, (kept, kept))
+    forget_cached_album(str(directory))
+
+    for form in ({}, {"snapshot": "true"}):
+        after = client.get("/deadwax/library/albums", params=form, headers={"If-None-Match": before.headers["etag"]})
+        assert after.status_code == 200
+        assert after.json()["albums"][0]["tracks"][0]["title"] == "Retitled"
+
+
+def test_a_review_changing_is_another_answer_though_no_folder_did(tmp_path, monkeypatch, store):
+    """What the queue says is part of the body, and no generation of the scan cache: it is compared by value."""
+    seed_album(tmp_path)
+    client = make_client(tmp_path, monkeypatch, store)
+    client.get("/deadwax/library/albums")
+    before = client.get("/deadwax/library/albums")
+    album = before.json()["albums"][0]
+    assert album["needs_attention"]
+    generation = library.generation()
+
+    ignored = client.post("/deadwax/library/queue/ignore", json={"album_path": album["path"], "issues": album["issues"]})
+    assert ignored.status_code == 200
+
+    after = client.get("/deadwax/library/albums", headers={"If-None-Match": before.headers["etag"]})
+    assert library.generation() == generation, "no folder changed"
+    assert after.status_code == 200 and not after.json()["albums"][0]["needs_attention"]
+    assert after.json()["queue"]["total"] == 0
+
+
+def test_a_kept_answer_is_gzipped_only_for_an_asker_who_accepts_it(tmp_path, monkeypatch, store):
+    import gzip
+    import json
+    client = warm_client(tmp_path, monkeypatch, store)
+
+    packed = client.get("/deadwax/library/albums", headers={"Accept-Encoding": "gzip"})
+    assert packed.headers["content-encoding"] == "gzip" and "accept-encoding" in packed.headers["vary"].lower()
+
+    plain = client.get("/deadwax/library/albums", headers={"Accept-Encoding": "identity"})
+    assert "content-encoding" not in plain.headers
+    assert plain.content == packed.content and json.loads(plain.content)["album_count"] == 2
+    assert plain.headers["etag"] == packed.headers["etag"]
+
+    #? and through the app's own compression: once, not twice
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from starlette.middleware.gzip import GZipMiddleware
+    from src.routes import library as library_route
+    app = FastAPI()
+    app.state.store = store
+    app.include_router(library_route.router, prefix="/deadwax/library")
+    app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=6)
+    with TestClient(app).stream("GET", "/deadwax/library/albums", headers={"Accept-Encoding": "gzip"}) as raw:
+        body = b"".join(raw.iter_raw())
+        assert raw.headers["content-encoding"] == "gzip"
+    assert gzip.decompress(body) == plain.content
