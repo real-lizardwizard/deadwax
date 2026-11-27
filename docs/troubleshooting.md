@@ -703,6 +703,28 @@ for it (deadwax 2.1.52 on - before that a description that came late went to the
 is that there's none, the gap closes; open the page again in the same visit and it isn't left. A description is
 always under the name or the hero now, never at the foot.
 
+## A song's credits say they can't be asked for just now
+
+A song's credits in the app's Info ([credits](ios.md)) come from MusicBrainz. "Can't be asked for just now" means
+deadwax had nothing kept for that album, and MusicBrainz didn't answer within eight seconds or couldn't be reached
+(or Navidrome couldn't be asked about the song). deadwax keeps asking MusicBrainz after the app gets that answer.
+Opening Info again a little later usually shows them, and once they've come they're kept for a month and shown even
+while MusicBrainz is down. If it lasts, see whether Settings' Connections says MusicBrainz isn't connected
+([above](#settings-connections-says-musicbrainz-isnt-connected)). deadwax's own log (the container's output) has a
+line starting "credits:" saying which it was.
+
+The other things credits can say:
+
+- **"MusicBrainz has no credits for this album yet"**: add them on MusicBrainz (the link opens the album's
+  release there). deadwax shows them once it asks MusicBrainz about that album again, which can take up to a month.
+  **Clear MusicBrainz's saved answers** (Server settings → **Connections**) makes it ask on the next look.
+- **Credits "on the album" for a song MusicBrainz does credit**: deadwax couldn't be sure which track of the release
+  the song is. The file has no recording id, and that disc has a different number of songs in Navidrome than on the
+  release (a missing or extra track, or two copies of the album). Matching the album to the release it really is
+  (**Edit → Release**) fixes it.
+- **"This album isn't matched to a release"**: its files carry no MusicBrainz release id, or MusicBrainz no longer
+  has that release. **Edit → Release** matches it.
+
 ## The artist page can't work out who this is
 
 When the files have no MusicBrainz artist ids and the name is shared by more than one artist,

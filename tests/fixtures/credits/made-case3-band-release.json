@@ -1,0 +1,236 @@
+{
+ "_made": "MADE, NOT FETCHED (27 Nov 2026): written for deadwax's tests in the shape of MusicBrainz's /ws/2 JSON and of tests/fixtures/credits/back-in-black-2003-us.json, the one real answer - no such release or artist exists on MusicBrainz. Replace with a real answer when one is fetched (see README.md here).",
+ "id": "c0000003-0000-4000-8000-0000000000c3",
+ "title": "Made Album Three",
+ "status": "Official",
+ "date": "2004-03-01",
+ "country": "GB",
+ "quality": "normal",
+ "disambiguation": "",
+ "packaging": "Jewel Case",
+ "barcode": "",
+ "text-representation": {
+  "language": "eng",
+  "script": "Latn"
+ },
+ "cover-art-archive": {
+  "artwork": false,
+  "count": 0,
+  "front": false,
+  "back": false,
+  "darkened": false
+ },
+ "release-events": [],
+ "artist-credit": [
+  {
+   "name": "The Made Quartet",
+   "joinphrase": "",
+   "artist": {
+    "id": "b0000003-0000-4000-8000-0000000000b3",
+    "name": "The Made Quartet",
+    "sort-name": "The Made Quartet",
+    "type": "Group",
+    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  }
+ ],
+ "relations": [],
+ "media": [
+  {
+   "position": 1,
+   "format": "CD",
+   "title": "",
+   "track-offset": 0,
+   "track-count": 4,
+   "id": "00000001-0000-4000-8000-000000000001",
+   "tracks": [
+    {
+     "id": "d3000001-0000-4000-8000-000000000001",
+     "number": "1",
+     "position": 1,
+     "title": "Song 1",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "The Made Quartet",
+       "joinphrase": "",
+       "artist": {
+        "id": "b0000003-0000-4000-8000-0000000000b3",
+        "name": "The Made Quartet",
+        "sort-name": "The Made Quartet",
+        "type": "Group",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e3000001-0000-4000-8000-000000000001",
+      "title": "Song 1",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1978-06-02",
+      "artist-credit": [
+       {
+        "name": "The Made Quartet",
+        "joinphrase": "",
+        "artist": {
+         "id": "b0000003-0000-4000-8000-0000000000b3",
+         "name": "The Made Quartet",
+         "sort-name": "The Made Quartet",
+         "type": "Group",
+         "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    },
+    {
+     "id": "d3000002-0000-4000-8000-000000000002",
+     "number": "2",
+     "position": 2,
+     "title": "Song 2",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "The Made Quartet",
+       "joinphrase": "",
+       "artist": {
+        "id": "b0000003-0000-4000-8000-0000000000b3",
+        "name": "The Made Quartet",
+        "sort-name": "The Made Quartet",
+        "type": "Group",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e3000002-0000-4000-8000-000000000002",
+      "title": "Song 2",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1978-06-02",
+      "artist-credit": [
+       {
+        "name": "The Made Quartet",
+        "joinphrase": "",
+        "artist": {
+         "id": "b0000003-0000-4000-8000-0000000000b3",
+         "name": "The Made Quartet",
+         "sort-name": "The Made Quartet",
+         "type": "Group",
+         "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    },
+    {
+     "id": "d3000003-0000-4000-8000-000000000003",
+     "number": "3",
+     "position": 3,
+     "title": "Song 3",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "The Made Quartet",
+       "joinphrase": "",
+       "artist": {
+        "id": "b0000003-0000-4000-8000-0000000000b3",
+        "name": "The Made Quartet",
+        "sort-name": "The Made Quartet",
+        "type": "Group",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e3000003-0000-4000-8000-000000000003",
+      "title": "Song 3",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1978-06-02",
+      "artist-credit": [
+       {
+        "name": "The Made Quartet",
+        "joinphrase": "",
+        "artist": {
+         "id": "b0000003-0000-4000-8000-0000000000b3",
+         "name": "The Made Quartet",
+         "sort-name": "The Made Quartet",
+         "type": "Group",
+         "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    },
+    {
+     "id": "d3000004-0000-4000-8000-000000000004",
+     "number": "4",
+     "position": 4,
+     "title": "Song 4",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "The Made Quartet",
+       "joinphrase": "",
+       "artist": {
+        "id": "b0000003-0000-4000-8000-0000000000b3",
+        "name": "The Made Quartet",
+        "sort-name": "The Made Quartet",
+        "type": "Group",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e3000004-0000-4000-8000-000000000004",
+      "title": "Song 4",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1978-06-02",
+      "artist-credit": [
+       {
+        "name": "The Made Quartet",
+        "joinphrase": "",
+        "artist": {
+         "id": "b0000003-0000-4000-8000-0000000000b3",
+         "name": "The Made Quartet",
+         "sort-name": "The Made Quartet",
+         "type": "Group",
+         "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    }
+   ]
+  }
+ ]
+}

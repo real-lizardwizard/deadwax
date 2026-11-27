@@ -1,0 +1,290 @@
+{
+ "_made": "MADE, NOT FETCHED (27 Nov 2026): written for deadwax's tests in the shape of MusicBrainz's /ws/2 JSON and of tests/fixtures/credits/back-in-black-2003-us.json, the one real answer - no such release or artist exists on MusicBrainz. Replace with a real answer when one is fetched (see README.md here).",
+ "id": "b0000003-0000-4000-8000-0000000000b3",
+ "name": "The Made Quartet",
+ "sort-name": "The Made Quartet",
+ "type": "Group",
+ "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+ "disambiguation": "",
+ "country": "GB",
+ "life-span": {
+  "begin": "1975",
+  "end": null,
+  "ended": false
+ },
+ "relations": [
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "lead vocals",
+    "original"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1975",
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000011-0000-4000-8000-000000000011",
+    "name": "Nan Voice",
+    "sort-name": "Nan Voice",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "guitar",
+    "original"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1975-01",
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000012-0000-4000-8000-000000000012",
+    "name": "Ole Strings",
+    "sort-name": "Ole Strings",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "bass guitar",
+    "original"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1975",
+   "end": "1978-01",
+   "ended": true,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000013-0000-4000-8000-000000000013",
+    "name": "Pat Low",
+    "sort-name": "Pat Low",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "bass guitar"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1978-02",
+   "end": "1984",
+   "ended": true,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000014-0000-4000-8000-000000000014",
+    "name": "Quin Low",
+    "sort-name": "Quin Low",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "drums (drum set)",
+    "background vocals"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1976",
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000015-0000-4000-8000-000000000015",
+    "name": "Rae Beat",
+    "sort-name": "Rae Beat",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "keyboard"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1979",
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000016-0000-4000-8000-000000000016",
+    "name": "Sol Later",
+    "sort-name": "Sol Later",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000017-0000-4000-8000-000000000017",
+    "name": "Tam Unknown",
+    "sort-name": "Tam Unknown",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "guitar"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1975",
+   "end": null,
+   "ended": true,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000018-0000-4000-8000-000000000018",
+    "name": "Uma Gone",
+    "sort-name": "Uma Gone",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "saxophone",
+    "additional"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1978-05",
+   "end": "1978-07",
+   "ended": true,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000019-0000-4000-8000-000000000019",
+    "name": "Vic Guest",
+    "sort-name": "Vic Guest",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "member of band",
+   "target-type": "artist",
+   "direction": "forward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1977",
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "b0000009-0000-4000-8000-0000000000b9",
+    "name": "The Made Supergroup",
+    "sort-name": "The Made Supergroup",
+    "type": "Group",
+    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+    "disambiguation": "",
+    "country": "GB"
+   },
+   "type-id": "5be4c609-9afa-4ea0-910b-12ffb71e3821"
+  },
+  {
+   "type": "tribute",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "b000000a-0000-4000-8000-0000000000ba",
+    "name": "The Made Tribute",
+    "sort-name": "The Made Tribute",
+    "type": "Group",
+    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  }
+ ]
+}

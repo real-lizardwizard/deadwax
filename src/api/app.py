@@ -13,6 +13,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from src.routes import search_musicbrainz, interface_logs, monitor_slskd, download, library, settings, navidrome, me, pins, store_album
 from src.routes import play_history
 from src.routes import lastfm as lastfm_route
+from src.routes import credits as credits_route
 from src.routes import auth as auth_routes, coverart, describe, eq, held, my_library, own_password, people
 from src import auth, lastfm_kept, permissions, player_cache, stars
 from src.api import navidrome_admin
@@ -188,6 +189,8 @@ async def lifespan(app: FastAPI):
         except asyncio.CancelledError:
             pass
 
+    #? a song's credits a deadline left asking MusicBrainz, before its connection goes
+    await credits_route.stop()
     await app.state.musicbrainz_client.stop_refreshing()
     await app.state.musicbrainz_client.close_client()
     #? what is queued for the file is written first; then it is closed
@@ -490,6 +493,9 @@ def start() -> FastAPI:
     #? (2.1.41) Last.fm's listeners and top songs for the iPhone and Mac app's artist page - a user's, like the
     #? descriptions: an outside source the phone never talks to itself (routes/lastfm.py)
     app.include_router(lastfm_route.router, prefix="/deadwax/lastfm", tags=["lastfm"], dependencies=signed_in)
+    #? (credits, 27 Nov 2026) a song's credits from MusicBrainz for the app's Info - a user's, like the descriptions,
+    #? asked as the asker (routes/credits.py)
+    app.include_router(credits_route.router, prefix="/deadwax/credits", tags=["credits"], dependencies=signed_in)
     #? signing in and out (2.0.0-player.48) - with no session, of course: see routes/auth.py
     app.include_router(auth_routes.router, prefix="/deadwax/auth", tags=["auth"])
 
