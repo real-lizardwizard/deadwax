@@ -23865,15 +23865,17 @@ the line's third colour (DWPalette.t3, `--t3`, the count's own grey); chosen, wh
 2 pt line - and a word semibold too (`.opt.on`'s 600; a glyph's weight is the same either way, as the drawing's stroke
 is). 3 either side of its words or glyph (the line as wide as the two, as `.opt.on`'s inset shadow is), 28 tall at
 least, the line at its foot; 13 pt words (Typeface.Phone `.meta`, `.opt`'s font-size). A glyph is the same SF Symbol as
-before (`square.grid.2x2`, `list.bullet`, Typeface.symbol(.body) medium) in a box 17 at least (`.opt svg`), where it
-had a 28 pt square.
+before (`square.grid.2x2`, `list.bullet`, medium) in a box 17 at least (`.opt svg`), where it had a 28 pt square -
+since the review fitted to the drawing's ink (`resizable`, `scaledToFit`, a frame of PhoneLook.optInk's 12.75 scaled
+with the line's words), so the box is what the line holds; on the Mac its own 13 pt symbol, as before (see "After
+review").
 
 **The line under it is the switch's own** - `DWChosenLine` (DWSegmented.swift), the overlay R1c drew inline in
 DWSegmented's phone segment, now a ViewModifier of its own: the accent's DWFlat.chosenLine at the foot, hidden from
 VoiceOver. DWSegmented's phone segment and LibraryLineEnd's choices both take it, so there is one lit line, not a
 second drawn for the line. (PhoneStrip and Sources' strip still draw their own copy of it inline, as R1c and R7 left
-them: outside this change.) It is phone-only by DWSegmented's halves (test_ios_mac_halves.py's PHONE_ONLY), so the Mac's
-pinned half is unchanged.
+them: outside this change.) It is NOT phone-only, as the first pass had it: the Mac's offline Library draws the line
+(see "The Mac"), so DWChosenLine is in DWSegmented's pinned Mac half, re-pinned (see "After review").
 
 **Pairs** (`.meta .pair`): Grid and List one pair, Yours and All the other, the two of a pair 6 apart, each choice
 holding its half of that 6 inside its target (as PhoneStrip's words hold half their gap), so every point of a pair
@@ -23889,9 +23891,10 @@ the count and the order lead, Grid and List then Yours | All trail; the callers 
 PlaylistsScreen, SongsScreen) are unchanged.
 
 **The sizes, as tokens** (PhoneLook, Core): `opt` 28 (`.meta .opt height`), `optPadding` 3 (`.opt padding-left`),
-`optGlyph` 17 (`.opt svg width`), `pairGap` 6 (`.pair gap`), `pairAfter` 14 (drawn: iLibrary's first `.pair`'s inline
-`margin-right: 14px` - in PHONE_FROM_DRAWINGS beside `meta` and `metaTrail`). `meta` stays 32 and `metaGap` 6. They
-replace R2b's metaGlyph 28, metaGlyphGap 2, metaGlyphsAfter 10, sidesGap 10 and sidesRule 12.
+`optGlyph` 17 (`.opt svg width`), `optInk` 12.75 (drawn: the svgs' ink, after review), `pairGap` 6 (`.pair gap`),
+`pairAfter` 14 (drawn: iLibrary's first `.pair`'s inline `margin-right: 14px` - in PHONE_FROM_DRAWINGS beside `meta`,
+`metaTrail` and `optInk`). `meta` stays 32 and `metaGap` 6. They replace R2b's metaGlyph 28, metaGlyphGap 2,
+metaGlyphsAfter 10, sidesGap 10 and sidesRule 12.
 
 **VoiceOver**: as before - Grid and List each a button, the shown one selected; Yours | All a group, "Your library or
 all music", the side shown selected. The line is decoration and never heard; the chosen one is also white where the
@@ -23907,26 +23910,35 @@ measures the real thing; `end` is for the arithmetic, as `fit` is). DWLookTests 
 (`aQuietLinesEndIsItsChoicesAtTheirSpacing`, `aQuietLineFoldsAtItsNewEnd`), and test_ios_library_look.py holds Core's
 body word for word and does the arithmetic with it.
 
-In the bundled faces at the standard size, with the glyphs taken at 1.3 of the symbol's size (the arithmetic's widest
-guess): Albums' end is 152.7 where R2b's was 147.5 (166.0 of 155.6 at xLarge) - Grid and List 6 apart where they were
-2, and 20 before Yours where they were 16, less the 3 the hairline's room gave back. At the symbols' likelier 1.2 it is
-under 2 pt wider. Every other page's end (Yours | All alone) is 3 narrower (70.5 of 73.5). Seven cells of R2b's tables
-moved, all on Albums' line with Yours | All, on 393 or 375:
+In the bundled faces, with the glyphs in their box of 17 (the symbols fitted to the drawing's ink since the review,
+so nothing here is a guess at a symbol's width): Albums' end is 142.5 where R2b's was 147.5 at the standard size (150.6
+of 155.6 at xLarge) - each glyph's choice 23 where its box was 28, Grid and List 6 apart where they were 2, 20 before
+Yours where they were 16, and 3 less for the hairline's room. Every other page's end (Yours | All alone) is 3 narrower
+(70.5 of 73.5). Eight cells of R2b's tables moved, all on Albums' line with Yours | All, every one toward one line:
 
 | size | count | order | R2b (375 / 393 / 402) | now |
 | --- | --- | --- | --- | --- |
-| standard | 2318 albums | Recently added | S F F | S **S** F |
-| standard | 12 of 2318 albums | Year, newest first | f S S | f **f** S |
-| xLarge | 2318 albums | Recently added | S S S | **f** S S |
-| xLarge | 2318 albums | Year, newest first | f S S | f **f** S |
-| xLarge | 12 of 140 albums | Artist | S F F | S **S** F |
-| xLarge | 12 of 140 albums | Recently added | f f S | f f **f** |
-| xLarge | 12 of 2318 albums | Artist | S S F | S S **S** |
+| standard | 140 albums | Year, newest first | S S F | S **F** F |
+| standard | 2318 albums | Year, newest first | S S S | S S **F** |
+| standard | 12 of 2318 albums | Recently added | f S S | **S** S S |
+| standard | 1234 of 2318 albums | Artist | S F F | **F** F F |
+| standard | 1234 of 2318 albums | Recently added | f f S | f **S** S |
+| standard | 1234 of 2318 albums | Year, newest first | f f f | f f **S** |
+| xLarge | 140 albums | Year, newest first | f S S | **S** S S |
+| xLarge | 12 of 2318 albums | Artist | S S F | S **F** F |
 
-(F one line, S the count's noun dropped, f folded.) So at the standard size a library's count still never folds the
-line on any of the three phones under any order; Find's count folds it on 393 now for a four-figure library's find under
-"Year, newest first" too. The other pages never fold at the standard size or at xLarge, as before; folded, every end
-fits a line of its own at every size.
+(F one line, S the count's noun dropped, f folded; two of them - 1234 of 2318 under "Recently added" at the standard
+size, 140 under the longest at xLarge - back to what R2b's Noto Sans drew.) So at the standard size a library's count
+still never folds the line on any of the three phones under any order; Find's count never folds it on 402 under any
+order (R2b: but for a four-figure find under the longest); on 393 only a four-figure find under a Year order does (R2b:
+under "Recently added" too); on 375, under "Recently added" only a four-figure find (R2b: any find in a four-figure
+library), under "Year, oldest first" a four-figure library's, and under the longest every find, as R2b's. The other pages never fold at the standard size or at xLarge, as
+before; folded, every end fits a line of its own at every size.
+
+(The first pass, a1e16198, took the glyphs at 1.3 of the body's 17, the symbol drawn at its own size: its end was
+152.7, and its seven moved cells all moved the other way. The review found that a guess: an SF Symbol at that size is
+some 18-20 of ink, so the box never bound and the line's width was the guess's - at 1.2 four of the seven would not
+have moved.)
 
 ### Departures from the brief and the drawing
 
@@ -23935,9 +23947,12 @@ fits a line of its own at every size.
   else in the line moves. A 28 pt choice sits in 32 with 2 above and below.
 - **"14 between the pairs" is 20 between the pairs' boxes**: the drawing's 14 is the first pair's margin in the line's
   flex row, whose own gap of 6 comes on top of it, so a browser draws 20 (R2b read `.views`' margin-right 10 the same
-  way: 16). Between the glyph's ink and "Yours", 26.
-- **A glyph's choice is the symbol's width and 6**, about 26, where the drawing's is 23: an SF Symbol at the line's
-  body size is wider than the drawing's 17 px svg. Its box is 17 at least, growing with the symbol.
+  way: 16). Between the glyph's ink and "Yours", about 28.
+- **A glyph is fitted to the drawing's ink, not its own size** (after review): the symbol `resizable`, `scaledToFit`
+  in a frame of 12.75 (PhoneLook.optInk) scaled with the line's words, in its box of 17 - its choice 23, as the
+  drawing's is. The ink is the box's until xxxLarge, the line's cap, where it is 18.6 and the box grows to hold it
+  (lookSquare a minimum on the phone), never cut. A resizable symbol keeps its weight (medium) and scales its stroke
+  with it, as the drawing's stroke of 2 scales with its svg.
 - **The pair's 6 is inside the targets**, half each - the drawing has no targets.
 - The drawing writes VoiceOver's label "Grid, chosen" on the chosen glyph; the app says "Grid" with the selected trait,
   as every other choice in the app.
@@ -23948,21 +23963,48 @@ The Mac's own Library pages (MacAlbumsPage, MacArtistsPage, MacPlaylistsPage) dr
 and change nothing. Its Library root borrows the phone's pager in two places (LibraryView's `desk` is nil there): the
 Songs page, whose line is PhoneMeta with the count alone - LibraryLineEnd(.songs, sides: nil) is empty, Yours | All
 never showing on the Mac (`!Platform.mac && LibraryPages.sides(...)`) - so it is as it was; and the root's Downloaded
-albums while deadwax can't be reached (LibraryRootList's `.downloaded`), whose line ends in Grid and List: those take
-the new look there too (grey, the chosen one white over the lit line, 6 apart, each about 26 wide where they were 28).
-DWSegmented's Mac half is pinned unchanged.
+albums while deadwax can't be reached (LibraryRootList's `.downloaded` - LibraryView's `pager` passes no desk for it,
+so AlbumsScreen draws the phone's page and its LibraryLineEnd), whose line ends in Grid and List: those take the new
+look there too (grey, the chosen one white over the lit line, 6 apart), each its own 13 pt symbol as before, in its box
+of 17 exactly (lookSquare is exact on the Mac), so 23 wide where they were 28. So the Mac draws DWChosenLine: the
+first pass had it phone-only in test_ios_mac_halves.py and the Mac's half of DWSegmented pinned unchanged, which the
+review found wrong - it is in the Mac's half now, re-pinned (see "After review").
+
+### After review (27 Nov)
+
+The review found no functional bug, but three things the tests claimed that the code didn't bear out:
+
+1. **DWChosenLine is not phone-only.** Offline, the Mac's Library shows the Downloaded albums: LibraryView's `pager`
+   passes no desk for `.downloaded`, so AlbumsScreen draws the phone's page, whose LibraryLineEnd's LineChoice takes
+   DWChosenLine. It is out of test_ios_mac_halves.py's PHONE_ONLY, and DWSegmented's Mac half re-pinned on purpose:
+   a804e4bbec16c8f3 (computed here, as the review had it), where 8d680fda0b85a713 was the switch's Mac half alone -
+   unchanged, the difference DWChosenLine's.
+2. **The glyphs drawn as the drawing draws them, so the tables stop resting on a guess.** The drawing's 17 px svg has
+   12.75 of ink (its paths run 4 to 20 of the viewBox's 24, the stroke of 2 square-capped: 3 to 21). The symbol drawn
+   at the body's size was some 18-20 of ink, so the 17 box never bound and the glyph's width was the test's guess
+   (1.3 of 17) alone. Now PhoneLook.optInk 12.75 (drawn: held by PHONE_FROM_DRAWINGS, and worked out from the paths
+   and dw.css's `.opt svg` stroke by test_ios_library_look.py), and the phone's symbol `resizable`, `scaledToFit` in a
+   frame of it, a @ScaledMetric relative to the line's own words (Typeface.Phone `.meta`, the footnote): the box of 17
+   binds at every size to xxLarge (16.7), and at xxxLarge, the line's cap, the ink is 18.6 and the box grows to it
+   rather than cut it. The tables are recomputed from the bound box ("The fold"), and the test's SYMBOL and BODY are
+   gone. The Mac's offline line keeps its own 13 pt symbol (`if Platform.mac`), in its exact box of 17.
+3. **Stale words**: test_ios_library_look.py's docstring still said R2b's "white where you are and purple what a tap goes
+   to"; it says what is drawn now.
 
 ### Tests, and what each was seen catching
 
 - test_ios_library_look.py: `test_the_chosen_one_is_underlined_and_purple_words_only_open_something` (dw.css's
   `.opt`/`.opt.on` read through the cascade - the grey the line's `--t3`, the line the switch's `inset 0 -2px 0
   #c084fc` - LineChoice's body exactly, each choice's selected trait, DWChosenLine's body exactly and DWSegmented's use
-  of it, no other colour and no rule in the line's end, metaRule and sidesRule gone, the order's and New playlist…'s
-  accent), `test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens` (the five tokens against dw.css and the
-  drawing, 13 pt, and no number of its own in LibraryLine.swift), and R2b's two rewritten: the end's structure (the
+  of it, the glyph's face exactly on the phone and the Mac since the review, no other colour and no rule in the line's
+  end, metaRule and sidesRule gone, the order's and New playlist…'s accent),
+  `test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens` (the five tokens against dw.css and the drawing, and
+  since the review the ink worked out from the drawn paths, its ScaledMetric with the line's words and the one size it
+  outgrows the box at; 13 pt, and no number of its own in LibraryLine.swift), and R2b's two rewritten: the end's structure (the
   pairs, the halves, no hairline) and the fit tables at the new spacing.
-- test_ios_phone_look.py: PHONE_FROM_DRAWINGS gains `pairAfter` 14 (every PhoneLook token is held to dw.css or a
-  drawing, so the five new ones are). test_ios_mac_halves.py: DWChosenLine in DWSegmented's PHONE_ONLY.
+- test_ios_phone_look.py: PHONE_FROM_DRAWINGS gains `pairAfter` 14 and (after review) `optInk` 12.75 (every PhoneLook
+  token is held to dw.css or a drawing, so the six new ones are). test_ios_mac_halves.py: DWSegmented re-pinned with
+  DWChosenLine in its Mac half (after review; the first pass had it in PHONE_ONLY).
 - Core: DWLookTests' `aQuietLinesEndIsItsChoicesAtTheirSpacing` and `aQuietLineFoldsAtItsNewEnd` new, and
   `thePhonesPiecesFitTogether`'s line (the choice inside the line, the glyph's box and the lit line inside the choice).
 
@@ -23980,14 +24022,22 @@ Mutations, each made in the source, seen failing, and put back (the files' diges
 | Core's `end` without the pairs' 14 | test_each_pages_line_fits_or_gives_way_without_cutting_a_word; in swift test, aQuietLinesEndIsItsChoicesAtTheirSpacing and aQuietLineFoldsAtItsNewEnd |
 | Core's `end` without a choice's 3 either side | aQuietLinesEndIsItsChoicesAtTheirSpacing, aQuietLineFoldsAtItsNewEnd |
 | Core's `end` with no 6 between a pair's two | aQuietLinesEndIsItsChoicesAtTheirSpacing, aQuietLineFoldsAtItsNewEnd |
+| (review) DWChosenLine's line at the top, not the foot | test_the_macs_half_of_each_shared_piece_is_pinned, and the underline test |
+| (review) DWChosenLine heard by VoiceOver | test_the_macs_half_of_each_shared_piece_is_pinned, and the underline test |
+| (review) the glyph's ink 14, not the drawing's 12.75 | test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens, test_phonelook_is_the_phones_rules_size_by_size |
+| (review) the glyph's ink 16, outgrowing the box at xLarge | those two, and test_each_pages_line_fits_or_gives_way_without_cutting_a_word (xLarge, 140 albums, "Year, newest first": fSS where it is SSS) |
+| (review) the phone's symbol at its own size again, not fitted to the ink | the underline test (the glyph's face held exactly) |
+| (review) the ink scaled with the body, not the line's words | test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens |
 
 ### Not verified - only a phone can say (check 654)
 
 - That the chosen one reads at a glance on James's and Ethan's phones, at the standard and the largest text size: the
   grey (#a8a8bc since the greys lifted) beside the white, the 2 pt line under a word as short as "All" (about 21 pt with
   its room) and under a glyph.
-- The glyphs' real width at body size (the arithmetic guesses 1.3 of it; 1.1-1.2 likelier), so exactly where Albums'
-  line now gives way; that ViewThatFits still takes the ways in Core's order.
+- That Grid and List, fitted to the drawing's ink (12.75 at the standard size), read clearly and not too small beside
+  the 13 pt words, and that their medium stroke scaled down looks like the drawing's; that Albums' line gives way where
+  the tables say and ViewThatFits takes the ways in Core's order.
+- The Mac's offline Downloaded line: its own 13 pt symbols, grey, the chosen one over the lit line (built, not looked
+  at).
 - A tap in the 6 between two of a pair taking the nearer; the targets' reach above and below, inside the pager.
 - VoiceOver reading each choice as before, the chosen one selected, and never the line.
-- The Mac's offline Downloaded line (built for Mac Catalyst, not looked at).

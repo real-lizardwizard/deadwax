@@ -291,6 +291,12 @@ public enum PhoneLook {
     public static let opt: Double = 28                  // dw.ph: .meta .opt height
     public static let optPadding: Double = 3            // dw.ph: .meta .opt padding-left
     public static let optGlyph: Double = 17             // dw.ph: .meta .opt svg width
+    /// (27 Nov's review) The glyph's ink in that box, as iLibrary draws it: Grid's squares and List's lines run 4 to 20
+    /// of the svg's 24, their stroke of 2 square-capped, so 3 to 21 - 18 of 24 at 17, 12.75. The phone's symbol is fitted
+    /// to it, scaled with the line's words, so the box of 17 is what the line holds until the ink outgrows it (xxxLarge,
+    /// the line's cap: 18.6). Drawn at the body's size, as it was, the symbol was some 18-20 of ink (the review's
+    /// reading), wider than the box at every size, so the line's width was the symbol's and not the drawing's.
+    public static let optInk: Double = 12.75            // drawn: iLibrary .meta .opt svg ink
     /// (27 Nov) The choices in pairs (`.meta .pair`): the two of a pair 6 apart, with no hairline between Yours and All
     /// now; and Grid and List's pair 14 before Yours | All - on top of the line's own 6 between them, as iLibrary's
     /// inline `margin-right: 14px` draws it in the line's flex row (20 between the two pairs).

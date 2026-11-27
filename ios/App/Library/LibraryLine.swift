@@ -32,6 +32,8 @@ struct LibraryLineEnd: View {
     let sides: LibrarySideChoice?
 
     @Environment(LibraryModel.self) private var library
+    /// A glyph's ink on the phone (iLibrary's `.opt svg`), growing with the line's words.
+    @ScaledMetric(relativeTo: Typeface.Phone.Size.meta.scaled.style) private var ink = CGFloat(PhoneLook.optInk)
 
     var body: some View {
         HStack(spacing: CGFloat(PhoneLook.metaGap)) {
@@ -67,14 +69,32 @@ struct LibraryLineEnd: View {
         return Button {
             library.layout = layout
         } label: {
-            Image(systemName: symbol)
-                .font(Typeface.symbol(.body).weight(.medium))
-                .lookSquare(PhoneLook.optGlyph)
+            face(symbol)
                 .modifier(LineChoice(on: on, before: before, after: after))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(words)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+
+    /// (27 Nov's review) A glyph as iLibrary draws it (`.opt svg`): on the phone the symbol fitted to the drawing's ink
+    /// (PhoneLook.optInk, 12.75 of its box's 17) and scaled with the line's words, so its box of 17 is what the line
+    /// holds until the ink outgrows it - at xxxLarge, the line's cap, where the box grows with it rather than cut it. On
+    /// the Mac's offline line (Downloaded, the phone's Albums page borrowed) the Mac's own 13 pt symbol, as it was.
+    @ViewBuilder
+    private func face(_ symbol: String) -> some View {
+        if Platform.mac {
+            Image(systemName: symbol)
+                .font(Typeface.symbol(.body).weight(.medium))
+                .lookSquare(PhoneLook.optGlyph)
+        } else {
+            Image(systemName: symbol)
+                .resizable()
+                .scaledToFit()
+                .font(Typeface.symbol(.body).weight(.medium))
+                .frame(width: ink, height: ink)
+                .lookSquare(PhoneLook.optGlyph)
+        }
     }
 
     /// Yours or All (.opt holding its word): chosen while it is the side drawn - semibold then (.opt.on's 600).

@@ -8,13 +8,13 @@ menu's place, each page's sort, and the pager's swipe, the pull and TopClearance
 Since slice R2b (notes/ios.md "The redesign, slice R2b: the Library's top, one row again" - James, 25 Nov: "The top of
 the library on iOS is actually kinda a mess, can we streamline it a bit?", "lets put the grid/list next to yours/all")
 the top is one row - Find's circle, the switch of the pages, the •••'s circle - over one quiet line per page: its count,
-its order or New playlist…, then Grid and List (Albums alone) and Yours | All, white where you are and purple what a
-tap goes to; Downloaded is the •••'s again. (R1c, notes/ios.md "The redesign, slice R1c: the phone is flat
-(2026-11-25)") Find and the ••• are bare white glyphs now, and the switch words over a hairline, the chosen one over the
-accent's line. (27 Nov, notes/ios.md "The Library's line underlines what is chosen (27 Nov)" - James: "Yeah I like the
-underline") The line's Grid, List, Yours and All too: grey until chosen, the chosen one white over the switch's own lit
-line, with no hairline between Yours and All, and purple words left to what opens something - the order, New
-playlist…. The row and the line fit a 375 pt phone at every text size - the line
+its order or New playlist…, then Grid and List (Albums alone) and Yours | All; Downloaded is the •••'s again. (R1c,
+notes/ios.md "The redesign, slice R1c: the phone is flat (2026-11-25)") Find and the ••• are bare white glyphs now, and
+the switch words over a hairline, the chosen one over the accent's line. (27 Nov, notes/ios.md "The Library's line
+underlines what is chosen (27 Nov)" - James: "Yeah I like the underline") The line's Grid, List, Yours and All too:
+grey until chosen, the chosen one white over the switch's own lit line, with no hairline between Yours and All, and
+purple words left to what opens something - the order, New playlist…; and Grid and List's symbols fitted to the
+drawing's ink, so their box is the drawing's 17. The row and the line fit a 375 pt phone at every text size - the line
 giving way inside itself first, its count's noun dropped, then folding - rather than cutting a word short, by the
 arithmetic below; where each view goes is Core's (LibraryTopFit, MetaLine), tested in LibrarySwitchTests and
 DWLookTests.
@@ -397,7 +397,8 @@ def test_grid_and_list_are_on_albums_alone_and_yours_all_only_where_it_was():
     # tap and the pair is as wide as drawn - the room on the inner side alone
     assert "private var half: CGFloat { CGFloat(PhoneLook.pairGap) / 2 }" in end
     assert end.count("after: half)") == 2 and end.count("before: half)") == 2
-    assert "@ScaledMetric" not in end, "no hairline to grow with the words"
+    # no hairline to grow with the words: the one size that grows is the glyphs' ink (27 Nov's review)
+    assert re.findall(r"@ScaledMetric\([^)]*\) private var (\w+)", end) == ["ink"], "no hairline to grow with the words"
 
 
 def test_the_chosen_one_is_underlined_and_purple_words_only_open_something():
@@ -424,8 +425,15 @@ def test_the_chosen_one_is_underlined_and_purple_words_only_open_something():
         ".padding(.leading, before) .padding(.trailing, after) .contentShape(DWTarget(face: Rectangle())) }")
     glyph = flat(body(code, "private func glyph("))
     assert "let on = library.layout == layout" in glyph
-    assert (".font(Typeface.symbol(.body).weight(.medium)) .lookSquare(PhoneLook.optGlyph) "
-            ".modifier(LineChoice(on: on, before: before, after: after))") in glyph
+    assert "face(symbol) .modifier(LineChoice(on: on, before: before, after: after))" in glyph
+    # (27 Nov's review) the glyph itself: on the phone, the symbol fitted to the drawing's ink in its box of 17; on the
+    # Mac's offline line, its own 13 pt symbol in that box, as it was before
+    face = flat(body(code, "private func face("))
+    assert face == (
+        "private func face(_ symbol: String) -> some View { if Platform.mac { Image(systemName: symbol) "
+        ".font(Typeface.symbol(.body).weight(.medium)) .lookSquare(PhoneLook.optGlyph) } else { Image(systemName: "
+        "symbol) .resizable() .scaledToFit() .font(Typeface.symbol(.body).weight(.medium)) .frame(width: ink, height: "
+        "ink) .lookSquare(PhoneLook.optGlyph) } }"), face
     assert ".accessibilityAddTraits(on ? .isSelected : [])" in glyph and ".accessibilityLabel(words)" in glyph
     word = flat(body(code, "private func word("))
     assert "let on = each == sides.side" in word
@@ -450,7 +458,7 @@ def test_the_chosen_one_is_underlined_and_purple_words_only_open_something():
     assert set(re.findall(r"DWPalette\.(\w+)", code)) == {"text", "t3"}
     assert ".foregroundStyle(DWPalette.t3)" in bare(source("Phone/PhoneMeta.swift"))
     # no hairline between Yours and All: no rule drawn in the line's end, and its colour gone from the palette
-    assert not re.search(r"DWRule|Divider\(|metaRule|sidesRule|ScaledMetric", code)
+    assert not re.search(r"DWRule|Divider\(|metaRule|sidesRule", code)
     assert "metaRule" not in palette and "sidesRule" not in (CORE / "DWLook.swift").read_text(encoding="utf-8")
     # nothing boxed: no face, edge or fill behind a glyph or a word
     assert not re.search(r"DWRaised|DWToggleStyle|DWButtonStyle|\.background|strokeBorder|selbg", code)
@@ -480,6 +488,27 @@ def test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens():
     assert re.search(r"case \.meta: return \(13, \.footnote\)\s+// dw\.ph: \.meta font-size", source("Shared/Typeface.swift"))
     # the 14 and the 32 are the drawings' inline styles, held by test_ios_phone_look.py's PHONE_FROM_DRAWINGS
     assert phone_look.PHONE_FROM_DRAWINGS["pairAfter"] == 14 and phone_look.PHONE_FROM_DRAWINGS["meta"] == 32
+    # (27 Nov's review) and a glyph's ink, iLibrary's svgs': each path's reach across the 24 of its viewBox, and the
+    # stroke dw.css gives it (2, square-capped, so it reaches 1 past either end of a line and either side of a square's
+    # edge) - 18 of 24 at the svg's 17, 12.75; PHONE_FROM_DRAWINGS holds it too
+    reach = {name: drawn_reach(path) for name, path in DRAWN_GLYPHS.items()}
+    assert reach == {"grid": (4, 20), "list": (4, 20)}, reach
+    stroke = float(css(".meta .opt svg", "stroke-width"))  # an svg's stroke is in its own units, as dw.css writes it
+    assert stroke == 2 and css(".meta .opt svg", "stroke-linecap") == "square"
+    ink = {name: (high - low + stroke) / DRAWN_VIEWBOX * px(css(".meta .opt svg", "width")) for name, (low, high) in
+           reach.items()}
+    assert ink == {"grid": 12.75, "list": 12.75} and phone_number("optInk") == 12.75 == phone_look.PHONE_FROM_DRAWINGS[
+        "optInk"]
+    # the phone's symbol fitted to that ink and scaled with the line's words (the footnote's 13): its box of 17 is the
+    # line's at every size to xxLarge, and only at xxxLarge, the line's cap, does the ink outgrow it - where the box
+    # (a minimum on the phone) grows with it rather than cut it
+    assert ("@ScaledMetric(relativeTo: Typeface.Phone.Size.meta.scaled.style) private var ink = "
+            "CGFloat(PhoneLook.optInk)") in flat(bare(source("Library/LibraryLine.swift")))
+    grows = [size for size, footnote in FOOTNOTE.items() if phone_number("optInk") * footnote / 13 > phone_number("optGlyph")]
+    assert grows == ["xxxLarge"], grows
+    square = flat(body(bare(source("Look/DWRaised.swift")), "@ViewBuilder func lookSquare("))
+    assert ("if DWLook.here.grows { frame(minWidth: CGFloat(side), minHeight: CGFloat(side)) } else { "
+            "frame(width: CGFloat(side), height: CGFloat(side)) }") in square, square
     # each a token: no size of its own in the line's end - only none (the two pairs' HStacks, no margin without Yours
     # | All, the four defaults of a choice's half), the halving of the pair's room, and a word's one line
     code = bare(source("Library/LibraryLine.swift"))
@@ -495,9 +524,32 @@ def test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens():
 FOOTNOTE = {"xSmall": 12, "small": 12, "medium": 12, "large": 13, "xLarge": 15, "xxLarge": 17, "xxxLarge": 19}
 #? (R1c) iOS's subheadline at each standard size, as FOOTNOTE: what the flat switch's 15 pt words scale with
 SUBHEADLINE = {"xSmall": 12, "small": 13, "medium": 14, "large": 15, "xLarge": 17, "xxLarge": 19, "xxxLarge": 21}
-BODY = {"xSmall": 14, "small": 15, "medium": 16, "large": 17, "xLarge": 19, "xxLarge": 21, "xxxLarge": 23}
-#? an SF Symbol's width at its size, taken wide (square.grid.2x2 and list.bullet are about 1.1-1.2 of it)
-SYMBOL = 1.3
+#? (27 Nov's review) iLibrary's Grid and List as its svgs draw them, on a viewBox of 24 - copied from iLibrary.dc.html
+#? (the canvas, kept beside the plans): the phone's symbols are fitted to their ink (PhoneLook.optInk), so the line's
+#? width rests on the drawing, not on a guess at an SF Symbol's
+DRAWN_GLYPHS = {"grid": "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z", "list": "M4 6h16M4 12h16M4 18h16"}
+DRAWN_VIEWBOX = 24
+
+
+def drawn_reach(path: str) -> tuple:
+    """How far across a drawn glyph's path runs, left to right: its M, H and h moves followed (Z back to where its piece
+    began; the vertical moves leave x as it is)."""
+    x = start = 0.0
+    xs = []
+    for command, numbers in re.findall(r"([MmHhVvZz])([^MmHhVvZz]*)", path):
+        values = [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", numbers)]
+        if command == "M":
+            x = start = values[0]
+        elif command == "H":
+            x = values[0]
+        elif command == "h":
+            x += values[0]
+        elif command in "Zz":
+            x = start
+        else:
+            assert command in "Vv", command
+        xs.append(x)
+    return min(xs), max(xs)
 #? the caret after an order's words (DWCaret, DWPopUp.swift's 8 x 4)
 CARET = 8
 #? the narrowest phone the app draws on: an iPhone SE's and a 13 mini's 375
@@ -632,8 +684,10 @@ PHONES = (375, 393, 402)
 def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
     lead, trail, gap, link = (phone_number(n) for n in ("metaLead", "metaTrail", "metaGap", "linkGap"))
     # (27 Nov) the end's choices: each its words or glyph (a box of 17 at least) and 3 either side, 6 apart in a pair,
-    # and Grid and List's pair 14 before Yours | All, on the line's 6 - Core's MetaLine.end, held here word for word
-    glyph, pad, pair, after = (phone_number(n) for n in ("optGlyph", "optPadding", "pairGap", "pairAfter"))
+    # and Grid and List's pair 14 before Yours | All, on the line's 6 - Core's MetaLine.end, held here word for word.
+    # (27 Nov's review) A glyph's box is its 17 or its ink, the wider: the drawing's 12.75, scaled with the line's words
+    # (the footnote's 13) - the test above holds both
+    glyph, ink, pad, pair, after = (phone_number(n) for n in ("optGlyph", "optInk", "optPadding", "pairGap", "pairAfter"))
     assert NARROW - lead - trail == 343
     core = flat(bare((CORE / "DWLook.swift").read_text(encoding="utf-8")))
     assert ("public static func end(_ pairs: [[Double]]) -> Double { let drawn = pairs.filter { (pair: [Double]) -> Bool "
@@ -658,9 +712,10 @@ def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
         return "s"
 
     def ends(points: float, size: str) -> dict:
-        """Each line's end at a size, MetaLine.end's (27 Nov): Grid and List (bare glyphs, each its box or the symbol's
-        width, the wider), then Yours | All - the side shown semibold, whichever is wider - with no hairline."""
-        glyphs = [max(glyph, SYMBOL * BODY[size])] * 2
+        """Each line's end at a size, MetaLine.end's (27 Nov): Grid and List (bare glyphs, each its box of 17 or its ink
+        at that size, the wider - the box at every size but xxxLarge), then Yours | All - the side shown semibold,
+        whichever is wider - with no hairline."""
+        glyphs = [max(glyph, ink * FOOTNOTE[size] / 13)] * 2
         yours = max((words_width("Yours", points, "SemiBold"), words_width("All", points)),
                     (words_width("Yours", points), words_width("All", points, "SemiBold")), key=sum)
         return {"albums": end_of(glyphs, list(yours)), "artists": end_of(list(yours)), "playlists": end_of(list(yours)),
@@ -689,21 +744,22 @@ def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
     # line with the count's noun dropped, f folded, s folded with it dropped): a three- and a four-figure library, and
     # Find's "N of M" in each, under the default order ("Artist"), "Recently added" and the longest. Counts are Core's
     # own (no thousands separator). In Libre Franklin (25 Nov), the face drawn today: another face moves these, and this
-    # table with it - Libre Franklin moved two from R2b's Noto Sans, said beside them. (27 Nov) The end at the new
-    # spacing moved seven more, said beside them with R2b's: on Albums it is 5.2 wider at the standard size here (152.7
-    # of 147.5; 166.0 of 155.6 at xLarge) - Grid and List 6 apart where they were 2, and 20 before Yours where they were
-    # 16, less the 3 the hairline's room gave back - with the glyphs taken at 1.3 of the symbol's size, the widest; at
-    # their likelier 1.2 it is under 2 wider. Every other page's end is 3 narrower
+    # table with it - Libre Franklin moved two from R2b's Noto Sans, said beside them. (27 Nov, and its review) The end
+    # at the new spacing, its glyphs in their box of 17 - the symbols fitted to the drawing's ink, so nothing here is a
+    # guess at a symbol's width - is 5 narrower than R2b's on Albums (142.5 of 147.5 at the standard size, 150.6 of
+    # 155.6 at xLarge): each glyph's choice 23 where its box was 28, Grid and List 6 apart where they were 2, 20 before
+    # Yours where they were 16, and 3 less for the hairline's room. Eight cells moved, every one toward one line, said
+    # beside them with R2b's (two back to Noto Sans's). Every other page's end is 3 narrower
     expected = {
-        "large": {"140 albums": ("FFF", "SFF", "SSF"),
-                  "2318 albums": ("FFF", "SSF", "SSS"),  # R2b: "SFF" - 393 held it whole
+        "large": {"140 albums": ("FFF", "SFF", "SFF"),  # R2b: "SSF" - 393 holds it whole
+                  "2318 albums": ("FFF", "SFF", "SSF"),  # R2b: "SSS" - 402 holds it whole
                   "12 of 140 albums": ("FFF", "SSS", "fSS"),
-                  "12 of 2318 albums": ("FFF", "fSS", "ffS"),  # R2b: "fSS" - 393 held it on one line
-                  "1234 of 2318 albums": ("SFF", "ffS", "fff")},  # Noto Sans: "fSS" - 393 held it
-        "xLarge": {"140 albums": ("FFF", "SSS", "fSS"),  # Noto Sans: "SSS" - 375 held it
-                   "2318 albums": ("FFF", "fSS", "ffS"),  # R2b: "SSS" and "fSS"
-                   "12 of 140 albums": ("SSF", "fff", "fff"),  # R2b: "SFF" and "ffS"
-                   "12 of 2318 albums": ("SSS", "fff", "fff"),  # R2b: "SSF"
+                  "12 of 2318 albums": ("FFF", "SSS", "fSS"),  # R2b: "fSS" - 375 holds it on one line
+                  "1234 of 2318 albums": ("FFF", "fSS", "ffS")},  # R2b: "SFF", "ffS" (Noto Sans's "fSS"), "fff"
+        "xLarge": {"140 albums": ("FFF", "SSS", "SSS"),  # R2b: "fSS" (Noto Sans's "SSS") - 375 holds it
+                   "2318 albums": ("FFF", "SSS", "fSS"),
+                   "12 of 140 albums": ("SFF", "ffS", "fff"),
+                   "12 of 2318 albums": ("SFF", "fff", "fff"),  # R2b: "SSF" - 393 holds it whole
                    "1234 of 2318 albums": ("SSS", "fff", "fff")},
     }
     for size, counts in expected.items():
@@ -715,15 +771,20 @@ def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
                 got = "".join(fit(full, short, end, phone - lead - trail) for phone in PHONES)
                 assert got == want, (size, count, order, got)
     # so, at the standard size: a library's count never folds the line on any of them, under any order - the review's
-    # "140 albums · Recently added" (352 of 343 on 375; 351 in Noto Sans) now "140 · Recently added"; on 402 Find's
-    # first keystroke never folds it either but for a four-figure find under the longest order, on 393 under "Recently
-    # added" too - and (27 Nov, the end at its new spacing) a four-figure library's find under the longest; on 375,
-    # with "Recently added", only in a four-figure library (notes/ios.md "The redesign, slice R2b": what is left)
+    # "140 albums · Recently added" (352 of 343 on 375; 351 in Noto Sans) now "140 · Recently added". And (27 Nov's
+    # review, the glyphs in their box) Find's count never folds it on 402 under any order (R2b: but for a four-figure
+    # find under the longest); on 393 only a four-figure find under a Year order does (R2b: under "Recently added"
+    # too); on 375, under "Recently added" only a four-figure find (R2b: any find in a four-figure library), and under
+    # the longest every find, as R2b's (notes/ios.md "The redesign, slice R2b": what is left)
     points = FOOTNOTE["large"]
     for count in ("140 albums", "2318 albums"):
         for order in album_orders:
             full, short = words(points, count, order)
             assert all(fit(full, short, ends(points, "large")["albums"], phone - lead - trail) in "FS" for phone in PHONES)
+    for count in ("12 of 140 albums", "12 of 2318 albums", "1234 of 2318 albums"):
+        for order in album_orders:
+            assert fit(*words(points, count, order), ends(points, "large")["albums"], 402 - lead - trail) in "FS", (
+                count, order)
 
     # every page at every size up to the line's cap: folded, its end fits a line of its own; no one word - a count's,
     # an order's with its caret, New playlist… - is wider than the line, so a wrap never cuts a word; and Artists',

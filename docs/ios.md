@@ -7653,8 +7653,9 @@ You said it wasn't clear which of Yours and All was chosen on the Library's line
 marks (27 Nov), and chose the underline. Each of the four is grey now until it's the chosen one, which is white over
 a short purple line, the same line the switch above it marks its page with; a chosen word is bold too. There's no
 thin line between Yours and All any more: the two words sit side by side. Purple words on the line are only what
-opens something or takes you somewhere, the order with its little arrow and **New playlist…**. Nothing on the line
-has moved and nothing works any differently.
+opens something or takes you somewhere, the order with its little arrow and **New playlist…**. The grid and list
+marks are a little smaller than before, the size the design draws them, and grow with the text size; otherwise
+nothing on the line has moved and nothing works any differently.
 
 - **654 Which one is chosen.** **Not done yet.** On each Library page - Albums, Artists, Playlists, and on All the
   Songs page - say at a glance which of the grid and list marks (Albums only) and which of **Yours** and **All** is
@@ -7664,9 +7665,10 @@ has moved and nothing works any differently.
   at the largest text size (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text, at its end): the
   same, nothing cut short, and where a line is too long it still drops its count's word first, then puts the marks
   and Yours and All on a line of their own under the words. Say if the grey reads too faint beside the white, if the
-  purple line is easy to miss under a small word like **All**, and whether a tap just between two of them takes the
-  nearer. On Ethan's phone too, or "not done yet". On the Mac, the Library while deadwax can't be reached (its
-  Downloaded albums) shows the grid and list marks this way too; nothing else on the Mac changes.
+  purple line is easy to miss under a small word like **All**, if the grid and list marks look too small beside the
+  words, and whether a tap just between two of them takes the nearer. On Ethan's phone too, or "not done yet". On the
+  Mac, the Library while deadwax can't be reached (its Downloaded albums) shows the grid and list marks this way too,
+  at the size they were; nothing else on the Mac changes.
 
 ## What it can't do yet
 

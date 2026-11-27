@@ -365,8 +365,10 @@ AUTO_HEIGHTS = {"chipHeight"}
 
 #? PhoneLook's sizes the drawings' own inline styles give, not dw.css's rules: (R2b) iLibrary's, iArtists' and
 #? iPlaylists' quiet line, `height: 32px; padding-right: 16px` (R2's titled top's three went with it); (27 Nov, the line
-#? underlines what is chosen) iLibrary's first `.pair`, `margin-right: 14px` - Grid and List's, before Yours | All
-PHONE_FROM_DRAWINGS = {"meta": 32, "metaTrail": 16, "pairAfter": 14}
+#? underlines what is chosen) iLibrary's first `.pair`, `margin-right: 14px` - Grid and List's, before Yours | All; and
+#? (its review) their glyphs' ink, iLibrary's svg paths' 4 to 20 of 24 with dw.css's stroke of 2 at its 17 - 12.75,
+#? worked out from the paths by test_ios_library_look.py
+PHONE_FROM_DRAWINGS = {"meta": 32, "metaTrail": 16, "pairAfter": 14, "optInk": 12.75}
 #? the two that stand above what holds them: dw.css's top is negative (`top: -7px`), PhoneLook's lift positive
 NEGATED = {"litLineLift", "legendLift"}
 

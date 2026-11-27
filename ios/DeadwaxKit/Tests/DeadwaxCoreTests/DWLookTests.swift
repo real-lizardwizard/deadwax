@@ -68,6 +68,10 @@ import Testing
         // glyph's box and a chosen one's line inside a choice's height
         #expect(PhoneLook.opt < PhoneLook.meta && PhoneLook.optGlyph < PhoneLook.opt)
         #expect(DWFlat.chosenLine < PhoneLook.opt && phone.target > PhoneLook.opt)
+        // (27 Nov's review) a glyph's ink inside its box as drawn - so the box is what the line holds - until the
+        // line's cap: at the footnote's 17 of 13 (xxLarge) it still fits, at its 19 (xxxLarge) the box grows to it
+        #expect(PhoneLook.optInk < PhoneLook.optGlyph)
+        #expect(PhoneLook.optInk * 17 / 13 <= PhoneLook.optGlyph && PhoneLook.optInk * 19 / 13 > PhoneLook.optGlyph)
         // the mini player's cover is its height less its top edge; Play's target fits it
         #expect(PhoneLook.miniCover == PhoneLook.mini - 1 && PhoneLook.miniPlay < PhoneLook.mini)
         // a tab item sits in the bar under its room, and the lit line stands on the bar's top edge, over its hairline
