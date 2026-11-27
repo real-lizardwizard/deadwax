@@ -238,16 +238,17 @@ def test_art_is_not_fetched_unless_asked(tmp_path):
 def test_art_is_downloaded_when_the_album_has_none(tmp_path):
     seed(tmp_path)
     plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path), want_art=True)
-    assert plan["art"] == {"action": "download", "reason": "", "existing": None}
+    assert plan["art"] == {"action": "download", "reason": "", "existing": None, "removes": None}
 
 
 def test_existing_art_is_a_replacement_not_a_download(tmp_path):
-    """Named differently on purpose - the interface says 'replace cover.jpg', not 'download'."""
+    """Named differently on purpose - the interface says 'replace cover.jpg', not 'download'. The plan names the
+    file a replace deletes (cover removal, 27 Nov): here the one a new cover.jpg overwrites instead."""
     directory = seed(tmp_path)
     write_image(directory / "cover.jpg")
 
     plan = plan_retag("Tame Impala/The Slow Rush (2020)", RELEASE, str(tmp_path), want_art=True)
-    assert plan["art"] == {"action": "replace", "reason": "", "existing": "cover.jpg"}
+    assert plan["art"] == {"action": "replace", "reason": "", "existing": "cover.jpg", "removes": "cover.jpg"}
 
 
 def test_art_needs_a_release_id_and_says_so(tmp_path):

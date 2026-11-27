@@ -22,18 +22,22 @@ files the user already had rather than ones we just downloaded - so the cost of 
 wrong is somebody's actual music collection.
 """
 
+import os
 import shutil
+import stat
 from pathlib import Path
 
 from src.editions import resolve_edition_label
 from src.logger import logger
-from src.library import find_cover_file
+from src.library import IMAGE_EXTENSIONS, find_cover_file
 from src.matching import AUDIO_EXTENSIONS, file_extension, match_tracks_to_files
 from src.tagkeys import easy_file
 from src.api.coverart_endpoint import extension_for
 from src.organizer import (LINK_REFUSED, build_album_dirname, country_in_folder, filed_artist, is_within,
                            read_album_mbid, sanitize_filename, tag_values, write_tags)
 
+#? Why an old cover that is a link was left where it is - the writes' LINK_REFUSED, said of a removal
+LINK_NOT_REMOVED = "is a link to somewhere else, which deadwax won't remove"
 
 
 def read_current_tags(path: Path) -> dict:
@@ -82,20 +86,28 @@ def plan_art(entries: list[Path], release: dict, want_art: bool) -> dict:
     Never replaces existing art unless asked. Somebody's hand-picked sleeve is not ours to
     overwrite because MusicBrainz has one too; the same instinct as execute_plan refusing to
     clobber a file it didn't put there.
+
+    Asked, a replace REMOVES the cover file it replaces (cover removal, 27 Nov - James: "Delete the
+    old file"), and the plan names that file as `removes`, for the preview and the write alike. Only
+    writing `cover.<ext>` left a `folder.jpg`, a `Cover.jpg` (on a case-sensitive disk) or a
+    `cover.jpeg` beside the new one, and find_cover_file went on showing the old cover. The name to be
+    written follows the image's type, known only once it's fetched, so the write itself sees whether
+    it landed on that very file (cover.jpg over cover.jpg): then it was overwritten, and nothing is
+    removed - see remove_replaced_cover. A cover only inside the files is no file: nothing to remove.
     """
     existing = find_cover_file(entries)
 
     if not want_art:
-        return {"action": "", "reason": "", "existing": existing.name if existing else None}
+        return {"action": "", "reason": "", "existing": existing.name if existing else None, "removes": None}
 
     if not (release.get("release_mbid") or "").strip():
         return {"action": "", "reason": "this release has no MusicBrainz id to look art up by",
-                "existing": existing.name if existing else None}
+                "existing": existing.name if existing else None, "removes": None}
 
     if existing is not None:
-        return {"action": "replace", "reason": "", "existing": existing.name}
+        return {"action": "replace", "reason": "", "existing": existing.name, "removes": existing.name}
 
-    return {"action": "download", "reason": "", "existing": None}
+    return {"action": "download", "reason": "", "existing": None, "removes": None}
 
 
 def plan_cover_art(
@@ -121,20 +133,20 @@ def plan_cover_art(
     directory = root / album_path
 
     if not album_path or not is_within(directory, root) or not directory.is_dir():
-        return {"release_mbid": None, "existing": None, "action": "",
+        return {"release_mbid": None, "existing": None, "action": "", "removes": None,
                 "problem": "that album is not inside the library"}
 
     try:
         entries = sorted(p for p in directory.iterdir() if p.is_file())
     except OSError as e:
-        return {"release_mbid": None, "existing": None, "action": "",
+        return {"release_mbid": None, "existing": None, "action": "", "removes": None,
                 "problem": f"could not read the album folder: {e}"}
 
     existing = find_cover_file(entries)
     existing_name = existing.name if existing else None
 
     if existing is not None and not replace:
-        return {"release_mbid": None, "existing": existing_name, "action": "",
+        return {"release_mbid": None, "existing": existing_name, "action": "", "removes": None,
                 "problem": f"this album already has {existing_name}"}
 
     #? Normally read from the files: the point of the plain "get art" path is that it needs no
@@ -148,7 +160,7 @@ def plan_cover_art(
     release_mbid = (release_mbid or "").strip() or read_album_mbid(directory)
 
     if not release_mbid:
-        return {"release_mbid": None, "existing": existing_name, "action": "",
+        return {"release_mbid": None, "existing": existing_name, "action": "", "removes": None,
                 "problem": "this album isn't tagged with a MusicBrainz release, so there's "
                            "nothing to look a cover up by - match it to a release first"}
 
@@ -156,11 +168,13 @@ def plan_cover_art(
         "release_mbid": release_mbid,
         "existing": existing_name,
         "action": "replace" if existing is not None else "download",
+        #? the cover file save_cover_art deletes once the new one is written - plan_art's `removes`
+        "removes": existing_name,
         "problem": None,
     }
 
 
-def save_cover_art(album_path: str, library_root: str, art: tuple[bytes, str]) -> dict:
+def save_cover_art(album_path: str, library_root: str, art: tuple[bytes, str], removes: str | None = None) -> dict:
     """
     Write a cover into an album folder, and touch nothing else.
 
@@ -171,26 +185,153 @@ def save_cover_art(album_path: str, library_root: str, art: tuple[bytes, str]) -
 
     Containment is re-checked here rather than trusted from the plan, for the reason the retag
     endpoint recomputes its plan: a path that arrived over the wire is not evidence.
+
+    `removes` is plan_cover_art's own (cover removal, 27 Nov): the cover a replace deletes once this
+    one is written, so the new one is the one shown - see remove_replaced_cover. `problem` is a save
+    that failed, and wrote nothing; `problems` what a save that worked has to say about the old cover.
     """
     root = Path(library_root)
     directory = root / album_path
 
     if not album_path or not is_within(directory, root) or not directory.is_dir():
-        return {"written": None, "problem": "that album is not inside the library"}
+        return {"written": None, "removed": None, "problem": "that album is not inside the library", "problems": []}
 
     name = f"cover.{extension_for(art[1])}"
     #? (2.0.0-player.65) a cover.jpg that is a symlink would be written wherever it points
     if (directory / name).is_symlink():
-        return {"written": None, "problem": f"{name} {LINK_REFUSED}"}
+        return {"written": None, "removed": None, "problem": f"{name} {LINK_REFUSED}", "problems": []}
 
     try:
         (directory / name).write_bytes(art[0])
     except OSError as e:
         logger.error(f"could not write cover art into {directory}: {e}")
-        return {"written": None, "problem": f"could not save the cover: {e}"}
+        #? and nothing removed: the old cover goes only once the new one is on disk
+        return {"written": None, "removed": None, "problem": f"could not save the cover: {e}", "problems": []}
 
     logger.info(f"saved {name} into {directory.name}", extra={"frontend": True})
-    return {"written": name, "problem": None}
+    removed, problems = remove_replaced_cover(directory, directory / name, removes, library_root)
+    return {"written": name, "removed": removed, "problem": None, "problems": problems}
+
+
+def remove_replaced_cover(directory: Path, written: Path, removes: str | None, library_root: str | Path | None,
+                          dry_run: bool = False) -> tuple[str | None, list[str]]:
+    """
+    After a cover is written into `directory` as `written`: delete the cover file the plan said it
+    replaces, then check the new one is the cover now shown. (The name removed or None, problems.)
+
+    Both writers call it once their write has worked, and only then - a write that failed has returned
+    before it, so the old cover stays. Every guard is checked again here, at the write, rather than
+    trusted from the plan, as delete_album's are (there is no undo):
+
+    - a bare name of a file directly in the album's folder: never a path, a subfolder's file or the
+      folder itself;
+    - the album's folder inside LIBRARY_PATH, and not the library itself;
+    - a regular file with an image extension, read with lstat: a link is refused and said
+      (LINK_NOT_REMOVED), never followed;
+    - still there: one already gone is said, and is no error;
+    - never the file just written - the same name, or the same file under another case on a
+      case-insensitive disk (`Cover.jpg` IS `cover.jpg` on macOS): that one was overwritten;
+    - with the new cover there to see.
+
+    Only the one file named is ever removed. Another cover that still outranks the new one in
+    find_cover_file (a `cover.jpeg` beside a new `cover.jpg`) is reported, never removed as well. A
+    failed removal is a problem in words, never a crash and never a reason to undo the tags. A dry run
+    makes every check but the unlink, and looks at the folder as the write would leave it.
+    """
+    said = f"{written.name} would be saved" if dry_run else f"saved {written.name}"
+    removed, problem = (_remove_one(directory, written, removes, library_root, said, dry_run)
+                        if removes else (None, None))
+    problems = [problem] if problem else []
+
+    shown = _shown_instead(directory, written, removed, dry_run)
+    if shown:
+        problems.append(f"{said}, but {shown} is still shown first - another cover in the album's folder, "
+                        f"left as it was")
+
+    #? in the event log too: the cover alone's answer is drawn as one line, which may not show these
+    if not dry_run:
+        for problem in problems:
+            logger.warning(f"{directory.name}: {problem}", extra={"frontend": True})
+
+    return removed, problems
+
+
+def _remove_one(directory: Path, written: Path, name: str, library_root: str | Path | None, said: str,
+                dry_run: bool) -> tuple[str | None, str | None]:
+    """remove_replaced_cover's one removal, behind every guard it lists. (The name removed or None, a problem.)"""
+    left = f"{said}, but the old {name} was left where it is"
+    old = directory / name
+
+    if Path(name).name != name or name in (".", "..") or old.parent != directory:
+        return None, f"{left} - it isn't a file in the album's own folder"
+
+    try:
+        inside = (library_root is not None and str(library_root) != "" and is_within(directory, Path(library_root))
+                  and directory.resolve() != Path(library_root).resolve())
+    except OSError:
+        inside = False
+    if not inside:
+        return None, f"{left} - the album isn't inside the library"
+
+    try:
+        info = old.lstat()
+    except FileNotFoundError:
+        return None, f"{said} - the old {name} was already gone, so there was nothing to remove"
+    except OSError as e:
+        return None, f"{left}: {e.strerror or e}"
+
+    if stat.S_ISLNK(info.st_mode):
+        return None, f"{said}, but the old {name} {LINK_NOT_REMOVED}"
+    if not stat.S_ISREG(info.st_mode) or file_extension(name) not in IMAGE_EXTENSIONS:
+        return None, f"{left} - it isn't an image file"
+
+    #? overwritten in place, so it IS the new cover now
+    if old == written or _same_file(old, written):
+        return None, None
+
+    if dry_run:
+        return name, None
+
+    try:
+        there = stat.S_ISREG(written.lstat().st_mode)
+    except OSError:
+        there = False
+    if not there:
+        return None, f"{left} - the new cover couldn't be found after saving it"
+
+    try:
+        old.unlink()
+    except OSError as e:
+        logger.error(f"could not remove the old cover {name} from {directory}: {e}")
+        return None, f"{said}, but the old {name} couldn't be removed: {e.strerror or e}"
+
+    logger.info(f"removed the old cover {name} from {directory.name} - {written.name} replaces it",
+                extra={"frontend": True})
+    return name, None
+
+
+def _shown_instead(directory: Path, written: Path, removed: str | None, dry_run: bool) -> str | None:
+    """The cover find_cover_file shows instead of the one just written, if it isn't that one."""
+    try:
+        entries = [p for p in directory.iterdir() if p.is_file()]
+    except OSError:
+        return None
+
+    if dry_run:
+        #? nothing was written or removed: the folder as the write would leave it
+        entries = [p for p in entries if p.name not in (removed, written.name)] + [written]
+
+    shown = find_cover_file(sorted(entries))
+    if shown is None or shown == written or _same_file(shown, written):
+        return None
+    return shown.name
+
+
+def _same_file(a: Path, b: Path) -> bool:
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
 
 
 def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool = False) -> dict:
@@ -300,7 +441,7 @@ def plan_retag(album_path: str, release: dict, library_root: str, want_art: bool
 
     art = plan_art(entries, release, want_art)
     if merge and merge["ok"] and merge["detail"]["has_cover"] and art["action"]:
-        art = {**art, "action": "", "reason": ""}
+        art = {**art, "action": "", "reason": "", "removes": None}
     if art["reason"]:
         problems.append(art["reason"])
 
@@ -342,7 +483,7 @@ def _empty_plan(album_path: str, problem: str) -> dict:
         "moves": False, "merge": False, "merge_detail": None,
         "edition_label": "", "files": [], "changed_file_count": 0,
         "file_count": 0, "matched_tracks": 0, "expected_tracks": 0,
-        "art": {"action": "", "reason": "", "existing": None},
+        "art": {"action": "", "reason": "", "existing": None, "removes": None},
         "problems": [problem], "empty": True,
     }
 
@@ -524,6 +665,9 @@ def execute_retag(
         "failed": 0,
         "moved_to": None,
         "art_written": None,
+        #? (cover removal, 27 Nov) the old cover file the new one replaced and deleted - plan["art"]["removes"],
+        #? once its write worked and every guard held again; None when nothing was removed
+        "art_removed": None,
         "problems": list(plan.get("problems") or []),
     }
 
@@ -555,7 +699,8 @@ def execute_retag(
     #? album is. The cover goes in as a plain file rather than being embedded in every
     #? track: it is what find_cover_file() prefers, what the organizer already copies across
     #? as a companion, and what every other music tool expects to find.
-    art_action = (plan.get("art") or {}).get("action")
+    art_plan = plan.get("art") or {}
+    art_action = art_plan.get("action")
 
     if art_action and (art is not None or results["dry_run"]):
         name = f"cover.{extension_for(art[1])}" if art else "cover.jpg"
@@ -569,17 +714,25 @@ def execute_retag(
 
         elif results["dry_run"]:
             results["art_written"] = name
+            results["art_removed"], problems = remove_replaced_cover(
+                source, source / name, art_plan.get("removes"), plan.get("library_root"), dry_run=True)
+            results["problems"].extend(problems)
 
         else:
             try:
-                #? a replacement leaves the old file behind under its own name only if that
-                #? name differs; same-named art is overwritten, which is what "replace" means
+                #? same-named art is overwritten; a cover under another name is the plan's `removes`, deleted
+                #? below once this has worked (cover removal, 27 Nov)
                 (source / name).write_bytes(art[0])
-                results["art_written"] = name
-                logger.info(f"wrote {name} into {source.name}", extra={"frontend": True})
             except OSError as e:
                 logger.error(f"could not write cover art into {source}: {e}")
                 results["problems"].append(f"tags were written but the cover art could not be saved: {e}")
+            else:
+                results["art_written"] = name
+                logger.info(f"wrote {name} into {source.name}", extra={"frontend": True})
+                #? only here, with the new cover on disk: a write that failed has removed nothing
+                results["art_removed"], problems = remove_replaced_cover(
+                    source, source / name, art_plan.get("removes"), plan.get("library_root"))
+                results["problems"].extend(problems)
 
     elif art_action and art is None and not results["dry_run"]:
         results["problems"].append("no cover art was available for that release")

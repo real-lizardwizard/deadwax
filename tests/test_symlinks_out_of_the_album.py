@@ -82,7 +82,7 @@ def test_saving_a_cover_never_writes_through_a_link(layout, dangling):
 
     result = save_cover_art("Artist/Album (1994)", str(library), (JPEG, "image/jpeg"))
 
-    assert result == {"written": None, "problem": f"cover.jpg {LINK_REFUSED}"}
+    assert result == {"written": None, "removed": None, "problem": f"cover.jpg {LINK_REFUSED}", "problems": []}
     assert outside.read_bytes() == SECRET and not (outside.parent / "made-by-the-link.jpg").exists()
 
 

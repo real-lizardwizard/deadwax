@@ -637,8 +637,8 @@ class RetagRequest(BaseModel):
     #? relative to LIBRARY_PATH, as the scan reports it
     album_path: str
     release: RetagRelease
-    #? off unless asked. Fetching art is a network round trip and can overwrite a cover the
-    #? user chose themselves, so it is never a side effect of correcting tags.
+    #? off unless asked. Fetching art is a network round trip and replaces - deletes - a cover the
+    #? user chose themselves (the plan's art.removes), so it is never a side effect of correcting tags.
     fetch_art: bool = False
 
 
@@ -1053,6 +1053,7 @@ class CoverArtRequest(BaseModel):
     album_path: str
     #? off by default. Somebody's hand-picked sleeve is not ours to overwrite because the
     #? Archive happens to have one too - the same instinct as execute_plan refusing to clobber.
+    #? On, the cover file there is deleted once the new one is saved (cover removal, 27 Nov).
     replace: bool = False
     #? Optional. Absent, the release comes from the album's own tags, which is what makes the
     #? plain path require no decision. The editor sends one because it is showing you that
@@ -1102,8 +1103,10 @@ async def fetch_cover_art(request: Request, body: CoverArtRequest):
                 else "the cover couldn't be downloaded from the Cover Art Archive - try again",
             )
 
+        #? (cover removal, 27 Nov) the cover a replace deletes once the new one is written is the plan's own,
+        #? made just above from the folder - never a name from the request
         results = await asyncio.to_thread(
-            save_cover_art, body.album_path, Config.LIBRARY_PATH, art
+            save_cover_art, body.album_path, Config.LIBRARY_PATH, art, plan["removes"]
         )
 
         if results["problem"]:
@@ -1115,7 +1118,10 @@ async def fetch_cover_art(request: Request, body: CoverArtRequest):
         forget_cached_album(str(Path(Config.LIBRARY_PATH) / body.album_path))
         await _persist_cache(request)
 
-        return {"written": results["written"], "replaced": plan["existing"]}
+        #? `removed`: the old cover file deleted, or None (a same-named one is overwritten instead); `problems`:
+        #? what the save that worked has to say about the old cover - one left in place, or one still shown first
+        return {"written": results["written"], "replaced": plan["existing"],
+                "removed": results["removed"], "problems": results["problems"]}
 
     except HTTPException:
         raise

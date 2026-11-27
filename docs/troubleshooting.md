@@ -643,6 +643,26 @@ minutes at a time; **Try again** later. *Couldn't get the cover.* is a problem o
 runs deadwax sees what went wrong after it, in brackets; anyone else is told to tell them if it keeps
 happening.
 
+## A replaced cover still shows the old one
+
+Replacing a cover saves the release's cover as `cover.jpg` (or `.png`) and deletes the one cover file
+it replaces ([the library](library.md#release-matching-it-to-a-release)). deadwax picks a folder's
+cover by its name - `cover` first, then `folder`, `front`, `album`… - so when the folder held two, the
+one left can still come first, and deadwax says so in the editor after **Apply**, and in the
+**Event log** either way:
+
+- *Saved cover.jpg, but cover.jpeg is still shown first - another cover in the album's folder, left as
+  it was.* deadwax deletes only the cover it replaced, never a second one. If you don't want the other,
+  delete it from the album's folder yourself.
+- *Saved cover.jpg, but the old folder.jpg is a link to somewhere else, which deadwax won't remove.* The
+  old cover was a symbolic link; deadwax never deletes one, or what it points to. Remove the link
+  yourself if it should go.
+- *Saved cover.jpg, but the old folder.jpg couldn't be removed: …* The new cover is saved (and an
+  **Apply**'s tags are written, and stay), but the user deadwax runs as isn't allowed to delete that
+  file. Delete it yourself, or give the folder's files to that user.
+- *Saved cover.jpg - the old folder.jpg was already gone, so there was nothing to remove.* Something
+  else deleted it after the editor opened. Nothing to do.
+
 ## Lyrics are missing, or land late
 
 - LRCLIB doesn't have every song, and instrumentals get no `.lrc` by design. When LRCLIB is under

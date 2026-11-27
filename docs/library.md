@@ -161,6 +161,18 @@ matched to MusicBrainz** (point at the first for the release id). You:
    everything. With a second library in Navidrome, or an admin scanning some other folder at
    that moment, the rename can come before this album has been scanned.
 
+**Replacing a cover deletes the one it replaces.** When the folder already has a cover file,
+replacing it - with the cover on when you **Apply**, or the cover alone, from beside the two covers -
+saves the release's cover as `cover.jpg` (or `.png`) and only then deletes the cover file the folder
+had, whatever it was called (`folder.jpg`, `Cover.jpg`, `cover.png`…), so the new one is the one
+shown. One already called `cover.jpg` is overwritten instead. It can't be undone. If saving the new
+cover fails, the old one stays. Only that one file is ever deleted: if another cover in the folder
+would still be shown first - a `cover.jpeg` beside the new `cover.jpg` - it's left as it is, and
+deadwax says so (*Saved cover.jpg, but cover.jpeg is still shown first…*) in the editor after
+**Apply**, and in the **Event log** either way ([troubleshooting](troubleshooting.md#a-replaced-cover-still-shows-the-old-one)).
+A cover file that's a link to somewhere else is never deleted, and a cover only inside the files
+isn't touched.
+
 **Cancel** closes the panel; nothing is written until **Apply**, which then says what it did (*Updated
 the tags in 12 files, saved cover.jpg, moved the folder to match its tags.*), or what it couldn't. For
 an album with issues, **It's fine as it is** marks it fine ([above](#what-needs-attention)) - the line

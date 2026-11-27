@@ -107,7 +107,8 @@ Moved verbatim from CLAUDE.md (2026-10-07), where it was loaded into every sessi
   pictures into their folder (v0.6.15), `lyrics.py` writes a `.lrc` beside each track (v0.7.0),
   `save_disc_art()` writes CD art (v0.7.2), and `save_cover_art()` writes a single cover (narrow enough not to need a plan/execute split, but it re-checks containment at
   the write rather than trusting the plan, for the same reason the retag endpoint recomputes its
-  own). A preview that disagrees with the write it previews is worse than no preview, so the
+  own; since 27 Nov a replace, by it or by a retag, deletes the one cover file its plan names, as
+  `removes`, behind every guard again - notes/library.md "Replacing a cover removes the one it replaces"). A preview that disagrees with the write it previews is worse than no preview, so the
   first two derive the tags from one shared `organizer.tag_values()` rather than computing them
   twice, and the hand editor compares against `library.named_tags()` - the same reading of the
   file the track viewer shows. Every apply endpoint **recomputes the plan** rather than
