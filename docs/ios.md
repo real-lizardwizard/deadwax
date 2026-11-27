@@ -2124,14 +2124,16 @@ bar does.
 **Now Playing**: along the top, **Close** at the left and **Turntable** and **•••** at the right, each a purple word
 or glyph on the page with no box round it; the cover, as wide as the screen less a margin either side (a little
 smaller while paused); the song's title, and under it "artist — album" in purple (tap it to go to the album - a song
-that names no album has it in grey, and it goes nowhere). Beside the title, in small typewriter figures, where the song
-is in what you queued ("3 of 11") and its format ("FLAC 16/44.1", "MP3"), as the Mac's player bar says them; a song
-added with Play Next has no place, and with neither known there's nothing there. VoiceOver reads them as one: "3 of 11,
-FLAC, 16-bit, 44.1 kHz". At the accessibility text sizes they go under the title, so it keeps its room. Under them:
+that names no album has it in grey, and it goes nowhere), with the whole width to themselves. Under them:
 
 - **The scrubber**, a squared-off bar sunk into the page that thickens under your finger: tap a place to go there, or
-  drag and let go. The clocks under it, in the same typewriter figures, say how far in the song is
-  and how much is left. VoiceOver reads it as "Position in the song", in 5-second steps.
+  drag and let go. The clocks under it, in small typewriter figures, say how far in the song is and how much is left.
+  Between them, in the same figures a shade dimmer, where the song is in what you queued and its format - "3 of 11 ·
+  FLAC 16/44.1", as the Mac's player bar says it; a song added with Play Next has no place, so the format alone, and
+  with neither known there's nothing there. Where the three don't fit across - the largest text sizes, or a long count
+  like "1,612 of 2,100" - it takes a line of its own under the clocks, centred. VoiceOver reads the scrubber as
+  "Position in the song", in 5-second steps, and then the line between the clocks as one: "3 of 11, FLAC, 16-bit,
+  44.1 kHz".
 - **Shuffle, previous, play/pause, next, Repeat.** Previous goes back to the song before in a song's
   first 3 seconds; after that, or on the first song, it starts the song again. Repeat goes from off to
   **Repeat all** to **Repeat one** and back to off, and this phone remembers it.
@@ -6932,10 +6934,10 @@ FLAC if you have one, and open Now Playing.
   before. (Along the top, **Close** at the left, **Turntable** and **•••** at the right: purple, with no box round any
   of them, each easy to tap. Close closes Now Playing; so does a swipe down from the top row or the cover. The cover
   is as wide as the screen less the same margin either side as everything under it. The title is white and bold,
-  "Artist — Album" under it in purple - tap it: the album opens. Beside the title, at its right, two small typewriter
-  lines in grey, "3 of 11" over "FLAC 16/44.1" (or "MP3" for a lossy song), its first line level with the title's -
-  skip a song: the number moves on; add a song with Play Next and play it: no number, the format alone. Make the text
-  the largest accessibility size: the two lines go under the title, and the title keeps its room. The scrubber is
+  "Artist — Album" under it in purple - tap it: the album opens. Nothing is beside the title (since 655): between the
+  scrubber's two times, one small typewriter line a shade dimmer than they are, "3 of 11 · FLAC 16/44.1" (or "3 of 11 ·
+  MP3" for a lossy song) - skip a song: the number moves on; add a song with Play Next and play it: no number, the
+  format alone. At the largest text sizes it goes under the times, on a line of its own (655). The scrubber is
   sunk into the page - a dark track with a thin line round it, the part played grey inside it - and grows under your
   finger as before; tap and drag still seek where you let go, and VoiceOver still reads "Position in the song" and
   moves 5 seconds a swipe. Its times under it are in the typewriter figures and hold still as they count. Shuffle,
@@ -7643,6 +7645,23 @@ slice.
   Tags, a button).
 - **648 Both phones.** **Not done yet.** On Green Anole, 645-647. On Ethan's phone, 645-647, or "not done yet". On
   the Mac, 645, 646 and the full-screen cover.
+
+#### Now Playing's readout under the scrubber (655)
+
+**Not done yet.** On the phones alone: Now Playing's "3 of 11 · FLAC 16/44.1" has moved from beside the title to
+between the scrubber's two times. The Mac's player bar keeps its own, as it was. Nothing plays any differently.
+
+- **655 The title's row, and the readout between the times.** **Not done yet.** On Green Anole, then on Ethan's phone:
+  queue an album and open Now Playing. The title, and "Artist — Album" under it, have the whole width with nothing
+  beside them - a long title runs on to the right-hand margin before it is cut short. Under the scrubber, one line:
+  the time played at the left, "3 of 11 · FLAC 16/44.1" centred between, the time left at the right, all in the same
+  small typewriter figures, the middle one a shade dimmer than the times. The times are where they were, at the bar's
+  two ends, and the middle one holds still as they count. Skip a song: the number moves on. Play a song added with
+  Play Next: the format alone, still centred. With VoiceOver on, after "Position in the song" it reads "3 of 11, FLAC,
+  16-bit, 44.1 kHz", as before. Make the text the largest accessibility size: the readout takes a line of its own
+  under the times, centred - never beside the title - and the times stay where they were. Tap **Turntable** and back
+  at that size: the turntable is as it was, with no readout of the song's place. (Say whether the middle line reads
+  well between the times, or sits too close to either.)
 
 ## What it can't do yet
 
