@@ -307,8 +307,9 @@ def _answered(answer) -> bool:
 
 
 #? (credits, 27 Nov 2026) a song's credits: one release with its recordings' and works' relations to artists - its own
-#? lookup, never RELEASE_FULL_INC's (that one is asked for every pressing looked at, and would grow several times over)
-CREDITS_INC = "recordings+artist-credits+artist-rels+recording-level-rels+work-rels+work-level-rels"
+#? lookup, never RELEASE_FULL_INC's (that one is asked for every pressing looked at, and would grow several times over).
+#? `release-groups` for the album's date: its release group's first release (original_year's), never a recording's
+CREDITS_INC = "recordings+artist-credits+artist-rels+recording-level-rels+work-rels+work-level-rels+release-groups"
 
 
 def _kept_parsed(endpoint: str, params: dict | None) -> bool:
@@ -816,7 +817,7 @@ class MusicBrainzClient:
         Through request_with_retries like every lookup - the pace, the user agent, the hour in memory and the month
         on disk (a lookup's freshness: an old answer answered at once and asked for again behind it) - but KEPT
         PARSED: what comes back, from MusicBrainz or a cache, is src/credits.py kept()'s shape (Back in Black's
-        93 KB answer is 19 KB kept, 1.2 KB compressed on disk against the whole answer's 9.3), or
+        93 KB answer is 20 KB kept, 1.3 KB compressed on disk against the whole answer's 9.3), or
         request_with_retries' error dict.
         """
         return await self.request_with_retries(

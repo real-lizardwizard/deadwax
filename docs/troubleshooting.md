@@ -711,7 +711,8 @@ deadwax had nothing kept for that album, and MusicBrainz didn't answer within ei
 Opening Info again a little later usually shows them, and once they've come they're kept for a month and shown even
 while MusicBrainz is down. If it lasts, see whether Settings' Connections says MusicBrainz isn't connected
 ([above](#settings-connections-says-musicbrainz-isnt-connected)). deadwax's own log (the container's output) has a
-line starting "credits:" saying which it was.
+line starting "credits:" saying which it was. When MusicBrainz was the trouble, the Event log shows it too, in the
+lines every MusicBrainz question writes while it retries and when it gives up.
 
 The other things credits can say:
 
@@ -719,9 +720,12 @@ The other things credits can say:
   release there). deadwax shows them once it asks MusicBrainz about that album again, which can take up to a month.
   **Clear MusicBrainz's saved answers** (Server settings → **Connections**) makes it ask on the next look.
 - **Credits "on the album" for a song MusicBrainz does credit**: deadwax couldn't be sure which track of the release
-  the song is. The file has no recording id, and that disc has a different number of songs in Navidrome than on the
-  release (a missing or extra track, or two copies of the album). Matching the album to the release it really is
-  (**Edit → Release**) fixes it.
+  the song is. The file has no recording id, and that disc's track numbers in Navidrome aren't the release's (a
+  missing or extra track, two songs with one number, or two copies of the album). Matching the album to the release
+  it really is (**Edit → Release**), or fixing the track numbers, fixes it.
+- **The band, with someone who wasn't on the album, or "joined" or "left" beside a name**: MusicBrainz's dates for
+  that member's time in the band don't rule them out, being missing or only a year. Dating the membership more
+  closely on MusicBrainz (the band's page, its members) narrows it, once deadwax asks again.
 - **"This album isn't matched to a release"**: its files carry no MusicBrainz release id, or MusicBrainz no longer
   has that release. **Edit → Release** matches it.
 

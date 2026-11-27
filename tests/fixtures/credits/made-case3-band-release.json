@@ -73,7 +73,7 @@
       "length": 200000,
       "video": false,
       "disambiguation": "",
-      "first-release-date": "1978-06-02",
+      "first-release-date": "1977-11-20",
       "artist-credit": [
        {
         "name": "The Made Quartet",
@@ -232,5 +232,15 @@
     }
    ]
   }
- ]
+ ],
+ "release-group": {
+  "id": "a0000003-0000-4000-8000-0000000000a3",
+  "title": "Made Album Three",
+  "primary-type": "Album",
+  "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+  "secondary-types": [],
+  "secondary-type-ids": [],
+  "first-release-date": "1978-06-02",
+  "disambiguation": ""
+ }
 }
