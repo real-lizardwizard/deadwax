@@ -20294,6 +20294,46 @@ after, the same). All 17 caught:
 - The Mac runs the same code; its row never stands above its window's edge in any layout read here, so nothing on the
   Mac should change. Not run on a Mac.
 
+## Find froze the app (2026-11-26)
+
+James, on his iPhone 17 Pro (iOS 27.2) with 21afeec: "the search button doesn't work in the library". His answers, in
+order: the magnifying glass dims under the finger and nothing opens; the switch and the ••• in the same row are dead too;
+an album below opens and the tabs change; after a fresh start the row works until Find has been used once; and "after
+closing and reopening, If I try to use the find in library, the entire app freezes".
+
+**Measured, not guessed.** With the app frozen on his phone, `xcrun xctrace record --template 'Time Profiler' --device
+"Green Anole" --attach <pid> --time-limit 10s` (the device by NAME - by its UDID xctrace couldn't find the process)
+recorded 10,772 main-thread samples, every one inside the same `CA::Transaction::commit` - one layout pass that never
+ended. In it: `_UIHostingView.layoutSubviews`, AttributeGraph updates, `ScrollViewCommitMutation.apply` dirtying the
+graph again, the pages' scroll views given new frames and safe areas (`HostingScrollView.PlatformContainer.frame.setter`,
+`UIScrollView setSafeAreaInsets:`), the pages' PhoneMetaLine laid out - and, called from that same pass, `closure #5 in
+LibraryTop.body.getter` (the row's `.onGeometryChange` action) -> `TopProbe.Probe.read` -> `LibraryTop.take` ->
+LibraryTopRow laid out again. So the row's geometry changed, the action read the probe at once (`now`, 18 Nov), the
+reading changed the room, the padding moved what was under the row, and the row's geometry changed again: a loop with no
+turn of the main loop in it. The app's own frames were named in the export without a dSYM (the dSYM in the build folder
+was the later 9e0971d's).
+
+**Why only with Find.** Not settled from the samples. What fits them and the 25 Nov notes above (a container that moves
+the row with its own room - "-53.5 for a centred container"): with Find's field under the row and the keyboard up, the
+Library's stack is laid out taller than the room left to it and centred, so its top rises with every point of room the
+row comes down, and the probe follows it. Nothing was changed for that here - the fix holds whatever moves the row.
+
+**The fix** (LibraryTop.swift, TopClearance.swift):
+- **The probe never reads inside a layout pass.** `now` is gone; SwiftUI's geometry changing asks `soon`, a reading on the
+  main loop's next turn, like every other moment. A feedback like this one can now take at most one step a turn; it
+  can't hold the main thread. The cost: where SwiftUI's geometry moves the row, its room changes a frame later than it
+  did (the 18 Nov reason for `now`).
+- **Find open keeps the room**, as a presentation does (`let keeps = sample.presented || finding`, for `room` and `holds`):
+  the row never chases the field and the keyboard. Cancel closes Find, the row's height changes, and the next reading
+  measures afresh.
+- **Debug says so**: Reading's `finding` (default false) - "kept, Find open" before any other reason.
+
+**Verified** on James's Mac: TopClearanceTests (13, the new `debugSaysFindOpenKeptTheRoom` among them); test_ios_palette
+and test_ios_library_look (57), the new `test_find_never_freezes_the_librarys_top` failing for each planted fault - `now`
+back in the action, `keeps` without `finding`; the unsigned iPhone and Mac Catalyst builds. **Not verified**: Find on the
+phone - the check is James's (check 615 in docs/ios.md): Find opens, types, Cancels, and the row's controls work after;
+and Debug's line while Find is open reads "kept, Find open".
+
 ## The redesign, slice R7: Search, Get and Sources (2026-11-25)
 
 The plan is ~/Desktop/Code/deadwax-plans/mac-redesign-build.md 3.4, "R7 - Search, Get and Sources", and the drawings

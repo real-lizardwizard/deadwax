@@ -556,15 +556,17 @@ def test_the_librarys_top_sits_under_the_status_bar():
                    "selector: #selector(sceneActive), name: UIScene.didActivateNotification, object: nil)",
                    "        probe.measured = measured\n        eyes.probe = probe\n        return probe\n"):
         assert moment in probe, moment
-    # SwiftUI asks too - the row appearing (the tabs back from under the cover), its geometry changing (at once, in its
-    # action, and once UIKit has laid it out) - and its own numbers are Debug's alone, never the room's
-    assert 'swiftUI = measured\n            eyes.probe?.now("geometry")\n            eyes.probe?.soon("geometry")' in body
+    # SwiftUI asks too - the row appearing (the tabs back from under the cover), its geometry changing (once UIKit has
+    # laid it out; never at once, in its action, since 26 Nov - test_find_never_freezes_the_librarys_top) - and its own
+    # numbers are Debug's alone, never the room's
+    assert 'swiftUI = measured\n            eyes.probe?.soon("geometry")\n        }' in body
     # never a guessed key window, nor SwiftUI's global space, for the room
     assert "KeyWindow" not in top and "isKeyWindow" not in top and ".windows" not in top
     clearance = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "TopClearance.swift").read_text(encoding="utf-8")
     assert "TopClearance.kept(" not in top and "func kept(" not in clearance
     take = row[row.index("private func take("):row.index("/// LibraryTop's eyes in UIKit")]
-    assert ("TopClearance.room(kept: Double(clearance), top: top, windowTop: windowTop, presented: sample.presented,\n"
+    # (26 Nov) presented, or Find open - test_find_never_freezes_the_librarys_top
+    assert ("TopClearance.room(kept: Double(clearance), top: top, windowTop: windowTop, presented: keeps,\n"
             "                                     stood: sample.stood)") in take
     assert "let top = Double(sample.top)\n        let windowTop = Double(sample.windowTop)\n" in take
     assert "global" not in take
@@ -585,7 +587,6 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert ("presented: presented, stood: stood,\n                             cause: cause))\n            readAgain()\n"
             "        }") in probe
     assert "if presented { readAgain() }" not in probe
-    assert "func now(_ cause: String) {\n            follow(cause)\n            read(cause)\n" in probe
     assert "func soon(_ cause: String) {\n            follow(cause)\n            schedule(cause)\n" in probe
     assert "left = Self.tries\n            asked = cause\n" in probe
     again = probe[probe.index("private func readAgain() {"):probe.index("private func presentedOver(")]
@@ -620,9 +621,9 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert "private var still = TopClearance.Stillness()\n" in probe and probe.count("still = TopClearance.Stillness()") == 2
     assert "let stood = still.read(top: Double(top), at: Monotonic.seconds(), presented: presented)\n" in probe
     assert "let stood: Double?\n" in probe
-    assert ("let held = TopClearance.holds(top: top, windowTop: windowTop, presented: sample.presented, "
-            "stood: sample.stood)\n") in take
-    assert "presented: sample.presented,\n                                           held: held, cause: sample.cause," in take
+    # (26 Nov) presented, or Find open - test_find_never_freezes_the_librarys_top
+    assert "let held = TopClearance.holds(top: top, windowTop: windowTop, presented: keeps, stood: sample.stood)\n" in take
+    assert "presented: sample.presented,\n                                           held: held, finding: finding," in take
     assert ': held ? "held, row settled above the window" : "kept, row above the window"' in clearance
     # the last reading is Debug's
     assert "if debug.libraryTop != reading { debug.libraryTop = reading }" in take
@@ -673,6 +674,37 @@ def test_the_librarys_top_sits_under_the_status_bar():
     backdrop = now_playing[now_playing.index("private struct Backdrop"):]
     assert ".ignoresSafeArea()" in backdrop and "CoverImage(" in backdrop
     assert ".background(Color(.systemBackground).ignoresSafeArea())" in sources["Root/RootView.swift"]
+
+
+def test_find_never_freezes_the_librarys_top():
+    # 26 Nov, James: the Library's magnifying glass "doesn't work", then "If I try to use the find in library, the
+    # entire app freezes". Ten seconds recorded on his phone while it was frozen were one layout pass that never ended:
+    # the row's onGeometryChange action read the probe at once (`now`), the reading changed the room, the pages under the
+    # row were laid out again and the row's geometry changed again. So (1) the probe never reads inside a layout pass -
+    # no `now` at all, SwiftUI's geometry changing asks on the main loop's next turn - and (2) while Find is open the room
+    # is kept, as under a presentation, and Debug says so.
+    top = (APP / "Library" / "LibraryTop.swift").read_text(encoding="utf-8")
+    probe = top[top.index("private struct TopProbe: UIViewRepresentable {"):]
+    assert "func now(" not in top and "probe?.now(" not in top and ".now(\"" not in top
+    action = top[top.index("} action: { (measured: [CGFloat]) -> Void in"):top.index('.onAppear { eyes.probe?.soon("appear") }')]
+    assert [line.strip() for line in action.splitlines()[1:] if line.strip() and not line.strip().startswith("//")] == [
+        "swiftUI = measured", 'eyes.probe?.soon("geometry")', "}"]
+    # every reading is the main loop's: `read(` only from `schedule`'s block, `schedule(` only from `soon` and the read again
+    assert probe.count("read(cause)") == 1 and "DispatchQueue.main.async { [weak self] in" in probe
+    assert probe.count("schedule(cause)") == 1 and probe.count('schedule("\\(asked), again")') == 1
+    take = top[top.index("private func take("):top.index("/// LibraryTop's eyes in UIKit")]
+    assert "let keeps = sample.presented || finding\n" in take
+    assert ("TopClearance.room(kept: Double(clearance), top: top, windowTop: windowTop, presented: keeps,\n"
+            "                                     stood: sample.stood)") in take
+    assert "TopClearance.holds(top: top, windowTop: windowTop, presented: keeps, stood: sample.stood)" in take
+    assert "presented: sample.presented,\n                                           held: held, finding: finding," in take
+    assert take.count("presented: sample.presented") == 1
+    clearance = (REPO / "ios" / "DeadwaxKit" / "Sources" / "DeadwaxCore" / "TopClearance.swift").read_text(encoding="utf-8")
+    assert 'let why = finding ? "kept, Find open"\n                : presented ? "kept, something presented"' in clearance
+    assert "finding: Bool = false, cause: String" in clearance and "self.finding = finding" in clearance
+    # what `finding` is: LibraryView's Find, open from the glass until Cancel (test_ios_library_look holds both)
+    library = (APP / "Library" / "LibraryView.swift").read_text(encoding="utf-8")
+    assert "LibraryTop(finding: finding, findLabel: findPrompt(shownPage), openFind: { openFind() }," in library
 
 
 def test_the_tab_bar_comes_down_into_the_home_indicators_room():

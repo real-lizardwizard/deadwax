@@ -7485,6 +7485,18 @@ them in 612.
   has changed: the buttons glossy and raised, the chips tinted, the segmented controls in their wells - say if
   anything looks different.
 
+### Find in the Library, fixed (615)
+
+The Library's magnifying glass froze the app on 26 Nov's builds: Find's field and keyboard set off the code that keeps
+the Library's top clear of the Dynamic Island, and the app stopped answering. Now the top stays exactly where it is
+while Find is open.
+
+- **615 Find.** **Not done yet.** On the phone, from a fresh start: tap the magnifying glass - the field comes up under
+  the top with the keyboard, and the app keeps answering. Type a few letters (the page narrows), switch pages, then
+  **Cancel**. Then the magnifying glass, the page switch and the ••• each work again, and the top hasn't moved at any
+  point. With Find open, You > Debug's Library top line ends its reasons with "kept, Find open"; after Cancel it says
+  "nothing presented" again. On Ethan's phone too, or "not done yet".
+
 ## What it can't do yet
 
 These are the web app's for now - open deadwax's address in a browser for them, since nothing in the app takes you

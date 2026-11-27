@@ -233,4 +233,15 @@ import Testing
         #expect(TopClearance.Reading(top: 0, windowTop: 62, room: 62, presented: false, held: true, cause: "layout")
             .line.contains("down 62 \u{00B7} nothing presented"))
     }
+
+    /// (26 Nov, James: "If I try to use the find in library, the entire app freezes") Find open keeps the room, and
+    /// Debug says that's why - before a presentation's words, whatever else the reading says; never by default.
+    @Test func debugSaysFindOpenKeptTheRoom() {
+        let open = TopClearance.Reading(top: 62, windowTop: 62, room: 0, presented: false, finding: true, cause: "layout")
+        #expect(open.line.contains("down 0 \u{00B7} kept, Find open \u{00B7} after layout"))
+        #expect(!open.line.contains("nothing presented"))
+        #expect(TopClearance.Reading(top: -15, windowTop: 62, room: 77, presented: true, held: true, finding: true,
+                                     cause: "layout").line.contains("kept, Find open"))
+        #expect(!TopClearance.Reading(top: 62, windowTop: 62, room: 0, presented: false, cause: "layout").finding)
+    }
 }

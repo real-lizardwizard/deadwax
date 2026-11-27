@@ -134,19 +134,23 @@ public enum TopClearance {
         public var presented: Bool
         /// (25 Nov) The row stood still above the window's edge and was followed down (`holds`).
         public var held: Bool
+        /// (26 Nov) The Library's Find was open - its field under the row, the keyboard up: the room was kept as it was,
+        /// as under a presentation (notes/ios.md "Find froze the app").
+        public var finding: Bool
         /// What asked for the reading - "window", "layout", "appear", "presentation gone" and the like.
         public var cause: String
         /// SwiftUI's own numbers, nil before SwiftUI has said: the row's top in its global space, and its top safe area.
         public var swiftTop: Double?
         public var swiftSafe: Double?
 
-        public init(top: Double, windowTop: Double, room: Double, presented: Bool, held: Bool = false, cause: String,
-                    swiftTop: Double? = nil, swiftSafe: Double? = nil) {
+        public init(top: Double, windowTop: Double, room: Double, presented: Bool, held: Bool = false,
+                    finding: Bool = false, cause: String, swiftTop: Double? = nil, swiftSafe: Double? = nil) {
             self.top = top
             self.windowTop = windowTop
             self.room = room
             self.presented = presented
             self.held = held
+            self.finding = finding
             self.cause = cause
             self.swiftTop = swiftTop
             self.swiftSafe = swiftSafe
@@ -156,7 +160,8 @@ public enum TopClearance {
         /// room was kept: "kept, something presented", "kept, row above the window" - or, followed, "held, row settled
         /// above the window"), "SwiftUI 0, safe 0" (once SwiftUI has said), "after layout".
         public var line: String {
-            let why = presented ? "kept, something presented"
+            let why = finding ? "kept, Find open"
+                : presented ? "kept, something presented"
                 : TopClearance.settled(top: top) ? "nothing presented"
                 : held ? "held, row settled above the window" : "kept, row above the window"
             var parts = ["row \(Self.points(top))", "window \(Self.points(windowTop))", "down \(Self.points(room))", why]

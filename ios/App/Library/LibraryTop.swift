@@ -42,6 +42,13 @@ import UIKit
 /// above the edge - the same within a point on a reading and its read again, nothing presented (the probe's
 /// TopClearance.Stillness) - comes down what it stands above the edge and the inset (TopClearance.holds), "held" in
 /// Debug's line; one that moves keeps its room, and one more than a whole inset above the edge is never followed.
+///
+/// Find froze the app (26 Nov, James: "If I try to use the find in library, the entire app freezes"; notes/ios.md "Find
+/// froze the app"): ten seconds of it recorded on his phone were one layout pass that never ended - SwiftUI's geometry
+/// for the row changing, the probe read at once in that action, the room changed, the pages under the row laid out
+/// again, the row's geometry changed again. So the probe never reads inside a layout pass - SwiftUI's geometry changing
+/// asks for a reading on the main loop's next turn, as every other moment does - and while Find is open (its field
+/// under the row, the keyboard up) the row keeps the room it has, as under a presentation: "kept, Find open" in Debug.
 struct LibraryTop<Find: View, Switch: View, More: View>: View {
     /// Find is open: its field drawn under the row.
     let finding: Bool
@@ -124,13 +131,13 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
             }
         }
         // SwiftUI's account of the row - its top in SwiftUI's global space, the safe area it is given: either changed,
-        // the probe reads at once, in this pass, where the room changed before the probe, and again once UIKit has laid
-        // out what moved (SwiftUI's numbers are Debug's, never the room's)
+        // the probe reads once UIKit has laid out what moved - never at once, in this pass (26 Nov: a reading here that
+        // changed the room changed this geometry again, and with Find open that never ended). SwiftUI's numbers are
+        // Debug's, never the room's
         .onGeometryChange(for: [CGFloat].self) { (proxy: GeometryProxy) -> [CGFloat] in
             [proxy.frame(in: .global).minY, proxy.safeAreaInsets.top]
         } action: { (measured: [CGFloat]) -> Void in
             swiftUI = measured
-            eyes.probe?.now("geometry")
             eyes.probe?.soon("geometry")
         }
         // back on screen - the tabs back from under Now Playing's full-screen cover, another tab, a page popped: read
@@ -144,19 +151,22 @@ struct LibraryTop<Find: View, Switch: View, More: View>: View {
         wide > 0 && LibraryTopFit.folds(needs: Double(needs), width: Double(wide))
     }
 
-    /// The probe's reading: the room worked out again (TopClearance.room - kept under a presentation or while the row
-    /// moves above its window's edge, afresh at the edge or below it, and since 25 Nov the row standing still above it
-    /// followed down), and the reading kept for Debug, each only when it changed.
+    /// The probe's reading: the room worked out again (TopClearance.room - kept under a presentation, while Find is open
+    /// (26 Nov) or while the row moves above its window's edge, afresh at the edge or below it, and since 25 Nov the row
+    /// standing still above it followed down), and the reading kept for Debug, each only when it changed.
     private func take(_ sample: TopProbe.Sample) {
         let top = Double(sample.top)
         let windowTop = Double(sample.windowTop)
-        let room = TopClearance.room(kept: Double(clearance), top: top, windowTop: windowTop, presented: sample.presented,
+        // (26 Nov) Find open is kept as a presentation is: the room never chases the field and the keyboard
+        let keeps = sample.presented || finding
+        let room = TopClearance.room(kept: Double(clearance), top: top, windowTop: windowTop, presented: keeps,
                                      stood: sample.stood)
         if CGFloat(room) != clearance { clearance = CGFloat(room) }
         let said = swiftUI.count == 2 ? swiftUI.map { (value: CGFloat) -> Double in Double(value) } : nil
-        let held = TopClearance.holds(top: top, windowTop: windowTop, presented: sample.presented, stood: sample.stood)
+        let held = TopClearance.holds(top: top, windowTop: windowTop, presented: keeps, stood: sample.stood)
         let reading = TopClearance.Reading(top: top, windowTop: windowTop, room: room, presented: sample.presented,
-                                           held: held, cause: sample.cause, swiftTop: said?[0], swiftSafe: said?[1])
+                                           held: held, finding: finding, cause: sample.cause, swiftTop: said?[0],
+                                           swiftSafe: said?[1])
         if debug.libraryTop != reading { debug.libraryTop = reading }
     }
 }
@@ -206,8 +216,9 @@ private struct LibraryTopRow: Layout {
 /// When: UIKit putting it in a window, laying it out and changing its safe area; a presentation the app made going
 /// (Notification.Name.appPresentationGone, after its onDismiss); the scene coming to the front; and SwiftUI's asks (the
 /// row appearing, SwiftUI's geometry changing). Each reads once, on the main loop's next turn, after the layout under
-/// way - however many ask meanwhile; SwiftUI's geometry changing reads at once in its action too (`now`), so the room
-/// changes in the pass that moved the row, as it did before the probe. After each ask it reads again every `gap`,
+/// way - however many ask meanwhile. Never inside a layout pass (26 Nov): SwiftUI's geometry changing read at once in
+/// its action too until Find froze the app with it - a reading that changed the room changed that geometry again, in the
+/// same pass, without end. After each ask it reads again every `gap`,
 /// `tries` times (3 s) after the last, whatever is presented (20 Nov): UIKit can move the row's container without a
 /// word to it or to SwiftUI - the tabs back from under Now Playing's cover settled 117 points lower than they were first
 /// read - and a cover going reads afresh as soon as it has gone, even should its onDismiss come before UIKit lets it go.
@@ -303,12 +314,6 @@ private struct TopProbe: UIViewRepresentable {
 
         @objc private func sceneActive() {
             soon("scene active")
-        }
-
-        /// A reading now (SwiftUI's geometry changing - LibraryTop reads in its action), the reads again started afresh.
-        func now(_ cause: String) {
-            follow(cause)
-            read(cause)
         }
 
         /// A reading on the main loop's next turn - one, however many ask before it - the reads again started afresh.
