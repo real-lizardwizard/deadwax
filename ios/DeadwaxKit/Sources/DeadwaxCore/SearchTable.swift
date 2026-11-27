@@ -294,9 +294,11 @@ public enum GetPageWords {
     public static func songsLine(_ tracks: [PressingTrack]) -> String {
         guard !tracks.isEmpty else { return "" }
         let count = "\(tracks.count) \(tracks.count == 1 ? "song" : "songs")"
-        let seconds = tracks.map { seconds($0.length) }
-        guard !seconds.contains(nil) else { return count }
-        let total = seconds.compactMap { $0 }.reduce(0, +)
+        // not `let seconds = tracks.map { seconds(...) }`: Swift 6.3 (GitHub's macOS runner, Xcode 26.6) reads the
+        // name inside the closure as the array being declared, and Core stops compiling there; 6.4 doesn't
+        let lengths = tracks.map { Self.seconds($0.length) }
+        guard !lengths.contains(nil) else { return count }
+        let total = lengths.compactMap { $0 }.reduce(0, +)
         return "\(count) \u{00B7} \(minutes(total))"
     }
 
