@@ -20678,9 +20678,9 @@ showed. Nothing Get or Sources does changed: the same searches, filters, sorts, 
   the Get, and a Get replaced (`.id`) or already over is nothing to end. Close's Escape stood aside while the words were
   edited (`.escapeCloses(!model.edited)`, so Escape never threw edited words away); the tab now holds Escape for that
   time alone, `.dockHoldsEscape(get.request.search.edited)`, and R16's whole-tab hold is gone from MacPanel's
-  `.sources` case - the one line of MacPanels.swift this slice changes. Sources has no View key and a click on its
-  folder tab shows it (AppNavigation.showPanel), so Escape is its close in practice; the View keys of the other tabs
-  switch to theirs, keeping the Get, as before.
+  `.sources` case - the one line of MacPanels.swift this slice changed at first. Sources has no View key; its close is
+  Escape or (after review, below) a click on its open folder tab; the View keys of the other tabs switch to theirs,
+  keeping the Get, as before.
 - **Sources' states in the look's type, both devices**: the state's line (searching, nothing found, nothing lossless,
   none through the chips, refused - `stateText`) the card row's words (the phone's `.go` 16, the Mac's 13) in --text,
   what goes with it (This takes a few seconds, why nothing lossless, Searched for, why it didn't pick) the small size in
@@ -20690,8 +20690,9 @@ showed. Nothing Get or Sources does changed: the same searches, filters, sorts, 
 - **Get's store line** (Get/StoreLineView): the Mac's Get.dc.html `.box` - DWPalette.card in DWCorners.boxShape (5),
   its 1 pt --line edge, 12 inside (the Get panel's `.col` padding) - the title --head (green when held), 13 semibold,
   the lines --t2 at the small size, the last --t3; the phone's flat on the black, the title the phone's 16 semibold.
-  Join and Add DWButtonStyle (was SecondaryPill through `face(_:)`), dimmed by DWPalette.off while busy; the error
-  DWPalette.redChipText.
+  Join and Add DWButtonStyle (was SecondaryPill through `face(_:)`), dimmed by DWPalette.off while busy - a
+  deliberate change, kept after review: the dimming MineBlock's, PlaylistPicker's and MacAlbumPage's busy buttons have,
+  where --app-job-busy's 0.75 was; the error DWPalette.redChipText.
 - **Manual search's Search** (Get/ManualSearchSheet): `DWButtonStyle(kind: .pri, size: .large, fills: true)` where
   PrimaryFace was; the footer the phone's `.s`.
 - **The old type and Palette** - each moved to the very size it was where the phone has one (Typeface.Phone's:
@@ -20723,8 +20724,9 @@ showed. Nothing Get or Sources does changed: the same searches, filters, sorts, 
     (`Self.chosen(choices, value: row.value)`, the phone row's own), its menu the very Picker - `selection: value`, the
     choices tagged `choice.value` - drawn `.inline`, so a choice sends exactly what the system pop-up sent. The phone's
     menu is R14's, untouched.
-  - **DesktopFrame**: the drawer's shadow DWPalette.buttonDrop (black 0.45, where Palette.well was 0.2: no token holds
-    0.2 - a touch darker, for the Mac to judge), the panel's hairline DWPalette.frame (--frame, the very #22202b).
+  - **DesktopFrame**: the drawer's shadow black at 0.2, as it always was (Palette.well's value), named in the frame -
+    `private static let drawerDrop` (after review: R19 had it DWPalette.buttonDrop, a button's 1-px drop at 0.45, more
+    than twice as dark) - and the panel's hairline DWPalette.frame (--frame, the very #22202b).
   - **RootView**: the sign-in's ground the page's (`Platform.mac ? DWPalette.bg : DWPalette.page`), not
     `Color(.systemBackground)`.
 - **Row Size into Add to a playlist** (R18's left item): DesktopFrame reads the store once (`private var rowSize`) and
@@ -20739,8 +20741,7 @@ Kept where the phone has no size of its own (Typeface.Phone has none at 20, 22 o
 over 60 letters) and artist (20), MBArtistView's name (28 bold, the artist page's hero's), the Storage bar's amount
 (22), and **PeopleScreen.swift:370**'s person's name (iPerson's 20/700) - left untouched rather than moved to a size
 it isn't. A Phone size at 20/22/28 in Shared/Typeface.swift would let them go; for the coordinator. Not built from
-Get.dc.html (as R7): Pin, Show all 14, the per-card signal chips. MacPanels' comments at the `.sources` case and in
-MacPanel's doc still say "until R19" - the slice may change that one line only; for the coordinator.
+Get.dc.html (as R7): Pin, Show all 14, the per-card signal chips.
 
 Words keys: none changed (iphone.json, mac.json untouched).
 
@@ -20771,12 +20772,50 @@ test_the_phone_is_flat_in_search_get_and_sources); Sources' query on `.roundedBo
 walk, test_ios_get_look's field); the panel put away keeping the Get (the dock's Close test,
 test_the_tab_goes_when_its_get_page_is_left); Row Size not handed in (the frame's test).
 
-Palette.busy, Palette.frameBorder and Palette.well have no reader left (DeadwaxApp.swift keeps them; not this slice's
-file to tidy).
+Palette.frameBorder and Palette.well have no reader left (DeadwaxApp.swift keeps them; not this slice's to tidy);
+Palette.busy went after review, below.
+
+### After review
+
+The review asked for nothing to be fixed and found the behaviour right; one more commit tidied five things:
+
+- **The drawer's shadow back at 0.2** (DesktopFrame): `private static let drawerDrop = Color.black.opacity(0.2)`,
+  named in the frame rather than a DWPalette line (another slice edits DWPalette.swift) - the look's tests take a
+  frame's own named constant, and check 643 ("look as before") is true again.
+- **A busy Join or Add stays DWPalette.off** (above, a deliberate change); nothing read `Palette.busy` any more, so it
+  went from DeadwaxApp.swift with test_ios_palette's two lines pinning it (`--app-job-busy` 0.75 and the `static let`).
+- **A click on the open folder tab closes the dock** (James's decision 1, 26 Nov, panel-review.md:72: "It closes with
+  Escape, the tab's View key, or a click on the open tab" - check 617 already said so, and MacPanel's binding called
+  `showPanel`, `shown`'s rule, which leaves the open tab open). Core's `MacDock.clicked(shown, asked, getOpen:,
+  sourcesEdited:)` is toggled's rule - the open tab nil, another switched to, Sources' Get gate kept - but Sources' open
+  tab while its words are edited answers `shown`, as Escape does nothing then: edited words are never lost to a click.
+  MacPanel's folder tabs' binding calls its `clicked(_:)`, which reads the Get's own `edited`
+  (`navigation.macSources?.request.search.edited`, the very one MacSourcesTab holds Escape by) and calls showPanel or
+  closePanel by MacDock's answer (AppNavigation's macPanel is private(set), and App/Shared/Routes.swift is not touched).
+  The panel put away by a click ends the Get through MacSourcesTab's `.onDisappear`, as Escape's does. `shown` stays
+  for the bar's ••• Info and EQ and Settings' Open the EQ. MacDock's header comment, `shown`'s doc and MacDockTests
+  (`aFolderTabClickedClosesTheOpenTabAndSwitchesFromAnother`: every shown, asked and gate against toggled, and the
+  hold) say so; docs/ios.md's side panel paragraph, Choose a source and check 639 too.
+- **Check 639 says only what the code guarantees**: with the cursor in the words Escape is the field's (MacFrame.escape
+  answers `.field`) and the panel stays - not that "the field lets go first", which is the system's to do or not.
+- **Sources' dock header is not drawn while it would hold nothing** (no subtitle, no folders found yet): `if
+  !request.subtitle.isEmpty || foundFolders { dockHeader }`. MacPanels' "until R19" comments (MacPanel's doc, the
+  `.sources` case, `dockHoldsEscape`'s doc) brought up to date. PeopleScreen's 20 bold name left, as asked.
+
+Tests: test_ios_get_look gains the click's test (MacPanel's binding and `clicked(_:)`, no `showPanel(chosen)` or
+`MacDock.shown(` in MacPanel, MacDock.clicked's text, the Get's own `edited`); its docstring now says only what is true
+(Sources has no View key); its header and shadow asserts follow the code, as test_ios_mac's shadow assert does.
+Mutations, each applied alone and restored: the folder tab's click back to `navigation.showPanel(chosen)` (caught by
+test_a_click_on_the_open_folder_tab_closes_the_dock_and_never_loses_edited_words and
+test_the_panels_are_one_at_a_time_and_never_modal); MacDock.clicked without the edited hold (MacDockTests'
+aFolderTabClickedClosesTheOpenTabAndSwitchesFromAnother); the drawer's shadow back to buttonDrop (test_ios_get_look's
+and test_ios_mac's frame tests); the dock header drawn while empty
+(test_the_macs_sources_has_no_bar_and_one_search_again_in_the_dock_header); and the first commit's panel put away
+keeping the Get, again (both its tests).
 
 **Not verified**: anything on a device (checks 639-644) - the dock's header against the folder tabs, Escape's three
-cases with the cursor and edited words, the store line's box beside the cards, the pop-ups' menus, the drawer's
-darker shadow, the picker's rows at Medium and Large.
+cases with the cursor and edited words, a click on the open Sources tab with words edited and not, the store line's box
+beside the cards, the pop-ups' menus, the drawer's shadow, the picker's rows at Medium and Large.
 
 ## The panel review, R20: the known holdouts (2026-11-26)
 

@@ -401,9 +401,6 @@ def test_the_sources_sheet_is_drawn_in_the_webs_colours():
                   ".opacity(phase == .busy ? DWPalette.off : 1)", ".foregroundStyle(DWPalette.redChipText)"):
         assert drawn in box, drawn
     assert not re.search(r"(?<![\w.])Palette\.", box) and "SecondaryPill" not in box
-    # (slice 3) --app-job-busy, as app.css fades .app-store-join, still the old palette's for what keeps it
-    assert token(REPO / "interface" / "player" / "app.css", "app-job-busy") == "0.75"
-    assert "static let busy: Double = 0.75\n" in palette
 
 def test_the_play_bar_is_the_tab_bars_top():
     # 15 Nov, James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole

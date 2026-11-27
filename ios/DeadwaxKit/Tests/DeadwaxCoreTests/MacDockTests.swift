@@ -69,7 +69,29 @@ import Testing
         }
     }
 
-    /// A folder tab clicked, the bar's ••• Info and EQ, Settings' Open the EQ: the tab, whatever was showing.
+    /// (R19 - James's decision 1, 26 Nov) A folder tab clicked is a tab's key: the open one closes the panel, another is
+    /// switched to - save Sources' open tab while its words are edited, which stays, as Escape leaves it then.
+    @Test func aFolderTabClickedClosesTheOpenTabAndSwitchesFromAnother() {
+        for getOpen in [false, true] {
+            for shown in Self.every {
+                for asked in MacDock.Tab.allCases {
+                    let key = MacDock.toggled(shown, asked, getOpen: getOpen)
+                    #expect(MacDock.clicked(shown, asked, getOpen: getOpen, sourcesEdited: false) == key)
+                    let held = MacDock.clicked(shown, asked, getOpen: getOpen, sourcesEdited: true)
+                    if asked == .sources && shown == .sources {
+                        #expect(held == .sources, "Sources' edited words: its open tab's click does nothing")
+                    } else {
+                        #expect(held == key, "\(String(describing: shown)) -> \(asked): edited words hold no other")
+                    }
+                }
+            }
+        }
+        #expect(MacDock.clicked(.sources, .sources, getOpen: true, sourcesEdited: false) == nil)
+        #expect(MacDock.clicked(.upNext, .upNext, getOpen: true, sourcesEdited: true) == nil)
+        #expect(MacDock.clicked(.sources, .upNext, getOpen: true, sourcesEdited: true) == .upNext)
+    }
+
+    /// The bar's ••• Info and EQ, Settings' Open the EQ: the tab, whatever was showing.
     @Test func aTabShownWhateverWasShowing() {
         for getOpen in [false, true] {
             for shown in Self.every {

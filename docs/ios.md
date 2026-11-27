@@ -386,7 +386,8 @@ menus and keys, and these differences.
   them, one at a time, 400 points wide. Open it from the bar's Queue, Lyrics, Info and EQ buttons (each lit
   while its tab shows), the •••'s Info and EQ, or **View > Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I and **EQ** ⌥⌘E, each ticked while its tab shows; or click a
   tab to move to it. A tab's key (or menu item) shows its tab - opening the panel if it's shut, switching to it if
-  another tab shows - and closes the panel when its tab is the one showing; a tab's **Done** or Escape closes it too.
+  another tab shows - and closes the panel when its tab is the one showing; a click on the tab that's showing, a
+  tab's **Done** or Escape closes it too (not **Sources** while its search words are changed and not yet searched).
   With the window 1280 points wide or more the panel is a column of its own and the page narrows beside it; narrower,
   it lies over the page's right edge. Either way the page, the sidebar and the bar still answer. The Queue is the
   phone's, Lyrics the lines Now Playing shows on the phone, lit as they're sung, and the EQ the phone's EQ page for
@@ -1928,9 +1929,9 @@ may have been added anyway. If it isn't in your library soon, add it again." Add
 them if you look at another tab and back, and the tab goes - its search stopped - when you leave the album's page
 (back, another page or another sidebar row), as the sheet does when it closes. The tab has no bar: the album and
 pressing are at the panel's top left, **Search again** at its right (lit while its words are open), and there's no
-Close - Escape puts the panel away, which stops the search and ends the Get as Close did (with the cursor in the words,
-Escape leaves the field first; with words changed and not yet searched, Escape does nothing, so they aren't thrown
-away). deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
+Close - Escape, or a click on the open **Sources** tab, puts the panel away, which stops the search and ends the Get as
+Close did (with the cursor in the words, Escape is the field's and the panel stays; with words changed and not yet
+searched, neither does anything, so they aren't thrown away). deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
 Portishead…" and "This takes a few seconds." while it does - and each folder found is a card, as in the web app's
 sheet (see [Downloading](downloading.md#choosing-a-source)):
 
@@ -7625,9 +7626,10 @@ is the same.
 - **639 Sources on the Mac.** **Not done yet.** Get an album you don't have: the **Sources** tab has no bar across its
   top - the album and pressing at the left, and once folders are found **Search again** at the right, a small button
   lit while its words are open above the chips (click it again to close them). There's no Close: Escape puts the
-  panel away and ends the Get, as Close did - open the album's page again and Get the album searches afresh. Click in
-  the search words and press Escape: the field lets go first, the panel stays. Change the words without searching and
-  press Escape: nothing happens, and the words are still there. Switch to the Queue and back: the Get is as you left
+  panel away and ends the Get, as Close did - open the album's page again and Get the album searches afresh. Get it
+  again and click the open **Sources** tab: the panel goes away and the Get ends the same way. Click in the search
+  words and press Escape: the panel stays. Change the words without searching, then press Escape or click the open
+  **Sources** tab: nothing happens, and the words are still there. Switch to the Queue and back: the Get is as you left
   it.
 - **640 The box for an album you have.** **Not done yet.** Get a pressing that's already in the store (or already
   downloading): on the Mac its box is the cards' box - the dark card, a thin edge and small rounded corners - with its

@@ -968,8 +968,8 @@ def test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar():
     assert order == sorted(order)
     #? (slice 3's review) the panel drawn in one place, a drawer's or a column's - crossing 1280 never draws it afresh
     assert frame.count("MacPanel(") == 1 and "if MacDock.liesOver(style, panel) {" not in frame
-    #? (the panel review's R19) its shadow over the page the look's drop
-    assert "MacDock.liesOver(style, panel) ? DWPalette.buttonDrop : Color.clear" in body
+    #? (the panel review's R19, after review) its shadow over the page black at 0.2 as it always was, named in the frame
+    assert "MacDock.liesOver(style, panel) ? Self.drawerDrop : Color.clear" in body
     assert "MacFrame.panelWidth" not in frame, "the web's 470 is MacFrame's, unread here"
     #? (R3) what a list on the page in front selects, for the menus: Info opens about it with nothing queued
     assert ("navigation.macSelected = selected" in frame
@@ -1026,9 +1026,11 @@ def test_the_panels_are_one_at_a_time_and_never_modal():
     app = app_sources()
     panels = bare(app["Player/MacPanels.swift"])
     panel = panels[panels.index("struct MacPanel: View {"):panels.index("extension EnvironmentValues")]
-    #? the strip: MacFolderTabs over MacDock's tabs (Sources only with a Get page), a click showing its tab
+    #? the strip: MacFolderTabs over MacDock's tabs (Sources only with a Get page) - (R19's review) a click a tab's key,
+    #? MacDock.clicked: the open tab put away, another shown
     assert ("MacFolderTabs(tabs: MacDock.tabs(getOpen: navigation.macGetOpen), words: MacDock.Words.tab," in panel
-            and "navigation.showPanel(chosen)" in panel and "spoken: MacDock.Words.spoken)" in panel)
+            and "-> Void in clicked(chosen) }" in panel and "MacDock.clicked(tab, chosen," in panel
+            and "spoken: MacDock.Words.spoken)" in panel)
     #? one tab's page, the tab chosen's: a switch on it, each page once
     assert panel.count("switch tab {") == 1
     for page in ("case .upNext:\n            UpNextScreen()", "case .lyrics:\n            LyricsPanel()",

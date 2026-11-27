@@ -80,8 +80,8 @@ struct DesktopFrame: View {
                                     rule
                                     MacPanel(tab: panel)
                                 }
-                                // (the panel review's R19) the look's drop, where the old palette's well was
-                                .shadow(color: MacDock.liesOver(style, panel) ? DWPalette.buttonDrop : Color.clear,
+                                // (the panel review's R19) the drawer's own drop, as dark as it always was
+                                .shadow(color: MacDock.liesOver(style, panel) ? Self.drawerDrop : Color.clear,
                                         radius: MacDock.liesOver(style, panel) ? 16 : 0)
                             }
                         }
@@ -209,6 +209,10 @@ struct DesktopFrame: View {
 
     /// View > Row Size, as this Mac keeps it (MacRowSizeStore, which the menus read too) - read here alone.
     private var rowSize: MacRowSize { MacRowSizeStore.shared.size }
+
+    /// (R19's review) The drawer's shadow over the page: black at 0.2, the old palette's well's very value, named here -
+    /// DWPalette's buttonDrop is a button's 1-px drop, more than twice as dark.
+    private static let drawerDrop = Color.black.opacity(0.2)
 
     /// --dw-frame-border, a hairline down the panel's edge. (R19) The look's `--frame`, the very colour.
     private var rule: some View {

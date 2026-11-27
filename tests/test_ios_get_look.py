@@ -4,17 +4,20 @@ left in redrawn pages (2026-11-27)"; panel-review.md's checks 639-644). James ch
 though R7 had kept it; the Mac's Sources still sat under a system bar; and pages already redrawn kept the old Palette and
 the system's text styles in corners no drawing showed. This holds what R19 drew:
 
-- The Mac's Sources has no system bar: its Search again is in R16's DockHeader - one button, one toggle - and its Close
-  is the dock's own (Escape, the View key, a click on its tab), the panel put away the Get over, as Close was. While the
-  words to search with are edited the tab holds Escape, as Close's Escape did; a field with the cursor gets it first.
+- The Mac's Sources has no system bar: its Search again is in R16's DockHeader - one button, one toggle, no row while
+  it would hold nothing - and its Close is the dock's own (Escape, or a click on its open folder tab: Sources has no
+  View key), the panel put away the Get over, as Close was. While the words to search with are edited the tab holds
+  Escape, as Close's Escape did, and a click on its open tab does nothing; a field with the cursor gets Escape first.
+- (R19's review, James's decision 1) A click on a folder tab is a tab's key: the open one puts the panel away, another
+  is switched to (MacDock.clicked, toggled's rule); `shown` stays for the bar's ••• Info and EQ and Settings' EQ.
 - Get's store line is Get.dc.html's box on the Mac (the look's 5 corners, the card and its line) and flat on the phone,
   its buttons the look's; Manual search's Search the look's primary.
 - The old Palette, Corners and the system's text styles are gone from the parts R19 names, each moved to a Typeface and
   DWPalette token; the 20, 22 and 28 the phone has no size of its own for are kept where they were, counted.
 - Server settings' choice setting and Downloads' two choices are the look's pop-up on the Mac, their menus the very
   Pickers they were - the same bindings and tags, so a choice sends exactly what it sent.
-- The desktop frame's hairline and drawer shadow are DWPalette's; it hands View > Row Size into Add to a playlist's
-  sheet, whose Mac rows read it.
+- The desktop frame's hairline is DWPalette's and its drawer shadow black at 0.2, as it always was, named in the
+  frame; it hands View > Row Size into Add to a playlist's sheet, whose Mac rows read it.
 - Every word each file draws is as it was: pinned here as the set of word expressions each draws.
 """
 import importlib.util
@@ -89,7 +92,8 @@ def test_the_macs_sources_has_no_bar_and_one_search_again_in_the_dock_header():
     page = code(SOURCES)
     body = flat(member(member(page, "struct SourcesPage: View"), "var body: some View"))
     # the dock's header in the bar's place: the subtitle, and Search again at its right
-    assert "if kept != nil, Platform.mac { dockHeader } else if !request.subtitle.isEmpty {" in body
+    assert ("if kept != nil, Platform.mac { if !request.subtitle.isEmpty || foundFolders { dockHeader } } "
+            "else if !request.subtitle.isEmpty {") in body
     assert ".toolbar(docked ? .hidden : .automatic, for: .navigationBar)" in body
     # no Close and no bar's Search again in the dock: both only where there is a bar
     assert "if !pushed && !docked { ToolbarItem(placement: .cancellationAction) { Button(SourcesLook.close) {" in body
@@ -127,6 +131,24 @@ def test_the_docks_close_is_the_docks_own_and_a_field_gets_escape_first():
             "return shown == nil ? .page : .panel }") in dock
     assert ("public static func escape(typing: Bool, panel: MacDock.Tab?) -> Escape { "
             "MacDock.escape(typing: typing, shown: panel) }") in dock
+
+
+def test_a_click_on_the_open_folder_tab_closes_the_dock_and_never_loses_edited_words():
+    # (R19's review - James's decision 1, 26 Nov: "a click on the open tab") the folder tab's click is a tab's key
+    panel = flat(member(code(PANELS), "struct MacPanel: View"))
+    assert "chosen: Binding(get: { tab }, set: { (chosen: MacDock.Tab) -> Void in clicked(chosen) })," in panel
+    assert ("private func clicked(_ chosen: MacDock.Tab) { let edited = navigation.macSources?.request.search.edited "
+            "?? false if let now = MacDock.clicked(tab, chosen, getOpen: navigation.macGetOpen, sourcesEdited: edited) "
+            "{ navigation.showPanel(now) } else { navigation.closePanel() } }") in panel
+    # the click never shows the asked tab outright: that is `shown`'s, kept for the bar's ••• and Settings' EQ
+    assert "showPanel(chosen)" not in panel and "MacDock.shown(" not in panel
+    dock = flat((CORE / "MacDock.swift").read_text(encoding="utf-8"))
+    assert ("public static func clicked(_ shown: Tab?, _ asked: Tab, getOpen: Bool, sourcesEdited: Bool) -> Tab? { "
+            "if asked == shown && asked == .sources && sourcesEdited { return shown } "
+            "return toggled(shown, asked, getOpen: getOpen) }") in dock
+    # the Get's own `edited` - the very one the tab holds Escape by
+    assert "navigation.macSources?.request.search.edited" in panel
+    assert ".dockHoldsEscape(get.request.search.edited)" in flat(code(SOURCES_TAB))
 
 
 def test_the_sources_states_and_query_field_are_in_the_looks_type():
@@ -312,7 +334,9 @@ def test_downloads_choices_are_the_looks_pop_up_on_the_mac_the_same_pickers():
 def test_the_frames_tokens_and_row_size_handed_into_add_to_a_playlist():
     frame = flat(code(FRAME))
     assert "Palette." not in re.sub(r"DWPalette\.", "", frame)
-    assert ".shadow(color: MacDock.liesOver(style, panel) ? DWPalette.buttonDrop : Color.clear," in frame
+    # (R19's review) the drawer's shadow black at 0.2, as before R19, named in the frame - not buttonDrop's 0.45
+    assert ".shadow(color: MacDock.liesOver(style, panel) ? Self.drawerDrop : Color.clear," in frame
+    assert "private static let drawerDrop = Color.black.opacity(0.2)" in frame and "buttonDrop" not in frame
     assert "private var rule: some View { DWPalette.frame .frame(width: hairline)" in frame
     # Row Size read once, handed to the frame's lists and, as plain numbers, into the sheet it puts up over itself
     assert "private var rowSize: MacRowSize { MacRowSizeStore.shared.size }" in frame

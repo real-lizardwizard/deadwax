@@ -10,11 +10,12 @@ import SwiftUI
 ///
 /// (The panel review's R19 - notes/ios.md "The panel review, R19: Get, and old type left in redrawn pages
 /// (2026-11-27)"; James, 26 Nov: "The dock's system bar and Done go") No bar: the page starts under the folder tabs, its
-/// Search again in the dock's header (SourcesPage's `dockHeader`). Its Close is the dock's own - Escape, MacPanel's key
-/// through MacFrame.escape, after a field with the cursor - and the panel put away is the Get over, as Close was: its
-/// search let go and Sources gone (`endSources`), so nothing is picked for a page no longer looked at. A tab switched to
-/// keeps the Get, as before. While its words to search with are edited, the tab holds Escape (`dockHoldsEscape`) and
-/// the key does nothing, as Close's Escape did: putting the panel away would throw the edited words away unasked.
+/// Search again in the dock's header (SourcesPage's `dockHeader`). Its Close is the dock's own - Escape (MacPanel's key
+/// through MacFrame.escape, which a field with the cursor answers first) or a click on its open folder tab
+/// (MacDock.clicked) - and the panel put away is the Get over, as Close was: its search let go and Sources gone
+/// (`endSources`), so nothing is picked for a page no longer looked at. A tab switched to keeps the Get, as before.
+/// While its words to search with are edited, the tab holds Escape (`dockHoldsEscape`) and neither does anything, as
+/// Close's Escape did: putting the panel away would throw the edited words away unasked.
 struct MacSourcesTab: View {
     @Environment(AppNavigation.self) private var navigation
 

@@ -97,9 +97,10 @@ struct GetRequest: Identifiable {
 ///   the panel put away.
 /// - (The panel review's R19 - notes/ios.md "The panel review, R19: Get, and old type left in redrawn pages
 ///   (2026-11-27)") In the Mac's dock there is no bar: the page starts under the folder tabs with the dock's own header
-///   (DockHeader) - the subtitle, and Search again as a `.btn.sm` - and its Close is the dock's (Escape, the panel put
-///   away: MacSourcesTab ends the Get then, as Close did). The states (asking, nothing found, refused) are in the look's
-///   type on both devices, and the query's field the look's well - square on the phone, `.in`'s corners on the Mac.
+///   (DockHeader) - the subtitle, and Search again as a `.btn.sm`, no row while it holds neither - and its Close is the
+///   dock's (Escape, or a click on the open tab, the panel put away: MacSourcesTab ends the Get then, as Close did).
+///   The states (asking, nothing found, refused) are in the look's type on both devices, and the query's field the
+///   look's well - square on the phone, `.in`'s corners on the Mac.
 struct SourcesPage: View {
     let request: GetRequest
     /// Pushed from Search Soulseek's form: no Cancel - Back is there.
@@ -162,8 +163,11 @@ struct SourcesPage: View {
     var body: some View {
         VStack(spacing: 0) {
             if kept != nil, Platform.mac {
-                // (R19) the dock's own header in the bar's place: the subtitle, and Search again at its right
-                dockHeader
+                // (R19) the dock's own header in the bar's place: the subtitle, and Search again at its right - (R19's
+                // review) no row at all while it would hold neither
+                if !request.subtitle.isEmpty || foundFolders {
+                    dockHeader
+                }
             } else if !request.subtitle.isEmpty {
                 // iSources: .s.q, at the left, 2 above and 10 under
                 Text(request.subtitle)

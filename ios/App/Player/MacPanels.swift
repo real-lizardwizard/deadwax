@@ -21,8 +21,9 @@ import SwiftUI
 /// with DockBack in place of the system's back. (R16's review) The EQ alone keeps its bar for now, root and pages - its
 /// ••• (Rename…, Back to AutoEq's) lives there until R17 draws the EQ's own header. The panel closes with Escape - this
 /// view's own key (DockEscapeKey), through MacFrame.escape, the main window's one owner, as DockDone's key had it - with
-/// the tab's View key, or a click on the open tab. A page that has an Escape of its own for now says so (`dockHoldsEscape`), and the panel's key stands
-/// aside while it does: the Queue's Done in Edit, and Sources' Close until R19 makes it the dock's.
+/// the tab's View key, or (R19) a click on the open tab (MacDock.clicked). A page that has an Escape of its own for now
+/// says so (`dockHoldsEscape`), and the panel's key stands aside while it does: the Queue's Done in Edit, and (R19)
+/// Sources while its words are edited - its open tab's click doing nothing then too.
 struct MacPanel: View {
     let tab: MacDock.Tab
 
@@ -35,7 +36,7 @@ struct MacPanel: View {
     var body: some View {
         VStack(spacing: 0) {
             MacFolderTabs(tabs: MacDock.tabs(getOpen: navigation.macGetOpen), words: MacDock.Words.tab,
-                          chosen: Binding(get: { tab }, set: { (chosen: MacDock.Tab) -> Void in navigation.showPanel(chosen) }),
+                          chosen: Binding(get: { tab }, set: { (chosen: MacDock.Tab) -> Void in clicked(chosen) }),
                           spoken: MacDock.Words.spoken)
             //? one tab's page at a time, and only the one showing: the tab chosen is the page drawn - or its words, with
             //? nothing for it to be about
@@ -57,6 +58,18 @@ struct MacPanel: View {
         .background(DWPalette.panel)
     }
 
+    /// (R19 - James's decision 1, 26 Nov: "a click on the open tab") A folder tab clicked: the open one puts the panel
+    /// away, another is switched to (MacDock.clicked, a tab's key's rule) - but Sources' open tab does nothing while its
+    /// words are edited, as Escape does nothing then: the Get's own `edited`, the very one MacSourcesTab holds Escape by.
+    private func clicked(_ chosen: MacDock.Tab) {
+        let edited = navigation.macSources?.request.search.edited ?? false
+        if let now = MacDock.clicked(tab, chosen, getOpen: navigation.macGetOpen, sourcesEdited: edited) {
+            navigation.showPanel(now)
+        } else {
+            navigation.closePanel()
+        }
+    }
+
     @ViewBuilder private var page: some View {
         switch tab {
         case .upNext:
@@ -68,8 +81,8 @@ struct MacPanel: View {
         case .eq:
             DockEQ()
         case .sources:
-            //? (R7) the Get the album you don't have asked for on the Mac, beside its page - (R16) its Close Escape's
-            //? own until R19 draws it in a DockHeader
+            //? (R7) the Get the album you don't have asked for on the Mac, beside its page - (R19) no Close of its own:
+            //? the dock's, holding Escape only while its words are edited (MacSourcesTab)
             MacSourcesTab()
         }
     }
@@ -291,7 +304,8 @@ extension View {
     }
 
     /// (R16) This page in the dock holds Escape itself while `held` - a Done of its own pressed by it (the Queue's in
-    /// Edit), a Close (Sources', until R19) - so the panel's own key stands aside: never two buttons for one key.
+    /// Edit), or (R19) Sources' edited words, which putting the panel away would lose - so the panel's own key stands
+    /// aside: never two buttons for one key, never words thrown away unasked.
     func dockHoldsEscape(_ held: Bool = true) -> some View {
         modifier(DockHoldsEscape(held: held))
     }
