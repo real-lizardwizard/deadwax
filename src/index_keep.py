@@ -10,6 +10,9 @@ It is a clock, and so it is short, and everything deadwax itself does that chang
 
   - a star or an unstar made through deadwax (Add and Remove on an album page, and the worker that stars a
     download for whoever asked for it - src/stars.py, src/routes/my_library.py): `forget()`;
+  - a play counted through deadwax (2.1.53 - the scrobble route's `submission=true`): the list carries each
+    album's `played` and `playCount`, which the Library's Recently played and Most played sort by -
+    `forget(user)`, that listener's lists alone;
   - Navidrome seen to have scanned (src/navidrome_listing.py) and a Rescan: `forget()`;
   - the library itself changed by deadwax - a download filed, a retag, a delete, a move
     (library.note_library_changed): `unsettle()`. Navidrome learns of that only when it next scans, some seconds
@@ -38,13 +41,15 @@ INDEX_SETTLE_S = 180
 _kept: dict[tuple, tuple[float, str, bytes]] = {}
 _unsettled_until = 0.0
 #? moved by every forget and unsettle: a list whose reading one of them cut across is not kept - it may be from
-#? before what happened
+#? before what happened. One for everybody, and (2.1.53) one a user: a forget of one person's lists - a play is
+#? counted every few minutes - cuts across only that person's readings, never everybody else's
 _epoch = 0
+_user_epochs: dict[str, int] = {}
 
 
-def epoch() -> int:
-    """Read before a list is asked of Navidrome, and handed to keep() with it."""
-    return _epoch
+def epoch(user: str = "") -> tuple[int, int]:
+    """Read before a list is asked of Navidrome for `user` (a key's first part), and handed to keep() with it."""
+    return _epoch, _user_epochs.get(user, 0)
 
 
 def kept(key: tuple, now: float | None = None) -> tuple[str, bytes] | None:
@@ -61,11 +66,11 @@ def kept(key: tuple, now: float | None = None) -> tuple[str, bytes] | None:
     return held[1], held[2]
 
 
-def keep(key: tuple, etag: str, packed: bytes, began: int, now: float | None = None) -> None:
-    """Keep a list just read - unless a forget or an unsettle happened since `began` (epoch() as the reading
-    started), or the library is unsettled."""
+def keep(key: tuple, etag: str, packed: bytes, began: tuple[int, int], now: float | None = None) -> None:
+    """Keep a list just read - unless a forget of everybody's or of this key's user, or an unsettle, happened
+    since `began` (epoch(user) as the reading started), or the library is unsettled."""
     now = time.monotonic() if now is None else now
-    if began != _epoch or now < _unsettled_until:
+    if began != epoch(key[0]) or now < _unsettled_until:
         return
     #? copied first (list() of a dict's items is atomic): a writer's thread may be dropping everything
     for old in [k for k, (read, _, _) in list(_kept.items()) if now - read >= INDEX_KEEP_S]:
@@ -76,10 +81,12 @@ def keep(key: tuple, etag: str, packed: bytes, began: int, now: float | None = N
 def forget(user: str | None = None) -> None:
     """Every kept list dropped - or only `user`'s (the first part of a key)."""
     global _epoch
-    _epoch += 1
     if user is None:
+        _epoch += 1
+        _user_epochs.clear()
         _kept.clear()
         return
+    _user_epochs[user] = _user_epochs.get(user, 0) + 1
     for key in [key for key in list(_kept) if key[0] == user]:
         _kept.pop(key, None)
 

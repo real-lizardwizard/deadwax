@@ -353,3 +353,54 @@ def test_the_settings_an_issue_reads_are_the_ones_the_count_is_kept_by(monkeypat
     templated = settings_read()
     monkeypatch.setattr(Config, "COUNTRY_IN_FOLDER", "on")
     assert len({before, templated, settings_read()}) == 3
+
+
+# ---------------------------------------------------------------- after review (2.1.53)
+
+def test_a_count_is_never_answered_from_what_is_kept_while_the_scan_cache_is_being_changed(root, store, monkeypatch):
+    """The lookup reads the scan cache's generation, which is none while a change is under way: nothing kept can
+    be the answer to that."""
+    untagged_album(root)
+    app = client(store)
+    app.get(ALBUMS)
+    seen = count_inspections(monkeypatch)
+    assert app.get(SUMMARY).json()["total"] == 1 and seen["counts"] == 1
+    assert app.get(SUMMARY).json()["total"] == 1 and seen["counts"] == 1, "kept"
+
+    with library._changing():
+        assert app.get(SUMMARY).json()["total"] == 1
+    assert seen["counts"] == 2, "worked out afresh, mid-change"
+    kept_before = route._kept_summary
+    assert kept_before is not None and kept_before[0][1] != library.generation(), "and what was worked out mid-change was not kept"
+
+
+def test_with_no_saved_scan_navidrome_is_not_asked_and_nothing_waits_for_it(root, store, monkeypatch):
+    """Until 2.1.48 the imports-only count was returned before anything else was asked; 2.1.48 read the reviews and
+    asked Navidrome first, so on a fresh install with a slow Navidrome the badge waited for an answer it never
+    needed."""
+    clean_album(root)
+    run(store.record_albums_seen([{"path": CLEAN}], source="import"))
+    monkeypatch.setattr(Config, "NAVIDROME_URL", "http://navidrome:4533")
+    monkeypatch.setattr(Config, "NAVIDROME_USER", "james")
+    monkeypatch.setattr(Config, "NAVIDROME_PASSWORD", "hunter2-very-secret")
+
+    async def asked(*_args, **_kwargs):
+        raise AssertionError("Navidrome was asked for a count that has no album to judge")
+
+    async def read(*_args, **_kwargs):
+        raise AssertionError("the review rows were read for a count that is the new imports alone")
+
+    monkeypatch.setattr(route.navidrome_listing, "ask", asked)
+    monkeypatch.setattr(store, "album_reviews", read)
+
+    answer = client(store).get(SUMMARY).json()
+
+    assert (answer["known"], answer["total"], answer["new_imports"], answer["unscanned_imports"]) == (False, 1, 1, 1)
+
+
+def test_holds_albums_says_whether_there_is_a_saved_scan_of_this_library(root, tmp_path):
+    assert library.holds_albums(str(root)) is False and library.holds_albums("") is False
+    untagged_album(root)
+    library.scan_library(str(root))
+    assert library.holds_albums(str(root)) is True
+    assert library.holds_albums(str(tmp_path / "elsewhere")) is False, "another library's albums are not this one's"

@@ -78,7 +78,8 @@ real one).
   (`forget_cached_album`: every retag, art fetch, delete and move), a seeding from the saved scan, a clear.
   A scan and a snapshot each carry the generation of the albums they return, or **None when they can't be
   sure**: a snapshot whose copy of the cache straddled a change, and a walk that something else cut across
-  (it counts its own moves; any other is a writer's). Never a clock.
+  (it counts its own moves; any other is a writer's). Never a clock. (As first built the number moved only after
+  each change, which left a gap a reader could copy the cache in - corrected in 2.1.53, below.)
 - **The route keeps the encoded answer** (`routes/library.py` `_kept_answers`): the ETag and the body
   gzipped (only gzipped - a twentieth of the JSON, and a 304 needs neither), one per form asked (saved scan
   or real, with tracks or without). It is kept BY everything the body is made of: the generation; the
@@ -109,7 +110,8 @@ to 5 ms (the snapshot's assembly, `attach_issues`). What is left of the answer's
 **Don't**: put a per-request value in the body (it was already a rule: the ETag; now it would also defeat
 the kept answer, silently); add a field to `attach_issues` without adding it to `DECORATIONS`
 (tests/test_metadata_health.py holds them together - a field missed is a stale answer); change
-`_album_cache` anywhere without `_moved()`.
+`_album_cache` anywhere but inside `_changing()` (2.1.53 - it was `_moved()` after the change until the review;
+see "The kept answers, after review").
 
 **Not verified**: on a real library, a real disk, or James's server - only the generated one. A real scan
 (not the snapshot) still walks and stats every folder in its thread, which this does not change. `/owned`
@@ -300,6 +302,37 @@ web app's `KINDS` in lib/searchList.ts is another thing, and is read), `LEVELS` 
 3 it held was the song section's count before 2.0.0-player.55's `PREVIEW`; notes/app-requests-search-get.md
 still names it where it tells that history). Nothing is faster for it. Left on purpose: `HEARD_PER_SECOND`
 (player/deck.ts, an engine file) and `GET /library/queue/new_imports` (kept on purpose).
+
+#### The kept answers, after review (2.1.53)
+
+A review of 2.1.47-2.1.50 found nothing serious and three things, each fixed with a test:
+
+1. **The scan generation moved only after a change.** `_walk` wrote `_album_cache[current]` and moved the
+   number a few statements later (as did `forget_cached_album` and `clear_scan_cache`), so a snapshot - or
+   the Needs-a-look count's lookup - that read the cache in that gap held the NEW contents under the OLD
+   number, matched a kept answer, and sent the body from before the change. 2.1.47's write-up called that
+   harmless ("a cache nothing was changing"); it was wrong about what the reader had copied. **Now the
+   number moves before a change and again after it** (`library._changing()`, around every write), with a
+   count of the changes under way: while one is, the cache is of no generation at all (`generation()` is
+   None), so a reader stamps what it copied only if no change was under way as it began AND the number is the
+   same when it has finished. A walk's own moves are two a change, and its `before + moves` check holds as it
+   did; a seeding that takes nothing changes nothing and moves nothing.
+2. **A play counted through deadwax did not drop the kept album list**, though the list carries `played` and
+   `playCount` and the Library's Recently played and Most played sort by them. The scrobble route now forgets
+   the listener's kept lists after a `submission=true` call - theirs alone (`index_keep.forget(user)`), and
+   nothing on the now-playing call that goes with every song. So that a play, which is frequent, cuts across
+   nobody else's reading, a forget of one person's lists now moves an epoch of their own (`epoch(user)`);
+   only a forget of everybody's, or an unsettle, cuts across everyone's.
+3. **The Needs-a-look count with no saved scan waited on Navidrome.** 2.1.48 moved the review rows and
+   `navidrome_listing.ask()` above the "no saved scan" return, so a fresh install with a slow Navidrome
+   waited up to `LISTING_WAIT_SECONDS` for the imports-only count it had always returned at once.
+   `library.holds_albums(root)` is asked first now - no snapshot is put together for it - and with nothing
+   saved the new imports are counted and returned before the reviews are read or Navidrome is asked.
+
+**Tests**: tests/test_library_cache.py (five: no generation mid-change, each of the three writers changing
+inside one, a snapshot a change began under), tests/test_queue_summary.py (three), tests/test_navidrome_album_index.py
+(one), tests/test_index_keep.py (one rewritten: whose forget cuts across whose reading). **Not measured
+again**: the generation is now read under its lock, twice a snapshot - nanoseconds beside the copy it brackets.
 
 ## Known performance problems (profiled, not guessed)
 

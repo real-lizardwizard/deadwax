@@ -24,6 +24,7 @@ import os
 import re
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 from src import index_keep
@@ -109,23 +110,38 @@ def library_is_behind() -> bool:
 #? without encoding it again (routes/library.py _library_response). Never a clock: a retag moves it
 #? at once (forget_cached_album), and nothing else does.
 #?
-#? Moved AFTER the change it counts, under a lock of its own (`+= 1` is a read and a write, and a
-#? writer's thread and the scan's can both be here): a reader that saw the same number before and
-#? after it copied the cache copied a cache nothing was changing.
+#? Moved BEFORE a change and again AFTER it (2.1.53, the review: moved only after, a reader that copied
+#? the cache between the write and the move held the new contents under the old number, and was answered
+#? from before the change), with a count of the changes under way beside it. While one is under way the
+#? cache is of NO generation - generation() says None - so a reader can stamp what it copied only when
+#? no change was under way as it began and the number is the same when it has finished: a change that
+#? began meanwhile moved the number first, and one already begun was counted. Under a lock of its own
+#? (`+= 1` is a read and a write, and a writer's thread and the scan's can both be here).
 _generation = 0
+_changes_under_way = 0
 _generation_lock = threading.Lock()
 
 
-def _moved() -> None:
-    """The scan cache's contents just changed: the next generation."""
-    global _generation
+@contextmanager
+def _changing():
+    """Around every change to _album_cache's contents: the generation moved before it and after it."""
+    global _generation, _changes_under_way
     with _generation_lock:
         _generation += 1
+        _changes_under_way += 1
+    try:
+        yield
+    finally:
+        with _generation_lock:
+            _generation += 1
+            _changes_under_way -= 1
 
 
-def generation() -> int:
-    """The scan cache's generation, as it stands - see _generation."""
-    return _generation
+def generation() -> int | None:
+    """The scan cache's generation - None while a change to it is under way, when it is of none. See
+    _generation."""
+    with _generation_lock:
+        return None if _changes_under_way else _generation
 
 
 #? Serialises scans. Two at once would both re-read every changed folder, and the tidy-up
@@ -750,11 +766,11 @@ def clear_scan_cache() -> None:
     Only the in-memory copy. Persisted rows are keyed on their root as well as their path, so
     the old root's rows simply stop being loaded - and come back if the path is changed back.
     """
-    _album_cache.clear()
-    _dirty.clear()
-    _removed.clear()
-    _written_at.clear()
-    _moved()
+    with _changing():
+        _album_cache.clear()
+        _dirty.clear()
+        _removed.clear()
+        _written_at.clear()
 
 
 def forget_cached_album(directory: str) -> None:
@@ -771,11 +787,11 @@ def forget_cached_album(directory: str) -> None:
     undone by the next restart, which would load the pre-edit tags straight back in from disk
     against a folder mtime that still matches them.
     """
-    _album_cache.pop(directory, None)
-    _dirty.discard(directory)
-    _removed.add(directory)
-    _written_at[directory] = time.time()
-    _moved()
+    with _changing():
+        _album_cache.pop(directory, None)
+        _dirty.discard(directory)
+        _removed.add(directory)
+        _written_at[directory] = time.time()
     note_library_changed()
 
 
@@ -787,18 +803,20 @@ def seed_cache(entries: list[tuple[str, float, dict]]) -> int:
     at least as fresh as a row saved by an earlier one. Seeding is not a scan - nothing is
     marked dirty, since these rows are by definition what is already saved.
     """
+    #? nothing to take: nothing changes, and the generation stands
+    if all(path in _album_cache for path, _, _ in entries):
+        return 0
     taken = 0
-    for path, mtime, album in entries:
-        if path not in _album_cache:
-            _album_cache[path] = (mtime, album)
-            taken += 1
-            #? when deadwax last wrote it, saved with it - kept for the next read of the folder to stamp
-            #? again (a Rescan reads every folder afresh)
-            wrote = album.get("written_at")
-            if isinstance(wrote, (int, float)) and wrote > _written_at.get(path, 0):
-                _written_at[path] = float(wrote)
-    if taken:
-        _moved()
+    with _changing():
+        for path, mtime, album in entries:
+            if path not in _album_cache:
+                _album_cache[path] = (mtime, album)
+                taken += 1
+                #? when deadwax last wrote it, saved with it - kept for the next read of the folder to stamp
+                #? again (a Rescan reads every folder afresh)
+                wrote = album.get("written_at")
+                if isinstance(wrote, (int, float)) and wrote > _written_at.get(path, 0):
+                    _written_at[path] = float(wrote)
     return taken
 
 
@@ -862,6 +880,20 @@ def _assemble(albums: list[dict], library_root: str, **extra) -> dict:
     }
 
 
+def holds_albums(library_root: str) -> bool:
+    """
+    Whether the scan cache holds any album under this root - whether snapshot_library() would have a
+    library to answer with - said without putting one together (2.1.53: the Needs-a-look count asks
+    it before it asks anything else).
+    """
+    if not library_root:
+        return False
+    root = str(Path(library_root))
+    prefix = root.rstrip(os.sep) + os.sep
+    #? copied first, as snapshot_library does: a scan may be changing the dict in another thread
+    return any(path == root or path.startswith(prefix) for path in list(_album_cache))
+
+
 def snapshot_library(library_root: str) -> dict | None:
     """
     The library as the cache last saw it, WITHOUT touching the disk. None if nothing is cached.
@@ -881,12 +913,13 @@ def snapshot_library(library_root: str) -> dict | None:
     prefix = root.rstrip(os.sep) + os.sep
     #? copied first: a scan may be running in another thread, and dict.copy() is atomic where
     #? iterating the live dict is not
-    before = _generation
+    before = generation()
     entries = [album for path, (_, album) in _album_cache.copy().items()
                if path == root or path.startswith(prefix)]
-    #? which generation these albums are - None when the cache moved while it was copied (a walk
-    #? under way, a writer forgetting a folder), so nothing is kept of an answer that fell between two
-    stamp = before if _generation == before else None
+    #? which generation these albums are - None when a change was under way as the copy began, or
+    #? one began before it ended (a walk reading a folder afresh, a writer forgetting one), so nothing
+    #? is kept of an answer that fell between two
+    stamp = before if before is not None and generation() == before else None
 
     if not entries:
         return None
@@ -916,12 +949,14 @@ def scan_library(library_root: str, force: bool = False) -> dict:
         )
 
     with _scan_lock:
-        before = _generation
+        before = generation()
         albums, reused, moves = _walk(root, force)
+        after = generation()
         #? which generation these albums are: the cache as this walk left it - unless something else
-        #? moved it meanwhile (a writer forgetting a folder the walk had already passed), when the
-        #? albums in hand may be of no generation at all, and say None
-        stamp = _generation if _generation == before + moves else None
+        #? moved it meanwhile (a writer forgetting a folder the walk had already passed, or one still
+        #? at it as the walk began or ended), when the albums in hand may be of no generation at all,
+        #? and say None. `moves` is the walk's own: two for each change it made, one before and one after
+        stamp = after if before is not None and after == before + moves else None
 
     return _assemble(
         albums, library_root,
@@ -938,18 +973,18 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int, int]:
     Every album under root, reusing cached folders whose mtime hasn't moved. Hold _scan_lock.
 
     Returns the albums, how many came from the cache, and how many times THIS walk moved the cache's
-    generation - once per change, as it makes it, so a snapshot taken mid-walk never shares a number
-    with one taken later in it.
+    generation - twice per change (_changing: before it and after), as it makes it, so a snapshot
+    taken mid-walk never shares a number with one taken later in it.
     """
     moves = 0
     if force:
         #? everything goes, persisted rows included - a forced rescan is the escape hatch for
         #? not trusting the cache, so it must not quietly keep trusting the saved copy of it
-        _removed.update(list(_album_cache))
-        _album_cache.clear()
-        _dirty.clear()
-        _moved()
-        moves += 1
+        with _changing():
+            _removed.update(list(_album_cache))
+            _album_cache.clear()
+            _dirty.clear()
+        moves += 2
 
     albums = []
     reused = 0
@@ -981,11 +1016,11 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int, int]:
         if current in _written_at:
             album["written_at"] = _written_at[current]
 
-        _album_cache[current] = (mtime, album)
-        _dirty.add(current)
-        _removed.discard(current)
-        _moved()
-        moves += 1
+        with _changing():
+            _album_cache[current] = (mtime, album)
+            _dirty.add(current)
+            _removed.discard(current)
+        moves += 2
         albums.append(dict(album))
         seen.add(current)
 
@@ -995,11 +1030,11 @@ def _walk(root: Path, force: bool) -> tuple[list[dict], int, int]:
     #? turning each back into a relative path (v0.9.20: that pathlib round trip was half of a
     #? warm scan on a thousand albums).
     for path in [p for p in _album_cache if p not in seen]:
-        _album_cache.pop(path, None)
-        _dirty.discard(path)
-        _removed.add(path)
-        _moved()
-        moves += 1
+        with _changing():
+            _album_cache.pop(path, None)
+            _dirty.discard(path)
+            _removed.add(path)
+        moves += 2
 
     global _behind
     _behind = False

@@ -12,7 +12,7 @@ ETHAN = ("ethan", ("user", "ethan"), "http://navidrome:4533", "store")
 
 
 def keep(key, at, etag='"a"', body=b"packed"):
-    index_keep.keep(key, etag, body, index_keep.epoch(), now=at)
+    index_keep.keep(key, etag, body, index_keep.epoch(key[0]), now=at)
 
 
 def test_the_numbers_the_notes_give():
@@ -51,15 +51,23 @@ def test_forgetting_one_person_leaves_everyone_elses():
 
 
 def test_a_list_whose_reading_a_forget_cut_across_is_not_kept():
-    """Read before the star landed, encoded after it: it may be the list from before."""
-    began = index_keep.epoch()
-    index_keep.forget("ethan")
-
+    """Read before the star landed, encoded after it: it may be the list from before. Their own forget, or
+    everybody's - never another person's (2.1.53: a play is counted every few minutes, and drops only the
+    listener's own)."""
+    began = index_keep.epoch("james")
+    index_keep.forget("james")
     index_keep.keep(JAMES, '"a"', b"packed", began, now=100.0)
+    assert index_keep.kept(JAMES, now=100.0) is None, "their own lists forgotten while this one was read"
 
-    assert index_keep.kept(JAMES, now=100.0) is None
-    keep(JAMES, 100.0)
-    assert index_keep.kept(JAMES, now=100.0) is not None
+    began = index_keep.epoch("james")
+    index_keep.forget()
+    index_keep.keep(JAMES, '"a"', b"packed", began, now=100.0)
+    assert index_keep.kept(JAMES, now=100.0) is None, "everybody's forgotten while it was read"
+
+    began = index_keep.epoch("james")
+    index_keep.forget("ethan")
+    index_keep.keep(JAMES, '"a"', b"packed", began, now=100.0)
+    assert index_keep.kept(JAMES, now=100.0) is not None, "another person's forget cuts across nothing of his"
 
 
 def test_an_unsettled_library_keeps_nothing_and_answers_from_nothing():

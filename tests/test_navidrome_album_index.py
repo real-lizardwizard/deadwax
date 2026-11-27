@@ -501,3 +501,33 @@ def test_a_star_made_in_another_app_shows_as_soon_as_deadwax_has_read_it_back(pl
     test_personal_libraries.work(player)  # the worker's read-back
 
     assert [album["id"] for album in ethan.get(f"{INDEX}?scope=yours").json()["albums"]] == ["nd-dummy"]
+
+
+# ---------------------------------------------------------------- a play counted, after review (2.1.53)
+
+def test_a_play_counted_through_deadwax_drops_that_listeners_kept_lists_and_nobody_elses(listing):
+    """The list carries each album's `played` and `playCount`, which Recently played and Most played sort by: a
+    play counted through deadwax is deadwax's own doing, and must not be answered from before it. Only a counted
+    play - never the now-playing call that goes with every song - and only the listener's own lists."""
+    scrobble = f"/deadwax/navidrome/scrobble/{test_player_as_you.SONG}"
+    james, ethan = signed_in(listing, "james"), signed_in(listing, "ethan")
+    for client in (james, ethan):
+        for scope in ("store", "yours"):
+            assert client.get(f"{INDEX}?scope={scope}").status_code == 200
+    listing.fake.calls.clear()
+
+    assert james.post(scrobble).status_code == 200
+    james.get(f"{INDEX}?scope=store")
+    assert listing.fake.asked() == [], "now playing: nothing dropped"
+
+    listing.fake.albums["al-0"]["playCount"] = 1
+    assert james.post(f"{scrobble}?submission=true").status_code == 200
+    albums = james.get(f"{INDEX}?scope=store").json()["albums"]
+    james.get(f"{INDEX}?scope=yours")
+    assert albums[0]["playCount"] == 1, "the play counted is in the list asked next"
+    assert {(user, q["type"]) for user, q in listing.fake.asked()} == {("james", "newest"), ("james", "starred")}, "both of his lists read afresh"
+
+    listing.fake.calls.clear()
+    ethan.get(f"{INDEX}?scope=store")
+    ethan.get(f"{INDEX}?scope=yours")
+    assert listing.fake.asked() == [], "nobody else's dropped"

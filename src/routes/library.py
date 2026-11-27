@@ -18,6 +18,7 @@ from src.config import COVER_ART_SIZES, rename_wait_seconds
 from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, disc_face, plan_disc_art,
                           save_disc_art)
 from src.library import generation as scan_generation
+from src.library import holds_albums
 from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, albums_without_tracks, compact_for_wire, delete_album,
                          drain_cache_changes, embedded_pictures, find_artist_art, find_disc_art, library_is_behind,
                          forget_cached_album, load_album_art, load_artist_art,
@@ -1593,7 +1594,17 @@ async def queue_summary(request: Request):
     if not root or store is None:
         return answer
 
+    async def imports_alone() -> dict:
+        imports = await store.new_import_summary()
+        count = int(imports.get("count") or 0)
+        return {**answer, "new_imports": count, "total": count, "unscanned_imports": count}
+
     await _ensure_cache_loaded(request)
+    #? (2.1.53, the review) no saved scan: the new imports alone, at once - looked for BEFORE Navidrome is asked,
+    #? as it was until 2.1.48, which read the reviews and asked Navidrome first: on a fresh install with a slow
+    #? Navidrome the badge then waited up to LISTING_WAIT_SECONDS for a count that never needed its answer
+    if not holds_albums(root):
+        return await imports_alone()
     reviews = await store.album_reviews()
     #? Navidrome's listing as the page's /albums judged by it: the one in hand - asked for only when
     #? there is none yet (the first answer waited for, a bounded while) or it is past
@@ -1607,10 +1618,9 @@ async def queue_summary(request: Request):
 
     snapshot = await asyncio.to_thread(snapshot_library, root)
 
+    #? (the saved scan gone since it was looked for - LIBRARY_PATH changed meanwhile)
     if snapshot is None:
-        imports = await store.new_import_summary()
-        count = int(imports.get("count") or 0)
-        return {**answer, "new_imports": count, "total": count, "unscanned_imports": count}
+        return await imports_alone()
 
     albums = snapshot["albums"]
     #? the verdicts, and what they were judged by, in one turn of the loop - then the inspecting, off it

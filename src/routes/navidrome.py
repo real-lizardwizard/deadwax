@@ -374,7 +374,7 @@ async def album_index(request: Request, scope: AlbumScope = Query(...), user: st
     if held is not None:
         return await answer_packed(request, *held)
 
-    began = index_keep.epoch()
+    began = index_keep.epoch(user)
     try:
         albums, truncated = await _read_album_index(client, scope)
     except NavidromeError as e:
@@ -872,6 +872,11 @@ async def scrobble(song_id: str, request: Request, submission: bool = False, tim
     except NavidromeError as e:
         raise _fail(e)
 
+    if submission:
+        #? (2.1.53, the review) a play counted: the album's `played` and `playCount` just moved in Navidrome, and
+        #? the Library's Recently played and Most played sort by them - this listener's kept album lists
+        #? (src/index_keep.py) are from before it. Theirs alone, and never for a now-playing call
+        index_keep.forget(user)
     return {"ok": True}
 
 

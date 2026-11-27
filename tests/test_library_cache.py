@@ -671,7 +671,7 @@ def test_a_forced_rescan_and_a_seeding_are_each_another_generation(tmp_path):
     cleared = library.generation()
     assert cleared > forced["generation"]
     assert seed_cache(saved) == 1 and library.generation() > cleared
-    assert seed_cache(saved) == 0 and library.generation() == cleared + 1, "nothing taken, nothing moved"
+    assert seed_cache(saved) == 0 and library.generation() == cleared + 2, "nothing taken, nothing moved"
 
 
 def test_a_scan_a_writer_cut_across_says_no_generation(tmp_path, monkeypatch):
@@ -836,3 +836,85 @@ def test_a_rescan_drops_the_librarys_kept_album_lists(tmp_path, monkeypatch, sto
 
     assert client.post("/deadwax/library/rescan").status_code == 200
     assert index_keep.epoch() != began
+
+
+# ---------------------------------------------------------------- the generation, after review (2.1.53)
+
+def test_the_scan_cache_is_of_no_generation_while_it_is_being_changed(tmp_path):
+    """The review: moved only AFTER a change, a snapshot copying the cache between the write and the move held
+    the new contents under the old number, and was answered from before the change. It moves before as well, and
+    while a change is under way the cache is of no generation at all."""
+    seed_album(tmp_path)
+    scanned = scan_library(str(tmp_path))
+    before = library.generation()
+    assert before == scanned["generation"]
+
+    with library._changing():
+        assert library.generation() is None
+        assert snapshot_library(str(tmp_path))["generation"] is None, "copied mid-change: of no generation"
+        with library._changing():
+            assert library.generation() is None
+        assert library.generation() is None, "one writer done, another still at it"
+
+    assert library.generation() == before + 4, "moved before each change and after it"
+    assert snapshot_library(str(tmp_path))["generation"] == before + 4
+
+
+@pytest.mark.parametrize("writer", ["a walk reading a folder afresh", "a writer forgetting a folder", "the cache cleared"])
+def test_every_writer_changes_the_cache_inside_a_change(tmp_path, monkeypatch, writer):
+    """What each writer does between its write to the cache and its last move of the generation is done with the
+    cache of no generation: a snapshot taken there is stamped with none, never with the number from before."""
+    first = seed_album(tmp_path)
+    seed_album(tmp_path, artist="Portishead", folder="Dummy (1994)", album="Dummy")
+    scan_library(str(tmp_path))
+    forget_cached_album(str(first))
+    seen = []
+
+    class Watched(set):
+        """_dirty and _removed, which every writer touches straight after the cache itself."""
+
+        def look(self):
+            snapshot = snapshot_library(str(tmp_path))
+            seen.append((library.generation(), snapshot["generation"] if snapshot else "nothing cached"))
+
+        def add(self, item):
+            self.look()
+            super().add(item)
+
+        def clear(self):
+            self.look()
+            super().clear()
+
+    if writer == "a walk reading a folder afresh":
+        monkeypatch.setattr(library, "_dirty", Watched())
+        rescanned = scan_library(str(tmp_path))
+        assert seen == [(None, None)]
+        assert rescanned["generation"] == library.generation(), "and the walk's own albums are of the one it left"
+    elif writer == "a writer forgetting a folder":
+        scan_library(str(tmp_path))
+        monkeypatch.setattr(library, "_removed", Watched())
+        forget_cached_album(str(first))
+        assert seen == [(None, None)]
+    else:
+        scan_library(str(tmp_path))
+        monkeypatch.setattr(library, "_dirty", Watched())
+        library.clear_scan_cache()
+        assert seen == [(None, "nothing cached")]
+
+
+def test_a_snapshot_a_change_began_under_is_of_no_generation(tmp_path, monkeypatch):
+    """Begun with nothing under way, its copy taken as a writer's change lands: the number has moved by the time
+    it looks again."""
+    first = seed_album(tmp_path)
+    seed_album(tmp_path, artist="Portishead", folder="Dummy (1994)", album="Dummy")
+    scan_library(str(tmp_path))
+
+    class Cut(dict):
+        def copy(self):
+            taken = dict(self)
+            forget_cached_album(str(first))
+            return taken
+
+    monkeypatch.setattr(library, "_album_cache", Cut(library._album_cache))
+    cut = snapshot_library(str(tmp_path))
+    assert cut["album_count"] == 2 and cut["generation"] is None, "the copy from before the change, stamped with nothing"
