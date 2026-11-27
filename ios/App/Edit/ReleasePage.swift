@@ -485,45 +485,79 @@ struct RetagPressingRow: View {
 /// Choose a release (phase8-managing.md 3.3): MusicBrainz's pressings for the album, best first - a flat list, as the
 /// web's ("an edition IS a release"). The search field, blank, searches the fielded query (its placeholder the plain
 /// one); submitted, what was typed. A tap loads the pressing's tracklist, fills the fields and goes back.
+///
+/// (R20 - notes/ios.md "The panel review, R20: the known holdouts (2026-11-26)") No List: the page's black, each pressing
+/// R10's RetagPressingRow as it was on a row's hairline, the chosen one marked by the accent's tick (no grey fill) and
+/// said selected. iOS's search field stays at the top: a field is where you type, and it keeps its well. A tap still
+/// only chooses - it fills the fields, and Apply on Release's foot is what writes.
 struct ChooseReleaseView: View {
     let retag: RetagModel
     @Binding var path: [EditPage]
 
     var body: some View {
         @Bindable var retag = retag
-        List {
-            if retag.flow.searching {
-                HStack(spacing: 10) {
-                    ProgressView()
-                    Text(RetagWords.searching).foregroundStyle(Palette.quiet)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                if retag.flow.searching {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text(RetagWords.searching)
+                            .font(Typeface.Phone.text(.row))
+                            .foregroundStyle(DWPalette.t2)
+                    }
+                    .releaseListRow()
+                    .accessibilityElement(children: .combine)
+                } else if let error = retag.searchError {
+                    Text(error)
+                        .font(Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.amberText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .releaseListRow()
+                } else if retag.searched && retag.candidates.isEmpty {
+                    Text(RetagWords.noReleases)
+                        .font(Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.t2)
+                        .releaseListRow()
+                } else if !retag.searched {
+                    Text(RetagWords.notSearched)
+                        .font(Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.t2)
+                        .releaseListRow()
                 }
-                .accessibilityElement(children: .combine)
-            } else if let error = retag.searchError {
-                Text(error)
-                    .foregroundStyle(Palette.amber)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if retag.searched && retag.candidates.isEmpty {
-                Text(RetagWords.noReleases).foregroundStyle(Palette.quiet)
-            } else if !retag.searched {
-                Text(RetagWords.notSearched).foregroundStyle(Palette.quiet)
-            }
-            if !retag.candidates.isEmpty, !retag.album.releaseMbid.isEmpty, !retag.foundCurrent {
-                Text(RetagWords.currentMissing)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-            }
-            ForEach(retag.candidates) { (candidate: RetagCandidate) in
-                Button {
-                    retag.pick(candidate)
-                    if path.last == .chooseRelease { path.removeLast() }
-                } label: {
-                    RetagPressingRow(candidate: candidate, album: retag.album, loading: retag.loadingId == candidate.id)
+                if !retag.candidates.isEmpty, !retag.album.releaseMbid.isEmpty, !retag.foundCurrent {
+                    Text(RetagWords.currentMissing)
+                        .font(Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .releaseListRow()
                 }
-                .buttonStyle(.plain)
-                .disabled(retag.flow.applying || !retag.flow.online)
-                .listRowBackground(retag.selectedId == candidate.id ? Palette.toggledFill : nil)
+                ForEach(retag.candidates) { (candidate: RetagCandidate) in
+                    let chosen = retag.selectedId == candidate.id
+                    Button {
+                        retag.pick(candidate)
+                        if path.last == .chooseRelease { path.removeLast() }
+                    } label: {
+                        HStack(alignment: .top, spacing: 8) {
+                            RetagPressingRow(candidate: candidate, album: retag.album, loading: retag.loadingId == candidate.id)
+                            if chosen {
+                                Image(systemName: "checkmark")
+                                    .font(Typeface.Phone.text(.row).weight(.semibold))
+                                    .foregroundStyle(DWPalette.acc)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .releaseListRow()
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(retag.flow.applying || !retag.flow.online)
+                    .accessibilityAddTraits(chosen ? .isSelected : [])
+                }
             }
+            .padding(.horizontal, CGFloat(PhoneLook.bigSide))
+            .padding(.bottom, CGFloat(PhoneLook.groupAbove))
         }
+        .background(DWPalette.page)
         .navigationTitle(EditWords.chooseRelease)
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $retag.typed, placement: .navigationBarDrawer(displayMode: .always), prompt: retag.searchPrompt)
@@ -537,35 +571,48 @@ struct ChooseReleaseView: View {
 }
 
 /// Changes (phase8-managing.md 3.3): each file the preview would change, its tags old to new - the web's preview list,
-/// in the server's order.
+/// in the server's order. (R20) No List: on the page's black, each file's name in the readout face as its heading, its
+/// changes under it on their hairlines - the tag, the old value struck through, the new one in white.
 struct ChangesView: View {
     let plan: RetagPlan
 
     var body: some View {
-        List {
-            ForEach(Array(plan.changedFiles.enumerated()), id: \.offset) { (_, file: RetagFileChange) in
-                Section {
-                    ForEach(file.changes, id: \.self) { (change: TagChange) in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(change.tag)
-                                .font(Typeface.footnote.weight(.semibold))
-                                .foregroundStyle(Palette.quiet)
-                            Text(change.from.isEmpty ? "—" : change.from)
-                                .foregroundStyle(Palette.quiet)
-                                .strikethrough(!change.from.isEmpty)
-                            Text(change.to)
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(plan.changedFiles.enumerated()), id: \.offset) { (_, file: RetagFileChange) in
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(file.filename)
+                            .font(Typeface.Phone.mono(.small))
+                            .foregroundStyle(DWPalette.t2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, CGFloat(PhoneLook.groupAbove))
+                            .padding(.bottom, ReleaseListLook.headingBelow)
+                            .accessibilityAddTraits(.isHeader)
+                        ForEach(file.changes, id: \.self) { (change: TagChange) in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(change.tag)
+                                    .font(Typeface.Phone.text(.small).weight(.semibold))
+                                    .foregroundStyle(DWPalette.t2)
+                                Text(change.from.isEmpty ? "—" : change.from)
+                                    .font(Typeface.Phone.text(.row))
+                                    .foregroundStyle(DWPalette.t2)
+                                    .strikethrough(!change.from.isEmpty)
+                                Text(change.to)
+                                    .font(Typeface.Phone.text(.row))
+                                    .foregroundStyle(DWPalette.text)
+                            }
+                            .fixedSize(horizontal: false, vertical: true)
+                            .releaseListRow()
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(change.tag): \(change.from.isEmpty ? "—" : change.from), \(change.to)")
                         }
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("\(change.tag): \(change.from.isEmpty ? "—" : change.from), \(change.to)")
                     }
-                } header: {
-                    Text(file.filename)
-                        .font(Typeface.mono(.footnote))
-                        .textCase(nil)
                 }
             }
+            .padding(.horizontal, CGFloat(PhoneLook.bigSide))
+            .padding(.bottom, CGFloat(PhoneLook.groupAbove))
         }
+        .background(DWPalette.page)
         .navigationTitle(EditWords.changes)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -575,20 +622,24 @@ struct ChangesView: View {
 /// pressing's - the one chosen, else the one the folder is tagged with - through deadwax's relay of the Cover Art
 /// Archive, never the Archive directly. A tap on either opens it full screen. Replace cover only (Save cover only, with
 /// none there) writes the pressing's cover into the folder and changes nothing else - on only once its cover has come.
+///
+/// (R20) No List: the two covers side by side on the page's black, a cover not there drawn as its square's hairline with
+/// why inside (no grey fill); Replace cover only the purple, the page's width, what it did and its note under it.
 struct CompareCoversView: View {
     let model: EditAlbumModel
     let retag: RetagModel
     let album: ScanAlbum
 
     @Environment(ServerModel.self) private var server
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var incoming: UIImage?
     @State private var looked = false
     @State private var full: FullCover?
 
     var body: some View {
         let release = retag.coverRelease
-        List {
-            Section {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 12) {
                     side(label: RetagWords.compareCurrent) {
                         if album.art.isEmpty {
@@ -619,41 +670,49 @@ struct CompareCoversView: View {
                         } else if looked {
                             missing(RetagWords.compareArchiveNone)
                         } else {
-                            ZStack {
-                                Rectangle().fill(Palette.coverEmpty)
-                                ProgressView()
-                            }
-                            .aspectRatio(1, contentMode: .fit)
+                            ProgressView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay { Rectangle().strokeBorder(DWPalette.line, lineWidth: 1) }
                         }
                     }
                 }
-                .padding(.vertical, 4)
-            }
-            if release != nil {
-                Section {
-                    Button {
-                        Task { await model.saveCoverOnly() }
-                    } label: {
-                        HStack(spacing: 10) {
-                            if retag.savingCover { ProgressView() }
-                            Text(retag.savingCover ? EditWords.savingCover : RetagWords.coverOnly(hasArt: !album.art.isEmpty))
+                .padding(.top, CGFloat(PhoneLook.groupAbove))
+                if release != nil {
+                    VStack(alignment: .leading, spacing: ReleaseListLook.footGap) {
+                        Button {
+                            Task { await model.saveCoverOnly() }
+                        } label: {
+                            HStack(spacing: 10) {
+                                if retag.savingCover { ProgressView() }
+                                Text(retag.savingCover ? EditWords.savingCover : RetagWords.coverOnly(hasArt: !album.art.isEmpty))
+                                    .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+                                    .multilineTextAlignment(.center)
+                            }
                         }
-                    }
-                    // only once the pressing's cover has come (what it saves is what was looked at), no write under
-                    // way, and the folder read since the last gap or write (RetagFlow.canSaveCover)
-                    .disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting
-                              || model.deleting)
-                    if let result = retag.coverResult {
-                        Text(result)
-                            .font(Typeface.footnote)
+                        .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
+                        // only once the pressing's cover has come (what it saves is what was looked at), no write under
+                        // way, and the folder read since the last gap or write (RetagFlow.canSaveCover)
+                        .disabled(incoming == nil || !retag.flow.canSaveCover || model.tagsApplying || model.getting
+                                  || model.deleting)
+                        if let result = retag.coverResult {
+                            Text(result)
+                                .font(Typeface.Phone.text(.small))
+                                .foregroundStyle(DWPalette.text)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Text(RetagWords.coverOnlyHint(hasArt: !album.art.isEmpty))
+                            .font(Typeface.Phone.text(.small))
+                            .foregroundStyle(DWPalette.t2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                } footer: {
-                    Text(RetagWords.coverOnlyHint(hasArt: !album.art.isEmpty))
-                        .font(Typeface.footnote)
+                    .padding(.top, CGFloat(PhoneLook.groupAbove))
                 }
             }
+            .padding(.horizontal, CGFloat(PhoneLook.bigSide))
+            .padding(.bottom, CGFloat(PhoneLook.groupAbove))
         }
+        .background(DWPalette.page)
         .navigationTitle(EditWords.compareCovers.replacingOccurrences(of: "…", with: ""))
         .navigationBarTitleDisplayMode(.inline)
         .task(id: release ?? "") {
@@ -675,23 +734,41 @@ struct CompareCoversView: View {
     private func side<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
-                .font(Typeface.footnote.weight(.semibold))
-                .foregroundStyle(Palette.quiet)
+                .font(Typeface.Phone.text(.small).weight(.semibold))
+                .foregroundStyle(DWPalette.t2)
+                .accessibilityAddTraits(.isHeader)
             content()
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
+    /// A cover that isn't there: its square's hairline, why inside it.
     private func missing(_ words: String) -> some View {
-        ZStack {
-            Rectangle().fill(Palette.coverEmpty)
-            Text(words)
-                .font(Typeface.footnote)
-                .foregroundStyle(Palette.quiet)
-                .multilineTextAlignment(.center)
-                .padding(8)
-        }
-        .aspectRatio(1, contentMode: .fit)
+        Text(words)
+            .font(Typeface.Phone.text(.small))
+            .foregroundStyle(DWPalette.t2)
+            .multilineTextAlignment(.center)
+            .padding(8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .aspectRatio(1, contentMode: .fit)
+            .overlay { Rectangle().strokeBorder(DWPalette.line, lineWidth: 1) }
+    }
+}
+
+/// (R20) Choose a release's and Changes' rows: 10 above and below, the page's width, on a row's hairline (`.dw.ph .row`).
+private enum ReleaseListLook {
+    static let rowRoom: CGFloat = 10
+    /// Under a file's name in Changes, over its first row.
+    static let headingBelow: CGFloat = 6
+    /// Between Replace cover only, what it did and its note.
+    static let footGap: CGFloat = 10
+}
+
+private extension View {
+    func releaseListRow() -> some View {
+        padding(.vertical, ReleaseListLook.rowRoom)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottom) { DWRule(colour: DWPalette.rowRule) }
     }
 }
 
@@ -711,6 +788,8 @@ struct FullCover: Identifiable {
 }
 
 /// The cover, full screen (EditWords.coverFullScreen): on black, fitted, Close at the top - and a tap anywhere closes it.
+/// (R20) The black is the page's (DWPalette.page), Close the look's button - flat accent words on the phone, the Mac's
+/// button on the Mac, where Artwork and Tags open it too.
 struct FullCoverView: View {
     let cover: FullCover
 
@@ -728,7 +807,7 @@ struct FullCoverView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            DWPalette.page.ignoresSafeArea()
             if let image {
                 Image(uiImage: image)
                     .resizable()
@@ -736,7 +815,8 @@ struct FullCoverView: View {
                     .accessibilityLabel(label)
             } else if failed {
                 Text(EditWords.pictureFailed)
-                    .foregroundStyle(.primary)
+                    .font(Typeface.Look.text(.field))
+                    .foregroundStyle(DWPalette.text)
                     .padding()
             } else {
                 ProgressView()
@@ -745,10 +825,14 @@ struct FullCoverView: View {
         .contentShape(Rectangle())
         .onTapGesture { dismiss() }
         .overlay(alignment: .topTrailing) {
-            Button(EditWords.close) { dismiss() }
-                .escapeCloses()
-                .font(Typeface.headline)
-                .padding()
+            Button {
+                dismiss()
+            } label: {
+                HoldoutWords(EditWords.close)
+            }
+            .buttonStyle(DWButtonStyle())
+            .escapeCloses()
+            .padding()
         }
         .task {
             guard let client = server.client else { return }

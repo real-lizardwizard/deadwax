@@ -65,6 +65,8 @@ struct ArtistImagesSheet: View {
                 }
             }
         }
+        // (R20) the page's ground under the sheet, not the system's raised grey
+        .presentationBackground(HoldoutLook.ground)
         .interactiveDismissDisabled(model?.flow.holdsWork == true || model?.flow.saving == true)
         .task {
             if model == nil {
@@ -101,53 +103,66 @@ struct ArtistImageSlot: Hashable {
     let label: String
 }
 
-/// Artist images' page: everything ArtistImagesSheet says, as sections of one list.
+/// Artist images' page: everything ArtistImagesSheet says, as groups of one page.
+///
+/// (R20 - notes/ios.md "The panel review, R20: the known holdouts (2026-11-26)") No List: the holdouts' pieces (DebugView's
+/// HoldoutPage, HoldoutGroup...) - on the phone flat (R1c), each part a group's heading over its rows on their hairlines on
+/// the page's black, the search's field in its well; on the Mac the Mac's group boxes on --bg. Save is the primary
+/// button, the one thing here with a face besides the pictures and the field.
 private struct ArtistImagesRoot: View {
     let model: ArtistImagesModel
 
-    @FocusState private var searchFocused: Bool
+    private enum Typing: Hashable { case search }
+    @FocusState private var typing: Typing?
 
     var body: some View {
         let flow = model.flow
         Group {
             if let reason = model.reason {
                 // no one folder takes their pictures: why, and nothing asked
-                List {
-                    Section {
-                        Text(reason)
-                            .fixedSize(horizontal: false, vertical: true)
+                HoldoutPage {
+                    HoldoutGroup {
+                        HoldoutLine(reason, tone: DWPalette.text)
                     }
                 }
             } else if !flow.online && flow.preview == nil && flow.loading == nil && flow.problem == nil {
                 // opened out of reach: nothing asked, nothing drawn as if live
-                ContentUnavailableView {
-                    Label(ArtistManageWords.imagesTitle, systemImage: "wifi.slash")
-                } description: {
-                    Text(EditWords.needsDeadwax)
-                }
+                HoldoutUnavailable(title: ArtistManageWords.imagesTitle, symbol: "wifi.slash", words: EditWords.needsDeadwax)
             } else {
-                List {
+                HoldoutPage {
                     if flow.mayHaveFinished {
                         // kept whatever the look after it does - a look that fails leaves it said
-                        Section {
+                        HoldoutGroup {
                             MayHaveFinished(reading: flow.loading != nil)
+                                .font(HoldoutLook.words)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .holdoutRow()
                         }
                     }
                     who(flow)
                     if flow.searchOpen { searchSections(flow) }
                     if let name = flow.loading {
-                        Section {
+                        HoldoutGroup {
                             HStack(spacing: 10) {
                                 ProgressView()
                                 Text(ArtistManageWords.looking(name))
+                                    .font(HoldoutLook.words)
+                                    .foregroundStyle(DWPalette.text)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .holdoutRow()
                             .accessibilityElement(children: .combine)
                         }
                     } else if let problem = flow.problem {
-                        Section {
-                            ReadAgainFailed(failure: problem, disabled: !flow.online) {
-                                Task { await model.lookAgain() }
+                        HoldoutGroup {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ReadAgainFailed(failure: problem, disabled: !flow.online) {
+                                    Task { await model.lookAgain() }
+                                }
                             }
+                            .buttonStyle(DWButtonStyle(size: .small))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .holdoutRow()
                         }
                     } else if let preview = flow.preview {
                         found(preview, flow: flow)
@@ -161,17 +176,20 @@ private struct ArtistImagesRoot: View {
     /// "Showing Ye (rapper)", with Not them? while the search is closed - once the pictures of someone are drawn.
     @ViewBuilder private func who(_ flow: ArtistImagesFlow) -> some View {
         if let preview = flow.preview, preview.mbid != nil, flow.loading == nil {
-            Section {
+            HoldoutGroup {
                 let name = ArtistManage.showingWho(factsName: preview.facts?.name, pageName: model.pageName)
-                Text(ArtistManage.showing(name, disambiguation: preview.facts?.disambiguation ?? ""))
-                    .font(Typeface.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
+                HoldoutLine(ArtistManage.showing(name, disambiguation: preview.facts?.disambiguation ?? ""),
+                            tone: DWPalette.text)
                 if !flow.searchOpen {
-                    Button(ArtistManageWords.notThem) {
-                        model.openSearch()
-                        searchFocused = true
+                    HoldoutButtons {
+                        Button {
+                            model.openSearch()
+                            typing = .search
+                        } label: {
+                            HoldoutWords(ArtistManageWords.notThem)
+                        }
+                        .disabled(flow.saving)
                     }
-                    .disabled(flow.saving)
                 }
             }
         }
@@ -180,41 +198,37 @@ private struct ArtistImagesRoot: View {
     /// The search: its field and Search, what it found (a pick looks for that artist's pictures), and its note.
     @ViewBuilder private func searchSections(_ flow: ArtistImagesFlow) -> some View {
         @Bindable var model = model
-        Section {
+        HoldoutGroup(legend: ArtistManageWords.searchLabel) {
             HStack(spacing: 10) {
                 TextField(ArtistManageWords.searchLabel, text: $model.query)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.search)
-                    .focused($searchFocused)
+                    .focused($typing, equals: .search)
+                    .modifier(HoldoutField(focus: $typing, field: .search))
                     .onSubmit { Task { await model.search() } }
                 if flow.searching { ProgressView() }
-                Button(ArtistManageWords.search) {
+                Button {
                     Task { await model.search() }
+                } label: {
+                    HoldoutWords(ArtistManageWords.search)
                 }
+                .buttonStyle(DWButtonStyle(size: .small))
                 .disabled(ArtistManage.searchWords(model.query).isEmpty || !flow.online || flow.saving)
             }
+            .holdoutRow()
             if let note = flow.searchNote {
-                Text(note)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .fixedSize(horizontal: false, vertical: true)
+                HoldoutLine(note)
             }
-        } header: {
-            Text(ArtistManageWords.searchLabel)
-                .font(Typeface.footnote)
         }
         if !flow.matches.isEmpty {
-            Section {
+            HoldoutGroup(legend: ArtistManageWords.whichArtist) {
                 ForEach(flow.matches, id: \.mbid) { (match: MBArtistMatch) in
                     ArtistMatchRow(match: match) {
                         Task { await model.look(mbid: match.mbid, name: match.name) }
                     }
                     .disabled(!flow.online || flow.saving)
                 }
-            } header: {
-                Text(ArtistManageWords.whichArtist)
-                    .font(Typeface.footnote)
             }
         }
     }
@@ -223,34 +237,26 @@ private struct ArtistImagesRoot: View {
     @ViewBuilder private func found(_ preview: ArtistImagesPreview, flow: ArtistImagesFlow) -> some View {
         let notes = preview.notes
         if preview.mbid == nil || !notes.isEmpty || !preview.problems.isEmpty {
-            Section {
+            HoldoutGroup {
                 // with no one settled, the problems first, as warnings; settled, after the notes, as notes
                 if preview.mbid == nil {
                     ForEach(Array(preview.problems.enumerated()), id: \.offset) { (_: Int, said: String) in
-                        Text(said)
-                            .foregroundStyle(Palette.amber)
-                            .fixedSize(horizontal: false, vertical: true)
+                        HoldoutLine(said, tone: DWPalette.amberText)
                     }
                 }
                 ForEach(Array(notes.enumerated()), id: \.offset) { (_: Int, note: String) in
-                    Text(note)
-                        .font(Typeface.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HoldoutLine(note)
                 }
                 if preview.mbid != nil {
                     ForEach(Array(preview.problems.enumerated()), id: \.offset) { (_: Int, said: String) in
-                        Text(said)
-                            .font(Typeface.footnote)
-                            .fixedSize(horizontal: false, vertical: true)
+                        HoldoutLine(said)
                     }
                 }
             }
         }
         if preview.mbid != nil, let dropped = flow.notOffered {
-            Section {
-                Text(dropped)
-                    .foregroundStyle(Palette.amber)
-                    .fixedSize(horizontal: false, vertical: true)
+            HoldoutGroup {
+                HoldoutLine(dropped, tone: DWPalette.amberText)
             }
         }
         if preview.mbid != nil {
@@ -273,15 +279,22 @@ private struct ArtistImagesRoot: View {
         let chosen = flow.chosen[slot.kind].flatMap { (url: String) -> ArtistImageCandidate? in
             every.first { ArtistManage.sameAddress($0.url, url) }
         }
-        Section {
+        // the slot's name, and what was found for it, as its group's legend
+        HoldoutGroup(legend: line.isEmpty ? slot.label : "\(slot.label) \u{00B7} \(line)") {
             if let chosen {
                 VStack(alignment: .leading, spacing: 6) {
                     RelayedArtistPicture(candidate: chosen, square: slot.kind == "thumb")
                         .frame(maxWidth: slot.kind == "thumb" ? 240 : .infinity)
-                    Label(ArtistManageWords.asWords(chosen), systemImage: "checkmark")
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(DWPalette.acc)
+                        Text(ArtistManageWords.asWords(chosen))
+                            .foregroundStyle(DWPalette.t2)
+                    }
+                    .font(HoldoutLook.small)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .holdoutRow()
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(ArtistManageWords.option(chosen))
                 .accessibilityValue(ArtistManageWords.chosenMark)
@@ -290,83 +303,109 @@ private struct ArtistImagesRoot: View {
                     ArtistFolderPicture(path: path, kind: slot.kind, square: slot.kind == "thumb")
                         .frame(maxWidth: slot.kind == "thumb" ? 240 : .infinity)
                     Text(ArtistManageWords.onDisk(slot.label))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(HoldoutLook.small)
+                        .foregroundStyle(DWPalette.t2)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .holdoutRow()
                 .accessibilityElement(children: .combine)
             }
             if let another {
-                NavigationLink(value: ArtistImageSlot(kind: slot.kind, label: slot.label)) {
-                    Text(another)
-                }
-                .disabled(flow.saving)
+                AnotherPictureLink(slot: ArtistImageSlot(kind: slot.kind, label: slot.label), words: another)
+                    .disabled(flow.saving)
             }
-        } header: {
-            HStack(alignment: .firstTextBaseline) {
-                Text(slot.label)
-                if !line.isEmpty {
-                    Spacer(minLength: 8)
-                    Text(line)
-                }
-            }
-            .font(Typeface.footnote)
         }
     }
 
     /// Replace, what is in their folder now, Save and what it said.
     @ViewBuilder private func saving(_ preview: ArtistImagesPreview, flow: ArtistImagesFlow) -> some View {
         @Bindable var model = model
-        Section {
-            Toggle(ArtistManageWords.replace, isOn: $model.replace)
+        HoldoutGroup {
+            HoldoutSwitch(words: ArtistManageWords.replace, on: $model.replace)
                 .disabled(flow.saving)
         }
         let kept = preview.kinds.filter { (slot: ArtistImageKind) -> Bool in
             !(preview.art[slot.kind] ?? "").isEmpty
         }
         if !kept.isEmpty, let path = preview.path, !path.isEmpty {
-            Section {
+            HoldoutGroup(legend: ArtistManageWords.inFolder) {
                 ForEach(kept, id: \.kind) { (slot: ArtistImageKind) in
                     HStack(spacing: 12) {
                         ArtistFolderPicture(path: path, kind: slot.kind, square: slot.kind == "thumb")
                             .frame(width: slot.kind == "thumb" ? 48 : 86)
-                            .clipShape(Corners.artShape)
+                            .clipped()
                         VStack(alignment: .leading, spacing: 2) {
                             Text(slot.label)
+                                .font(HoldoutLook.words)
+                                .foregroundStyle(DWPalette.text)
                             Text(preview.art[slot.kind] ?? "")
-                                .font(Typeface.mono(.caption))
-                                .foregroundStyle(Palette.quiet)
+                                .font(Platform.mac ? Typeface.Look.mono(.chip) : Typeface.Phone.mono(.extraSmall))
+                                .foregroundStyle(DWPalette.t2)
                         }
+                        .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
                     }
+                    .holdoutRow()
                     .accessibilityElement(children: .combine)
                 }
-            } header: {
-                Text(ArtistManageWords.inFolder)
-                    .font(Typeface.footnote)
             }
         }
-        Section {
-            Button {
-                Task { await model.save() }
-            } label: {
-                HStack(spacing: 10) {
-                    if flow.saving { ProgressView() }
-                    Text(flow.saving ? ArtistManageWords.saving : ArtistManageWords.save)
+        HoldoutGroup {
+            HoldoutButtons {
+                Button {
+                    Task { await model.save() }
+                } label: {
+                    HStack(spacing: 10) {
+                        if flow.saving { ProgressView() }
+                        HoldoutWords(flow.saving ? ArtistManageWords.saving : ArtistManageWords.save)
+                    }
                 }
+                .buttonStyle(DWButtonStyle(kind: .pri, size: .small))
+                .disabled(!flow.canSave)
             }
-            .disabled(!flow.canSave)
             if let saved = flow.saved, !saved.isEmpty {
-                Text(saved)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-                    .fixedSize(horizontal: false, vertical: true)
+                HoldoutLine(saved)
             }
+        }
+    }
+}
+
+/// (R20) Use another picture (N): the row that pushes the slot's grid - on the phone a row that goes somewhere (`.go`:
+/// its words in white, the chevron), on the Mac a small button.
+private struct AnotherPictureLink: View {
+    let slot: ArtistImageSlot
+    let words: String
+
+    var body: some View {
+        if Platform.mac {
+            NavigationLink(value: slot) {
+                HoldoutWords(words)
+            }
+            .buttonStyle(DWButtonStyle(size: .small))
+            .holdoutRow()
+        } else {
+            NavigationLink(value: slot) {
+                HStack(spacing: CGFloat(PhoneLook.goGap)) {
+                    Text(words)
+                        .font(Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.text)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    PhoneChevron()
+                }
+                .lookHeight(PhoneLook.goRow)
+                .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 }
 
 /// Use another picture: every picture a slot can take - its own kind's first, then the rest found - as a grid, each
 /// with where it is from; a tap chooses it for the slot, a tap on the one chosen takes it back (that slot isn't
-/// written). Lazy: a picture is asked only once it is near the screen.
+/// written). Lazy: a picture is asked only once it is near the screen. (R20) On the page's ground, the one chosen
+/// outlined in the accent on the picture's own square edge, the words under each in the extra-small size.
 private struct ArtistPictureGrid: View {
     let model: ArtistImagesModel
     let slot: ArtistImageSlot
@@ -387,19 +426,19 @@ private struct ArtistPictureGrid: View {
                             RelayedArtistPicture(candidate: candidate, square: square)
                                 .overlay {
                                     if on {
-                                        Corners.artShape
-                                            .strokeBorder(Palette.accent, lineWidth: 3)
+                                        Rectangle()
+                                            .strokeBorder(DWPalette.acc, lineWidth: 3)
                                     }
                                 }
                             HStack(alignment: .firstTextBaseline, spacing: 4) {
                                 if on {
                                     Image(systemName: "checkmark")
-                                        .font(Typeface.symbol(.caption2).weight(.bold))
-                                        .foregroundStyle(Palette.accent)
+                                        .font(HoldoutLook.extraSmall.weight(.bold))
+                                        .foregroundStyle(DWPalette.acc)
                                 }
                                 Text(ArtistManageWords.asWords(candidate))
-                                    .font(Typeface.caption)
-                                    .foregroundStyle(Palette.quiet)
+                                    .font(HoldoutLook.extraSmall)
+                                    .foregroundStyle(DWPalette.t2)
                                     .lineLimit(2)
                             }
                         }
@@ -413,13 +452,15 @@ private struct ArtistPictureGrid: View {
             }
             .padding(16)
         }
+        .background(HoldoutLook.ground)
         .navigationTitle(slot.label)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 /// One of MusicBrainz's artists for a name (the web's MatchList row): their name, and what tells them apart
-/// (matchLine) - a tap takes them.
+/// (matchLine) - a tap takes them. (R20) A group's row: the name in white over its line in the second colour, the whole
+/// row the button, one element for VoiceOver.
 struct ArtistMatchRow: View {
     let match: MBArtistMatch
     let pick: () -> Void
@@ -428,17 +469,21 @@ struct ArtistMatchRow: View {
         Button(action: pick) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(match.name)
-                    .foregroundStyle(.primary)
+                    .font(HoldoutLook.words)
+                    .foregroundStyle(DWPalette.text)
                 let line = ArtistManage.matchLine(match)
                 if !line.isEmpty {
                     Text(line)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(HoldoutLook.small)
+                        .foregroundStyle(DWPalette.t2)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .holdoutRow()
             .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
     }
 }

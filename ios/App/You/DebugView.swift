@@ -13,9 +13,15 @@ import UIKit
 /// tasks, reachability, what waits to be sent, the time each check took, the download log and "Stream even when
 /// downloaded" (phase2-downloads.md 6.9). Phase 3's Your library (phase3-autodownload.md 3.5): Follow your library, what
 /// is followed, the albums and their songs read, the last check, the first read's time and what would fit. The address
-/// and the sign-in are the app's own screens now. Its measurements are in the footnote's readout (Courier Prime, 25
-/// Nov): `.monospacedDigit()` held them still in Noto Sans, and does nothing in Libre Franklin. Every row of it is on
-/// its label's baseline (the `.readout` LabeledContent style), where a centred row would set a readout higher.
+/// and the sign-in are the app's own screens now. Its measurements are in the readout face (Courier Prime, 25 Nov):
+/// `.monospacedDigit()` held them still in Noto Sans, and does nothing in Libre Franklin.
+///
+/// (R20 - notes/ios.md "The panel review, R20: the known holdouts (2026-11-26)") No Form: drawn from the canvas's pieces,
+/// as no drawing has it. On the phone flat, as R9's Settings pages are (iSettings) - each section a group's heading
+/// over its rows on their hairlines, on the page's black, its footer a note under it; on the Mac each a group box
+/// (Settings.dc.html's `.group.onbg`), its facts as the Mac's Settings draws a fact - the label right-aligned at 124 in
+/// the second colour, the value beside it. Every line it showed is still there, in the same order; every fact's value
+/// sits on its label's first baseline (HoldoutFact), the readouts in Courier Prime, the words in Libre Franklin.
 struct DebugView: View {
     @Environment(DebugModel.self) private var model
     @Environment(PlayerModel.self) private var player
@@ -27,7 +33,7 @@ struct DebugView: View {
     init() {}
 
     var body: some View {
-        Form {
+        HoldoutPage {
             server
             if model.report?.ok == true {
                 testSounds
@@ -40,16 +46,10 @@ struct DebugView: View {
             DownloadsDebugSection()
             LibraryFollowDebugSection()
             libraryLists
-            Section {
-                Text(model.installLine)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
-            } footer: {
-                Text(DebugWords.footer(version: YouView.appVersion, device: Platform.device))
-                    .font(Typeface.footnote)
+            HoldoutGroup(note: DebugWords.footer(version: YouView.appVersion, device: Platform.device)) {
+                HoldoutLine(model.installLine)
             }
         }
-        .labeledContentStyle(.readout)
         .navigationTitle("Debug")
         .task { if model.report == nil { await model.check() } }
         // Muffle is a test (eq.md 5.2): it goes off as Debug closes - back out of it, or another tab - so it can't be
@@ -66,51 +66,45 @@ struct DebugView: View {
     /// Each scope's last album_index answer: a new list (200) or the one kept still standing (304), how many albums
     /// and how long it took - to count against the web's Library, and to time a big library.
     private var libraryLists: some View {
-        Section {
+        HoldoutGroup(legend: "Library") {
             ForEach([AlbumScope.yours, .store], id: \.self) { scope in
                 if let fetch = library.lastFetch[scope] {
-                    LabeledContent(scope == .yours ? "Your albums" : "All albums") {
-                        Text("\(fetch.albums) albums \u{00B7} \(fetch.status) \u{00B7} \(String(format: "%.2f", fetch.seconds)) s")
-                            .font(Typeface.readout(.footnote))
-                    }
+                    HoldoutFact(scope == .yours ? "Your albums" : "All albums",
+                                "\(fetch.albums) albums \u{00B7} \(fetch.status) \u{00B7} \(String(format: "%.2f", fetch.seconds)) s")
                 }
             }
             if library.lastFetch.isEmpty {
-                Text("Not asked yet").foregroundStyle(Palette.quiet)
+                HoldoutLine("Not asked yet")
             }
             // (18 Nov) the Library's top's last reading - the row in its window, the window's inset, the room it came
             // down, whether something was presented: what to send if the row still stands in the Dynamic Island
-            LabeledContent("Top") {
-                Text(model.libraryTop?.line ?? "Not measured yet")
-                    .font(Typeface.readout(.footnote))
-            }
-        } header: {
-            Text("Library")
-                .font(Typeface.footnote)
+            HoldoutFact("Top", model.libraryTop?.line ?? "Not measured yet")
         }
     }
 
     // MARK: the server
 
     private var server: some View {
-        Section {
-            Button(model.checking ? "Checking\u{2026}" : "Check") {
-                Task { await model.check() }
+        HoldoutGroup(legend: "deadwax") {
+            HoldoutButtons {
+                Button {
+                    Task { await model.check() }
+                } label: {
+                    HoldoutWords(model.checking ? "Checking\u{2026}" : "Check")
+                }
+                .disabled(model.checking)
             }
-            .disabled(model.checking)
             ForEach(model.report?.lines(Platform.device) ?? [], id: \.self) { line in
-                Text(line).font(Typeface.footnote)
+                HoldoutLine(line, tone: DWPalette.text)
             }
-        } header: {
-            Text("deadwax")
-                .font(Typeface.footnote)
         }
     }
 
     // MARK: the test sounds
 
     private var testSounds: some View {
-        Section {
+        HoldoutGroup(legend: "Test sounds",
+                     note: DebugWords.testSoundsFooter(trial: TurntableDebugRows.trialFooter, device: Platform.device)) {
             ForEach(Array(model.testSongs.enumerated()), id: \.element.id) { index, song in
                 songRow(song, playing: player.current?.track.id == song.id) {
                     model.play(model.testSongs, at: index)
@@ -118,39 +112,52 @@ struct DebugView: View {
             }
             if !model.testSongs.isEmpty {
                 let missing = model.testSongs.filter { !model.downloaded.contains($0.id) }
-                Button(missing.isEmpty ? "All downloaded" : "Download all \(model.testSongs.count)") {
-                    model.download(model.testSongs)
-                }
-                .disabled(missing.isEmpty || !model.downloading.isEmpty)
-                if !model.downloaded.isEmpty {
-                    Button("Remove the downloads", role: .destructive) { model.removeDownloads() }
+                HoldoutButtons {
+                    Button {
+                        model.download(model.testSongs)
+                    } label: {
+                        HoldoutWords(missing.isEmpty ? "All downloaded" : "Download all \(model.testSongs.count)")
+                    }
+                    .disabled(missing.isEmpty || !model.downloading.isEmpty)
+                    if !model.downloaded.isEmpty {
+                        Button(role: .destructive) {
+                            model.removeDownloads()
+                        } label: {
+                            HoldoutWords("Remove the downloads")
+                        }
+                        .buttonStyle(DWButtonStyle(kind: .danger, size: .small))
+                    }
                 }
             }
-            if let words = model.testWords { Text(words).font(Typeface.footnote) }
+            if let words = model.testWords { HoldoutLine(words) }
             DeckTrialRows(model: deckTrial)
-        } header: {
-            Text("Test sounds")
-                .font(Typeface.footnote)
-        } footer: {
-            Text(DebugWords.testSoundsFooter(trial: TurntableDebugRows.trialFooter, device: Platform.device))
-                .font(Typeface.footnote)
         }
     }
 
+    /// A song's row: its name (in the accent while it plays) over its facts, a tap playing it from there - and its
+    /// download's glyph, a flat button on the phone and a small one on the Mac, or the spinner while it comes.
     private func songRow(_ song: Song, playing: Bool, play: @escaping () -> Void) -> some View {
-        HStack {
+        HStack(spacing: 8) {
             Button(action: play) {
-                HStack {
+                HStack(spacing: 8) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(song.name).foregroundStyle(playing ? Palette.accent : .primary)
-                        Text(detail(song)).font(Typeface.caption).foregroundStyle(Palette.quiet)
+                        Text(song.name)
+                            .font(HoldoutLook.words)
+                            .foregroundStyle(playing ? DWPalette.acc : DWPalette.text)
+                        Text(detail(song))
+                            .font(HoldoutLook.extraSmall)
+                            .foregroundStyle(DWPalette.t2)
                     }
-                    Spacer()
-                    if playing { Image(systemName: "speaker.wave.2.fill").foregroundStyle(Palette.accent) }
+                    .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    if playing {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .foregroundStyle(DWPalette.acc)
+                    }
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             if model.downloading.contains(song.id) {
                 ProgressView()
             } else {
@@ -159,11 +166,12 @@ struct DebugView: View {
                 } label: {
                     Image(systemName: model.downloaded.contains(song.id) ? "checkmark.circle.fill" : "arrow.down.circle")
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(DWButtonStyle(size: .small))
                 .disabled(model.downloaded.contains(song.id))
                 .accessibilityLabel(model.downloaded.contains(song.id) ? "Downloaded" : "Download")
             }
         }
+        .holdoutRow()
     }
 
     private func detail(_ song: Song) -> String {
@@ -180,44 +188,52 @@ struct DebugView: View {
     // MARK: the hi-res row
 
     private var hiRes: some View {
-        Section {
-            Button(model.findingHiRes ? "Looking\u{2026}" : (model.hiRes == nil ? "Find a 24/192 FLAC" : "Look again")) {
-                Task { await model.findHiRes() }
+        HoldoutGroup(legend: "Hi-res",
+                     note: "Decodes the song at its own rate. What's playing below says the file's rate and the output's: when they differ, the app's audio engine converts to the output's rate, as any app must.") {
+            HoldoutButtons {
+                Button {
+                    Task { await model.findHiRes() }
+                } label: {
+                    HoldoutWords(model.findingHiRes ? "Looking\u{2026}" : (model.hiRes == nil ? "Find a 24/192 FLAC" : "Look again"))
+                }
+                .disabled(model.findingHiRes)
             }
-            .disabled(model.findingHiRes)
             if let song = model.hiRes {
                 songRow(song, playing: player.current?.track.id == song.id) {
                     model.play([song], at: 0)
                 }
             }
-            if let words = model.hiResWords { Text(words).font(Typeface.footnote) }
-        } header: {
-            Text("Hi-res")
-                .font(Typeface.footnote)
-        } footer: {
-            Text("Decodes the song at its own rate. What's playing below says the file's rate and the output's: when they differ, the app's audio engine converts to the output's rate, as any app must.")
-                .font(Typeface.footnote)
+            if let words = model.hiResWords { HoldoutLine(words) }
         }
     }
 
     // MARK: playing
 
     private var playing: some View {
-        Section {
+        HoldoutGroup(legend: "Playing") {
             if let track = player.current?.track {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(track.title.isEmpty ? track.id : track.title).font(Typeface.headline)
+                    Text(track.title.isEmpty ? track.id : track.title)
+                        .font(HoldoutLook.words.weight(.semibold))
+                        .foregroundStyle(DWPalette.text)
                     Text([track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " \u{2014} "))
-                        .font(Typeface.subheadline).foregroundStyle(Palette.quiet)
+                        .font(HoldoutLook.small)
+                        .foregroundStyle(DWPalette.t2)
                     Text("\(player.phaseWords) \u{00B7} \(clock(player.shownPosition))\(player.duration > 0 ? " of \(clock(player.duration))" : "")")
-                        .font(Typeface.readout(.footnote))
+                        .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))
+                        .foregroundStyle(DWPalette.t2)
                     if let readout = player.readout {
-                        Text(readout).font(Typeface.footnote)
+                        Text(readout)
+                            .font(HoldoutLook.small)
+                            .foregroundStyle(DWPalette.t2)
                     }
                 }
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .holdoutRow()
                 HStack {
                     Spacer()
-                    Button { player.previous() } label: { SharpSymbol(.previous) }
+                    Button { player.previous() } label: { SharpSymbol(.previous).font(Typeface.symbol(.body)) }
                         .accessibilityLabel("Previous")
                     Spacer()
                     Button { player.toggle() } label: {
@@ -226,27 +242,22 @@ struct DebugView: View {
                     }
                     .accessibilityLabel(player.engineState.phase == .playing ? "Pause" : "Play")
                     Spacer()
-                    Button { player.next() } label: { SharpSymbol(.next) }
+                    Button { player.next() } label: { SharpSymbol(.next).font(Typeface.symbol(.body)) }
                         .accessibilityLabel("Next")
                         .disabled(nextIndex(player.queue) == nil)
                     Spacer()
                 }
-                .buttonStyle(.borderless)
-                .padding(.vertical, 4)
+                .buttonStyle(DWButtonStyle())
+                .holdoutRow()
             } else {
-                Text("Nothing playing").foregroundStyle(Palette.quiet)
+                HoldoutLine("Nothing playing")
             }
             if player.holdsAnEdit {
-                LabeledContent(UpNextWords.title, value: "An edit held for the next song")
+                HoldoutFact(UpNextWords.title, "An edit held for the next song", words: true)
             }
             if let words = player.lastFailure {
-                LabeledContent("Last failure") {
-                    Text(words).font(Typeface.footnote).foregroundStyle(.red)
-                }
+                HoldoutFact("Last failure", words, words: true, tone: DWPalette.redChipText)
             }
-        } header: {
-            Text("Playing")
-                .font(Typeface.footnote)
         }
     }
 
@@ -265,21 +276,13 @@ private struct EQDebugSection: View {
     @State private var rows: [(label: String, value: String)] = []
 
     var body: some View {
-        Section {
+        HoldoutGroup(legend: EQWords.Debug.header, note: EQWords.Debug.muffleFooter) {
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                LabeledContent(row.label) {
-                    Text(row.value).font(Typeface.footnote)
-                }
+                HoldoutFact(row.label, row.value, words: true)
             }
-            Toggle(EQWords.Debug.muffle, isOn: Binding<Bool>(get: { eq.muffle }, set: { (on: Bool) -> Void in
+            HoldoutSwitch(words: EQWords.Debug.muffle, on: Binding<Bool>(get: { eq.muffle }, set: { (on: Bool) -> Void in
                 eq.muffle = on
             }))
-        } header: {
-            Text(EQWords.Debug.header)
-                .font(Typeface.footnote)
-        } footer: {
-            Text(EQWords.Debug.muffleFooter)
-                .font(Typeface.footnote)
         }
         .task(id: phase) {
             guard phase == .active else { return }
@@ -301,24 +304,14 @@ private struct TurntableDebugSection: View {
     @State private var recording: DeckRecordingStatus = .idle
 
     var body: some View {
-        Section {
+        HoldoutGroup(legend: "Turntable") {
             ForEach(Array(rows.enumerated()), id: \.offset) { (_: Int, row: InfoRow) in
-                LabeledContent(row.label) {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(row.value).font(row.mono ? Typeface.mono(.footnote) : Typeface.footnote)
-                        if let note = row.note {
-                            Text(note).font(Typeface.caption).foregroundStyle(Palette.quiet)
-                        }
-                    }
-                }
+                HoldoutFact(row.label, row.value, words: !row.mono, note: row.note)
             }
             TurntableRecordingRow(status: recording, shown: deck.hasDeck, url: deck.recordingURL) {
                 deck.record()
                 recording = deck.recordingStatus
             }
-        } header: {
-            Text("Turntable")
-                .font(Typeface.footnote)
         }
         .task(id: phase) {
             guard phase == .active else { return }
@@ -341,24 +334,20 @@ private struct TurntableRecordingRow: View {
 
     var body: some View {
         let said = TurntableDebugRows.recordingRow(status, turntable: shown)
-        VStack(alignment: .leading, spacing: 6) {
-            LabeledContent(said.row.label) {
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(said.row.value).font(Typeface.footnote)
-                    if let note = said.row.note {
-                        Text(note).font(Typeface.caption).foregroundStyle(Palette.quiet)
+        let again = TurntableDebugRows.recordAgain(status, turntable: shown)
+        HoldoutFact(said.row.label, said.row.value, words: true, note: said.row.note)
+        if said.action != nil || again != nil {
+            HoldoutButtons {
+                if let action = said.action {
+                    if case .saved = status, let url {
+                        ShareLink(item: url) { Text(action) }
+                    } else {
+                        Button(action: record) { HoldoutWords(action) }
                     }
                 }
-            }
-            if let action = said.action {
-                if case .saved = status, let url {
-                    ShareLink(item: url) { Text(action) }
-                } else {
-                    Button(action, action: record)
+                if let again {
+                    Button(action: record) { HoldoutWords(again) }
                 }
-            }
-            if let again = TurntableDebugRows.recordAgain(status, turntable: shown) {
-                Button(again, action: record)
             }
         }
     }
@@ -427,8 +416,13 @@ private struct DeckTrialRows: View {
     @Environment(\.scenePhase) private var phase
 
     var body: some View {
-        LabeledContent(TurntableDebugRows.trialLabel) {
-            Button(TurntableDebugRows.trialButton(running: model.running)) { model.toggle() }
+        HoldoutControlRow(label: TurntableDebugRows.trialLabel) {
+            Button {
+                model.toggle()
+            } label: {
+                HoldoutWords(TurntableDebugRows.trialButton(running: model.running))
+            }
+            .buttonStyle(DWButtonStyle(size: .small))
         }
         .task(id: phase) {
             guard phase == .active else { return }
@@ -438,58 +432,59 @@ private struct DeckTrialRows: View {
             }
         }
         ForEach(Array(model.rows.enumerated()), id: \.offset) { _, row in
-            LabeledContent(row.label) {
-                Text(row.value).font(Typeface.readout(.footnote))
-            }
+            HoldoutFact(row.label, row.value)
         }
     }
 }
 
 /// The engine's log (EngineTrace): its last lines, the newest last, read again once a second while the log's row is
 /// on screen and the app is in front - and only then (not on a locked phone left on Debug with music playing) - and
-/// drawn lazily, a line at a time. Copy puts the whole log on the clipboard as it is at the tap; Share hands it on as
-/// text (Mail, Messages, Files...) as last read.
+/// drawn lazily, a line at a time, each in the readout face. Copy puts the whole log on the clipboard as it is at the
+/// tap; Share hands it on as text (Mail, Messages, Files...) as last read.
 private struct EngineLogSection: View {
     @State private var shown = EngineLog.Snapshot.empty
     @State private var copied = false
     @Environment(\.scenePhase) private var phase
 
     var body: some View {
-        Section {
-            HStack(spacing: 24) {
-                Button(copied ? "Copied" : "Copy") {
+        HoldoutGroup(legend: "Engine log",
+                     note: DebugWords.engineLogFooter(capacity: EngineTrace.log.capacity, total: shown.total,
+                                                      device: Platform.device)) {
+            HoldoutButtons {
+                Button {
                     UIPasteboard.general.string = EngineTrace.log.snapshot().text
                     copied = true
                     Task {
                         try? await Task.sleep(for: .seconds(2))
                         copied = false
                     }
+                } label: {
+                    HoldoutWords(copied ? "Copied" : "Copy")
                 }
                 ShareLink(item: shown.text, preview: SharePreview("deadwax engine log")) {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
-                Spacer(minLength: 0)
             }
-            .buttonStyle(.borderless)
             .disabled(shown.lines.isEmpty)
             Group {
                 if shown.lines.isEmpty {
-                    Text("Nothing yet: the engine writes here once something plays.")
-                        .foregroundStyle(Palette.quiet)
+                    HoldoutLine("Nothing yet: the engine writes here once something plays.")
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 3) {
                             // by each line's number, which stays its own as the window moves on
                             ForEach(shown.first..<shown.total, id: \.self) { number in
                                 Text(shown.lines[number - shown.first])
+                                    .font(Platform.mac ? Typeface.Look.mono(.chip) : Typeface.Phone.mono(.extraSmall))
                             }
                         }
-                        .font(Typeface.mono(.caption2))
+                        .foregroundStyle(DWPalette.t2)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .defaultScrollAnchor(.bottom)
                     .frame(height: 320)
+                    .holdoutRow()
                 }
             }
             .task(id: phase) {
@@ -501,12 +496,6 @@ private struct EngineLogSection: View {
                     try? await Task.sleep(for: .seconds(1))
                 }
             }
-        } header: {
-            Text("Engine log")
-                .font(Typeface.footnote)
-        } footer: {
-            Text(DebugWords.engineLogFooter(capacity: EngineTrace.log.capacity, total: shown.total, device: Platform.device))
-                .font(Typeface.footnote)
         }
     }
 }
@@ -522,73 +511,42 @@ private struct DownloadsDebugSection: View {
     @State private var tasksRead = false
 
     var body: some View {
-        Section {
-            Toggle("Stream even when downloaded", isOn: Binding(get: { downloads.streamEvenWhenDownloaded },
-                                                                set: { downloads.streamEvenWhenDownloaded = $0 }))
+        HoldoutGroup(legend: "Downloads") {
+            HoldoutSwitch(words: "Stream even when downloaded",
+                          on: Binding(get: { downloads.streamEvenWhenDownloaded },
+                                      set: { downloads.streamEvenWhenDownloaded = $0 }))
             ForEach(StoredState.allCases, id: \.self) { state in
                 let rows = downloads.records.values.filter { $0.state == state }
                 let bytes = rows.reduce(Int64(0)) { $0 + ($1.bytes ?? 0) }
-                LabeledContent(state.rawValue) {
-                    Text("\(rows.count) \u{00B7} \(Bytes.words(bytes))")
-                        .font(Typeface.readout(.footnote))
-                }
+                HoldoutFact(state.rawValue, "\(rows.count) \u{00B7} \(Bytes.words(bytes))")
             }
-            LabeledContent("Tasks") {
-                let running = tasks.filter(\.running).count
-                let resumable = downloads.records.values.filter { $0.resume != nil }.count
-                Text(tasksRead ? "\(running) running \u{00B7} \(tasks.count - running) waiting \u{00B7} \(resumable) with resume data"
-                               : "Reading\u{2026}")
-                    .font(Typeface.readout(.footnote))
-            }
-            LabeledContent("Reach") {
-                Text(reachability.reach.rawValue + (reachability.probing ? " \u{00B7} probing" : ""))
-                    .font(Typeface.mono(.footnote))
-            }
-            LabeledContent("Path") {
-                Text(pathFacts(reachability.path))
-                    .font(Typeface.mono(.footnote))
-            }
-            LabeledContent("Last probe") {
-                Text(reachability.lastProbe.map { "\($0.answered ? "answered" : "no answer") \u{00B7} \($0.at.formatted(date: .omitted, time: .standard))" } ?? "none yet")
-                    .font(Typeface.mono(.footnote))
-            }
-            LabeledContent("Plays waiting to be sent") {
-                Text("\(downloads.playsWaiting)")
-                    .font(Typeface.readout(.footnote))
-            }
-            LabeledContent("Starts waiting to be sent") {
-                Text("\(downloads.startsWaiting)")
-                    .font(Typeface.readout(.footnote))
-            }
+            HoldoutFact("Tasks", tasksLine)
+            HoldoutFact("Reach", reachability.reach.rawValue + (reachability.probing ? " \u{00B7} probing" : ""))
+            HoldoutFact("Path", pathFacts(reachability.path))
+            HoldoutFact("Last probe", reachability.lastProbe.map { "\($0.answered ? "answered" : "no answer") \u{00B7} \($0.at.formatted(date: .omitted, time: .standard))" } ?? "none yet")
+            HoldoutFact("Plays waiting to be sent", "\(downloads.playsWaiting)")
+            HoldoutFact("Starts waiting to be sent", "\(downloads.startsWaiting)")
             if !downloads.checkSeconds.isEmpty {
                 let times = Array(downloads.checkSeconds.values)
-                LabeledContent("Checks") {
-                    Text("\(times.count) \u{00B7} mean \(String(format: "%.2f", times.reduce(0, +) / Double(times.count))) s \u{00B7} longest \(String(format: "%.2f", times.max() ?? 0)) s")
-                        .font(Typeface.readout(.footnote))
-                }
+                HoldoutFact("Checks", "\(times.count) \u{00B7} mean \(String(format: "%.2f", times.reduce(0, +) / Double(times.count))) s \u{00B7} longest \(String(format: "%.2f", times.max() ?? 0)) s")
             }
             if let problem = downloads.storeProblem {
-                Text(problem)
-                    .font(Typeface.mono(.footnote))
-                    .foregroundStyle(Palette.danger)
-                    .textSelection(.enabled)
+                HoldoutLine(problem, tone: DWPalette.redChipText, readout: true)
             }
             if downloads.log.isEmpty {
-                Text("No download events yet.")
-                    .foregroundStyle(Palette.quiet)
+                HoldoutLine("No download events yet.")
             } else {
                 VStack(alignment: .leading, spacing: 3) {
                     ForEach(Array(downloads.log.suffix(50).enumerated()), id: \.offset) { _, line in
                         Text(line)
+                            .font(Platform.mac ? Typeface.Look.mono(.chip) : Typeface.Phone.mono(.extraSmall))
                     }
                 }
-                .font(Typeface.mono(.caption2))
+                .foregroundStyle(DWPalette.t2)
                 .textSelection(.enabled)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .holdoutRow()
             }
-        } header: {
-            Text("Downloads")
-                .font(Typeface.footnote)
         }
         .task {
             while !Task.isCancelled {
@@ -597,6 +555,14 @@ private struct DownloadsDebugSection: View {
                 try? await Task.sleep(for: .seconds(1))
             }
         }
+    }
+
+    /// The session's tasks: running, waiting and how many have resume data - "Reading..." until first asked.
+    private var tasksLine: String {
+        let running = tasks.filter(\.running).count
+        let resumable = downloads.records.values.filter { $0.resume != nil }.count
+        return tasksRead ? "\(running) running \u{00B7} \(tasks.count - running) waiting \u{00B7} \(resumable) with resume data"
+                         : "Reading\u{2026}"
     }
 
     private func pathFacts(_ path: NetworkPath) -> String {
@@ -616,20 +582,13 @@ private struct LibraryFollowDebugSection: View {
 
     var body: some View {
         let follower = downloads.follower
-        Section {
+        HoldoutGroup(legend: LibraryFollowWords.section, note: LibraryFollowWords.followNote(Platform.device)) {
             if follower.on {
                 facts(follower)
             } else {
-                Text(LibraryFollowWords.notFollowing)
-                    .foregroundStyle(Palette.quiet)
+                HoldoutLine(LibraryFollowWords.notFollowing)
             }
             backgroundRows()
-        } header: {
-            Text(LibraryFollowWords.section)
-                .font(Typeface.footnote)
-        } footer: {
-            Text(LibraryFollowWords.followNote(Platform.device))
-                .font(Typeface.footnote)
         }
     }
 
@@ -640,100 +599,477 @@ private struct LibraryFollowDebugSection: View {
         let listed = albums.filter(\.isListed).count
         let read = albums.filter { $0.isListed && $0.songs != nil }.count
         if let scope = follower.scope {
-            LabeledContent("Following") {
-                Text(LibraryFollowWords.scope(scope))
-                    .font(Typeface.footnote)
-            }
+            HoldoutFact("Following", LibraryFollowWords.scope(scope), words: true)
         }
-        LabeledContent("Albums") {
-            Text(LibraryFollowWords.count(albums.count))
-                .font(Typeface.readout(.footnote))
-        }
-        LabeledContent("Songs read") {
-            Text(LibraryFollowWords.read(read, of: listed)
-                 + (follower.readingNow > 0 ? " \u{00B7} reading \(follower.readingNow)" : ""))
-                .font(Typeface.readout(.footnote))
-        }
-        LabeledContent("Missing") {
-            Text(LibraryFollowWords.missing(albums, now: now))
-                .font(Typeface.readout(.footnote))
-        }
-        LabeledContent("Held back") {
-            Text(LibraryFollowWords.held(follower.held, device: Platform.device)
-                 + (follower.believing ? " \u{00B7} believing (Remove)" : "")
-                 + (follower.keptThem ? " \u{00B7} kept them" : ""))
-                .font(Typeface.footnote)
-        }
-        LabeledContent("Removed, to let go") {
-            Text(LibraryFollowWords.count(follower.removed.count))
-                .font(Typeface.readout(.footnote))
-        }
-        LabeledContent("Leaving their albums") {
-            Text(LibraryFollowWords.leaving(albums))
-                .font(Typeface.readout(.footnote))
-        }
-        LabeledContent("Last check") {
-            Text(follower.checking ? "Checking\u{2026}"
-                 : follower.lastCheck.map { LibraryFollowWords.lastCheck($0, now: now) } ?? LibraryFollowWords.noCheckYet)
-                .font(Typeface.readout(.footnote))
-        }
+        HoldoutFact("Albums", LibraryFollowWords.count(albums.count))
+        HoldoutFact("Songs read", LibraryFollowWords.read(read, of: listed)
+                    + (follower.readingNow > 0 ? " \u{00B7} reading \(follower.readingNow)" : ""))
+        HoldoutFact("Missing", LibraryFollowWords.missing(albums, now: now))
+        HoldoutFact("Held back", LibraryFollowWords.held(follower.held, device: Platform.device)
+                    + (follower.believing ? " \u{00B7} believing (Remove)" : "")
+                    + (follower.keptThem ? " \u{00B7} kept them" : ""), words: true)
+        HoldoutFact("Removed, to let go", LibraryFollowWords.count(follower.removed.count))
+        HoldoutFact("Leaving their albums", LibraryFollowWords.leaving(albums))
+        HoldoutFact("Last check", follower.checking ? "Checking\u{2026}"
+                    : follower.lastCheck.map { LibraryFollowWords.lastCheck($0, now: now) } ?? LibraryFollowWords.noCheckYet)
         if let first = follower.firstRead {
-            LabeledContent("First read") {
-                Text(LibraryFollowWords.firstRead(seconds: first.seconds, albums: first.albums))
-                    .font(Typeface.readout(.footnote))
-            }
+            HoldoutFact("First read", LibraryFollowWords.firstRead(seconds: first.seconds, albums: first.albums))
         }
         if let plan = downloads.libraryFill {
             VStack(alignment: .leading, spacing: 2) {
                 Text(LibraryFollowWords.wouldFit(plan, limit: downloads.storageLimit, device: Platform.device))
+                    .font(HoldoutLook.words)
+                    .foregroundStyle(DWPalette.text)
                 Text(LibraryFollowWords.fitDetail(plan, device: Platform.device))
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(HoldoutLook.small)
+                    .foregroundStyle(DWPalette.t2)
                 if plan.deficit > 0 {
                     Text(LibraryFollowWords.underReserve(plan.deficit, confirmed: downloads.libraryDeficitConfirmed))
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.amber)
+                        .font(HoldoutLook.small)
+                        .foregroundStyle(DWPalette.amberText)
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .holdoutRow()
             .accessibilityElement(children: .combine)
         }
         if let problem = follower.problem {
-            Text(problem)
-                .font(Typeface.mono(.footnote))
-                .foregroundStyle(Palette.danger)
-                .textSelection(.enabled)
+            HoldoutLine(problem, tone: DWPalette.redChipText, readout: true)
         }
-        Button(LibraryFollowWords.checkNow) { follower.check(.byHand) }
+        HoldoutButtons {
+            Button {
+                follower.check(.byHand)
+            } label: {
+                HoldoutWords(LibraryFollowWords.checkNow)
+            }
             .disabled(follower.checking)
+        }
     }
 
     /// The power, Only while charging, the albums handed to iOS, and the background runs kept.
     @ViewBuilder
     private func backgroundRows() -> some View {
-        LabeledContent("Power") {
-            Text(LibraryFollowWords.power(downloads.power, device: Platform.device)
-                 + (downloads.onlyWhileCharging ? " \u{00B7} only while charging" : ""))
-                .font(Typeface.footnote)
-        }
-        LabeledContent("Albums out") {
-            Text(LibraryFollowWords.count(downloads.libraryAlbumsOut))
-                .font(Typeface.readout(.footnote))
-        }
+        HoldoutFact("Power", LibraryFollowWords.power(downloads.power, device: Platform.device)
+                    + (downloads.onlyWhileCharging ? " \u{00B7} only while charging" : ""), words: true)
+        HoldoutFact("Albums out", LibraryFollowWords.count(downloads.libraryAlbumsOut))
         VStack(alignment: .leading, spacing: 2) {
             Text("In the background")
+                .font(HoldoutLook.words)
+                .foregroundStyle(DWPalette.text)
             let now = ListenTracker.wallMs()
             if downloads.backgroundRuns.isEmpty {
                 Text(LibraryFollowWords.noBackgroundRun)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(HoldoutLook.small)
+                    .foregroundStyle(DWPalette.t2)
             }
             ForEach(Array(downloads.backgroundRuns.enumerated()), id: \.offset) {
                 (item: (offset: Int, element: LibraryBackground.Run)) in
                 Text(LibraryFollowWords.backgroundRun(item.element, now: now, device: Platform.device))
-                    .font(Typeface.readout(.footnote))
-                    .foregroundStyle(Palette.quiet)
+                    .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))
+                    .foregroundStyle(DWPalette.t2)
             }
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .holdoutRow()
         .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: the holdouts' pieces (R20)
+
+/// (R20 - notes/ios.md "The panel review, R20: the known holdouts (2026-11-26)") The pages that kept iOS's grouped lists
+/// longest - Debug, an artist's Artist images, Move albums and Which artist is this? - drawn from the canvas's pieces,
+/// since no drawing has them (James, 26 Nov: "the undrawn pages are drawn from the canvas's pieces"). Each piece draws
+/// its own device's: flat on the phone (R1c) - PhoneGroup's headings, rows on hairlines, the page's black - and on the Mac
+/// the Mac's groups (dw.css's `.group`, as MacGroupBox draws it, which a file outside App/Mac can't name) on --bg.
+/// Their words in each device's sizes: the phone's `.dw.ph`, the Mac's `.dw` (through Typeface.Look's roles, the only
+/// Mac sizes a page both devices draw may name).
+enum HoldoutLook {
+    /// A row's words: the phone's 16 (.go, .kv), the Mac's 13 (.dw).
+    static var words: Font { Platform.mac ? Typeface.Look.text(.field) : Typeface.Phone.text(.row) }
+    /// .s: the phone's 13, the Mac's 12.
+    static var small: Font { Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small) }
+    /// .xs: the phone's 12, the Mac's 11.5.
+    static var extraSmall: Font { Platform.mac ? Typeface.Look.text(.chip) : Typeface.Phone.text(.extraSmall) }
+    /// The page's ground: the phone's black (.dw.ph), the Mac's --bg.
+    static var ground: Color { Platform.mac ? DWPalette.bg : DWPalette.page }
+
+    /// The phone's room above and below a row's words, inside its 42 at least (.kv's min-height).
+    static let rowRoom: CGFloat = 10
+    /// The Mac's room above and below a row in a group (.group.col's gap of 7, shared out).
+    static let macRowRoom: CGFloat = 3
+    /// The Mac's fact label (Settings.dc.html's `.field > label` and `.kv > span`, 124 wide).
+    static let macLabel: CGFloat = 124
+    /// The Mac's gap beside a label (.field gap).
+    static let macGap: CGFloat = 8
+    /// The Mac's room between groups (Settings.dc.html's `.col` gap) and round the page (`.page.pad`, its top 28).
+    static let macGroupGap: CGFloat = 24
+    static let macPage = EdgeInsets(top: 28, leading: 22, bottom: 22, trailing: 22)
+    /// The Mac's group: .group's padding 14px 12px 12px, its legend's 0 6px, 16 tall, set 10 in and 8 up on the edge.
+    static let macGroup = EdgeInsets(top: 14, leading: 12, bottom: 12, trailing: 12)
+    static let macLegendSide: CGFloat = 6
+    static let macLegendHeight: CGFloat = 16
+    static let macLegendIn: CGFloat = 10
+    static let macLegendUp: CGFloat = -8
+    /// The Mac's note under a group, and the buttons' gap (.f gap 6).
+    static let macNoteAbove: CGFloat = 6
+    static let macButtonGap: CGFloat = 6
+    /// The phone's gap between flat buttons on a row.
+    static let buttonGap: CGFloat = 12
+}
+
+/// (R20) A page of groups on either device: on the phone Settings' own (SettingsPage - 16 in from each edge, down the
+/// page's black, no List); on the Mac a scroll of group boxes 24 apart on --bg, the page's 22 either side.
+struct HoldoutPage<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        if Platform.mac {
+            ScrollView {
+                VStack(alignment: .leading, spacing: HoldoutLook.macGroupGap) {
+                    content
+                }
+                .padding(HoldoutLook.macPage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .background(DWPalette.bg)
+        } else {
+            SettingsPage {
+                content
+            }
+            .background(DWPalette.page)
+        }
+    }
+}
+
+/// (R20) A group on either device, with its note under it: on the phone PhoneGroup (its heading over its rows, no face)
+/// and Settings' note; on the Mac `.group.onbg` - a box's corners in the line's edge, its legend set into the top edge
+/// on --bg, a header for VoiceOver - and the note under it in the third colour.
+struct HoldoutGroup<Content: View>: View {
+    var legend: String? = nil
+    var note: String? = nil
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        if Platform.mac {
+            VStack(alignment: .leading, spacing: HoldoutLook.macNoteAbove) {
+                VStack(alignment: .leading, spacing: 0) {
+                    content
+                }
+                .padding(HoldoutLook.macGroup)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line, lineWidth: 1))
+                .overlay(alignment: .topLeading) {
+                    if let legend {
+                        Text(legend)
+                            .font(Typeface.Look.text(.chip).weight(.semibold))
+                            .foregroundStyle(DWPalette.label)
+                            .lineLimit(1)
+                            .padding(.horizontal, HoldoutLook.macLegendSide)
+                            .frame(height: HoldoutLook.macLegendHeight)
+                            .background(DWPalette.bg)
+                            .offset(x: HoldoutLook.macLegendIn, y: HoldoutLook.macLegendUp)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+                if let note, !note.isEmpty {
+                    Text(note)
+                        .font(HoldoutLook.extraSmall)
+                        .foregroundStyle(DWPalette.t3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                PhoneGroup(legend: legend) {
+                    content
+                }
+                if let note, !note.isEmpty {
+                    SettingsNote(words: note)
+                }
+            }
+        }
+    }
+}
+
+/// (R20) A fact's row: its label, then its value on the label's first baseline - in the readout face (Courier Prime,
+/// the drawings' `.mono.s`) unless it is `words` - with a `note` under the value in the third colour. On the phone
+/// `.kv`'s (PhoneKV's look: the label white at the row's 16, 116 at least, the value at the right in the second colour,
+/// 42 tall at least on its hairline), the value under its label where the two don't fit side by side; on the Mac the
+/// Mac's Settings' (the label right-aligned at 124 in the second colour, the value beside it in white, 28 tall at least).
+/// One element for VoiceOver: its label, then its value.
+struct HoldoutFact: View {
+    let label: String
+    let value: String
+    var words = false
+    var tone: Color? = nil
+    var note: String? = nil
+
+    init(_ label: String, _ value: String, words: Bool = false, tone: Color? = nil, note: String? = nil) {
+        self.label = label
+        self.value = value
+        self.words = words
+        self.tone = tone
+        self.note = note
+    }
+
+    var body: some View {
+        if Platform.mac {
+            HStack(alignment: .firstTextBaseline, spacing: HoldoutLook.macGap) {
+                Text(label)
+                    .font(Typeface.Look.text(.fieldLabel))
+                    .foregroundStyle(DWPalette.t2)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: HoldoutLook.macLabel, alignment: .trailing)
+                said(.leading)
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: CGFloat(DWLook.here.fieldRowHeight))
+            .accessibilityElement(children: .combine)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: CGFloat(PhoneLook.kvGap)) {
+                    phoneLabel
+                        .frame(minWidth: CGFloat(PhoneLook.kvLabelWidth), alignment: .leading)
+                    Spacer(minLength: 0)
+                    said(.trailing)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    phoneLabel
+                    said(.leading)
+                }
+            }
+            .holdoutRow()
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private var phoneLabel: some View {
+        Text(label)
+            .font(Typeface.Phone.text(.row))
+            .foregroundStyle(DWPalette.kvLabel)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// The value (and its note), at `edge`.
+    private func said(_ edge: HorizontalAlignment) -> some View {
+        VStack(alignment: edge, spacing: 2) {
+            if words {
+                // PhoneKV's value at the row's 16; MacSettingsFact's at the Mac's 13
+                Text(value)
+                    .font(HoldoutLook.words)
+            } else {
+                Text(value)
+                    .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))
+            }
+            if let note, !note.isEmpty {
+                Text(note)
+                    .font(HoldoutLook.extraSmall)
+                    .foregroundStyle(DWPalette.t3)
+            }
+        }
+        .foregroundStyle(tone ?? (Platform.mac ? DWPalette.text : DWPalette.t2))
+        .multilineTextAlignment(edge == .trailing ? .trailing : .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// (R20) A line of a group's own: words in the small size - the second colour unless said - or (`readout`) data in the
+/// readout face, selectable (a problem's own words, to send on); wrapping, a row of the group's.
+struct HoldoutLine: View {
+    let words: String
+    var tone: Color = DWPalette.t2
+    var readout = false
+
+    init(_ words: String, tone: Color = DWPalette.t2, readout: Bool = false) {
+        self.words = words
+        self.tone = tone
+        self.readout = readout
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if readout {
+                Text(words)
+                    .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))
+                    .textSelection(.enabled)
+            } else {
+                Text(words)
+                    .font(HoldoutLook.small)
+            }
+        }
+        .foregroundStyle(tone)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .holdoutRow()
+    }
+}
+
+/// (R20) A row of buttons in a group: DWButtonStyle's small - flat accent words on the phone, the Mac's faced buttons -
+/// side by side, and on the phone at the accessibility sizes one over another, each the row's width. A button that is
+/// another kind (the red) says so itself.
+struct HoldoutButtons<Content: View>: View {
+    @ViewBuilder let content: Content
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let stacked = !Platform.mac && typeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
+            : AnyLayout(HStackLayout(spacing: Platform.mac ? HoldoutLook.macButtonGap : HoldoutLook.buttonGap))
+        layout {
+            content
+        }
+        .buttonStyle(DWButtonStyle(size: .small, fills: stacked))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .holdoutRow()
+    }
+}
+
+/// (R20) A row with one control beside its name: on the phone the name at the row's 16 in white and the control at the
+/// row's end; on the Mac a Settings row - the name right-aligned at 124 in the second colour, the control beside it. One
+/// element for VoiceOver, the control's action its own.
+struct HoldoutControlRow<Control: View>: View {
+    let label: String
+    @ViewBuilder let control: Control
+
+    var body: some View {
+        if Platform.mac {
+            HStack(spacing: HoldoutLook.macGap) {
+                Text(label)
+                    .font(Typeface.Look.text(.fieldLabel))
+                    .foregroundStyle(DWPalette.t2)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: HoldoutLook.macLabel, alignment: .trailing)
+                control
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: CGFloat(DWLook.here.fieldRowHeight))
+            .accessibilityElement(children: .combine)
+        } else {
+            HStack(spacing: CGFloat(PhoneLook.goGap)) {
+                Text(label)
+                    .font(Typeface.Phone.text(.row))
+                    .foregroundStyle(DWPalette.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                control
+            }
+            .holdoutRow()
+            .accessibilityElement(children: .combine)
+        }
+    }
+}
+
+/// (R20) A switch's row: on the phone the purple switch on Settings' row (settingsSwitch); on the Mac the checkbox, as
+/// the Mac's Settings draws a choice in a group (DWCheckbox). Either is a toggle to VoiceOver, its name and its state.
+struct HoldoutSwitch: View {
+    let words: String
+    @Binding var on: Bool
+
+    var body: some View {
+        if Platform.mac {
+            DWCheckbox(words: words, on: $on)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .holdoutRow()
+        } else {
+            Toggle(isOn: $on) {
+                Text(words)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .settingsSwitch()
+        }
+    }
+}
+
+/// (R20) A button's words: one line, and up to three at the accessibility sizes (DWButtonStyle draws one line).
+struct HoldoutWords: View {
+    let words: String
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    init(_ words: String) {
+        self.words = words
+    }
+
+    var body: some View {
+        Text(words)
+            .lineLimit(typeSize.isAccessibilitySize ? 3 : 1)
+            .multilineTextAlignment(.center)
+    }
+}
+
+/// (R20) A page that can't be drawn yet - opened out of reach: its glyph, its name and why, centred on the page's ground
+/// (in place of the system's ContentUnavailableView and its grey). One element for VoiceOver.
+struct HoldoutUnavailable: View {
+    let title: String
+    let symbol: String
+    let words: String
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: symbol)
+                .font(Typeface.symbol(.title2))
+                .foregroundStyle(DWPalette.t3)
+            Text(title)
+                .font(HoldoutLook.words.weight(.semibold))
+                .foregroundStyle(DWPalette.text)
+            Text(words)
+                .font(HoldoutLook.small)
+                .foregroundStyle(DWPalette.t2)
+        }
+        .multilineTextAlignment(.center)
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.horizontal, CGFloat(PhoneLook.bigSide))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(HoldoutLook.ground)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// (R20) A field you type in, on the look's well on either device: on the phone DWWellField (its focus the page's own);
+/// on the Mac `.in` - the plain field in the field's type on DWWell, 24 tall, the accent's edge while it has the cursor
+/// (DWWellField draws nothing on the Mac: the page's own field, which a List boxed until now).
+struct HoldoutField<Field: Hashable>: ViewModifier {
+    let focus: FocusState<Field?>.Binding
+    let field: Field
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if Platform.mac {
+            content
+                .textFieldStyle(.plain)
+                .font(Typeface.Look.text(.field))
+                .foregroundStyle(DWPalette.fieldText)
+                .focusEffectDisabled()
+                // .in: padding 0 8px
+                .padding(.horizontal, 8)
+                .lookHeight(DWLook.here.fieldHeight)
+                .background {
+                    DWWell(focused: focus.wrappedValue == field)
+                }
+        } else {
+            content
+                .modifier(DWWellField(focus: focus, field: field))
+        }
+    }
+}
+
+extension View {
+    /// (R20) A row of a group's: on the phone 10 above and below its words, 42 tall at least (.kv), on the group's
+    /// hairline (PhoneGroup clips the last one's); on the Mac its content's height with 3 above and below, no line (the
+    /// Mac's groups draw none between their rows).
+    @ViewBuilder func holdoutRow() -> some View {
+        if Platform.mac {
+            padding(.vertical, HoldoutLook.macRowRoom)
+        } else {
+            padding(.vertical, HoldoutLook.rowRoom)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .lookHeight(PhoneLook.kvRow)
+                .overlay(alignment: .bottom) { DWRule(colour: DWPalette.groupRule) }
+        }
     }
 }

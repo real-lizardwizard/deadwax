@@ -54,6 +54,8 @@ struct ArtistMoveSheet: View {
                 }
             }
         }
+        // (R20) the page's ground under the sheet, not the system's raised grey
+        .presentationBackground(HoldoutLook.ground)
         .interactiveDismissDisabled(model?.flow.applying == true)
         .task {
             if model == nil {
@@ -83,6 +85,10 @@ struct ArtistMoveSheet: View {
     }
 }
 
+/// (R20 - notes/ios.md "The panel review, R20: the known holdouts (2026-11-26)") Move albums' page, no List: the holdouts'
+/// pieces (DebugView's) - on the phone flat (R1c), the subtitle, the outcome, the plan's parts and Move each a group on the
+/// page's black; on the Mac the Mac's group boxes on --bg. The plan is still the confirmation: Move is the primary button,
+/// under the preview it applies, on only as canMove says - nothing moves from anywhere else.
 private struct ArtistMoveRoot: View {
     let model: ArtistMoveModel
     let name: String
@@ -91,88 +97,87 @@ private struct ArtistMoveRoot: View {
         let flow = model.flow
         Group {
             if !flow.online && flow.plans == nil && flow.outcome == nil && flow.error == nil {
-                ContentUnavailableView {
-                    Label(ArtistManageWords.refileTitle, systemImage: "wifi.slash")
-                } description: {
-                    Text(EditWords.needsDeadwax)
-                }
+                HoldoutUnavailable(title: ArtistManageWords.refileTitle, symbol: "wifi.slash", words: EditWords.needsDeadwax)
             } else {
-                List {
+                HoldoutPage {
                     // the web's subtitle: whose albums move, and to which name ("Kanye West → Ye") - what a Move was
                     // made for while it runs and once it is over, the page's names emptied by it or not
-                    Section {
+                    HoldoutGroup {
                         let shown = flow.shownFor
-                        Text(ArtistManage.refileSubtitle(moveNames: shown.names, current: shown.current, name: name))
-                            .font(Typeface.subheadline)
-                            .foregroundStyle(Palette.quiet)
-                            .fixedSize(horizontal: false, vertical: true)
+                        HoldoutLine(ArtistManage.refileSubtitle(moveNames: shown.names, current: shown.current, name: name))
                     }
                     if let outcome = flow.outcome {
-                        Section {
-                            Text(outcome.text)
-                                .fixedSize(horizontal: false, vertical: true)
+                        HoldoutGroup {
+                            HoldoutLine(outcome.text, tone: DWPalette.text)
                             ForEach(Array(outcome.failures.enumerated()), id: \.offset) { (_: Int, failure: String) in
-                                Text(failure)
-                                    .foregroundStyle(Palette.amber)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                HoldoutLine(failure, tone: DWPalette.amberText)
                             }
                         }
                     } else {
                         if flow.mayHaveFinished {
-                            Section {
+                            HoldoutGroup {
                                 if let partly = flow.partly {
-                                    Text(partly)
-                                        .fixedSize(horizontal: false, vertical: true)
+                                    HoldoutLine(partly, tone: DWPalette.text)
                                 }
                                 MayHaveFinished(reading: flow.loading)
+                                    .font(HoldoutLook.words)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .holdoutRow()
                             }
                         }
                         if let settled = flow.settled {
                             // what the check after a Move that never answered found
-                            Section {
-                                Text(settled)
-                                    .fixedSize(horizontal: false, vertical: true)
+                            HoldoutGroup {
+                                HoldoutLine(settled, tone: DWPalette.text)
                             }
                         }
                         if let error = flow.error {
-                            Section {
-                                ReadAgainFailed(failure: error, disabled: !flow.online || flow.loading) {
-                                    Task { await model.preview() }
+                            HoldoutGroup {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ReadAgainFailed(failure: error, disabled: !flow.online || flow.loading) {
+                                        Task { await model.preview() }
+                                    }
                                 }
+                                .buttonStyle(DWButtonStyle(size: .small))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .holdoutRow()
                             }
                         } else if flow.loading && flow.plans == nil {
-                            Section {
+                            HoldoutGroup {
                                 HStack(spacing: 10) {
                                     ProgressView()
                                     Text(ArtistManageWords.working)
+                                        .font(HoldoutLook.words)
+                                        .foregroundStyle(DWPalette.text)
                                 }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .holdoutRow()
                                 .accessibilityElement(children: .combine)
                             }
                         } else if let view = flow.view {
                             plan(view)
                         } else if flow.plans != nil {
                             // no name left to move them from
-                            Section {
-                                Text(ArtistManageWords.nothingToMove(flow.ask.current ?? name))
-                                    .fixedSize(horizontal: false, vertical: true)
+                            HoldoutGroup {
+                                HoldoutLine(ArtistManageWords.nothingToMove(flow.ask.current ?? name), tone: DWPalette.text)
                             }
                         }
-                        Section {
-                            Button {
-                                Task { await model.move() }
-                            } label: {
-                                HStack(spacing: 10) {
-                                    if flow.applying || (flow.loading && flow.plans != nil) { ProgressView() }
-                                    Text(flow.applying ? ArtistManageWords.moving
-                                        : ArtistManage.moveButton(flow.view?.moves.count ?? 0))
+                        HoldoutGroup {
+                            HoldoutButtons {
+                                Button {
+                                    Task { await model.move() }
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        if flow.applying || (flow.loading && flow.plans != nil) { ProgressView() }
+                                        HoldoutWords(flow.applying ? ArtistManageWords.moving
+                                            : ArtistManage.moveButton(flow.view?.moves.count ?? 0))
+                                    }
                                 }
+                                .buttonStyle(DWButtonStyle(kind: .pri, size: .small))
+                                .disabled(!flow.canMove)
                             }
-                            .disabled(!flow.canMove)
                             if let words = flow.notStarted {
-                                Text(words)
-                                    .font(Typeface.footnote)
-                                    .foregroundStyle(Palette.amber)
-                                    .fixedSize(horizontal: false, vertical: true)
+                                HoldoutLine(words, tone: DWPalette.amberText)
                             }
                         }
                     }
@@ -185,57 +190,58 @@ private struct ArtistMoveRoot: View {
     /// The previews, drawn as one (refileView).
     @ViewBuilder private func plan(_ view: ArtistManage.RefileView) -> some View {
         let note = ArtistManageWords.refileNote(toFolder: view.toFolder, currentName: view.currentName)
-        Section {
+        HoldoutGroup {
             Text(Self.note(note))
+                .font(HoldoutLook.words)
+                .foregroundStyle(DWPalette.text)
                 .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .holdoutRow()
             ForEach(Array(view.problems.enumerated()), id: \.offset) { (_: Int, problem: String) in
-                Text(problem)
-                    .foregroundStyle(Palette.amber)
-                    .fixedSize(horizontal: false, vertical: true)
+                HoldoutLine(problem, tone: DWPalette.amberText)
             }
             if view.empty && view.problems.isEmpty {
-                Text(view.refused.isEmpty ? ArtistManageWords.nothingToMove(view.currentName)
-                    : ArtistManageWords.nothingCanMove)
-                    .fixedSize(horizontal: false, vertical: true)
+                HoldoutLine(view.refused.isEmpty ? ArtistManageWords.nothingToMove(view.currentName)
+                    : ArtistManageWords.nothingCanMove, tone: DWPalette.text)
             }
         }
         if !view.moves.isEmpty {
-            Section {
+            HoldoutGroup(legend: ArtistManageWords.albumsThatMove) {
                 ForEach(view.moves, id: \.path) { (move: RefileMove) in
                     VStack(alignment: .leading, spacing: 3) {
                         Text(move.path)
-                            .font(Typeface.mono(.footnote))
+                            .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))
+                            .foregroundStyle(DWPalette.text)
                         Text(ArtistManageWords.movesTo(move.targetPath))
-                            .font(Typeface.mono(.footnote))
-                            .foregroundStyle(Palette.quiet)
+                            .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))
+                            .foregroundStyle(DWPalette.t2)
                         Text(ArtistManage.moveLine(move))
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
+                            .font(HoldoutLook.small)
+                            .foregroundStyle(DWPalette.t2)
                     }
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .holdoutRow()
                     .accessibilityElement(children: .combine)
                 }
-            } header: {
-                Text(ArtistManageWords.albumsThatMove)
-                    .font(Typeface.footnote)
             }
         }
         if !view.refused.isEmpty {
-            Section {
+            HoldoutGroup(legend: ArtistManageWords.albumsThatStay) {
                 ForEach(view.refused, id: \.path) { (refused: RefileRefused) in
                     VStack(alignment: .leading, spacing: 3) {
                         Text(refused.path)
-                            .font(Typeface.mono(.footnote))
+                            .font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))
+                            .foregroundStyle(DWPalette.text)
                         Text(ArtistManageWords.stays(refused.reason))
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.amber)
+                            .font(HoldoutLook.small)
+                            .foregroundStyle(DWPalette.amberText)
                     }
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .holdoutRow()
                     .accessibilityElement(children: .combine)
                 }
-            } header: {
-                Text(ArtistManageWords.albumsThatStay)
-                    .font(Typeface.footnote)
             }
         }
     }
@@ -253,6 +259,9 @@ private struct ArtistMoveRoot: View {
 /// name - and every artist going by it, each with what tells them apart (matchLine). A pick gives the page that id for
 /// this visit (ArtistsModel.choose: their albums, and the folder's pictures asked by it), and closes. It writes
 /// nothing; it needs deadwax to search.
+///
+/// (R20) Drawn as Artist images' search is, from the holdouts' pieces: flat on the phone, its field in the well; the
+/// Mac's group boxes on the Mac.
 struct ArtistWhoSheet: View {
     let name: String
     let onChosen: (MBArtistMatch) -> Void
@@ -261,6 +270,9 @@ struct ArtistWhoSheet: View {
     @Environment(Reachability.self) private var reachability
     @Environment(\.dismiss) private var dismiss
     @State private var model: ArtistWhoModel?
+
+    private enum Typing: Hashable { case search }
+    @FocusState private var typing: Typing?
 
     var body: some View {
         NavigationStack {
@@ -282,6 +294,8 @@ struct ArtistWhoSheet: View {
                 }
             }
         }
+        // (R20) the page's ground under the sheet, not the system's raised grey
+        .presentationBackground(HoldoutLook.ground)
         .task {
             if model == nil {
                 model = ArtistWhoModel(name: name, client: server.client, admin: server.access.seesDetail,
@@ -298,58 +312,53 @@ struct ArtistWhoSheet: View {
         @Bindable var model = model
         let flow = model.flow
         if !flow.online && flow.matches == nil && flow.note == nil {
-            ContentUnavailableView {
-                Label(ArtistManageWords.whoTitle, systemImage: "wifi.slash")
-            } description: {
-                Text(EditWords.needsDeadwax)
-            }
+            HoldoutUnavailable(title: ArtistManageWords.whoTitle, symbol: "wifi.slash", words: EditWords.needsDeadwax)
         } else {
-            List {
-                Section {
-                    Text(ArtistManageWords.whoNote(name))
-                        .font(Typeface.footnote)
-                        .fixedSize(horizontal: false, vertical: true)
+            HoldoutPage {
+                HoldoutGroup {
+                    HoldoutLine(ArtistManageWords.whoNote(name))
                 }
-                Section {
+                HoldoutGroup(legend: ArtistManageWords.searchLabel) {
                     HStack(spacing: 10) {
                         TextField(ArtistManageWords.searchLabel, text: $model.query)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .submitLabel(.search)
+                            .focused($typing, equals: .search)
+                            .modifier(HoldoutField(focus: $typing, field: .search))
                             .onSubmit { Task { await model.search() } }
-                        Button(ArtistManageWords.search) {
+                        Button {
                             Task { await model.search() }
+                        } label: {
+                            HoldoutWords(ArtistManageWords.search)
                         }
+                        .buttonStyle(DWButtonStyle(size: .small))
                         .disabled(ArtistManage.searchWords(model.query).isEmpty || !flow.online)
                     }
+                    .holdoutRow()
                     if flow.searching {
                         HStack(spacing: 10) {
                             ProgressView()
                             Text(ArtistManageWords.searching)
+                                .font(HoldoutLook.words)
+                                .foregroundStyle(DWPalette.text)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .holdoutRow()
                         .accessibilityElement(children: .combine)
                     }
                     if let note = flow.note {
-                        Text(note)
-                            .font(Typeface.footnote)
-                            .foregroundStyle(Palette.quiet)
-                            .fixedSize(horizontal: false, vertical: true)
+                        HoldoutLine(note)
                     }
-                } header: {
-                    Text(ArtistManageWords.searchLabel)
-                        .font(Typeface.footnote)
                 }
                 if let matches = flow.matches, !matches.isEmpty {
-                    Section {
+                    HoldoutGroup(legend: ArtistManageWords.artistsGoingBy) {
                         ForEach(matches, id: \.mbid) { (match: MBArtistMatch) in
                             ArtistMatchRow(match: match) {
                                 onChosen(match)
                                 dismiss()
                             }
                         }
-                    } header: {
-                        Text(ArtistManageWords.artistsGoingBy)
-                            .font(Typeface.footnote)
                     }
                 }
             }

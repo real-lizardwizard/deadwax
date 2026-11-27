@@ -20354,6 +20354,103 @@ judges those.
 as it was) fails with t3 put back; test_ios_palette, phone_look, mac_look, search_look and test_type pass. **Not
 verified**: how it reads - check 616.
 
+## The panel review, R20: the known holdouts (2026-11-26)
+
+James asked for "a full review of the design on every pannel", and decided that the pages with no drawing are drawn from
+the canvas's pieces: flat on the phone (R1c), and the Mac's boxes and groups on the Mac. R20 took the pages docs/ios.md
+listed as "Not flat yet": Settings > Debug (a Form); an artist's Artist images and Move albums sheets, with Which artist
+is this? (ArtistWhoSheet, in Move albums' file and drawn the same way, so all three of the artist page's ••• sheets
+match); and the four pages Edit album's Release pushes - Choose a release, Changes, Compare covers and the full cover.
+Only the EQ's two (Correction's search and a filter's editor) are left on that list, for R17. Checks 645-648.
+
+**The holdouts' pieces** (DebugView.swift's foot, internal, so the artist sheets draw with them too). Each draws its own
+device's, through Look pieces and `Platform.mac` (test_ios_mac_reach's zones: a shared file names no App/Mac type and
+no `Typeface.Mac`):
+- `HoldoutPage`: on the phone SettingsPage (16 either side, R9's) on DWPalette.page; on the Mac a scroll of groups 24
+  apart, padded 28/22/22/22, on DWPalette.bg.
+- `HoldoutGroup(legend:note:)`: on the phone PhoneGroup and SettingsNote; on the Mac `.group.onbg` as MacGroupBox draws
+  it (its legend 11.5 semibold in `label`, set 10 in and 8 up into the top edge on --bg, 6 either side, 16 tall; 14 12
+  12 12 inside; the box's 5 corners in the line's edge) - redrawn here because a shared file can't name MacGroupBox.
+- `HoldoutFact(label, value, words:tone:note:)`: on the phone PhoneKV's look (the label white at the row's 16, 116 at
+  least, the value at the right in t2, on its first baseline, stacked under the label where the two don't fit), 42 tall
+  at least on the group's hairline; on the Mac MacSettingsFact's (the label right-aligned at 124 in t2, the value
+  beside it in white, 28 tall at least). The value is Courier Prime (`.mono.s`: Look.mono(.smallButton) on the Mac,
+  Phone.mono(.small)) unless `words`, then the row's words face (16, the Mac's 13). One VoiceOver element.
+- `HoldoutLine` (a line of the group's: the small words, or a problem's own words in the readout face, selectable),
+  `HoldoutButtons` (DWButtonStyle's small, stacked and filling the width on the phone at the accessibility sizes),
+  `HoldoutWords` (a button's words, three lines at the accessibility sizes), `HoldoutControlRow` (the record engine's
+  Start/Stop beside its name), `HoldoutSwitch` (settingsSwitch on the phone, DWCheckbox on the Mac),
+  `HoldoutUnavailable` (in place of ContentUnavailableView) and `HoldoutField` (DWWellField on the phone; on the Mac
+  the plain field on DWWell, 24 tall - DWWellField draws nothing there, and these fields had only the List's box).
+  `holdoutRow()`: 10 above and below, 42 at least and the hairline on the phone; 3 above and below on the Mac, where
+  lookHeight is exact and the groups draw no line between rows.
+
+**Debug** keeps every line it showed, in the same order, its `.task` check and its `.onDisappear` (Muffle off, the
+record engine stopped). Its measurements are all still in Courier Prime - the 26 readout faces it had: the 18
+`Typeface.readout(.footnote)` and three of the six `Typeface.mono(.footnote)` (Reach, Path, Last probe) are HoldoutFact
+readouts or lines of their own (the clock of what plays, the background runs); the turntable's rows are a readout or
+words as each row says (`words: !row.mono`); the two problems are HoldoutLine's readout, selectable; and the two logs'
+`Typeface.mono(.caption2)` lines are Courier Prime at .xs. What was in the words face stays words (Up Next's held edit, Last failure, the EQ's rows, the
+recording's row, Following, Held back, Power). Colours: Palette.quiet to t2, accent to acc, amber to amberText, danger
+and `.red` to redChipText. Remove the downloads is the red; the transport's three glyphs DWButtonStyle's (flat on the
+phone, faced on the Mac); Copy and Share, Record 20 s and Download all flat words. The Mac still pushes it as
+`MacSettings.page(.debug)`, now in its group boxes.
+
+**The artist sheets**: each a HoldoutPage on the page's ground (`.presentationBackground(HoldoutLook.ground)`, not the
+sheet's raised grey); the system's bar, Close/Cancel/Done, their escapes and the discard dialog as they were. The
+search fields on the look's well (HoldoutField, a `@FocusState` of their own; Not them? puts the cursor there as
+before). Save and Move are the primary button; Use another picture is a `.go` row with the chevron on the phone and a
+small button on the Mac; the grid's chosen picture is outlined in acc on its own square edge (Corners.artShape is 0 on
+both). Each slot's name, with its line (ArtistManage.slotLine) after a middle dot, is its group's legend - the line the
+List's section header carried at its right.
+
+**Move albums is a writer, and its confirmation is its preview**: there was never a dialog - the plan (where every
+album goes, the problems, the albums that stay) is drawn first, and Move N albums sits under it, on only as Core's
+`ArtistRefileFlow.canMove` says. That is unchanged: one call to `model.move()`, from that button alone. Artist images'
+Save the same, on only as `canSave` says.
+
+**Release's pushed pages** (the phone's alone, but for the full cover): Choose a release is a ScrollView of
+RetagPressingRow - untouched, as R10 drew it - on row hairlines, the chosen one marked by the accent's tick and said
+selected (the old grey `toggledFill` row gone). The tap is still only `retag.pick` and the pop: nothing applies there.
+iOS's search field (`.searchable`) stays: a field is where you type and keeps its box, so the typing test still counts
+ReleasePage as [WELL, SYSTEM]. Changes: each file's name in Courier Prime as its heading, its changes on hairlines
+(the old value struck through in t2, the new in white). Compare covers: the two sides on black, a missing cover or one
+still coming drawn as its square's hairline (no coverEmpty fill), Replace cover only the purple at the page's width,
+its disabled condition word for word. The full cover: DWPalette.page in place of `Color.black` (the same #000), Close
+the look's button (flat on the phone, faced on the Mac, where Artwork and Tags open it), `escapeCloses` kept.
+ReleaseCards, ReleaseYearFace, ReleaseFoot and RetagPressingRow are pinned by digest (test_ios_holdouts_look).
+
+**Left as it was**: RetagPressingRow's Current badge (Palette.badgeFill) and its old type - R10's, pinned unchanged;
+MayHaveFinished and ReadAgainFailed (EditAlbumSheet's, still in Palette.amber), used inside the new groups; the sheets'
+navigation bars; `.searchable` in Choose a release.
+
+Tests: test_ios_holdouts_look.py (new); test_ios_palette (Debug's readouts counted afresh, the Top line, the full
+cover's ground), test_ios_phone_look (R20_PAGES; both artist files' fields now [WELL]), test_ios_edit_look (FLAT for the
+Release file).
+
+**Verified** on James's Mac, from 8696ce8a:
+- the unsigned iPhone (Debug) and Mac Catalyst (Release) builds succeed, with no warning in the four files;
+- swift test: 2707 swift-testing tests pass (12 + 2537 + 158);
+- check_project passes, and so does iosframe.sim.cjs --check (367 cases);
+- pytest over test_ios_*.py and test_source_bytes: 1064 passed, 1 skipped;
+- pyflakes is clean over the four test files.
+
+Each of these mutations was applied, failed a test, and was put back:
+- Move without `.disabled(!flow.canMove)`;
+- `retag.apply()` in Choose a release's tap;
+- HoldoutFact's readout in HoldoutLook.small;
+- HoldoutPage's SettingsPage made a Form;
+- a group row given `.background(DWPalette.card)`;
+- Artist images' field without HoldoutField. This one also failed the typing test.
+
+**Not verified** - checks 645-648, on the phones and the Mac:
+- how the pages look and read, and whether the Mac's groups feel cramped at Debug's length;
+- facts stacking under their labels at the accessibility sizes;
+- Choose a release's tick beside R10's row;
+- VoiceOver on each.
+
+No Mac smoke run: James's app was running.
+
 ## The redesign, slice R7: Search, Get and Sources (2026-11-25)
 
 The plan is ~/Desktop/Code/deadwax-plans/mac-redesign-build.md 3.4, "R7 - Search, Get and Sources", and the drawings

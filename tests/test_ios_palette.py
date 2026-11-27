@@ -629,7 +629,8 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert "if debug.libraryTop != reading { debug.libraryTop = reading }" in take
     assert "var libraryTop: TopClearance.Reading?" in (APP / "Models" / "DebugModel.swift").read_text(encoding="utf-8")
     debug_view = (APP / "You" / "DebugView.swift").read_text(encoding="utf-8")
-    assert 'LabeledContent("Top") {\n                Text(model.libraryTop?.line ?? "Not measured yet")' in debug_view
+    # (R20) a readout fact of Debug's own, on its label's baseline (HoldoutFact)
+    assert 'HoldoutFact("Top", model.libraryTop?.line ?? "Not measured yet")' in debug_view
     assert "KeyWindow.safeArea.bottom" in (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
     sources = {path.relative_to(APP).as_posix(): path.read_text(encoding="utf-8") for path in APP.rglob("*.swift")}
     assert [name for name, text in sources.items() if ".toolbar(.hidden, for: .navigationBar)" in text] == [
@@ -645,7 +646,7 @@ def test_the_librarys_top_sits_under_the_status_bar():
     # The cover full screen's two (notes/ios.md "The cover, full screen"): its black ground, a fill, and the zoomed
     # picture, edge to edge as Photos' is, with the status bar hidden - its ✕ keeps to the safe area.
     # Edit album's cover full screen, from Compare covers (Phase 8, slice 1): its black ground alone, a fill - the
-    # picture and its Close keep to the safe area.
+    # picture and its Close keep to the safe area. (R20) The page's black, DWPalette.page, not SwiftUI's Color.black.
     # (The Mac redesign, R1) The Mac's desktop frame, laid under the window's title bar for its title strip - the Mac's
     # alone (the iPhone draws MainTabs, never the frame), and its content below the strip.
     # (The redesign, slice R1c's review) The manual search's black, a fill behind its scroll view - under its bar too,
@@ -660,7 +661,7 @@ def test_the_librarys_top_sits_under_the_status_bar():
         ".background(DWPalette.page.ignoresSafeArea())"]
     full = sources["Edit/ReleasePage.swift"]
     full = full[full.index("struct FullCoverView"):]
-    assert "ZStack {\n            Color.black.ignoresSafeArea()\n" in full and full.count("ignoresSafeArea") == 1
+    assert "ZStack {\n            DWPalette.page.ignoresSafeArea()\n" in full and full.count("ignoresSafeArea") == 1
     viewer = sources["Player/CoverViewer.swift"]
     assert "Palette.page\n                .opacity(ground)\n                .ignoresSafeArea()\n" in viewer
     assert "onDrag: held, onClose: close)\n                .ignoresSafeArea()\n" in viewer
@@ -1043,8 +1044,9 @@ TICKING = [
     ("EQ/EQScreen.swift", "Text(EQWords.Advanced.detail(f))\n                        .font(Typeface.readout(.footnote))", None),
     ("EQ/EQScreen.swift", "Text(EQWords.Advanced.detail(f))\n                        .font(Typeface.Phone.mono(.extraSmall))",
      None),
-    # Debug's measurements (not drawn): every one, below
-    ("You/DebugView.swift", "Text(row.value).font(Typeface.readout(.footnote))", "Debug's measurements"),
+    # Debug's measurements (not drawn): every one, below - (R20) each a HoldoutFact's value, or a line of its own
+    ("You/DebugView.swift", "Text(value)\n                    .font(Platform.mac ? Typeface.Look.mono(.smallButton) "
+                            ": Typeface.Phone.mono(.small))", "Debug's measurements"),
 ]
 #? (a readout face, or what chooses one: a status bar fact named a readout, a fact's row set in mono)
 READOUT_FONT = re.compile(r"Typeface\.readout\(|Typeface\.(Mac|Phone|Look)\.mono\(|readouts: |mono: true")
@@ -1076,8 +1078,18 @@ def test_every_number_that_ticks_is_in_the_readout_face():
     assert "var mono = false" in kv
     assert "if mono {\n                Text(value)\n                    .font(Typeface.Phone.mono(.small))" in kv
     # Debug's measurements, every one (`.monospacedDigit()` held them still in Noto Sans)
+    # - (R20) the 18 that were Typeface.readout(.footnote) and the three Typeface.mono(.footnote) facts: 19 facts in
+    # HoldoutFact's readout (none `words:`), the turntable's as each row says, the clock of what plays and the background
+    # runs each a line of its own in Courier Prime
     debug = (APP / "You" / "DebugView.swift").read_text(encoding="utf-8")
-    assert debug.count(".font(Typeface.readout(.footnote))") == 18
+    assert "Typeface.readout(" not in debug and "Typeface.mono(" not in debug
+    swift = _swift()
+    code = swift.code_only(debug)
+    calls = [code[match.end() - 1:swift.closer(code, match.end() - 1) + 1]
+             for match in re.finditer(r"(?<!struct )\bHoldoutFact\(", code)]
+    assert len([call for call in calls if "words:" not in call]) == 19, calls
+    assert [call for call in calls if "words: !" in call] == ["(row.label, row.value, words: !row.mono, note: row.note)"]
+    assert debug.count(".font(Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small))") == 4
     # and nothing in the app asks `.monospacedDigit()` of a face where it does nothing: Libre Franklin has no tabular
     # figures, Courier Prime's are all one width, and every Text takes one or the other (DeadwaxApp's root font)
     assert not [f"{name}:{number}" for name, number, code in app_code() if ".monospacedDigit()" in code]

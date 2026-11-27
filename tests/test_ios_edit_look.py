@@ -311,10 +311,15 @@ FLAT = {
     # the Fields card's rows' line (one row of Release's own for every field since R10's review) - (R11) the page's
     # black went with ReleasePage, the root's own; then the pages pushed from the cards, still iOS's (docs/ios.md's
     # "Not flat yet") - (R10's review: the wider matcher sees them) Choose a release's Current badge and its chosen
-    # row's fill, the full cover's empty square and Compare covers', and the full cover on black, a photo's ground
+    # row's fill, the full cover's empty square and Compare covers', and the full cover on black, a photo's ground -
+    # (R20) flat now: R10's Current badge as it was (RetagPressingRow stays R10's); Choose a release, Changes and
+    # Compare covers each on the page's black, a cover that isn't there (and one still coming) its square's hairline,
+    # the two lists' rows on a row's hairline, the chosen pressing marked by the accent's tick, no fill; the full cover
+    # on the page's black, a photo's ground
     RELEASE: ["DWRule: DWPalette.groupRule", "background: Palette.badgeFill",
-              "listRowBackground: Palette.toggledFill", "fill: Palette.coverEmpty", "fill: Palette.coverEmpty",
-              "ZStack: Color.black"],
+              "background: DWPalette.page", "background: DWPalette.page", "strokeBorder: DWPalette.line",
+              "background: DWPalette.page", "strokeBorder: DWPalette.line", "DWRule: DWPalette.rowRule",
+              "ZStack: DWPalette.page"],
 }
 
 

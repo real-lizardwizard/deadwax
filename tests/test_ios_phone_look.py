@@ -1392,7 +1392,9 @@ def test_the_phone_is_flat():
 #? on FieldLook (SignInView's), as the sign-in's two were.
 WELL, OWN, SYSTEM = "the look's well", "the app's own box", "iOS's own box"
 TEXT_INPUTS = {
-    "Artist/ArtistImagesSheet.swift": [SYSTEM], "Artist/ArtistMoveSheet.swift": [SYSTEM],
+    # (R20) Artist images' search and Which artist is this?'s (ArtistMoveSheet's file) on the look's wells: HoldoutField
+    # (DebugView's), DWWellField's on the phone - no List round them now
+    "Artist/ArtistImagesSheet.swift": [WELL], "Artist/ArtistMoveSheet.swift": [WELL],
     "EQ/EQCorrectionScreen.swift": [SYSTEM], "EQ/EQFilterEditor.swift": [SYSTEM], "EQ/EQNameAlert.swift": [SYSTEM],
     "Edit/ChooseFolderView.swift": [SYSTEM],
     # (R10) Release's fields on the look's wells (Artist, Album, Year, Original, Edition: one helper), Choose a release's
@@ -1733,8 +1735,12 @@ A2_PAGES = {"Artist/AlbumOrderMenu.swift", "Artist/SimilarArtistsSection.swift",
 #? (Last.fm, slice A4) About at the foot of the artist and album pages: the phone's section (the small words, the
 #? link's 44-point target) flat, and the words both devices draw in their own faces (tests/test_ios_lastfm_a4.py)
 A4_PAGES = {"Shared/AboutSection.swift"}
+#? R20: the known holdouts - Debug, an artist's Artist images, Move albums and Which artist is this? - flat on the phone
+#? from the holdouts' pieces (DebugView's HoldoutPage, HoldoutGroup...), the Mac's groups on the Mac; Release's pushed
+#? pages are R10's file's (tests/test_ios_holdouts_look.py holds what each draws)
+R20_PAGES = {"You/DebugView.swift", "Artist/ArtistImagesSheet.swift", "Artist/ArtistMoveSheet.swift"}
 SLICES = (R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES
-          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES | A4_PAGES)
+          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES | A4_PAGES | R20_PAGES)
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

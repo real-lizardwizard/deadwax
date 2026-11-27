@@ -7440,11 +7440,10 @@ and glyphs on the page, thin lines between things. Only the purple button (and t
 track, a picture and anywhere you type keep a face. Nothing works any differently, and the Mac doesn't change. Have a
 download or two on Requests and something queued.
 
-**Not flat yet**, each until the slice that redraws it: Settings' Debug page; and the EQ's own pages -
-Correction's search and a filter's editor - an artist's Artist images and Move albums sheets, and the pages Edit
-album's Release opens (Choose a release, Changes, Compare covers), which no slice has taken yet. Those keep iOS's
-grouped lists and their grey rows for now: don't count
-them in 612.
+**Not flat yet**, until the slice that redraws them: the EQ's own pages - Correction's search and a filter's editor.
+Those keep iOS's grouped lists and their grey rows for now: don't count them in 612. (Settings' Debug page, an
+artist's Artist images, Move albums and Which artist is this? sheets, and the pages Edit album's Release opens are
+flat since 645-648.)
 
 - **612 The flat look.** **Not done yet.** Go through the Library (Albums, Artists, Songs, Playlists and Downloaded),
   Requests, an album, a playlist, an artist's page, Now Playing's sheet, Search Soulseek…'s sheet, Search, an album
@@ -7502,6 +7501,44 @@ the purple is as it was.
   greys above the dimmer ones as before. Say where a grey still reads faint, and whether any now looks too close to
   white. The purple and white words, the hairlines and the buttons are as they were. On the Mac, the same greys lift
   (the sidebar's small headings and search prompt, a list's column headings, the status bar).
+
+### The panel review's fixes (617-648)
+
+You asked for every panel's design to be reviewed. Some pages were still iOS's grey grouped lists, because no drawing
+showed them: Settings' Debug, an artist's picture and move sheets, and the pages Edit album's Release opens. They are
+now drawn from the canvas's own pieces: flat on the black on the phone, and in the Mac's boxes and groups on the Mac.
+
+#### The known holdouts (645-648)
+
+**Not done yet.** The last pages that kept iOS's grey grouped lists are flat now: Settings' Debug, an artist's
+**Artist images**, **Move albums to …** and **Which artist is this?**, and the pages Edit album's Release opens.
+Nothing on them works any differently. Only the EQ's Correction search and a filter's editor are left for their own
+slice.
+
+- **645 Debug.** **Not done yet.** You > Settings > Debug is black, with grey headings over rows on thin lines and no
+  grey boxes. Every line it had is still there, in the same order: deadwax's **Check** and its report, Test sounds
+  (with the record's engine beside the song), Hi-res, Playing and its three buttons, Turntable, EQ and **Muffle what
+  plays**, the Engine log with **Copy** and **Share**, Downloads, Your library, Library, and how long this install
+  runs. Every measurement (times, counts, sizes, the clock of what plays, the log's lines) is in the typewriter face,
+  on its label's line; the words stay in the app's face. Check, the test songs, **Record 20 s**, Copy, Share and both
+  switches work as before, and Muffle still goes off when you leave the page. On the Mac (Settings > Debug), each
+  section is a box with its name set into its top edge, each label right-aligned at the left: say if anything reads
+  cramped.
+- **646 An artist's sheets.** **Not done yet.** From an artist's •••: **Artist images**, **Move albums to …** and
+  **Which artist is this?** are each black with no grey rows. Each search field is a dark sunken box, its edge purple
+  while you type. In Artist images, **Use another picture** opens the grid, the chosen picture has a square purple
+  outline, **Replace pictures that are already there** is a switch, and **Save** is the purple button. In Move albums,
+  where every album goes is still shown first, **Move N albums** is the purple button under it, and nothing moves until
+  you tap it. On the Mac the same, in boxes.
+- **647 Release's pages.** **Not done yet.** Edit album > Release, then each page it opens. **Choose a release** is a
+  black list on thin lines, with the search field at the top as before; the chosen pressing has a purple tick, and a
+  tap only chooses (the fields fill, and nothing is written until **Apply**). Each pressing's row looks exactly as it
+  did. **Changes** shows each file's name in the typewriter face over its changes. **Compare covers** shows the two
+  covers on black: a missing one is a thin square with words in it, and **Replace cover only** is purple and as wide
+  as the page. Tap a cover: it opens full screen on black with **Close** in purple words (on the Mac, from Artwork or
+  Tags, a button).
+- **648 Both phones.** **Not done yet.** On Green Anole, 645-647. On Ethan's phone, 645-647, or "not done yet". On
+  the Mac, 645, 646 and the full-screen cover.
 
 ## What it can't do yet
 
