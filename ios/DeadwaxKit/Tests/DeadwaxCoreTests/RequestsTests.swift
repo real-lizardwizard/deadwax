@@ -14,7 +14,8 @@ import Testing
         let filing: Double? = RequestsPolling.delay(open: false, hasActive: true, filing: true, online: true, watching: .other)
         let away: Double? = RequestsPolling.delay(open: false, hasActive: true, filing: false, online: true, watching: .other)
         let idle: Double? = RequestsPolling.delay(open: false, hasActive: false, filing: false, online: true, watching: .other)
-        #expect(open == 0.5)
+        // (Speed A, fix 6) the root with nothing moving once a second, the web's pace while something is
+        #expect(open == 1)
         #expect(openActive == 0.5)
         #expect(filing == 1)
         #expect(away == 5)

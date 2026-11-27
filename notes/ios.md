@@ -24036,3 +24036,29 @@ artist) still holds.
 **Not verified (a device or the server log):** one `/library/owned` for a run of artist pages opened in a row (check
 653); whether the prefetch's four asks still slow the page's Last.fm and About answers on the JSON session - nothing
 here measured it.
+
+### 6. Requests' polling
+
+**Confirmed:** while Requests' root showed, the one poll (RequestsModel.poll) asked `/download/jobs` every 0.5 s
+(`RequestsPolling.openSeconds`, the web's POLL_OPEN_MS) whether anything was on its way or not, and every answer set
+`board` - and `trackingEnabled`, `failure` and `answered` - though nothing had changed: each is an observed property, so
+each look redrew the screen (both frames) and the tab's badge. The board is Equatable, and its only time-made words are
+a Done row's age, which moves once a minute.
+
+**Now:** the board is set only when the look made a different one (`if board != next`), and `trackingEnabled`,
+`failure` and `answered` only when they change; what a screen reader hears is worked out as before. Core's
+`RequestsPolling.delay` keeps the root at the web's 0.5 s only while something is moving - a job active or being filed
+(or a Get whose answer never came, `looksForAJob`) - and otherwise looks once a second (`idleOpenSeconds`, the app's own;
+`openSeconds` stays the web's, as RequestsVectorTests checks); the first look that sees something moving goes back to
+0.5 s, and the app's own Get, Cancel, Retry and Clear look at once as before (`kick`). Away from the root nothing
+changed: 1 s while filing, 5 s while something is on its way, none otherwise, none offline or in the background.
+
+**What drops what's kept:** nothing is kept; a look that changes the board draws it, as before.
+
+**Tests:** SpeedATests `requestsRootIsLookedAtOnceASecondWhileNothingMoves` and RequestsTests'
+`thePollIsFastOnRequestsSlowForSomethingOnItsWayAndNoneOtherwise` (its open-and-idle case now 1 s), both seen failing
+with the root's half second put back for everything; test_ios_speed_a.py
+`test_a_look_that_changes_nothing_redraws_nothing`, seen failing with the board set on every look again.
+
+**Not verified (a device or the server log):** half as many `/download/jobs` a minute with Requests open and nothing
+moving, and the screen not redrawing between them (check 654); a download someone else starts shows within a second.

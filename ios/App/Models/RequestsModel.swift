@@ -265,7 +265,7 @@ final class RequestsModel {
                 guard !Task.isCancelled, epoch == self.epoch, look == looks, !APIFailure.isCancellation(error) else { return }
                 // keep asking rather than dying on one bad answer
                 failure = error
-                answered = true
+                if !answered { answered = true }
                 redraw()
             }
             // a turn of `open` asked again at once (this loop let go)
@@ -301,9 +301,10 @@ final class RequestsModel {
             self.filed += 1
         }
         overlays = overlays.claimed(jobs).reconcile(jobs)
-        trackingEnabled = answer.trackingEnabled
-        failure = nil
-        answered = true
+        // (Speed A, fix 6) set only when they change: an observed property set to what it holds still redraws
+        if trackingEnabled != answer.trackingEnabled { trackingEnabled = answer.trackingEnabled }
+        if failure != nil { failure = nil }
+        if !answered { answered = true }
         redraw()
     }
 
@@ -327,7 +328,8 @@ final class RequestsModel {
             doneSince[row.key] = answered && baseline ? now : 0
         }
         if answered { baseline = true }
-        board = next
+        // (Speed A, fix 6) the same board as the last look's - nothing moving - draws nothing again
+        if board != next { board = next }
         runLooks()
     }
 

@@ -301,3 +301,24 @@ def test_an_artist_page_asks_which_albums_are_yours_only_when_it_has_to():
     assert flat(func(page, "askAlbums")) == (
         "let order = ArtistPage.playOrder(ArtistPage.rows(answer?.album ?? [])) send(asks.want(order), client: client)")
     assert "if answer != nil { askAlbums(client) }" in page
+
+
+# ---------------------------------------------------------------------------- fix 6: Requests' polling
+
+
+def test_a_look_that_changes_nothing_redraws_nothing():
+    model = code(APP / "Models" / "RequestsModel.swift")
+    redraw = flat(func(model, "redraw"))
+    # the board drawn again only when the look made a different one
+    assert "if board != next { board = next } runLooks()" in redraw and "} board = next" not in redraw
+    land = flat(func(model, "land"))
+    assert ("if trackingEnabled != answer.trackingEnabled { trackingEnabled = answer.trackingEnabled }"
+            " if failure != nil { failure = nil } if !answered { answered = true } redraw()") in land
+    poll = flat(func(model, "poll"))
+    assert "failure = error if !answered { answered = true } redraw()" in poll
+    # the pace is Core's: the root once a second with nothing moving, the half second while something is
+    assert ("let delay = RequestsPolling.delay(open: open, hasActive: hasActive, filing: filing,"
+            " online: reachability.online, watching: watching)") in poll
+    rules = code(CORE / "RequestsWatch.swift")
+    assert "if open { return hasActive || filing ? openSeconds : idleOpenSeconds }" in rules
+    assert "public static let idleOpenSeconds: Double = 1" in rules and "public static let openSeconds: Double = 0.5" in rules

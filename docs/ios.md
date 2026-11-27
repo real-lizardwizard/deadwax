@@ -7669,6 +7669,11 @@ differently.
 - **653 Artist pages in a row.** **Not done yet.** Open an artist, go back, open another, and another: each page's
   albums you have are marked as quickly as the first (the server's log shows one `/library/owned` for the run, not one
   per page). Pull down on an artist page: it asks again. Play and Shuffle light up as soon as they did before.
+- **654 Requests, nothing moving.** **Not done yet.** Open Requests with nothing downloading: the server's log shows
+  `/download/jobs` about once a second, not twice, and the list sits still. Start a download: from the next look the
+  progress moves as smoothly as it did before.
+- **655 The Mac, and someone else.** **Not done yet.** Do 649 to 654 on the Mac app too. Then sign in as someone else
+  (or on the other phone): their albums, artists and Edit album show only theirs, never the first person's.
 
 ## What it can't do yet
 

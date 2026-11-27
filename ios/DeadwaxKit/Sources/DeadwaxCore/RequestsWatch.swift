@@ -50,10 +50,15 @@ public enum RequestsWatch {
 
 /// The one poll's pace (useDownloadJobs.ts), with the phone's own rules (phase6-get-requests.md 2.5, question 3): fast
 /// while Requests' root shows, faster than the background while an album is being filed, slow while anything is on its
-/// way - and never while deadwax can't be reached, nor while the app is in the background.
+/// way - and never while deadwax can't be reached, nor while the app is in the background. (Speed A, fix 6 - notes/ios.md
+/// "Speed A: what's asked again") Requests' root at the web's pace only while something is moving - a download on its
+/// way or being filed; with nothing moving, once a second (`idleOpenSeconds`), back to the web's pace at the first look
+/// that sees something.
 public enum RequestsPolling {
     /// POLL_OPEN_MS, POLL_FILING_MS, POLL_BACKGROUND_MS - in seconds.
     public static let openSeconds: Double = 0.5
+    /// (Speed A) The root's pace with nothing moving - the app's own.
+    public static let idleOpenSeconds: Double = 1
     public static let filingSeconds: Double = 1
     public static let backgroundSeconds: Double = 5
 
@@ -62,7 +67,8 @@ public enum RequestsPolling {
     public static func delay(open: Bool, hasActive: Bool, filing: Bool, online: Bool, watching: Watching) -> Double? {
         guard online, watching != .hidden else { return nil }
         if !hasActive && !open { return nil }
-        return open ? openSeconds : filing ? filingSeconds : backgroundSeconds
+        if open { return hasActive || filing ? openSeconds : idleOpenSeconds }
+        return filing ? filingSeconds : backgroundSeconds
     }
 
     /// Whether a look may go out at all now.

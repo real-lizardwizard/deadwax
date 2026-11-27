@@ -204,4 +204,23 @@ import Testing
         #expect(OwnedCheck.asks(inHand: true, writes: 0, askedUnder: nil))
         #expect(OwnedCheck.asks(inHand: true, writes: 3, askedUnder: 2))
     }
+
+    // MARK: fix 6 - Requests' polling
+
+    @Test func requestsRootIsLookedAtOnceASecondWhileNothingMoves() {
+        func delay(open: Bool, active: Bool, filing: Bool) -> Double? {
+            RequestsPolling.delay(open: open, hasActive: active, filing: filing, online: true, watching: .requests)
+        }
+        #expect(RequestsPolling.idleOpenSeconds == 1 && RequestsPolling.openSeconds == 0.5)
+        // the root showing, nothing on its way: once a second
+        #expect(delay(open: true, active: false, filing: false) == 1)
+        // something on its way, or being filed: the web's half second, from the first look that sees it
+        #expect(delay(open: true, active: true, filing: false) == 0.5)
+        #expect(delay(open: true, active: true, filing: true) == 0.5)
+        #expect(delay(open: true, active: false, filing: true) == 0.5)
+        // away from the root, as before
+        #expect(delay(open: false, active: true, filing: true) == 1)
+        #expect(delay(open: false, active: true, filing: false) == 5)
+        #expect(delay(open: false, active: false, filing: false) == nil)
+    }
 }
