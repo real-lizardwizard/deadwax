@@ -180,7 +180,10 @@ def test_the_same_start_twice_is_one_row_and_counted_is_never_taken_back(player)
 
 def test_a_bad_start_is_skipped_and_the_rest_taken(player):
     ethan = signed_in(player, "ethan")
-    answer = ethan.post(HISTORY, json={"starts": [start(NOW + 3_600_000, "future"), start(NOW, "fine"),
+    #? a day past the clock as this test runs, not an hour past the module's NOW: a full run of the suite can take
+    #? longer than an hour on a loaded machine, and by then NOW + an hour is no longer in the future
+    future = int(time.time() * 1000) + 86_400_000
+    answer = ethan.post(HISTORY, json={"starts": [start(future, "future"), start(NOW, "fine"),
                                                   start(1000, "1970"), start(NOW - 1, "")]})
     assert answer.json() == {"taken": 1, "skipped": 3}
     assert [row["song_id"] for row in kept(player.path, "ethan")] == ["fine"]
