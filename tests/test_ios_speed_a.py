@@ -121,3 +121,82 @@ def test_a_cover_kept_on_disk_draws_while_deadwax_cant_be_reached():
     assert "client.archiveCoverRequest(cover, size: size)" in load and "client.coverRequest(coverID: id, size: size)" in load
     on_disk = flat(func(cover, "onDisk"))
     assert "URLSessionTransport.coverCache?.cachedResponse(for: URLRequest(request))" in on_disk
+
+
+# ---------------------------------------------------------------------------- fix 2: an album's answer kept
+
+
+def test_an_album_opened_again_draws_its_kept_answer_and_asks_behind_it():
+    model = code(APP / "Models" / "AlbumModel.swift")
+    load = flat(func(model, "load"))
+    # the phone's kept answer first, then the session's - both drawn at once, online or not, and deadwax asked behind
+    phone = load.index("if album == nil, let kept = downloads.keptAlbum(route.id) {")
+    session = load.index("if album == nil, let kept, let answer = KeptAlbumAnswers.shared.answer(route.id, stamp: kept) {"
+                         " album = answer fromKept = true }")
+    asked = load.index("guard let client, online else { return }")
+    assert phone < session < asked
+    assert "let wantsAlbum = (album == nil || fromPhone || fromKept) && !empty && !goneButHere" in load
+    assert "await self.askAlbum(client, player: player, downloads: downloads, again: false, kept: kept)" in load
+    # another album or person starts afresh
+    assert "fromKept = false" in load[:load.index("self.personal = personal")]
+    ask = flat(func(model, "askAlbum"))
+    # deadwax's answer replaces it and is kept under the stamp it was asked under
+    assert ("album = found empty = false fromPhone = false fromKept = false goneButHere = false"
+            " if let kept { KeptAlbumAnswers.shared.keep(found, stamp: kept) }") in ask
+    # an album deadwax says is gone is let go; a failure behind the kept answer keeps it drawn, but never a gone one
+    assert ask.count("KeptAlbumAnswers.shared.forget(route.id)") == 3
+    assert "if again || fromPhone || (fromKept && !gone), album != nil { return }" in ask
+    assert "if gone { album = nil fromKept = false }" in ask
+    assert "kept: kept)" in flat(func(model, "refresh"))
+    # this page's Add or Remove changes the album's starred: its kept answer goes
+    change = flat(func(model, "change"))
+    assert change.index("KeptAlbumAnswers.shared.forget(route.id)") < change.index("changed = done")
+
+
+def test_the_kept_answers_are_per_person_and_drop_on_every_write():
+    model = code(APP / "Models" / "AlbumModel.swift")
+    store = model[model.index("final class KeptAlbumAnswers {"):]
+    assert "private var kept = KeptAnswers<Album>(most: KeptAlbums.most)" in store
+    # who is signed in (the person counter and the pages' session, both moved by every sign-in change) and every write
+    # deadwax was told of: Edit album's to a folder, and every managing write (an apply, a delete, a re-file, a Get)
+    assert flat(func(store, "stamp")) == flat("""
+        let edits = navigation.albumWrites.values.reduce(0) { (sum: Int, each: Int) -> Int in sum + each }
+        return KeptAnswers<Album>.Stamp(person: server.person, session: navigation.session,
+                                        writes: edits + navigation.managingWrites)""")
+    rules = code(CORE / "KeptAnswers.swift")
+    assert "(a.person, a.session, a.writes) < (b.person, b.session, b.writes)" in rules
+    assert flat(func(rules, "adopt")) == flat("""
+        if let held = self.stamp {
+            if stamp == held { return true }
+            if stamp < held { return false }
+        }
+        self.stamp = stamp
+        answers = [:]
+        order = []
+        return true""")
+    # the album page reads and keeps under the stamp of now, its Refresh too - and an Edit's write asks it again
+    view = code(APP / "Album" / "AlbumView.swift")
+    assert "private var kept: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation) }" in view
+    loads = re.findall(r"await model\.load\(key: taskKey,[^)]*\)", view)
+    assert len(loads) == 2 and all(call.endswith("downloads: downloads, kept: kept)") for call in loads), loads
+    assert "Task { await model.refresh(client: server.client, player: player, downloads: downloads, kept: kept) }" in view
+    assert ".onChange(of: navigation.albumWrites[route.id]) { _, _ in refresh() }" in view
+    # Play and Shuffle take the songs drawn - a kept answer's at once - in the tap, nothing awaited first
+    play = func(view, "play", after="private func play(at index: Int?, shuffle: Bool = false)")
+    assert "await" not in play and "Task" not in play
+    assert "player.play(songs: songs, album: album, at: index, shuffle: shuffle)" in play
+
+
+def test_the_artist_pages_prefetch_fills_the_same_store():
+    model = code(APP / "Models" / "ArtistPageModel.swift")
+    send = flat(func(model, "send"))
+    assert "let kept = self.kept" in send
+    assert ("if let found { if let kept { KeptAlbumAnswers.shared.keep(found, stamp: kept) }"
+            " next = self.asks.answered(ask, with: found)") in send
+    assert "if let kept { self.kept = kept }" in flat(func(model, "load"))
+    view = code(APP / "Artist" / "ArtistView.swift")
+    assert "private var keptStamp: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation) }" in view
+    loads = re.findall(r"await model\.load\([^)]*\)", view)
+    assert len(loads) == 5 and all(flat(call).endswith("kept: keptStamp)") for call in loads), loads
+    # (not `kept`: the body's own `kept` is the Last.fm answer, and its tasks and pull would read that one instead)
+    assert "let kept = artists.keptLastfm(route.id)" in view

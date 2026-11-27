@@ -7653,6 +7653,11 @@ differently.
   scroll the same albums: the covers are there at once, not grey squares filling in. Quit again, turn WireGuard off and
   open it: the covers you'd seen still show, where they were grey. Replace an album's cover in Edit album: once
   Navidrome has scanned, its page and its tile show the new one.
+- **650 An album opened again.** **Not done yet.** Open an album, go back, open it again: its songs are there at once,
+  with no wait. Open an artist, wait for Play to light up, then open one of their albums: its songs are there at once
+  too, and Play plays them straight away. Change something in Edit album (a title, say) and go back to the album: it
+  shows the change, not the old songs. Sign out and in as someone else: nothing of the first person's albums shows
+  before deadwax answers.
 
 ## What it can't do yet
 

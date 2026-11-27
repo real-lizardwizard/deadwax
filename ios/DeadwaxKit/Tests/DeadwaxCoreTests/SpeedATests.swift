@@ -36,4 +36,61 @@ import Testing
         #expect(CoverDisk.matches("/deadwax/coverart/release/x", "/deadwax/coverart/{kind}/{mbid}"))
         #expect(!CoverDisk.matches("/deadwax/coverart/release", "/deadwax/coverart/{kind}/{mbid}"))
     }
+
+    // MARK: fix 2 - an album's answer kept
+
+    private typealias Stamp = KeptAnswers<String>.Stamp
+
+    @Test func anAnswerKeptIsReadUnderTheSameStampAlone() {
+        var kept = KeptAnswers<String>(most: KeptAlbums.most)
+        let now = Stamp(person: 1, session: 1, writes: 0)
+        kept.keep("al-1", "Dummy", stamp: now)
+        #expect(kept.answer("al-1", stamp: now) == "Dummy")
+        #expect(kept.answer("al-2", stamp: now) == nil)
+        // a write deadwax was told of (an Edit's apply, a delete, a re-file) drops everything at the next look
+        let written = Stamp(person: 1, session: 1, writes: 1)
+        #expect(kept.answer("al-1", stamp: written) == nil)
+        #expect(kept.count == 0)
+        // and an answer asked before it, landing after, keeps nothing - nor is anything read under the old stamp
+        kept.keep("al-1", "Dummy (before the write)", stamp: now)
+        #expect(kept.answer("al-1", stamp: written) == nil)
+        #expect(kept.answer("al-1", stamp: now) == nil)
+        kept.keep("al-1", "Dummy", stamp: written)
+        #expect(kept.answer("al-1", stamp: written) == "Dummy")
+        // an older ask landing late takes nothing away from what is kept under the newer stamp
+        kept.keep("al-2", "Third (before the write)", stamp: now)
+        #expect(kept.answer("al-1", stamp: written) == "Dummy")
+        #expect(kept.answer("al-2", stamp: written) == nil)
+    }
+
+    @Test func anotherPersonNeverReadsTheAnswersOfTheOneBefore() {
+        var kept = KeptAnswers<String>(most: KeptAlbums.most)
+        let james = Stamp(person: 1, session: 1, writes: 5)
+        kept.keep("al-1", "James's", stamp: james)
+        // signed out, someone else signed in: the person counter and the pages' session move, the writes start again
+        let ethan = Stamp(person: 2, session: 2, writes: 0)
+        #expect(kept.answer("al-1", stamp: ethan) == nil)
+        // James's ask landing late keeps nothing for Ethan
+        kept.keep("al-2", "James's late one", stamp: james)
+        #expect(kept.answer("al-2", stamp: ethan) == nil)
+        // a sign-in again as the same person is another person to the store too
+        kept.keep("al-1", "Ethan's", stamp: ethan)
+        #expect(kept.answer("al-1", stamp: Stamp(person: 3, session: 3, writes: 0)) == nil)
+    }
+
+    @Test func theOldestKeptGoesPastTheMostAndOneCanBeForgotten() {
+        var kept = KeptAnswers<String>(most: 3)
+        let now = Stamp(person: 1, session: 1, writes: 0)
+        for id in ["a", "b", "c"] { kept.keep(id, id, stamp: now) }
+        // kept again moves it to the newest
+        kept.keep("a", "a again", stamp: now)
+        kept.keep("d", "d", stamp: now)
+        #expect(kept.answer("b", stamp: now) == nil)
+        #expect(kept.answer("a", stamp: now) == "a again")
+        #expect(kept.count == 3)
+        kept.forget("a")
+        #expect(kept.answer("a", stamp: now) == nil)
+        #expect(kept.count == 2)
+        #expect(KeptAlbums.most == 40)
+    }
 }

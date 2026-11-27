@@ -23898,3 +23898,41 @@ over the network) - seen failing with the cover branch made `else if false` - an
 covers, each a 304); that a task's metrics come before its end, so Reachability hears covers that did go out; the 256 MB
 bound holding (CFNetwork evicts on its own schedule); that Navidrome 0.64.2's album cover ids carry the hash, so an Edit's
 new cover is a new URL (check 649).
+
+### 2. An album's answer kept
+
+**Confirmed:** AlbumModel's `load` drew only the phone's kept answer for a downloaded album; every other album page
+asked `/navidrome/albums/{id}` and showed the hero alone until it came, each time the page was opened again (a new page
+is a new model). The artist page's prefetch asked every album of theirs for its songs (`ArtistAlbumAsks`) and kept the
+answers only on its own model, so opening one of them from there asked it again.
+
+**Now:** Core's `KeptAnswers` keeps the last `KeptAlbums.most` (40) answers by id under a `Stamp` - `person`
+(ServerModel.person), `session` (AppNavigation.session) and `writes` (albumWrites summed, plus managingWrites), compared
+in that order, each only growing. An answer is read only under the stamp it was kept under; a newer stamp drops
+everything at its first look; an answer asked under an older stamp lands nowhere and takes nothing away. The app's
+`KeptAlbumAnswers.shared` (in AlbumModel.swift) holds it. AlbumModel's `load` draws the phone's kept answer first, as
+before, else the session's (`fromKept`), and asks deadwax behind either; deadwax's answer replaces it and is kept under
+the stamp it was asked under. A failure behind a kept answer keeps it drawn, as behind the phone's - but an album deadwax
+says is gone (`{}` or a 404) is let go from the store and drawn gone. ArtistPageModel's `send` keeps each album that
+comes, under the stamp the page last asked with. AlbumView's change is to its fetch alone: `load` and `refresh` take
+`kept:` (its `kept` property, KeptAlbumAnswers.stamp of now); ArtistView's five `load`s pass the same, as `keptStamp`
+(its body has a `kept` of its own, the Last.fm answer, which would shadow it).
+
+**What drops what's kept:** another person, a sign-in again or a sign-out (person and session move:
+`server.whenPersonChanges` runs `navigation.reset()`); Edit album's write to any folder (albumWrites); any managing write
+- an Edit's apply, a delete, a Get, a mark, an artist's re-file or images (managingWrites); and, one album alone, deadwax
+saying it is gone, or its page's Add or Remove taken (its `starred` is the other way now). Playlists hold no album
+answer, so a playlist change drops nothing here. Kept in memory only: the app ending forgets it.
+
+**Play at the tap:** the album page's Play, Shuffle and a row's tap take `model.songs` - a kept answer's at once - with
+nothing awaited (unchanged code); the artist page's Play and Shuffle are as they were.
+
+**Tests:** SpeedATests `anAnswerKeptIsReadUnderTheSameStampAlone` (seen failing with the older-stamp rule taken out),
+`anotherPersonNeverReadsTheAnswersOfTheOneBefore`, `theOldestKeptGoesPastTheMostAndOneCanBeForgotten`;
+test_ios_speed_a.py `test_an_album_opened_again_draws_its_kept_answer_and_asks_behind_it` (seen failing with the
+session's read made `if false`), `test_the_kept_answers_are_per_person_and_drop_on_every_write`,
+`test_the_artist_pages_prefetch_fills_the_same_store` (seen failing with its keep taken out).
+
+**Not verified (a device):** the album page drawing its songs on the first frame when opened from an artist's page or
+opened again (check 650); that a write made outside the app (the web's Edit) is the one thing a kept answer can't hear
+of - it is replaced as soon as deadwax answers behind it.

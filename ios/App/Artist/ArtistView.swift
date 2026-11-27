@@ -110,6 +110,11 @@ struct ArtistView<Desk: View>: View {
     /// Who and which artist: a new person asks everything again.
     private var taskKey: String { "\(server.person)|\(route.id)" }
 
+    /// (Speed A, fix 2) The stamp the albums' songs the page asks are kept under for the album pages now (who is signed
+    /// in and every write deadwax was told of - KeptAlbumAnswers.stamp). Not `kept`: the body has a `kept` of its own
+    /// (the Last.fm answer), which its tasks and pull would read in its place.
+    private var keptStamp: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation) }
+
     /// Who they are on MusicBrainz, as the artist's answer and the library's folders now say (ArtistJoin.mbid).
     private var said: String? { model.mbid(index: search.ownedIndex, version: search.ownedVersion) }
     /// ...or, with nothing saying, who was chosen with Which artist is this? for this visit (the web's `said ?? chosen`).
@@ -264,7 +269,8 @@ struct ArtistView<Desk: View>: View {
         .task(id: taskKey) {
             // which of MusicBrainz's albums are yours is the library's folders' word: asked again as the page shows
             search.refreshOwned()
-            await model.load(key: taskKey, client: server.client, online: reachability.online, artists: artists)
+            await model.load(key: taskKey, client: server.client, online: reachability.online, artists: artists,
+                             kept: keptStamp)
         }
         .task(id: "\(taskKey)|\(mbid ?? "")") {
             // their albums on MusicBrainz, once who they are there is known - or let go when it no longer is
@@ -309,7 +315,8 @@ struct ArtistView<Desk: View>: View {
                 reachability.tryNow()
                 return
             }
-            await model.load(key: taskKey, client: server.client, online: true, artists: artists, again: true)
+            await model.load(key: taskKey, client: server.client, online: true, artists: artists, again: true,
+                             kept: keptStamp)
             if model.asks.someMissing { model.again(client: server.client) }
             model.theirAlbums(mbid: mbid, client: server.client, online: true, retry: true)
             summaryAsks += 1
@@ -339,7 +346,8 @@ struct ArtistView<Desk: View>: View {
     private func reload() {
         let key = taskKey
         Task {
-            await model.load(key: key, client: server.client, online: reachability.online, artists: artists)
+            await model.load(key: key, client: server.client, online: reachability.online, artists: artists,
+                             kept: keptStamp)
             if model.asks.someMissing { model.again(client: server.client) }
             model.theirAlbums(mbid: mbid, client: server.client, online: reachability.online, retry: true)
             await model.theirFacts(client: server.client, online: reachability.online)
@@ -552,12 +560,14 @@ struct ArtistView<Desk: View>: View {
         let key = taskKey
         let session = navigation.session
         Task {
-            await model.load(key: key, client: server.client, online: reachability.online, artists: artists, again: true)
+            await model.load(key: key, client: server.client, online: reachability.online, artists: artists, again: true,
+                             kept: keptStamp)
             try? await Task.sleep(for: .milliseconds(AlbumEdit.settleMs))
             guard navigation.session == session else { return }
             search.refreshOwned()
             summaryAsks += 1
-            await model.load(key: key, client: server.client, online: reachability.online, artists: artists, again: true)
+            await model.load(key: key, client: server.client, online: reachability.online, artists: artists, again: true,
+                             kept: keptStamp)
         }
     }
 
