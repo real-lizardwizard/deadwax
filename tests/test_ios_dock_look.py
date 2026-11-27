@@ -5,7 +5,7 @@ rounded." No slice had redrawn the inside of the dock's tabs; this holds what R1
 
   - No tab's page has a system bar, a title or a Done; Escape still puts the panel away - MacPanel's own key, through
     MacFrame.escape, the one owner - standing aside while a page holds Escape itself (the Queue's Done in Edit,
-    Sources' Close until R19). (R16's review) The EQ alone keeps its bar, root and pages, until R17 draws its header:
+    and - R19 - Sources while its words are edited, as its Close's Escape did). (R16's review) The EQ alone keeps its bar, root and pages, until R17 draws its header:
     its root's ••• (Rename…, Back to AutoEq's) is there, and the Mac has nowhere else to reach it.
   - DockHeader and DockBack, the dock's two pieces R17 and R19 build on: a row of `.btn.sm`s, and `‹ <where you came
     from>` in the accent in a pushed page's bar's place (`.dockBack`).
@@ -142,11 +142,14 @@ def test_escape_is_the_panels_own_key_through_the_one_owner():
                  ".onDisappear { holds?.hold(holder, false) }"):
         assert part in holds, part
     assert "PreferenceKey" not in panels
-    #? the Queue's Done in Edit, and Sources' Close until R19
+    #? the Queue's Done in Edit - and (R19) Sources only while its words are edited, held in MacSourcesTab
+    #? (tests/test_ios_get_look.py): R16's whole-tab hold gone from MacPanel
     queue = flat(member(code(source(QUEUE)), "private func macTop"))
     assert (".escapeCloses(editing && MacFrame.escape(typing: TextEditing.shared.typing, panel: navigation.macPanel) == "
             ".panel) } .background(DWPalette.panel) .dockHoldsEscape(editing)") in queue
-    assert "MacSourcesTab() .dockHoldsEscape()" in flat(member(panels, "var page: some View"))
+    page = flat(member(panels, "var page: some View"))
+    assert "case .sources: MacSourcesTab() }" in page and "MacSourcesTab() .dockHoldsEscape" not in page
+    assert ".dockHoldsEscape(get.request.search.edited)" in flat(code(source("Mac/Search/MacSourcesTab.swift")))
     #? MacFrame.escape is the one owner still, and Routes.swift's is untouched
     assert "MacDock.escape(typing: typing, shown: panel)" in flat((CORE / "MacDock.swift").read_text(encoding="utf-8"))
 

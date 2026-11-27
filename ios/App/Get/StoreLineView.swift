@@ -26,7 +26,12 @@ import SwiftUI
 ///
 /// (R7 - notes/ios.md "The redesign, slice R7: Search, Get and Sources (2026-11-25)") Flat on the phone, as every page
 /// it stands on now is: its words on the page's black in the look's colours, no grey box, Join and Add the look's flat
-/// buttons. The Mac's box and buttons are as they were.
+/// buttons.
+///
+/// (The panel review's R19 - notes/ios.md "The panel review, R19: Get, and old type left in redrawn pages
+/// (2026-11-27)"; James chose it redrawn, 26 Nov) On the Mac Get.dc.html's box: the card's raised ground, the line's
+/// edge, a box's corners (DWCorners' 5), its words in the look's type and colours, Join and Add the look's `.btn`. Every
+/// word, what each button does and when it is off are as they were.
 struct StoreLineView: View {
     let status: StoreStatus?
     let notes: [String]
@@ -46,8 +51,8 @@ struct StoreLineView: View {
                 }
                 ForEach(notes.indices, id: \.self) { (at: Int) in
                     Text(notes[at])
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Platform.mac ? Palette.text2 : DWPalette.t2)
+                        .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -57,12 +62,13 @@ struct StoreLineView: View {
 
     @ViewBuilder private func box(_ status: StoreStatus) -> some View {
         if Platform.mac {
+            // (R19) Get.dc.html's `.box`: the card's ground, the line's edge, a box's 5 corners
             inside(status)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(12)
+                .padding(StoreLineLook.inside)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Palette.card, in: Corners.cardShape)
-                .overlay(Corners.cardShape.strokeBorder(Palette.border))
+                .background(DWPalette.card, in: DWCorners.boxShape)
+                .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line, lineWidth: 1))
                 .accessibilityElement(children: .contain)
         } else {
             // (R7) flat: its words on the page's own black
@@ -74,20 +80,20 @@ struct StoreLineView: View {
     }
 
     private func inside(_ status: StoreStatus) -> some View {
-        let held: Color = Platform.mac ? Palette.held : DWPalette.greenText
-        let title: Color = Platform.mac ? Color.primary : DWPalette.text
-        let detail: Color = Platform.mac ? Palette.textTertiary : DWPalette.t3
-        let line: Color = Platform.mac ? Palette.text2 : DWPalette.t2
+        // (R19) the look's colours on both: the held title green, the rest the heading's (the Mac's) or white, the lines
+        // the second colour, the detail the third
+        let title: Color = Platform.mac ? DWPalette.head : DWPalette.text
         return VStack(alignment: .leading, spacing: 2) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(status.title)
-                    .font(Typeface.subheadline.weight(.semibold))
-                    .foregroundStyle(status.kind == .held ? held : title)
+                    .font(Platform.mac ? Typeface.Look.text(.field) : Typeface.Phone.text(.row))
+                    .fontWeight(.semibold)
+                    .foregroundStyle(status.kind == .held ? DWPalette.greenText : title)
                 ForEach(status.lines.indices, id: \.self) { (at: Int) in
                     // the folders (or the peer) first; the last of several the detail under them
                     Text(status.lines[at])
-                        .font(Typeface.footnote)
-                        .foregroundStyle(at > 0 && at == status.lines.count - 1 ? detail : line)
+                        .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                        .foregroundStyle(at > 0 && at == status.lines.count - 1 ? DWPalette.t3 : DWPalette.t2)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -131,38 +137,31 @@ private struct StoreActionButton: View {
     var body: some View {
         if phase == .done {
             Text(words.done)
-                .font(Typeface.footnote)
-                .foregroundStyle(Platform.mac ? Palette.text2 : DWPalette.t2)
+                .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
         } else {
             VStack(alignment: .leading, spacing: 6) {
-                face(Button(phase == .busy ? words.busy : words.idle, action: tap))
+                // (R19) the look's button on both: the phone's flat accent words, the Mac's `.btn`
+                Button(phase == .busy ? words.busy : words.idle, action: tap)
+                    .buttonStyle(DWButtonStyle())
                     // waiting, it stays where it is and keeps VoiceOver's focus: faded, a second tap nothing
-                    .opacity(phase == .busy ? Palette.busy : 1)
+                    .opacity(phase == .busy ? DWPalette.off : 1)
                     // out of reach, off - unless already asked, whose answer is still coming
                     .disabled(!live && phase == .idle)
                 if unanswered {
                     // not a refusal: it may have gone through
                     Text(words.unanswered)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Platform.mac ? Palette.text2 : DWPalette.t2)
+                        .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                 } else if let refused {
                     ErrorNote(refused)
-                        .foregroundStyle(Palette.danger)
+                        .foregroundStyle(DWPalette.redChipText)
                 }
             }
             .padding(.top, 8)
-        }
-    }
-
-    /// (R7) The Mac's pill, as it was; the phone's the look's flat button.
-    @ViewBuilder private func face(_ button: Button<Text>) -> some View {
-        if Platform.mac {
-            button.buttonStyle(SecondaryPill())
-        } else {
-            button.buttonStyle(DWButtonStyle())
         }
     }
 
@@ -189,4 +188,10 @@ private struct StoreActionButton: View {
             }
         }
     }
+}
+
+/// (R19) The store line's Mac box: its words in from its edge - Get.dc.html's boxes' 12 (the panel's column, a card's 10
+/// and 12 about it).
+enum StoreLineLook {
+    static let inside: CGFloat = 12         // drawn: Get panel .col padding
 }

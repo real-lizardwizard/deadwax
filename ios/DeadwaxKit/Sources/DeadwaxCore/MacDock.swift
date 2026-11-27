@@ -10,8 +10,11 @@ import Foundation
 // over, Queue and Info go with the queue. The EQ (a sheet on the Mac until now) and Sources (R7's) are the Mac's own.
 //
 // - A tab's key - View > Queue (⌥⌘U), Lyrics (⌥⌘L), Info (⌘I), EQ (⌥⌘E), MacMenu's - and the player bar's buttons
-//   close the panel when that tab is the one showing, and switch to it otherwise (`toggled`). A folder tab clicked, the
-//   bar's ••• Info and EQ and Settings' EQ show their tab, whatever was showing (`shown`).
+//   close the panel when that tab is the one showing, and switch to it otherwise (`toggled`). The bar's ••• Info and
+//   EQ and Settings' EQ show their tab, whatever was showing (`shown`). (The panel review's R19 - James's decision 1,
+//   26 Nov: "It closes with Escape, the tab's View key, or a click on the open tab") A folder tab clicked is a tab's
+//   key: the open one closes the panel, another is switched to (`clicked`) - but not Sources' open tab while its words
+//   are edited, as Escape does nothing then: edited words are never lost to a click.
 // - Escape closes it: after a text field with the cursor, before the page's own Escape (`escape` - MacFrame's one owner).
 // - Info's subject is the selection on the page in front, or the song playing while nothing is selected (James, 24 Nov:
 //   "Selection, else playing"), and its heading says which (`infoSubject`, `Words.heading`).
@@ -61,10 +64,18 @@ public enum MacDock {
         return opens(asked, getOpen: getOpen) ? asked : shown
     }
 
-    /// A tab shown whatever was showing - its folder tab clicked, the bar's ••• Info or EQ, Settings' EQ: `asked`, and
-    /// one tab at a time. Sources not without a Get page.
+    /// A tab shown whatever was showing - the bar's ••• Info or EQ, Settings' EQ: `asked`, and one tab at a time.
+    /// Sources not without a Get page.
     public static func shown(_ shown: Tab?, asked: Tab, getOpen: Bool) -> Tab? {
         opens(asked, getOpen: getOpen) ? asked : shown
+    }
+
+    /// (R19) A folder tab clicked (`asked`), with `shown` showing: `toggled`'s rule - the open tab's click closes the
+    /// panel, another's switches to it - save that Sources' open tab stays while its words are edited
+    /// (`sourcesEdited`), as Escape leaves it then (MacSourcesTab's hold).
+    public static func clicked(_ shown: Tab?, _ asked: Tab, getOpen: Bool, sourcesEdited: Bool) -> Tab? {
+        if asked == shown && asked == .sources && sourcesEdited { return shown }
+        return toggled(shown, asked, getOpen: getOpen)
     }
 
     /// Whether `tab` can be opened now: every tab but Sources, and Sources while a Get page is open.

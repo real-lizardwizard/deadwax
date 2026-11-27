@@ -210,8 +210,10 @@ def test_the_tab_goes_when_its_get_page_is_left():
     queued = body(routes, "func sourcesQueued(_ id: Int) {")
     assert "guard macSources?.request.id == id else { return } endSources() showRequestsRoot()" in queued
     sheet = flat(bare(source(SHEET)))
-    assert "guard !docked else { return closeDock() }" in sheet
-    assert "navigation.endSources()" in body(sheet, "private func closeDock() {")
+    # (the panel review's R19) the dock's page has no Close of its own: the panel put away is the Get over, as its
+    # Close's endSources() and closePanel() were (tests/test_ios_get_look.py)
+    assert "closeDock" not in sheet and "endSources" not in sheet
+    assert ".onDisappear { if navigation.macPanel == nil { navigation.endSources() } }" in flat(bare(source(MAC_TAB)))
     # the dock's page is let go with the Get, never as the tab is switched away from (its search outlives the tab)
     assert ".onDisappear { if !docked { model.close() } }" in sheet
     # (R7's review) and drawn again as its tab comes back, its Get as it was - never searched afresh
@@ -359,9 +361,9 @@ FLAT = {
     # bar in the accent and the line under each track
     GROUP: ["background: DWPalette.page", "strokeBorder: DWPalette.t2", "DWRule: DWPalette.rowRule",
             "fill: DWPalette.acc", "DWRule: DWPalette.rowRule"],
-    # the page's black, the query's own box (R1c's typing rule - its field keeps a face: its well, which R10's wider
-    # reading sees, and its edge), the filters' strip's hairline and the chosen filter's line in the accent
-    SHEET: ["background: DWPalette.page", "background: Palette.well", "strokeBorder: Palette.border", "DWRule: DWPalette.stripRule",
+    # the page's black, the query on the look's well (R1c's typing rule - (the panel review's R19) its own box until
+    # then), the filters' strip's hairline and the chosen filter's line in the accent
+    SHEET: ["background: DWPalette.page", "DWWell: focused: againFocused", "DWRule: DWPalette.stripRule",
             "fill: DWPalette.acc"],
     # the cards: PhoneCard's line under each, nothing of their own; the picker iOS's list; the store line words alone
     CARD: [], PICKER: [], STORE: [],
@@ -540,10 +542,9 @@ def test_the_search_field_is_the_looks_box():
     for name in (GROUP, STORE, CARD) + MAC_FILES:
         assert not phone_look.TYPING.search(bare(source(name))), name
     assert bare(source(PICKER)).count(".searchable(") == 1
-    # Sources' query keeps its own box, in its block
+    # Sources' query on the look's well (the panel review's R19 - it kept its own box until then), in its block
     sheet = flat(bare(source(SHEET)))
-    assert ".background(Palette.well, in: Corners.controlShape) .overlay(Corners.controlShape.strokeBorder(Palette.border))" \
-        in sheet
+    assert ".background { DWWell(focused: againFocused) .contentShape(DWTarget(face: DWCorners.buttonShape))" in sheet
 
 
 # ----------------------------------------------------------------------------- the Mac's tables
@@ -719,10 +720,9 @@ def test_search_get_and_sources_draw_no_value_of_their_own():
         if mac_look.NAMED_COLOUR.search(named):
             left.append(f"{name}: a named colour ({mac_look.NAMED_COLOUR.search(named).group(0)})")
     assert not left, left
-    # the old palette only where it was kept: the Mac's store box and its pill, Sources' query's box, and its dimming
+    # (the panel review's R19) no old palette left: the store line's, Sources' query's box and its dimming went with it
     olds = {name: sorted(set(re.findall(r"(?<![\w.])Palette\.\w+", phone_code(name)))) for name in PHONE_FILES}
-    assert olds == {SCREEN: [], GROUP: [], PICKER: [], CARD: [], STORE: ["Palette.busy", "Palette.danger"],
-                    SHEET: ["Palette.border", "Palette.dimmed", "Palette.well"]}, olds
+    assert olds == {SCREEN: [], GROUP: [], PICKER: [], CARD: [], STORE: [], SHEET: []}, olds
     # the phone's fonts: Typeface.Phone's, the look's, the symbols' and iOS's text styles
     for name in PHONE_FILES:
         fonts = mac_look.font_arguments(phone_code(name))

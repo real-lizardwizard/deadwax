@@ -1407,7 +1407,7 @@ TEXT_INPUTS = {
     # (R11) Edit tags' eleven fields on the look's wells, as Release's are (one helper)
     "Edit/TagsPages.swift": [WELL],
     # (R1c's review) Artist and Album on the look's wells, in a flat sheet
-    "Get/ManualSearchSheet.swift": [WELL, WELL], "Get/SourcesSheet.swift": [OWN],
+    "Get/ManualSearchSheet.swift": [WELL, WELL], "Get/SourcesSheet.swift": [WELL],
     "Library/AlbumsScreen.swift": [SYSTEM], "Library/ArtistsScreen.swift": [SYSTEM], "Library/LibraryView.swift": [WELL],
     "Library/SongsScreen.swift": [SYSTEM], "Look/DWField.swift": [WELL],
     # (R13) Library care's Narrow to is DWField now, the look's well - its file holds no field of its own
@@ -1618,8 +1618,10 @@ def test_every_place_you_type_on_the_phone_is_still_a_box():
         assert manual.count(f".focused($focused, equals: .{kind})") == 1, kind
         assert f".focused($focused, equals: .{kind}) .tabs($focused, in: Self.order)" in manual, kind
     assert manual.count("prompt: Text(ManualSearch.") == 2 and manual.count(".foregroundStyle(DWPalette.t3)") == 2
-    assert "Text(ManualSearch.footer) .font(Typeface.footnote) .foregroundStyle(DWPalette.t2)" in manual
-    assert "Button(ManualSearch.search, action: search) .buttonStyle(PrimaryFace())" in manual
+    assert "Text(ManualSearch.footer) .font(Typeface.Phone.text(.small)) .foregroundStyle(DWPalette.t2)" in manual
+    # (R19) the look's primary, large and across the page
+    assert ("Button(ManualSearch.search, action: search) .buttonStyle(DWButtonStyle(kind: .pri, size: .large, "
+            "fills: true))") in manual
     # Platform's phone half of searchField is still iOS's own search field in the navigation bar - (R7's review) though
     # Search, its only caller, now draws the look's well of its own (tests/test_ios_search_look.py)
     platform = re.sub(r"\s+", " ", bare((APP / "Shared" / "Platform.swift").read_text(encoding="utf-8")))
@@ -1753,9 +1755,13 @@ R18_PAGES = {"Playlists/PlaylistPicker.swift", "Edit/ChooseFolderView.swift", "A
 #? from the holdouts' pieces (DebugView's HoldoutPage, HoldoutGroup...), the Mac's groups on the Mac; Release's pushed
 #? pages are R10's file's (tests/test_ios_holdouts_look.py holds what each draws)
 R20_PAGES = {"You/DebugView.swift", "Artist/ArtistImagesSheet.swift", "Artist/ArtistMoveSheet.swift"}
+#? (the panel review's R19) the pages it moved off the old type and Palette that no slice had listed - an artist found on
+#? MusicBrainz, what went wrong, the manual search (already the look's) - in the phone's sizes and the look's buttons
+R19_PAGES = {"Search/MBArtistView.swift", "Shared/ErrorNote.swift", "Get/ManualSearchSheet.swift",
+             "Root/RootView.swift"}
 SLICES = (R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES
           | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES | A4_PAGES | R16_PAGES | R18_PAGES
-          | R20_PAGES)
+          | R19_PAGES | R20_PAGES)
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

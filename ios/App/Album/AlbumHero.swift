@@ -140,7 +140,9 @@ struct AlbumHero: View {
 
 /// The hero's download line (3.2): the album's line in the "In the collection" style - caption, semibold, quiet, no box
 /// - its mark in front (amber, and amber words, for didn't); centred, wrapping at the largest sizes. Not a button: the
-/// control in the bar is. VoiceOver reads it after the badge, the words alone.
+/// control in the bar is. VoiceOver reads it after the badge, the words alone. (The panel review's R19) In the phone's
+/// own type - `.xs`, 12 semibold, the very size and text style caption was - and the look's colours: the second colour,
+/// amber's words for didn't.
 struct DownloadLine: View {
     let download: AlbumDownload
     let line: String
@@ -159,8 +161,8 @@ struct DownloadLine: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .font(Typeface.caption.weight(.semibold))
-        .foregroundStyle(failed ? Palette.amber : Palette.quiet)
+        .font(Typeface.Phone.text(.extraSmall).weight(.semibold))
+        .foregroundStyle(failed ? DWPalette.amberText : DWPalette.t2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(line)
     }

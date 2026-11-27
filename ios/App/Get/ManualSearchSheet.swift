@@ -92,14 +92,14 @@ struct ManualSearchSheet: View {
                     }
                     // what the Form's footer said, under the fields on the page
                     Text(ManualSearch.footer)
-                        .font(Typeface.footnote)
+                        .font(Typeface.Phone.text(.small))
                         .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 8)
+                    // (the panel review's R19) the look's primary, large and across the page, where PrimaryFace was
                     Button(ManualSearch.search, action: search)
-                        .buttonStyle(PrimaryFace())
+                        .buttonStyle(DWButtonStyle(kind: .pri, size: .large, fills: true))
                         .disabled(!searchable)
-                        .frame(maxWidth: .infinity)
                         .padding(.top, 20)
                 }
                 // the page's sides, 16 (.f's padding 0 16px)

@@ -80,7 +80,8 @@ struct DesktopFrame: View {
                                     rule
                                     MacPanel(tab: panel)
                                 }
-                                .shadow(color: MacDock.liesOver(style, panel) ? Palette.well : Color.clear,
+                                // (the panel review's R19) the drawer's own drop, as dark as it always was
+                                .shadow(color: MacDock.liesOver(style, panel) ? Self.drawerDrop : Color.clear,
                                         radius: MacDock.liesOver(style, panel) ? 16 : 0)
                             }
                         }
@@ -107,7 +108,7 @@ struct DesktopFrame: View {
         .environment(selection)
         // (the Mac's Row Size) every list's rows at View > Row Size's height, as this Mac keeps it (MacRowSizeStore,
         // which the menus read too) - and Make Bigger's second key, ⌘= (MacCommands' menu draws ⌘+)
-        .environment(\.macRowSize, MacRowSizeStore.shared.size)
+        .environment(\.macRowSize, rowSize)
         .modifier(RowSizeAlternateKey())
         .onGeometryChange(for: Double.self) { (frame: GeometryProxy) -> Double in
             Double(frame.size.width)
@@ -126,7 +127,10 @@ struct DesktopFrame: View {
         // Add to a playlist and Edit album, over the frame as they are over the tabs (MainTabs). (R3's review) No EQ sheet:
         // a shared file's EQ is the dock's EQ tab, its preview over it (SharedEQFile, DockEQ) - one EQ, never a second
         .appSheet(item: $navigation.playlistPick) { (request: PlaylistPickRequest) in
+            // (the panel review's R19) a sheet's window is outside the frame's `macRowSize`: its rows' size handed in
             PlaylistPicker(request: request)
+                .environment(\.sheetRowSize, SheetRowSize(height: CGFloat(rowSize.rowHeight),
+                                                          cover: CGFloat(rowSize.cover)))
                 .macSheet()
         }
         .appSheet(item: $navigation.albumEdit, onDismiss: { navigation.editorDismissed() }) { (request: AlbumEditRequest) in
@@ -203,9 +207,16 @@ struct DesktopFrame: View {
                                       depth: navigation.shownStack.count, sheetOpen: false)
     }
 
-    /// --dw-frame-border, a hairline down the panel's edge.
+    /// View > Row Size, as this Mac keeps it (MacRowSizeStore, which the menus read too) - read here alone.
+    private var rowSize: MacRowSize { MacRowSizeStore.shared.size }
+
+    /// (R19's review) The drawer's shadow over the page: black at 0.2, the old palette's well's very value, named here -
+    /// DWPalette's buttonDrop is a button's 1-px drop, more than twice as dark.
+    private static let drawerDrop = Color.black.opacity(0.2)
+
+    /// --dw-frame-border, a hairline down the panel's edge. (R19) The look's `--frame`, the very colour.
     private var rule: some View {
-        Palette.frameBorder
+        DWPalette.frame
             .frame(width: hairline)
             .accessibilityHidden(true)
     }
@@ -214,4 +225,17 @@ struct DesktopFrame: View {
     private var hairline: CGFloat {
         1 / max(displayScale, 1)
     }
+}
+
+/// (The panel review's R19 - notes/ios.md "The panel review, R19: Get, and old type left in redrawn pages (2026-11-27)")
+/// View > Row Size's row height and cover side as plain numbers, for the sheet the frame puts up over itself (Add to a
+/// playlist): a sheet's window is outside the frame's `macRowSize`, so the frame hands these in, and a shared file reads
+/// them without naming the Mac's store. Nil wherever no frame did (the phone), where the sheet's own sizes hold.
+struct SheetRowSize: Equatable {
+    let height: CGFloat
+    let cover: CGFloat
+}
+
+extension EnvironmentValues {
+    @Entry var sheetRowSize: SheetRowSize? = nil
 }

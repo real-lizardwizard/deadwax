@@ -25,7 +25,8 @@ struct RootView: View {
             gate
             if server.launch == .ready, let over = server.signInOver {
                 signIn(reason: over.reason, why: over.why)
-                    .background(Color(.systemBackground).ignoresSafeArea())
+                    // (the panel review's R19) the page's ground - the Mac's --bg, the phone's black - not the system's
+                    .background((Platform.mac ? DWPalette.bg : DWPalette.page).ignoresSafeArea())
                     .accessibilityAddTraits(.isModal)
                     .transition(.opacity)
             }
