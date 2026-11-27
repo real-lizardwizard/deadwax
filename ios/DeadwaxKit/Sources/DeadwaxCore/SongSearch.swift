@@ -291,8 +291,6 @@ public struct SongHolding: Sendable, Equatable {
 public enum SongSearch {
     /// How many recordings a song search asks for (`SONG_SEARCH_LIMIT`, the route's own default).
     public static let limit = 25
-    /// How many songs the All view's section shows (`SONG_ROWS_SHOWN`).
-    public static let rowsShown = 3
     /// How many of a song's recordings an album's address carries, at most (`SONG_IDS_KEPT`).
     public static let idsKept = 8
 

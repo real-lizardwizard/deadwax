@@ -97,7 +97,6 @@ function numbers() {
   return {
     songSearchLimit: S.SONG_SEARCH_LIMIT,
     artistSearchLimit: L.ARTIST_SEARCH_LIMIT,
-    songRowsShown: S.SONG_ROWS_SHOWN,
     songIdsKept: S.SONG_IDS_KEPT,
     artistsKept: Number(sourceMatch('src/app/ArtistPage.tsx', /export const ARTISTS_KEPT = (\d+)/)),
   }

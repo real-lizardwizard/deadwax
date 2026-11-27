@@ -55,6 +55,10 @@ execFileSync(path.join(UI, 'node_modules/.bin/tsc'), [
 ], { cwd: UI, stdio: 'inherit' })
 
 const L = require(path.join(OUT, 'lib/searchList.js'))
+/** Whether a row is from what's saved: savedRow's own mark (`saved: true`). The web's `isSaved` said this until
+ *  2.1.51 removed it as unread there; the vectors still carry the flag, so the predicate lives here. */
+const savedFlag = (row) => 'saved' in row && row.saved === true
+
 const Q = require(path.join(OUT, 'lib/searchQuery.js'))
 const R = require(path.join(OUT, 'lib/searchResults.js'))
 const S = require(path.join(OUT, 'lib/songs.js'))
@@ -348,8 +352,8 @@ function areas() {
       const made = L.kindArea(before, rowsOf(saved, true), rowsOf(musicbrainz, false), new Set(above), problem)
       steps.push({
         saved, musicbrainz, above, problem,
-        lead: made.lead.map((row) => [row.key, L.isSaved(row)]),
-        rest: made.rest.map((row) => [row.key, L.isSaved(row)]),
+        lead: made.lead.map((row) => [row.key, savedFlag(row)]),
+        rest: made.rest.map((row) => [row.key, savedFlag(row)]),
         area: made.area,
       })
       before = made.area
@@ -546,19 +550,19 @@ function webCase({ text, library, failed = false, artistList = null, list = 0, m
   const momentCandidates = L.candidatesOf(atMoment, term, plan)
   const candidates = L.candidatesOf(rows, term, plan)
   const n = L.TOP_RESULTS.phone
-  const flagged = (row) => [row.key, L.isSaved(row)]
+  const flagged = (row) => [row.key, savedFlag(row)]
   const decided = [kinds, ['albums'], []].map((out_) => {
     const made = L.decidedTop(momentCandidates, out_.map((kind) => L.phantom(kind, plan)).filter(Boolean), n, familyAtMoment)
     return { kinds: out_, prefix: made.prefix.map(flagged), place: made.place }
   })
   const prefix = L.decidedTop(momentCandidates, kinds.map((kind) => L.phantom(kind, plan)).filter(Boolean), n, familyAtMoment).prefix
-  const placed = (list_) => list_.map((each) => [each.row.key, each.holder, each.position, !!each.saved, L.isSaved(each.row)])
+  const placed = (list_) => list_.map((each) => [each.row.key, each.holder, each.position, !!each.saved, savedFlag(each.row)])
   out.kinds = kinds
   out.studio = studio
   out.answer = answerOut(answer)
   out.pool = Object.fromEntries(L.KINDS.map((kind) => [kind, { library: placed(rows[kind].library), brought: placed(rows[kind].brought), saved: placed(rows[kind].saved), musicbrainz: placed(rows[kind].musicbrainz) }]))
   out.moment = Object.fromEntries(L.KINDS.map((kind) => [kind, { brought: placed(atMoment[kind].brought), saved: placed(atMoment[kind].saved) }]))
-  out.candidates = candidates.map((each) => [each.key, each.tier, each.source, each.position, L.isSaved(each.row)])
+  out.candidates = candidates.map((each) => [each.key, each.tier, each.source, each.position, savedFlag(each.row)])
   out.decided = decided
   out.top = L.topResults(candidates, n, family).map((each) => flagged(each.row))
   out.topFixed = L.topResults(candidates, n, family, prefix).map((each) => flagged(each.row))
@@ -577,7 +581,7 @@ function webCase({ text, library, failed = false, artistList = null, list = 0, m
   }))
   const every = L.KINDS.flatMap((kind) => [...rows[kind].library, ...rows[kind].brought, ...rows[kind].saved, ...rows[kind].musicbrainz])
   out.families = every.filter((each) => each.row.type === 'mb-song' || each.row.type === 'group')
-    .map((each) => ({ key: each.row.key, saved: L.isSaved(each.row), family: L.familyOf(each.row, family).map(flagged) }))
+    .map((each) => ({ key: each.row.key, saved: savedFlag(each.row), family: L.familyOf(each.row, family).map(flagged) }))
   return out
 }
 

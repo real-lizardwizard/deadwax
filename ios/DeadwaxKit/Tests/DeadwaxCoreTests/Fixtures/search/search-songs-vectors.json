@@ -2,7 +2,6 @@
  "numbers": {
   "songSearchLimit": 25,
   "artistSearchLimit": 10,
-  "songRowsShown": 3,
   "songIdsKept": 8,
   "artistsKept": 20
  },

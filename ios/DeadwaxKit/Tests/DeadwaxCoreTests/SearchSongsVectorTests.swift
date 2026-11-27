@@ -49,7 +49,7 @@ enum SearchSongsVectors {
         let pairs: [Pair]
     }
 
-    struct Numbers: Decodable { let songSearchLimit, artistSearchLimit, songRowsShown, songIdsKept, artistsKept: Int }
+    struct Numbers: Decodable { let songSearchLimit, artistSearchLimit, songIdsKept, artistsKept: Int }
 
     /// `[primary type | null, [secondary types]]`.
     struct Types: Decodable {
@@ -299,7 +299,6 @@ enum SearchSongsVectors {
         let numbers = try V.load().numbers
         #expect(SongSearch.limit == numbers.songSearchLimit)
         #expect(MBArtistSearch.limit == numbers.artistSearchLimit)
-        #expect(SongSearch.rowsShown == numbers.songRowsShown)
         #expect(SongSearch.idsKept == numbers.songIdsKept)
         #expect(MBArtistPage.kept == numbers.artistsKept)
     }

@@ -415,7 +415,7 @@ public struct SearchKindPool: Sendable, Equatable {
         self.musicbrainz = musicbrainz
     }
 
-    /// The keys of the rows from what's saved (searchList.ts `isSaved` - a row brought in through it isn't one: it is
+    /// The keys of the rows from what's saved (savedRow's `saved: true` - a row brought in through it isn't one: it is
     /// the library's).
     public var savedKeys: Set<String> { Set(saved.map(\.row.key)) }
 }
@@ -724,7 +724,7 @@ public enum SearchList {
         public let source: Double
         public let position: Double
         public let phantom: Bool
-        /// Its row is from what's saved (searchList.ts `isSaved`) - drawn as MusicBrainz's would be; what the words say
+        /// Its row is from what's saved (savedRow's `saved: true`) - drawn as MusicBrainz's would be; what the words say
         /// of it differs.
         public let saved: Bool
 
