@@ -291,6 +291,16 @@ shows, noted at player.26) were looked at again and left: both modules already s
 change nothing - if they are still asked twice it is one ask after another, and telling a needed re-ask
 from a wasted one takes a request log from the running app, which this pass did not take.
 
+#### The audit's unused names, removed (2.1.51)
+
+The same audit found almost no dead code on the server and in the web app. Four names nothing read were
+removed, each after a search of `src/`, `tests/`, `ui/` and `ios/` for a reader: `KINDS` (src/pins.py - the
+web app's `KINDS` in lib/searchList.ts is another thing, and is read), `LEVELS` and its comment
+(src/resample.py), `isSaved` (ui/src/lib/searchList.ts) and `SONG_ROWS_SHOWN` (ui/src/lib/songs.ts - the
+3 it held was the song section's count before 2.0.0-player.55's `PREVIEW`; notes/app-requests-search-get.md
+still names it where it tells that history). Nothing is faster for it. Left on purpose: `HEARD_PER_SECOND`
+(player/deck.ts, an engine file) and `GET /library/queue/new_imports` (kept on purpose).
+
 ## Known performance problems (profiled, not guessed)
 
 Measured with 148 releases × 12 tracks:

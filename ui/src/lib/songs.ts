@@ -48,9 +48,6 @@ import { anyYours, heldPhrase, pressingHeldPhrase } from './whose'
  *  song's takes merge into one row, so a bigger page is more of one song's albums in one request. */
 export const SONG_SEARCH_LIMIT = 25
 
-/** How many songs the section shows before More: a few, so an album's words still show the albums. */
-export const SONG_ROWS_SHOWN = 3
-
 /** How many of a song's recordings an album's address carries, at most. */
 export const SONG_IDS_KEPT = 8
 
