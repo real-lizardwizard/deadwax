@@ -71,7 +71,6 @@ struct MacPanel: View {
             //? (R7) the Get the album you don't have asked for on the Mac, beside its page - (R16) its Close Escape's
             //? own until R19 draws it in a DockHeader
             MacSourcesTab()
-                .dockHoldsEscape()
         }
     }
 }

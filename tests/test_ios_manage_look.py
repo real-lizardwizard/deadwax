@@ -882,8 +882,8 @@ def test_the_chips_and_the_marks_say_what_they_mean_in_their_tones():
 
 def test_a_choice_is_a_whole_row_to_tap_on_the_phone():
     # (R14's review) out of a Form's row a menu Picker takes a tap on its own words alone: on the phone the choice is a
-    # Menu whose label is the whole row, at least a finger's 44 tall, the Picker's choices inline in it; the Mac keeps
-    # its menu Picker
+    # Menu whose label is the whole row, at least a finger's 44 tall, the Picker's choices inline in it; (R19) the Mac's
+    # is the look's pop-up round the very Picker (tests/test_ios_get_look.py)
     control = struct(code(GROUP), "SettingControl")
     phone = flat(phone_look.phone_path(control))
     assert ("Menu { Picker(selection: value) { ForEach(choices) { (choice: ServerSettings.Choice) in "
@@ -895,7 +895,8 @@ def test_a_choice_is_a_whole_row_to_tap_on_the_phone():
     assert ".pickerStyle(.menu)" not in phone
     assert re.search(r"static let onPhone = DWLook\((?:(?!\)\n).)*?target: 44,", core("DWLook.swift"), re.S)
     mac = flat(settings_look.mac_path(bare(control)))
-    assert ".pickerStyle(.menu) .labelsHidden()" in mac and "Menu {" not in mac
+    assert "DWPopUp(words: Self.chosen(choices, value: row.value)) { Picker(selection: value)" in mac
+    assert ".pickerStyle(.menu)" not in mac and "Menu {" not in mac
     # the row says the choice in its words; a value the choices don't hold, as itself
     assert ("static func chosen(_ choices: [ServerSettings.Choice], value: String) -> String { choices.first { "
             "(choice: ServerSettings.Choice) -> Bool in choice.value == value }?.label ?? value }") in flat(control)

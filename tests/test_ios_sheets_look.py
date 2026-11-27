@@ -191,10 +191,13 @@ def test_add_to_a_playlist_is_rows_on_hairlines_and_the_macs_box():
     # (R18's review) each half whole, not by substring: a face, a frame or a lost Spacer added to either fails
     assert phone == (" LibraryListRow(title: name, line: line ?? \"\", lines: typeSize.isAccessibilitySize ? 2 : 1) "
                      "{ mark(side: LibraryLook.rowCover) } trailing: { EmptyView() } "), phone
-    assert mac == (" HStack(spacing: 10) { mark(side: SheetLook.macCover) Text(name) .foregroundStyle(DWPalette.head) "
-                   ".lineLimit(1) .truncationMode(.tail) Spacer(minLength: 8) if let line { Text(line) "
-                   ".font(SheetLook.small) .foregroundStyle(DWPalette.t2) .lineLimit(1) } } .font(SheetLook.words) "
-                   ".sheetRow() .help(name) "), mac
+    # (the panel review's R19) its cover and height View > Row Size's, handed in by the desktop frame - the sheet's own
+    # 20 and 30 where none was (tests/test_ios_get_look.py)
+    assert mac == (" HStack(spacing: 10) { mark(side: rowSize?.cover ?? SheetLook.macCover) Text(name) "
+                   ".foregroundStyle(DWPalette.head) .lineLimit(1) .truncationMode(.tail) Spacer(minLength: 8) "
+                   "if let line { Text(line) .font(SheetLook.small) .foregroundStyle(DWPalette.t2) .lineLimit(1) } } "
+                   ".font(SheetLook.words) .frame(minHeight: rowSize?.height ?? SheetLook.rowHeight) .sheetRow() "
+                   ".help(name) "), mac
     assert "static let macCover: CGFloat = 20" in code(SHEET)
     # VoiceOver hears a row as one: its name and its line
     assert ('.accessibilityElement(children: .ignore) .accessibilityLabel([name, line].compactMap { $0 }'

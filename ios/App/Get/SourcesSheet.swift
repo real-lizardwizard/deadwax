@@ -95,6 +95,11 @@ struct GetRequest: Identifiable {
 ///   Sources tab (MacSourcesTab, `kept`): the Get's own chips and sort, so they outlast its tab switched away from and
 ///   back, its search begun once and let go only as the Get ends (AppNavigation.endSources) - its Close the Get over and
 ///   the panel put away.
+/// - (The panel review's R19 - notes/ios.md "The panel review, R19: Get, and old type left in redrawn pages
+///   (2026-11-27)") In the Mac's dock there is no bar: the page starts under the folder tabs with the dock's own header
+///   (DockHeader) - the subtitle, and Search again as a `.btn.sm` - and its Close is the dock's (Escape, the panel put
+///   away: MacSourcesTab ends the Get then, as Close did). The states (asking, nothing found, refused) are in the look's
+///   type on both devices, and the query's field the look's well - square on the phone, `.in`'s corners on the Mac.
 struct SourcesPage: View {
     let request: GetRequest
     /// Pushed from Search Soulseek's form: no Cancel - Back is there.
@@ -112,7 +117,6 @@ struct SourcesPage: View {
     @Environment(Reachability.self) private var reachability
     @Environment(LibraryModel.self) private var library
     @Environment(SearchModel.self) private var searchModel
-    @Environment(AppNavigation.self) private var navigation
     /// This Get's search (GetRequest.search).
     private var model: SourcesSearch { request.search }
     /// The chips, the sort and whether one was tapped: the page's own, or the dock's Get's (`kept`).
@@ -157,7 +161,10 @@ struct SourcesPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if !request.subtitle.isEmpty {
+            if kept != nil, Platform.mac {
+                // (R19) the dock's own header in the bar's place: the subtitle, and Search again at its right
+                dockHeader
+            } else if !request.subtitle.isEmpty {
                 // iSources: .s.q, at the left, 2 above and 10 under
                 Text(request.subtitle)
                     .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
@@ -199,29 +206,29 @@ struct SourcesPage: View {
         .navigationTitle(SourcesWords.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            // (manual search) pushed from Search Soulseek's form, Back is there in its place
-            if !pushed {
+            // (manual search) pushed from Search Soulseek's form, Back is there in its place - (R19) and in the Mac's
+            // dock no bar at all: its Close is the dock's own, Search again in its header
+            if !pushed && !docked {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(SourcesLook.close) {
-                        // (R7) in the Mac's dock: the Get over, its search let go, and the panel put away
-                        guard !docked else { return closeDock() }
                         // the search let go in the tap, then the sheet closes
                         model.close()
                         dismiss()
                     }
                     // (the Mac app, slice 2) Escape is Close only with the search's words as searched: Close throws
-                    // edited words away without asking - (R7) and in the dock only as Escape's owner says the panel's
-                    .escapeCloses(!model.edited && (!docked || MacFrame.escape(typing: TextEditing.shared.typing,
-                                                                               panel: navigation.macPanel) == .panel))
+                    // edited words away without asking
+                    .escapeCloses(!model.edited)
                 }
             }
-            if foundFolders {
+            if foundFolders && !docked {
                 // (James) at the right of the title, so a long list needn't be scrolled to its end to search again
                 ToolbarItem(placement: .topBarTrailing) {
                     againInBar
                 }
             }
         }
+        // (R19) the dock's page starts under its folder tabs: the stack's bar hidden there
+        .toolbar(docked ? .hidden : .automatic, for: .navigationBar)
         .onAppear {
             // (R7) the dock's page drawn again as its tab comes back: its Get as it was, never searched afresh
             guard !docked || model.search == nil else { return }
@@ -307,12 +314,6 @@ struct SourcesPage: View {
         let found = StoreLine.drawn(answer.store, floor: floor, joins: server.access.can(.request))
         guard let found, addedFrom == model.landed else { return found }
         return StoreLine.addedStatus(found)
-    }
-
-    /// (R7) The dock's Close: the Get over (its search let go, Sources gone) and the panel put away.
-    private func closeDock() {
-        navigation.endSources()
-        navigation.closePanel()
     }
 
     // MARK: the chips
@@ -441,11 +442,12 @@ struct SourcesPage: View {
                 VStack(spacing: 12) {
                     ProgressView()
                     Text(Sources.searchingLine(search.release))
-                        .font(Typeface.subheadline)
+                        .font(Platform.mac ? Typeface.Look.text(.field) : Typeface.Phone.text(.row))
+                        .foregroundStyle(DWPalette.text)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(Sources.searchTakes)
-                        .font(Typeface.footnote)
+                        .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
                         .foregroundStyle(DWPalette.t2)
                 }
                 .frame(maxWidth: .infinity)
@@ -475,14 +477,14 @@ struct SourcesPage: View {
             StoreLineView(status: status, notes: notes,
                           onJoin: server.access.can(.request) ? { (jobId: Int) in try await join(jobId, release: release) } : nil,
                           onAdd: { try await add(release) }, live: online)
-                .opacity(online ? 1 : Palette.dimmed)
+                .opacity(online ? 1 : DWPalette.off)
         } else {
             StoreLineView(status: nil, notes: notes)
             if let notPicked = model.notPicked ?? model.search.flatMap({ tooOld($0) }) {
                 // When I tap Get said pick, and nothing qualified: why, above the sources - (manual search) or why
                 // every Get is off
                 Text(notPicked)
-                    .font(Typeface.footnote)
+                    .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
                     .foregroundStyle(DWPalette.t2)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -497,7 +499,7 @@ struct SourcesPage: View {
                     queryForm {
                         stateText(Sources.nothingLosslessLine(answer))
                         Text(Sources.nothingLosslessNote)
-                            .font(Typeface.footnote)
+                            .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
                             .foregroundStyle(DWPalette.t2)
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
@@ -530,7 +532,7 @@ struct SourcesPage: View {
                     }
                 }
                 Text(Sources.searchedLine(answer, shown: shown.count))
-                    .font(Typeface.footnote)
+                    .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
                     .foregroundStyle(DWPalette.t2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -604,7 +606,8 @@ struct SourcesPage: View {
 
     private func stateText(_ words: String) -> some View {
         Text(words)
-            .font(Typeface.subheadline)
+            .font(Platform.mac ? Typeface.Look.text(.field) : Typeface.Phone.text(.row))
+            .foregroundStyle(DWPalette.text)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -641,12 +644,34 @@ struct SourcesPage: View {
         .accessibilityValue(again == .top ? SourcesWords.expanded : SourcesWords.collapsed)
     }
 
+    /// (R19) The Mac's dock's header, in the bar's place (Get.dc.html's panel has no bar): the subtitle at the left in
+    /// `.s .q`, wrapping, and - while folders found are shown, as the bar's was - Search again at the right as a `.btn.sm`,
+    /// lit (`.on`) while its words to change are open above the chips. One button, one toggle: the bar's own Search again
+    /// isn't drawn in the dock.
+    private var dockHeader: some View {
+        DockHeader {
+            if !request.subtitle.isEmpty {
+                Text(request.subtitle)
+                    .font(Typeface.Look.text(.smallButton))
+                    .foregroundStyle(DWPalette.t2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } trailing: {
+            if foundFolders {
+                Button(SourcesWords.searchAgain) { toggleAgain(.top) }
+                    .buttonStyle(DWButtonStyle(kind: again == .top ? .on : .normal, size: .small))
+                    .fixedSize()
+                    .accessibilityValue(again == .top ? SourcesWords.expanded : SourcesWords.collapsed)
+            }
+        }
+    }
+
     /// "Search again" under folders found: a disclosure - the query to edit opens under it, focused; a second tap closes
     /// it, and the bar's moves it up there.
     @ViewBuilder private var searchAgain: some View {
         Button(SourcesWords.searchAgain) { toggleAgain(.bottom) }
-            .font(Typeface.body)
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .buttonStyle(DWButtonStyle())
+            .frame(maxWidth: .infinity)
             .accessibilityValue(again == .bottom ? SourcesWords.expanded : SourcesWords.collapsed)
         if again == .bottom {
             queryForm(focus: true) {
@@ -663,21 +688,30 @@ struct SourcesPage: View {
             said()
             VStack(alignment: .leading, spacing: 6) {
                 Text(SourcesWords.searchFor)
-                    .font(Typeface.caption)
+                    .font(Platform.mac ? Typeface.Look.text(.chip) : Typeface.Phone.text(.extraSmall))
                     .foregroundStyle(DWPalette.label)
                     .accessibilityHidden(true)
+                // (R19) the look's field: its well under it (`.in`) - square on the phone, a button's 4 on the Mac -
+                // its edge the accent's while it has the cursor, and a tap on the well's target puts the cursor in it
                 TextField(SourcesWords.searchFor, text: $model.query)
+                    .textFieldStyle(.plain)
+                    .font(Typeface.Look.text(.field))
+                    .foregroundStyle(DWPalette.fieldText)
                     .focused($againFocused)
+                    .focusEffectDisabled()
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .submitLabel(.search)
                     .onSubmit {
                         if online { requery() }
                     }
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: 44)
-                    .background(Palette.well, in: Corners.controlShape)
-                    .overlay(Corners.controlShape.strokeBorder(Palette.border))
+                    .padding(.horizontal, SourcesPageLook.fieldInside)
+                    .lookHeight(DWLook.here.fieldHeight)
+                    .background {
+                        DWWell(focused: againFocused)
+                            .contentShape(DWTarget(face: DWCorners.buttonShape))
+                            .onTapGesture { againFocused = true }
+                    }
                     .accessibilityLabel(SourcesWords.searchFor)
                     .task {
                         // focused once it is drawn: a focus asked before the field exists is lost
@@ -727,6 +761,8 @@ enum SourcesPageLook {
     static let subtitleBelow: CGFloat = 10  // drawn: iSources subtitle padding-bottom
     static let sortGap: CGFloat = 8         // drawn: iSources sort line gap
     static let sortFold: CGFloat = 4        // own: the count folded under the pop-ups
+    /// (R19) The query's field's words in from its well's edge.
+    static let fieldInside: CGFloat = 8     // drawn: .in padding-left
     static let cardGap: CGFloat = 10        // drawn: iSources cards gap
     /// (R7's review) The Mac's foot under the cards: 34 tall, its words 12 in.
     static let foot: Double = 34            // drawn: Get panel foot height

@@ -208,9 +208,10 @@ struct PlaylistPicker: View {
 
 /// One row of the picker: the playlist's mosaic (or New playlist…'s plus on the empty cover's square), its name and its
 /// count - "Adding…" while its add is out. Read as one: "Late night, 12 songs". (R18) On the phone the Library's
-/// playlist row (LibraryListRow, iPlaylists' tall row on its hairline); on the Mac a box's row (`.row`, 30 tall, its
-/// cover 20 - a sheet's own window reads the Small Row Size), the count after the name in the second colour, a long
-/// name cut short with the whole of it in `.help` and VoiceOver.
+/// playlist row (LibraryListRow, iPlaylists' tall row on its hairline); on the Mac a box's row (`.row`) at View > Row
+/// Size's height and cover - (the panel review's R19) handed in by the desktop frame (`sheetRowSize`), a sheet's window
+/// being outside its environment; the sheet's own 30 and 20 where none was - the count after the name in the second
+/// colour, a long name cut short with the whole of it in `.help` and VoiceOver.
 private struct PickerRow: View {
     let cover: String?
     let name: String
@@ -218,12 +219,13 @@ private struct PickerRow: View {
     let symbol: String?
 
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.sheetRowSize) private var rowSize
 
     var body: some View {
         Group {
             if Platform.mac {
                 HStack(spacing: 10) {
-                    mark(side: SheetLook.macCover)
+                    mark(side: rowSize?.cover ?? SheetLook.macCover)
                     Text(name)
                         .foregroundStyle(DWPalette.head)
                         .lineLimit(1)
@@ -237,6 +239,7 @@ private struct PickerRow: View {
                     }
                 }
                 .font(SheetLook.words)
+                .frame(minHeight: rowSize?.height ?? SheetLook.rowHeight)
                 .sheetRow()
                 .help(name)
             } else {

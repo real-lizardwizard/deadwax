@@ -413,7 +413,10 @@ def test_the_row_selected_stays_in_view_as_the_size_changes():
 
 def test_the_frame_hands_the_one_choice_down():
     frame = flat(bare(source(FRAME)))
-    assert ".environment(\\.macRowSize, MacRowSizeStore.shared.size) .modifier(RowSizeAlternateKey())" in frame
+    # (R19) read once, in `rowSize` - which also hands it, as plain numbers, into Add to a playlist's sheet
+    # (tests/test_ios_get_look.py)
+    assert "private var rowSize: MacRowSize { MacRowSizeStore.shared.size }" in frame
+    assert ".environment(\\.macRowSize, rowSize) .modifier(RowSizeAlternateKey())" in frame
     sources = {path.relative_to(APP).as_posix(): bare(path.read_text(encoding="utf-8"))
                for path in sorted(APP.rglob("*.swift"))}
     handed = [name for name, code in sources.items() if ".environment(\\.macRowSize" in code]

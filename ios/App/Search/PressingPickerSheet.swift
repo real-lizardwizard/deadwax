@@ -108,17 +108,19 @@ private struct PressingChoiceRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.label)
                     .foregroundStyle(DWPalette.text)
+                // (the panel review's R19) the small words, where the system's footnote and caption were
                 if !row.facts.isEmpty {
                     Text(row.facts)
-                        .font(Typeface.footnote)
+                        .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
                         .foregroundStyle(DWPalette.t2)
                 }
                 Text(row.note)
-                    .font(Typeface.footnote)
+                    .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
                     .foregroundStyle(row.kind == .differs ? DWPalette.amberText : DWPalette.t2)
                 if row.held {
                     Text(row.heldLabel)
-                        .font(Typeface.caption.weight(.semibold))
+                        .font(Platform.mac ? Typeface.Look.text(.chip) : Typeface.Phone.text(.extraSmall))
+                        .fontWeight(.semibold)
                         .foregroundStyle(DWPalette.greenText)
                 }
             }

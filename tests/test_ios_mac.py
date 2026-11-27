@@ -561,7 +561,9 @@ GUARDED_ESCAPES = {
     "Artist/ArtistMoveSheet.swift": ["model.map { (model: ArtistWhoModel) -> Bool in model.query == name } ?? true)"],
     "Artist/ArtistImagesSheet.swift": ["model.map { (model: ArtistImagesModel) -> Bool in"],
     #? (R7) and in the Mac's dock only as the main window's Escape owner says it is the panel's
-    "Get/SourcesSheet.swift": ["!model.edited && (!docked || MacFrame.escape(typing: TextEditing.shared.typing,"],
+    #? (the panel review's R19) its Close only where there is a bar: in the Mac's dock the tab holds Escape while the
+    #? words are edited (MacSourcesTab's `.dockHoldsEscape(get.request.search.edited)`, tests/test_ios_get_look.py)
+    "Get/SourcesSheet.swift": ["!model.edited)"],
     #? (manual search, slice A1) Search Soulseek's Cancel throws the typed artist and album away
     "Get/ManualSearchSheet.swift": ["artist.isEmpty && album.isEmpty)"],
     "Playlists/PlaylistPicker.swift": ["!(model.making && nameTyped))", "escapes && blank)"],
@@ -966,7 +968,8 @@ def test_the_frame_holds_the_sidebar_the_page_a_panel_and_the_bar():
     assert order == sorted(order)
     #? (slice 3's review) the panel drawn in one place, a drawer's or a column's - crossing 1280 never draws it afresh
     assert frame.count("MacPanel(") == 1 and "if MacDock.liesOver(style, panel) {" not in frame
-    assert "MacDock.liesOver(style, panel) ? Palette.well : Color.clear" in body
+    #? (the panel review's R19) its shadow over the page the look's drop
+    assert "MacDock.liesOver(style, panel) ? DWPalette.buttonDrop : Color.clear" in body
     assert "MacFrame.panelWidth" not in frame, "the web's 470 is MacFrame's, unread here"
     #? (R3) what a list on the page in front selects, for the menus: Info opens about it with nothing queued
     assert ("navigation.macSelected = selected" in frame

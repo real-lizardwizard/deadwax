@@ -392,12 +392,18 @@ def test_the_sources_sheet_is_drawn_in_the_webs_colours():
                   "DWButtonStyle(kind: best ? .pri : .normal, size: .small)"):
         assert drawn in card, drawn
     assert "SpeedBar" not in card and not re.search(r"(?<![\w.])Palette\.", card)
+    # (the panel review's R19) and the store line in the look's colours as the cards are: on the Mac Get.dc.html's box,
+    # the card's face on the line's edge; held in green; Join and Add the look's buttons, faded to the look's off while
+    # waiting on deadwax; the error in the red chip's words (tests/test_ios_get_look.py)
     box = (APP / "Get" / "StoreLineView.swift").read_text(encoding="utf-8")
-    assert "Palette.card" in box and "Palette.border" in box and "Palette.held" in box
-    # (slice 3) Join and Add waiting on deadwax: faded to --app-job-busy, as app.css fades .app-store-join
+    for drawn in (".background(DWPalette.card, in: DWCorners.boxShape)",
+                  ".overlay(DWCorners.boxShape.strokeBorder(DWPalette.line, lineWidth: 1))", "DWPalette.greenText",
+                  ".opacity(phase == .busy ? DWPalette.off : 1)", ".foregroundStyle(DWPalette.redChipText)"):
+        assert drawn in box, drawn
+    assert not re.search(r"(?<![\w.])Palette\.", box) and "SecondaryPill" not in box
+    # (slice 3) --app-job-busy, as app.css fades .app-store-join, still the old palette's for what keeps it
     assert token(REPO / "interface" / "player" / "app.css", "app-job-busy") == "0.75"
     assert "static let busy: Double = 0.75\n" in palette
-    assert "Palette.busy" in box and "SecondaryPill()" in box and "Palette.danger" in box
 
 def test_the_play_bar_is_the_tab_bars_top():
     # 15 Nov, James: "merge the play bar with the bottom bar so it doesn't look like it's floating", "opaque the whole
@@ -681,7 +687,8 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert "Color.black.ignoresSafeArea()" in now_playing
     backdrop = now_playing[now_playing.index("private struct Backdrop"):]
     assert ".ignoresSafeArea()" in backdrop and "CoverImage(" in backdrop
-    assert ".background(Color(.systemBackground).ignoresSafeArea())" in sources["Root/RootView.swift"]
+    #? (the panel review's R19) the sign-in's ground the page's, a fill, not the system's
+    assert ".background((Platform.mac ? DWPalette.bg : DWPalette.page).ignoresSafeArea())" in sources["Root/RootView.swift"]
 
 
 def test_find_never_freezes_the_librarys_top():
@@ -1282,7 +1289,8 @@ def test_every_list_sections_header_and_footer_is_libre_franklin():
     for index, (name, number, code) in enumerate(lines):
         if re.search(r"\} (header|footer): \{", code):
             following = " ".join(line for _, _, line in lines[index:index + 40])
-            if ".font(Typeface." not in following:
+            #? (R19) or a ternary of Typeface's faces, each device's: still the face
+            if not re.search(r"\.font\((?:Platform\.mac \? )?Typeface\.", following):
                 loose.append(f"{name}:{number}")
         if re.search(r"Section\([^{}:]+\) \{", code) and name not in ("Player/QueueMenu.swift",
                                                                      "Downloads/DownloadControl.swift"):

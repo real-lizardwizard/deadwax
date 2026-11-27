@@ -20658,6 +20658,126 @@ Judged and left:
   Can't reach deadwax and the first ask's headings at the Mac's 13 semibold (SheetLook.title), a point over the 12
   under them - whether that reads as a heading.
 
+## The panel review, R19: Get, and old type left in redrawn pages (2026-11-27)
+
+The panel review's slice R19 (panel-review.md rows M8, M9, M19, M20, P6 and P10; checks 639-644), after R16. James chose
+to have Get's store line redrawn, though R7 had kept it as it was; the Mac's Sources still sat under a system bar, its
+Close the bar's; and pages already redrawn kept the old Palette and the system's text styles in corners no drawing
+showed. Nothing Get or Sources does changed: the same searches, filters, sorts, Get and gates
+(`server.access.can(.request)` untouched), and every word is as it was.
+
+- **The Mac's Sources, no bar** (Get/SourcesSheet, Mac/Search/MacSourcesTab): in the dock (`docked`, `kept != nil`)
+  the page hides the stack's bar (`.toolbar(docked ? .hidden : .automatic, for: .navigationBar)`) and draws
+  `dockHeader` in its place - R16's DockHeader with the subtitle at the left (`.s .q`, wrapping) and, while folders
+  found are shown (as the bar's was), **Search again** at the right as a `.btn.sm`, `.on` while its words are open
+  above the chips: the same `toggleAgain(.top)` the bar's sent, the bar's not drawn there. Close and the bar's Search
+  again are drawn only where there is a bar (`!docked`). The old `closeDock()` went with Close.
+- **Its Close is the dock's**: MacPanel's own Escape (DockEscapeKey, through MacFrame.escape - a field with the cursor
+  gets Escape first, `.field`), and the panel put away is the Get over, as Close was: MacSourcesTab's `.onDisappear`
+  calls `navigation.endSources()` when `navigation.macPanel == nil`, so a tab switched to (macPanel another tab) keeps
+  the Get, and a Get replaced (`.id`) or already over is nothing to end. Close's Escape stood aside while the words were
+  edited (`.escapeCloses(!model.edited)`, so Escape never threw edited words away); the tab now holds Escape for that
+  time alone, `.dockHoldsEscape(get.request.search.edited)`, and R16's whole-tab hold is gone from MacPanel's
+  `.sources` case - the one line of MacPanels.swift this slice changes. Sources has no View key and a click on its
+  folder tab shows it (AppNavigation.showPanel), so Escape is its close in practice; the View keys of the other tabs
+  switch to theirs, keeping the Get, as before.
+- **Sources' states in the look's type, both devices**: the state's line (searching, nothing found, nothing lossless,
+  none through the chips, refused - `stateText`) the card row's words (the phone's `.go` 16, the Mac's 13) in --text,
+  what goes with it (This takes a few seconds, why nothing lossless, Searched for, why it didn't pick) the small size in
+  --t2. The query field the look's well: DWWell (square on the phone, `.in`'s 4 on the Mac), the plain field in the
+  field's type and --fieldText, the focus ring off, 8 inside (`.in`'s padding-left), a tap anywhere on it focusing it -
+  R1c's typing walk reads it as WELL now (was OWN). Search again under the cards DWButtonStyle, across the page.
+- **Get's store line** (Get/StoreLineView): the Mac's Get.dc.html `.box` - DWPalette.card in DWCorners.boxShape (5),
+  its 1 pt --line edge, 12 inside (the Get panel's `.col` padding) - the title --head (green when held), 13 semibold,
+  the lines --t2 at the small size, the last --t3; the phone's flat on the black, the title the phone's 16 semibold.
+  Join and Add DWButtonStyle (was SecondaryPill through `face(_:)`), dimmed by DWPalette.off while busy; the error
+  DWPalette.redChipText.
+- **Manual search's Search** (Get/ManualSearchSheet): `DWButtonStyle(kind: .pri, size: .large, fills: true)` where
+  PrimaryFace was; the footer the phone's `.s`.
+- **The old type and Palette** - each moved to the very size it was where the phone has one (Typeface.Phone's:
+  headline's 17 semibold to `.topName` semibold, callout 16 to `.row`, footnote 13 to `.small`, caption 12 to `.extraSmall`; the
+  system's `mono(.footnote)` for an error's raw detail to the words' `.small`, the readout face being for numbers that
+  tick since 25 Nov's review - test_ios_palette's BACK_IN_WORDS keeps it out of Downloads), the Mac's through Typeface.Look's roles (field 13, smallButton 12,
+  chip 11.5). Typeface.body stays: Libre Franklin's 17 scaled with body is the phone's row title (LibraryListRow's,
+  R2's; test_ios_settings_look pins Downloads' rows to it), and a row R19 gave a font where it inherited one takes it
+  on the phone, the very size and style it had. Palette.quiet to --t2, `.tertiary` to --t3, held/amber/danger to greenText/amberText/redChipText,
+  Corners.artShape to DWCorners.chipShape, Divider to DWRule:
+  - **MBArtistView**: the bar's name, the about line, Albums' heading (ArtistSectionHead's semibold --head), the
+    loading line, the rows (title, tick, line, chevron, the cover's corners, the hairline); the picture's shadow gone
+    (the artist page's hero has none); Studio only still a Toggle, drawn `DWButtonStyle(kind: on ? .on : .normal,
+    size: .small)`; Try again DWButtonStyle.
+  - **DownloadsScreen**: the headline, the error's detail, the covers' corners, the swipe's red; on the
+    Mac (Settings > Downloading and downloaded…) **Storage limit** and **Download over** are DWPopUp, their menus the
+    very Pickers (`storageLimitPicker`, `overPicker` - each the Picker it was, word for word, declared once and drawn
+    `.inline` in the pop-up, `.menu` on
+    the phone as Settings' other pages keep iOS's menu) - MacSettingsRoot draws the same two the same way.
+  - **AlbumHero**'s DownloadLine: `.xs` semibold, --t2, amber's words for didn't.
+  - **PlaylistView**'s Edit (editSections, editRow) and QuietLine: the notes and the songs' heading small --t2, Needs a
+    name redChipText, the rows' titles --text and artists --t2, the (-) the red button's face and words
+    (`DWPalette.redText, DWPalette.redFace`, `.plain` where `.borderless` was).
+  - **PressingPickerSheet**'s rows: the facts and note the small size (SheetLook.small's two, spelled out for
+    test_ios_search_look's phone fonts), In your library `.xs` / chip semibold green.
+  - **ErrorNote**: the line the card row's words, the detail and the disclosure the small words, the detail --t2. Its
+    colour otherwise the caller's, as before.
+  - **ServerSettingsGroupScreen**'s choice setting on the Mac: DWPopUp with the chosen value's words
+    (`Self.chosen(choices, value: row.value)`, the phone row's own), its menu the very Picker - `selection: value`, the
+    choices tagged `choice.value` - drawn `.inline`, so a choice sends exactly what the system pop-up sent. The phone's
+    menu is R14's, untouched.
+  - **DesktopFrame**: the drawer's shadow DWPalette.buttonDrop (black 0.45, where Palette.well was 0.2: no token holds
+    0.2 - a touch darker, for the Mac to judge), the panel's hairline DWPalette.frame (--frame, the very #22202b).
+  - **RootView**: the sign-in's ground the page's (`Platform.mac ? DWPalette.bg : DWPalette.page`), not
+    `Color(.systemBackground)`.
+- **Row Size into Add to a playlist** (R18's left item): DesktopFrame reads the store once (`private var rowSize`) and
+  hands it to the frame's lists as before and, as plain numbers, into the sheet it puts up over itself -
+  `.environment(\.sheetRowSize, SheetRowSize(height:cover:))` on PlaylistPicker. SheetRowSize and the `sheetRowSize`
+  entry are declared in DesktopFrame (a frame file, so not a Mac name test_ios_mac_reach keeps out of shared files),
+  nil by default; PickerRow's Mac half reads it (`rowSize?.cover ?? SheetLook.macCover`, `.frame(minHeight:
+  rowSize?.height ?? SheetLook.rowHeight)` before `.sheetRow()`), the phone's never does. test_ios_mac_rows' rules hold:
+  only the frame hands `macRowSize` down, MacRowSizeStore.shared read once there.
+
+Kept where the phone has no size of its own (Typeface.Phone has none at 20, 22 or 28): AlbumHero's title (22 bold, 20
+over 60 letters) and artist (20), MBArtistView's name (28 bold, the artist page's hero's), the Storage bar's amount
+(22), and **PeopleScreen.swift:370**'s person's name (iPerson's 20/700) - left untouched rather than moved to a size
+it isn't. A Phone size at 20/22/28 in Shared/Typeface.swift would let them go; for the coordinator. Not built from
+Get.dc.html (as R7): Pin, Show all 14, the per-card signal chips. MacPanels' comments at the `.sources` case and in
+MacPanel's doc still say "until R19" - the slice may change that one line only; for the coordinator.
+
+Words keys: none changed (iphone.json, mac.json untouched).
+
+**Tests**: tests/test_ios_get_look.py (new, 11): the Mac's Sources with no bar and one Search again in the dock's
+header (one Button, one `toggleAgain`); the dock's Close (Escape held only while the words are edited, the panel put
+away ends the Get, R16's whole-tab hold gone, MacDock.escape answering a field first); the states and the query field
+in the look's type and well; the store line's box on the Mac (DWCorners.box's 5) and nothing under it on the phone, the
+old faces gone from every file R19 redrew; Manual search's primary; no old Palette or system type where R19 drew (the
+20/22/28 kept, counted, and Typeface.body allowed); each moved to its very size; the choice setting's pop-up round the
+very Picker, compared with the phone's; Downloads' two pop-ups and their Pickers, each declared once; the frame's tokens
+and Row Size handed into the picker, by the frame alone; every word as it was (each file's set of word expressions -
+the first argument of each Text, Button, Toggle, Picker, Label, pop-up, accessibility label, value and hint - counted
+and sampled: read against b51a90a5 none went, and the only ones new are the dock header's subtitle and Search again
+and the pop-ups' labels, each a copy of words the page already drew). Changed on purpose: test_ios_dock_look (Sources'
+hold), test_ios_search_look (FLAT[SHEET] the well, the olds empty, the query's well, the dock's Close),
+test_ios_mac (Sources' Escape guard, the drawer's shadow), test_ios_mac_rows (`rowSize`), test_ios_manage_look and
+test_ios_server_settings (the Mac's pop-up), test_ios_palette (the store line's colours, RootView's ground, a header's
+face through a ternary of Typeface's), test_ios_phone_look (Sources' query WELL, the manual search's asserts,
+R19_PAGES in SLICES), test_ios_sheets_look (the picker's Mac row), test_ios_contract and test_ios_manual_search (Close
+and the bar's Search again only where there is a bar).
+
+Mutations, each applied alone and restored: Search again sent twice from DockHeader (caught by
+test_the_macs_sources_has_no_bar_and_one_search_again_in_the_dock_header); the store line's box radius off its token
+(test_ios_get_look's box test, test_ios_palette's corners and Sources colours, test_ios_search_look's values); a raw
+Palette back in AlbumHero (two of test_ios_get_look's); a choice setting tagging its old value
+(test_a_choice_setting_sends_exactly_what_the_system_picker_sent); a ground under the phone's store line (the box test,
+test_the_phone_is_flat_in_search_get_and_sources); Sources' query on `.roundedBorder` (test_ios_phone_look's typing
+walk, test_ios_get_look's field); the panel put away keeping the Get (the dock's Close test,
+test_the_tab_goes_when_its_get_page_is_left); Row Size not handed in (the frame's test).
+
+Palette.busy, Palette.frameBorder and Palette.well have no reader left (DeadwaxApp.swift keeps them; not this slice's
+file to tidy).
+
+**Not verified**: anything on a device (checks 639-644) - the dock's header against the folder tabs, Escape's three
+cases with the cursor and edited words, the store line's box beside the cards, the pop-ups' menus, the drawer's
+darker shadow, the picker's rows at Medium and Large.
+
 ## The panel review, R20: the known holdouts (2026-11-26)
 
 James asked for "a full review of the design on every pannel", and decided that the pages with no drawing are drawn from
