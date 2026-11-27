@@ -220,7 +220,7 @@ minutes. See [Organizing](organizing.md) and [troubleshooting](troubleshooting.m
 
 | setting | default | what it does |
 | --- | --- | --- |
-| `AUTO_RETRY_PEER` | `off` | `on` moves a failed download to the next source from the list you picked it from, by itself. It's off by default because the next source down may be a different pressing or a worse rip. **Another source** on a failed download, in Requests, works either way. |
+| `AUTO_RETRY_PEER` | `off` | `on` moves a failed download to the next source from the list you picked it from, by itself. It's off by default because the next source down may be a different pressing or a worse rip. **Another source** on a failed download, in Requests, works either way, and a download that arrives [damaged](downloading.md#when-a-download-arrives-damaged) always moves on by itself. |
 
 ### Cover art
 

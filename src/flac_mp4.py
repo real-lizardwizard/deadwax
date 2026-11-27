@@ -41,6 +41,11 @@ class Unsupported(CannotRepackage):
     """A FLAC stream, but not one this can repackage with certainty."""
 
 
+class Truncated(Unsupported):
+    """The file ends inside its own metadata - an Unsupported like any other here; src/flac_check.py, which judges
+    downloads, reads it as a file cut short."""
+
+
 #? A bound on the memory: the input and the output are both held whole. Ten minutes of CD audio
 #? is ~60 MB and an hour of 24/192 two or three GB; past 1 GiB the caller keeps the FLAC.
 MAX_INPUT_BYTES = 1 << 30
@@ -215,13 +220,13 @@ def _read_metadata(data: bytes, pos: int) -> tuple[StreamInfo, int]:
     info = None
     while True:
         if pos + 4 > len(data):
-            raise Unsupported("the metadata runs past the end of the file")
+            raise Truncated("the metadata runs past the end of the file")
         head = data[pos]
         kind, last = head & 0x7F, head & 0x80
         length = int.from_bytes(data[pos + 1:pos + 4], "big")
         body = data[pos + 4:pos + 4 + length]
         if len(body) < length:
-            raise Unsupported("the metadata runs past the end of the file")
+            raise Truncated("the metadata runs past the end of the file")
         if info is None:
             if kind != _STREAMINFO or length != _STREAMINFO_LENGTH:
                 raise Unsupported("the first metadata block isn't STREAMINFO")

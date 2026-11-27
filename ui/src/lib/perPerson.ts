@@ -1,4 +1,4 @@
-import type { Candidate, DownloadInFlight, DownloadJob, FindCandidatesResponse, JobQuality } from '../api/types'
+import type { Candidate, DownloadInFlight, DownloadJob, EnqueueAlternative, FindCandidatesResponse, JobQuality } from '../api/types'
 import { HELD_TITLE, beingFiled, downloadProgressText, passesFilters, qualityText, storeStatus, type StoreStatus } from './candidates'
 import { QUALITY_FLOORS, candidateFilters, floorFilters, type QualityFloor } from './getSettings'
 import { ADD_NOTE, IN_THE_STORE, heldNotYours } from './myLibrary'
@@ -29,6 +29,18 @@ export function candidateQuality(candidate: Pick<Candidate, 'formats' | 'bitrate
     bit_depths: [...(candidate.bit_depths ?? [])],
     sample_rates: [...(candidate.sample_rates ?? [])],
     variable_bitrate: Boolean(candidate.variable_bitrate),
+  }
+}
+
+/** The rest of a card a Get sends (damaged downloads, 27 Nov): the signals its score was made of, a free slot or
+ *  its queue - kept with the download, so the server can say how the next source differs from it. */
+export function cardFacts(
+  candidate: Pick<Candidate, 'signals' | 'has_free_slot' | 'queue_length'>,
+): Pick<EnqueueAlternative, 'signals' | 'has_free_slot' | 'queue_length'> {
+  return {
+    ...(candidate.signals ? { signals: { ...candidate.signals } } : {}),
+    has_free_slot: Boolean(candidate.has_free_slot),
+    queue_length: candidate.queue_length ?? 0,
   }
 }
 

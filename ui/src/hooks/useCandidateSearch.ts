@@ -6,7 +6,7 @@ import { autoGrabPick, autoPickBlocked, candidateKey, queryOverride, type Candid
 import { requestDownload } from '../lib/downloadRequests'
 import { notPickedLine } from '../lib/getSettings'
 import { isAbort, latestOnly } from '../lib/latest'
-import { candidateQuality } from '../lib/perPerson'
+import { candidateQuality, cardFacts } from '../lib/perPerson'
 import { DOWN, errorWords, said } from '../lib/errorWords'
 import { accessNow, seesDetail } from '../app/access'
 
@@ -132,9 +132,12 @@ export function useCandidateSearch({ picking, onPicked, formatPreference }: {
       alternatives: shown
         .filter((each) => candidateKey(each) !== key)
         .slice(0, 10)
-        .map((each) => ({ username: each.username, directory: each.directory, files: each.files, score: each.score, quality: candidateQuality(each) })),
+        .map((each) => ({ username: each.username, directory: each.directory, files: each.files, score: each.score, quality: candidateQuality(each), ...cardFacts(each) })),
       //? what the copy is, for someone offered to join it (2.0.0-player.49)
       quality: candidateQuality(candidate),
+      //? and the rest of its card, so the next source can be told apart from it (damaged downloads, 27 Nov)
+      score: candidate.score,
+      ...cardFacts(candidate),
     }).catch((caught: unknown) => {
       //? slskd's refusal, or deadwax's 409, is on the pending row in Requests ("refused: ...")
       console.error(`Enqueue error: ${caught instanceof Error ? caught.message : caught}`)

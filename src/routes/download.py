@@ -10,8 +10,9 @@ from src.config import Config, search_timeout_seconds
 from src.logger import logger
 from src.matching import rank_candidates
 from src.organizer import remove_incomplete_downloads
-from src.poller import (NOT_FILED_PATTERNS, job_lock_key, job_outcome, retry_next_peer, retry_same_peer, retryable,
-                        tidy_cancelled_later, tidy_cancelled_transfers, untried_alternatives)
+from src.poller import (NOT_FILED_PATTERNS, job_as_source, job_lock_key, job_outcome, retry_next_peer, retry_same_peer,
+                        retryable, tidy_cancelled_later, tidy_cancelled_transfers, untried_alternatives)
+from src.source_compare import next_source, quality_words, source_facts
 from src.store import (CLEARABLE_STATUSES, FINISHED_STATUSES, OPEN_STATUSES, RETRYABLE_STATUSES,
                        index_transfers_by_user, summarize_transfers)
 from src.store_index import (FILING_STATUSES, already_have, coming_now, describe_job, filing_folder, held_copy,
@@ -171,6 +172,17 @@ class Alternative(BaseModel):
     score: float | None = None
     #? (2.0.0-player.49) its quality, which the job takes on if a retry moves it here
     quality: Quality | None = None
+    #? (damaged downloads, 27 Nov) the rest of what its card showed - the parts of its score, a free slot, its queue
+    #? - so the next source can be told apart from the one before (src/source_compare.py). Declared, every field:
+    #? pydantic drops what it wasn't told about without a word. Stored only when sent.
+    signals: dict[str, float | None] | None = None
+    has_free_slot: bool | None = None
+    queue_length: int | None = None
+
+
+#? (damaged downloads) an Alternative's fields stored only when sent, so a runner-up sent without them is stored
+#? as it always was
+OPTIONAL_ALTERNATIVE = ("quality", "signals", "has_free_slot", "queue_length")
 
 
 class EnqueueRequest(BaseModel):
@@ -184,6 +196,11 @@ class EnqueueRequest(BaseModel):
     alternatives: list[Alternative] = Field(default_factory=list)
     #? the picked folder's quality (2.0.0-player.49) - optional, as everything added since is
     quality: Quality | None = None
+    #? (damaged downloads) and the rest of what its card showed (store.job_source), for how the next source differs
+    score: float | None = None
+    signals: dict[str, float | None] | None = None
+    has_free_slot: bool | None = None
+    queue_length: int | None = None
 
 
 def _asker(user) -> str:
@@ -688,10 +705,13 @@ async def enqueue(request: Request, body: EnqueueRequest, user: str = Depends(cu
                 directory=body.directory,
                 files=files,
                 release=release,
-                #? a runner-up sent without a quality is stored as it always was
-                alternatives=[a.model_dump(exclude=None if a.quality else {"quality"}) for a in body.alternatives],
+                #? a runner-up sent without a quality (or the rest of its card) is stored as it always was
+                alternatives=[a.model_dump(exclude={k for k in OPTIONAL_ALTERNATIVE if getattr(a, k) is None} or None)
+                              for a in body.alternatives],
                 user=user,
                 quality=body.quality.model_dump() if body.quality else None,
+                source={"score": body.score, "signals": body.signals, "has_free_slot": body.has_free_slot,
+                        "queue_length": body.queue_length},
             )
 
         return {"status": "ok", "queued": len(files), "job_id": job_id}
@@ -774,6 +794,8 @@ async def jobs(request: Request, user: str = Depends(current_user)):
         positions = await asyncio.gather(*(position(j, sm) for j, sm in zip(stored, summaries)))
         #? (2.1.40) what each manual search's download was filed as, its store row's names
         filed = await _filed_as(store, stored)
+        #? (damaged downloads) where "try the next peer" would move each failed one, and how it differs
+        upcoming = await _next_sources(store, stored, logins)
 
         merged = []
         for job, summary, queue_position in zip(stored, summaries, positions):
@@ -811,6 +833,15 @@ async def jobs(request: Request, user: str = Depends(current_user)):
                 #? one nothing of could be filed), and 0 hides the button
                 **({"alternatives_left": len(untried_alternatives(job))}
                    if retryable(job, logins) else {}),
+                #? (damaged downloads, 27 Nov) the copy being fetched: its quality as kept from its card, in words
+                #? too, and its size; who it came from before (`tried`, the peers that sent nothing left out); and
+                #? what happened that the status can't say - a damaged copy refused and where it comes from now
+                "quality": {**(job.get("quality") or {}), "words": quality_words(job.get("quality") or {}, job["files"])},
+                "total_size": sum(int(f.get("size") or 0) for f in job["files"]),
+                "earlier_sources": earlier_sources(job),
+                **({"notice": job["notice"]} if job.get("notice") else {}),
+                #? the source "try the next peer" would move it to, against this one (source_compare.next_source)
+                **({"next_source": upcoming[job["id"]]} if job["id"] in upcoming else {}),
                 **_per_person(job, user, admin),
                 #? (2.0.0-player.51) what its filing gave those who asked - 'added', 'incomplete', 'flagged'
                 #? or None - with logins on only (off, the one library isn't shown)
@@ -822,6 +853,75 @@ async def jobs(request: Request, user: str = Depends(current_user)):
     except Exception as e:
         logger.error(f"Exception in /jobs endpoint: {e}")
         raise HTTPException(status_code=500, detail=f"Error fetching download jobs: {e}")
+
+
+def earlier_sources(job: dict) -> list[dict]:
+    """
+    (Damaged downloads) Who a download came from before the source it is on - its `tried` list, oldest first, less
+    the current source and the peers asked who refused to send anything (`declined`) - each {username, directory}
+    and, for a copy refused as damaged, `damaged`: why, in a listener's words.
+    """
+    tried = [t for t in job.get("tried") or [] if isinstance(t, dict)]
+    current = next((i for i in range(len(tried) - 1, -1, -1) if tried[i].get("username") == job.get("username")), None)
+    return [{"username": t.get("username"), "directory": t.get("directory") or "",
+             **({"damaged": t["damaged"]} if t.get("damaged") else {})}
+            for i, t in enumerate(tried) if i != current and not t.get("declined")]
+
+
+#? (damaged downloads) next_source answers already worked out, keyed on what they are made from - /jobs is polled
+#? twice a second while a Requests page is open, and a failed row changes rarely
+_NEXT_SOURCES: dict[tuple, dict] = {}
+NEXT_SOURCES_KEPT = 256
+
+
+async def _next_sources(store, jobs: list[dict], logins: bool) -> dict[int, dict]:
+    """
+    (Damaged downloads) For each job "try the next peer" could move on - failed, cancelled, or (logins on) nothing
+    of it filed - with a runner-up left: that runner-up described against the job's own source
+    (source_compare.next_source), keyed on the job's id. Never raises: a row without it is a row as it was.
+    """
+    wanted = []
+    for job in jobs:
+        if not retryable(job, logins):
+            continue
+        untried = untried_alternatives(job)
+        if untried:
+            index = next(i for i, a in enumerate(job.get("alternatives") or []) if a is untried[0])
+            wanted.append((job, index, untried[0].get("username")))
+    if not wanted:
+        return {}
+    try:
+        speeds = await store.peer_speeds([name for job, _, other in wanted for name in (job["username"], other)])
+    except Exception:
+        speeds = {}
+
+    def rate(name):
+        return (speeds.get(name) or {}).get("avg_bytes_sec")
+
+    async def one(job, index, other):
+        #? the store's file too (a second store - a test's - numbers its jobs from 1 again), and the peer: a move
+        #? changes the peer and the index in the same second updated_at can't tell apart
+        key = (getattr(store, "path", None), job["id"], job.get("updated_at"), job["username"], index,
+               rate(job["username"]), rate(other))
+        if key in _NEXT_SOURCES:
+            return job["id"], _NEXT_SOURCES[key]
+        inputs = await store.next_source_inputs(job["id"], index)
+        if not inputs:
+            return job["id"], None
+        tracks = inputs["tracks"]
+        described = next_source(source_facts(inputs["alternative"], tracks, rate(other)),
+                                source_facts(job_as_source(job), tracks, rate(job["username"])))
+        if len(_NEXT_SOURCES) >= NEXT_SOURCES_KEPT:
+            _NEXT_SOURCES.clear()
+        _NEXT_SOURCES[key] = described
+        return job["id"], described
+
+    try:
+        answers = await asyncio.gather(*(one(job, index, other) for job, index, other in wanted))
+    except Exception as e:
+        logger.debug(f"couldn't describe the next sources: {e}")
+        return {}
+    return {job_id: described for job_id, described in answers if described}
 
 
 async def _filed_as(store, jobs: list[dict]) -> dict[int, dict]:

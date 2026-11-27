@@ -26,6 +26,7 @@ from collections import Counter
 from pathlib import Path
 
 from src.editions import edition_discriminator, resolve_edition_label
+from src.flac_check import check_file
 from src.naming import DEFAULT_ALBUM_FOLDER, render_album_folder, validate_template
 from src.logger import logger
 from src.tagkeys import easy_file
@@ -223,7 +224,7 @@ def folders_under(root: Path, library: Path | None):
 
 
 def find_local_file(download_root: str, remote_filename: str, remote_directory: str = "",
-                    library_root: str = "") -> Path | None:
+                    library_root: str = "", skip: frozenset | set = frozenset()) -> Path | None:
     """
     Locate what slskd actually wrote to disk for a given remote file.
 
@@ -245,6 +246,10 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
     the peer's folders better than slskd's `/downloads/Album (1998)/` did - which was moved, retagged as the new
     release, and its album folder removed. The library's folder is never entered (folders_under) and a hit that
     leads into it anyway (a link) is passed over (in_library).
+
+    (Damaged downloads, 27 Nov) Nor a file another source's refused download left behind: `skip` holds their
+    identities (file_identity - where, how big, when written), and a hit with one is passed over. A refused album
+    stays in slskd's folder, as a cancelled one does, and the next source's files are usually named as its were.
     """
     root = Path(download_root)
     if not root.is_dir():
@@ -264,6 +269,8 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
     ]
     if library is not None:
         matches = [path for path in matches if not in_library(path, library)]
+    if skip:
+        matches = [path for path in matches if file_identity(path) not in skip]
 
     if len(matches) < 2:
         return matches[0] if matches else None
@@ -280,6 +287,38 @@ def find_local_file(download_root: str, remote_filename: str, remote_directory: 
 
     #? max() keeps the first of equals, which is what this always returned with nothing to go on
     return max(matches, key=agreement)
+
+
+def file_identity(path: Path | str) -> tuple[str, int, int] | None:
+    """
+    (Damaged downloads) A file in slskd's folder as a refusal records it - (path, size, modified in ns) - or None
+    when it can't be read. The same file found again matches; a file written there since under the same name
+    (slskd putting another source's download in its place) does not.
+    """
+    try:
+        status = os.stat(path)
+    except (OSError, ValueError):
+        return None
+    return str(path), status.st_size, status.st_mtime_ns
+
+
+def refused_identities(tried: list[dict] | None, username: str | None) -> frozenset:
+    """
+    (Damaged downloads) Every file the refused downloads of OTHER sources left behind, as file_identity()s - what
+    the job's `tried` entries recorded when each was refused (poller._refuse_damaged). The current source's own are
+    not passed over: asking it again finds its files, and they are checked, and refused, again.
+    """
+    found = set()
+    for entry in tried or []:
+        if not isinstance(entry, dict) or entry.get("username") == username:
+            continue
+        for identity in entry.get("refused") or []:
+            try:
+                path, size, written = identity
+                found.add((str(path), int(size), int(written)))
+            except (TypeError, ValueError):
+                continue
+    return frozenset(found)
 
 
 #? (2.0.0-player.65, the 2.0.0 release review) what a writer of a picture or a .lrc says of a name in the album's
@@ -782,7 +821,7 @@ def _positive(value) -> int | None:
     return value if isinstance(value, int) and value > 0 else None
 
 
-def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
+def plan_organization(job: dict, download_root: str, library_root: str, check_audio: bool = True) -> dict:
     """
     Work out every file operation this job implies. Touches nothing.
 
@@ -790,6 +829,12 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     than having been persisted at match time: match_tracks_to_files is pure and needs only
     filenames, so recomputing keeps one source of truth instead of storing derived data that
     could drift from the code that produced it.
+
+    (Damaged downloads, 27 Nov) Every FLAC the download brought is checked whole (src/flac_check.py) - reading
+    it, never changing it - and any found damaged is listed in `damaged`, which refuses the whole filing
+    (organize_job, execute_plan): one damaged song refuses the album from that source. `check_audio` False
+    leaves the check out, for a plan made only to see whether a refusal still holds (poller.refile_refused).
+    Files another source's refused download left behind are never found (refused_identities).
     """
     release = job.get("release") or {}
     tracks = release.get("tracks") or []
@@ -811,9 +856,11 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
         entry["file"]["filename"]: entry["track"] for entry in mapping.values()
     }
 
-    #? every file found first, once: a manual search's download is named by what they carry
+    #? every file found first, once: a manual search's download is named by what they carry - and never one another
+    #? source's refused download left in slskd's folder (damaged downloads)
+    skip = refused_identities(job.get("tried"), job.get("username"))
     located = [(file_entry, find_local_file(download_root, file_entry.get("filename", ""),
-                                            job.get("directory", ""), library_root))
+                                            job.get("directory", ""), library_root, skip))
                for file_entry in files]
 
     #? (2.1.38) A MANUAL search's download (the app's Search Soulseek) has no release behind it, only the
@@ -903,7 +950,7 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
             "job_id": job.get("id"), "album_dir": None, "operations": [], "companion_count": 0,
             "source_dirs": [], "read_only_dirs": [], "overlap": overlap,
             "problems": problems, "matched_tracks": len(mapping), "total_tracks": len(tracks),
-            "same_release": False,
+            "same_release": False, "damaged": [], "songs": 0,
         }
 
     album_dir = Path(operations[0]["target"]).parent if operations else None
@@ -927,6 +974,8 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
     if album_dir_for_companions is not None:
         for source_dir in sorted(source_dirs):
             for companion in find_companion_files(source_dir, placed_names):
+                if skip and file_identity(companion) in skip:
+                    continue
                 target = album_dir / sanitize_filename(companion.name, companion.name)
                 if target in used_targets:
                     continue
@@ -949,6 +998,11 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
                    if not op.get("duplicate_of") and not op.get("exists")}
     read_only_dirs = sorted(str(folder) for folder in moving_from if not can_move_out_of(folder))
 
+    #? (damaged downloads) every song the download brought, checked whole - a duplicate's and one already at its
+    #? target too, since the album comes from one source or none. Not while the filing is refused for its
+    #? folders: refile_refused plans it again once they're put right, and the check is made then.
+    damaged = check_audio_files(operations) if check_audio and not read_only_dirs else []
+
     plan = {
         "job_id": job.get("id"),
         "album_dir": str(album_dir) if album_dir else None,
@@ -969,12 +1023,34 @@ def plan_organization(job: dict, download_root: str, library_root: str) -> dict:
         #? (src/library_ledger.py grant_for). Reading it changes nothing filed. Since 2.1.39: the
         #? folder's commonest id is this release AND every track already there is in a file of it.
         "same_release": same_release,
+        #? (damaged downloads) the songs found damaged (check_audio_files) - any at all, and nothing is filed - and
+        #? how many songs the download brought, for "3 of 11 songs"
+        "damaged": damaged,
+        "songs": len(operations),
     }
     if manual:
         #? (2.1.38) filed by its own tags, as `naming` - which the poller labels the review row with
         plan["manual"] = True
         plan["naming"] = release
     return plan
+
+
+def check_audio_files(operations: list[dict]) -> list[dict]:
+    """
+    (Damaged downloads) Each FLAC among `operations` (a plan's songs - its sources in slskd's folder) checked whole by
+    src/flac_check.py, and those found damaged as [{file, source, kind, why, extra}] - `file` the name it came
+    with. Reads the files, writes nothing. Any other format, and a FLAC the check can't judge, passes as before.
+    """
+    damaged = []
+    for operation in operations:
+        source = Path(operation["source"])
+        if operation.get("companion") or source.suffix.lower() != ".flac":
+            continue
+        verdict = check_file(source)
+        if verdict.damaged:
+            damaged.append({"file": source.name, "source": str(source), "kind": verdict.kind,
+                            "why": verdict.why, "extra": verdict.extra})
+    return damaged
 
 
 def _is_multi_disc(release: dict) -> bool:
@@ -1234,6 +1310,10 @@ def execute_plan(plan: dict, release: dict) -> dict:
     #? nothing is copied in half-way and left untagged (plan_organization's read_only_dirs)
     if plan.get("read_only_dirs"):
         results["read_only"] = list(plan["read_only_dirs"])
+        return results
+    #? (damaged downloads) a song of the download is damaged: nothing of it is moved (plan_organization's damaged)
+    if plan.get("damaged"):
+        results["damaged"] = list(plan["damaged"])
         return results
 
     for operation in plan["operations"]:
@@ -1532,6 +1612,10 @@ def remove_incomplete_downloads(
     return results
 
 
+#? (damaged downloads) the damaged songs the event log names one by one before "and N more"
+DAMAGED_NAMED = 5
+
+
 async def organize_job(job: dict, download_root: str, library_root: str, on_plan=None) -> dict:
     """
     Plan then execute - a move - with the logging the UI's event log surfaces. `on_plan(plan)`,
@@ -1571,6 +1655,19 @@ async def organize_job(job: dict, download_root: str, library_root: str, on_plan
         )
         return {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
                 "read_only": list(plan["read_only_dirs"]), "plan": plan}
+
+    #? (damaged downloads) refused whole, before anything is marked, moved or cleaned up: the poller says which
+    #? songs and why, and moves the download to its next source (poller._refuse_damaged)
+    if plan.get("damaged"):
+        named = ", ".join(f"{d['file']} ({d['why']})" for d in plan["damaged"][:DAMAGED_NAMED])
+        more = len(plan["damaged"]) - DAMAGED_NAMED
+        logger.warning(
+            f"not filing {label} from {job.get('username')}: {len(plan['damaged'])} of {plan.get('songs')} song(s) "
+            f"damaged - {named}{f' and {more} more' if more > 0 else ''}. Nothing was moved.",
+            extra={"frontend": True, "src": "slskd"},
+        )
+        return {"organized": 0, "tracks_organized": 0, "skipped": 0, "duplicates": 0, "failed": 0,
+                "damaged": list(plan["damaged"]), "plan": plan}
 
     if on_plan is not None:
         on_plan(plan)

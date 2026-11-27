@@ -80,6 +80,30 @@ Look at the album in the library (**Library care → Rescan** first) and in slsk
 whatever hadn't been filed yet is still in slskd's folder. Anything missing is dealt with as in the
 section above. **Clear done** removes the row.
 
+## A download said it was damaged
+
+"The copy from glassbeads was damaged (extra data after the end of 3 of 11 songs)…", in the event log or on
+the download's row. A FLAC in that copy wasn't whole: bytes after the end of its music that aren't a tag,
+the file cut short, or a frame of music failing its checksum. deadwax checks every FLAC before filing, so
+none of that copy was filed, and the download moved to its next source by itself
+([downloading](downloading.md#when-a-download-arrives-damaged)) - **there is nothing to do** but let it
+finish. The rest of the message says how the new source differs from the damaged one.
+
+- **"…and there is no other source."** Every source on the list has been tried. **Get** it again: a fresh
+  search lists the sources sharing it now.
+- **"…and no other source would send it."** / **"…the sources asked next wouldn't send it."** The next
+  ones on the list refused. **Another source** tries the rest, if any are left; otherwise **Get** it again.
+- **"…and it wasn't tried again: …"** The album has meanwhile been filed, or is coming, some other way.
+- The damaged files are still in slskd's download folder, as a cancelled download's are. They are never
+  filed later - not by the next source, a restart or **Same source again** (which only finds the same
+  damaged files again) - so they are safe to delete from there.
+- **If every download says it**, the files are probably being damaged on your side: check the disk and the
+  `/downloads` mount, and slskd's own folders, before blaming the people sharing them. The event log names
+  each song and what was wrong with it ("2000 bytes after the end of the audio", "the file ends inside the
+  last frame", "frame 10 fails its checksum").
+
+There is no setting to file a damaged copy anyway, and deadwax never trims or repairs one.
+
 ## Requests says why a download stopped, or wasn't added
 
 Under **Needs attention** (and on a **Done** row that wasn't added) Requests says why in a listener's
@@ -99,6 +123,9 @@ runs deadwax can put it right, everyone else is told **"Tell whoever runs deadwa
   transfers), looks the same to deadwax, even mid-download - if every download says it at once, see
   [below](#requests-shows-nothing-moving-or-cant-update-your-requests-right-now).
 - **"Cancelled."**: you (or someone) cancelled it with its ✕.
+- **"The copy from … was damaged (…) and there is no other source."** (or "…no other source would send
+  it."): a song of it wasn't whole, so none of it was filed, and there was nowhere left to move it
+  ([A download said it was damaged](#a-download-said-it-was-damaged)).
 - **"It downloaded, but deadwax couldn't find its files to add them to your library."**: nothing could
   be organized - almost always `SLSKD_DOWNLOAD_PATH` not pointing at the files slskd writes
   ([Downloads finish, but nothing appears in my library](#downloads-finish-but-nothing-appears-in-my-library)).

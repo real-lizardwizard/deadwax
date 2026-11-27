@@ -369,6 +369,54 @@ While either runs the button says so ("Trying another source…", "Trying again�
 nobody would take it, why is shown under the reason ("No other source would send it.", say). On a narrow phone the two buttons stack, so
 neither loses its words.
 
+### When a download arrives damaged
+
+Before a finished download is filed, deadwax reads every FLAC in it from end to end - reading only, never
+changing a byte - and checks that each song's music ends where the file does (or where an ID3v1 or APEv2
+tag after it begins), that the file holds all of the song its header says it has, and that every frame
+of music passes its own checksum. One song failing any of them **refuses the whole copy** from that
+source:
+
+- none of its files is filed. They stay in slskd's download folder as a cancelled download's do: the
+  transfers leave slskd's list, and with `SLSKD_INCOMPLETE_PATH` set any half-finished file is deleted;
+- they are never filed later - not by the next source's download (even one whose files have the same
+  names), not after a restart, and not by **Same source again**, which finds the same files and refuses
+  them again;
+- the download moves to its **next source by itself**, whether `AUTO_RETRY_PEER` is on or off, and
+  whatever that source is like. With no source left, it stops there.
+
+What happened is said in the event log and on the download's row:
+
+> The copy from glassbeads was damaged (extra data after the end of 3 of 11 songs). Now coming from
+> sofaking, as good a match: same quality, songs and edition.
+
+> The copy from glassbeads was damaged (1 of 11 songs is cut short). Now coming from sofaking, a weaker
+> match: MP3 320, was FLAC 16/44.1 · match 81%, was 96%.
+
+> The copy from glassbeads was damaged (2 of 11 songs are damaged inside) and there is no other source.
+
+The reason in brackets is **"extra data after the end of N of M songs"** (bytes after the music that
+aren't a tag - what a sharer's program that writes the end of its buffer twice leaves), **"N of M songs
+are cut short"**, or **"N of M songs are damaged inside"**. The event log also names each song and what
+was found in it. In the web app's Requests the words show once the download has stopped (with no other
+source to go to); while the next source is downloading they are in the event log.
+
+**As good a match** means the same quality, every song of the pressing, the same edition words in the
+folder's name, and a match score at least as high. Anything else is **a weaker match** - a better quality
+too, since it isn't the copy you picked - and the differences are listed, each as "new, was old", in this
+order: quality; the songs it has, and which are missing ("10 of 11 songs (missing: Krakow), was all
+11"); files that aren't songs of the pressing ("13 files for 11 songs, was 11"); edition words in the
+folder name ("folder says Deluxe, was nothing"); the match score, and any part of it that moved by more
+than 5 points ("match 81%, was 96% (track lengths 70%, was 100%)"); the size, when it is 10% or more
+different; when it can start ("starts after 4 others, was now"); and the speed deadwax has measured from
+each, when it has measured both and one is at least half as fast again as the other. When nothing
+differs it says so: "Same quality, songs and edition as glassbeads". A download from before this was
+added doesn't know its first source's match score, and the score is then left out of the comparison.
+
+Only FLAC is checked: other formats, and a FLAC deadwax can't make sense of at all, are filed as before.
+A whole file, and one with an ID3 tag in front or an ID3v1 or APEv2 tag behind, is filed exactly as
+before. Nothing is ever trimmed or repaired.
+
 ### Cancelling
 
 **✕** on a downloading or waiting download cancels it. It asks first, in the card itself - "Cancel

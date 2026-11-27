@@ -514,7 +514,7 @@ def test_and_every_fifteen_minutes(monkeypatch):
     async def poll(*args, **kwargs):
         polls.append(1)
 
-    async def refile(_store):
+    async def refile(_store, _slskd_client=None):
         tried.append(len(polls))
         return 0
 

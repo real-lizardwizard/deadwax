@@ -414,6 +414,14 @@ export interface EnqueueRequest {
   alternatives?: EnqueueAlternative[]
   /** The picked folder's quality (2.0.0-player.49), for someone offered to join the download. */
   quality?: JobQuality
+  /**
+   * The rest of what the picked card showed (damaged downloads, 27 Nov) - its score and the signals it was made
+   * of, a free slot or its queue - so the server can say how the next source differs (src/source_compare.py).
+   */
+  score?: number
+  signals?: CandidateSignals
+  has_free_slot?: boolean
+  queue_length?: number
 }
 
 /** A runner-up from the candidates list, kept with the job for "try next peer" (v0.9.12). */
@@ -424,6 +432,10 @@ export interface EnqueueAlternative {
   score?: number
   /** Its quality, which the download takes on if it moves there (2.0.0-player.49). */
   quality?: JobQuality
+  /** The rest of its card, as EnqueueRequest's (damaged downloads). */
+  signals?: CandidateSignals
+  has_free_slot?: boolean
+  queue_length?: number
 }
 
 export interface RetryResponse {

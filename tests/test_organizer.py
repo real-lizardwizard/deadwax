@@ -273,8 +273,11 @@ def write_minimal_flac(path: Path) -> None:
     Worth the fiddliness - tagging is the part most likely to silently do nothing, so the
     test needs mutagen to genuinely parse and round-trip a real container rather than a file
     that merely ends in .flac.
+
+    Its length is 0, "unknown" (damaged downloads, 27 Nov): a STREAMINFO counting a second of audio that the file
+    doesn't hold is a file cut short, which filing now refuses (src/flac_check.py).
     """
-    sample_rate, channels, bits_per_sample, total_samples = 44100, 2, 16, 44100
+    sample_rate, channels, bits_per_sample, total_samples = 44100, 2, 16, 0
 
     packed = (sample_rate << 44) | ((channels - 1) << 41) | ((bits_per_sample - 1) << 36) | total_samples
 
@@ -1077,6 +1080,8 @@ def test_a_release_less_job_without_manual_is_planned_and_tagged_exactly_as_befo
              "exists": False}],
         "source_dirs": [str(root / "Dummy")], "read_only_dirs": [], "overlap": None, "problems": [],
         "matched_tracks": 0, "total_tracks": 0, "same_release": False,
+        #? (damaged downloads) every plan says which songs were found damaged, and how many it had
+        "damaged": [], "songs": 2,
     }
 
     execute_plan(plan, release)

@@ -577,6 +577,14 @@ JOB_COLUMNS = {
     #? row's way to its album, which has no release id to be found by.
     "album_id": "INTEGER",
     "library_grant": "TEXT",
+    #? (damaged downloads, 27 Nov) the rest of what the source being fetched showed as a candidate - its match
+    #? score, the signals it was made of, a free slot or its queue (SOURCE_KEYS) - so the next source can be
+    #? told apart from it (src/source_compare.py). '{}' for a job from before, or a caller that sent none.
+    "source_json": "TEXT NOT NULL DEFAULT '{}'",
+    #? (damaged downloads) what a listener is told happened to the download beyond its status - the copy from a
+    #? source refused as damaged, and where it is coming from now (poller._refuse_damaged): {kind, text, from,
+    #? to, reason, verdict, differences, at}. NULL for none; any move to a source clears it (move_to_peer).
+    "notice_json": "TEXT",
 }
 
 #? (2.0.0-player.61) Columns added to `sessions` since it shipped (2.0.0-player.48), as JOB_COLUMNS are to jobs.
@@ -625,6 +633,28 @@ def _rename_break_glass(connection) -> None:
 
 #? the parts of a candidate's quality a job keeps (quality_json), and nothing else it might be sent
 QUALITY_KEYS = ("formats", "bitrates", "bit_depths", "sample_rates", "variable_bitrate")
+
+
+#? (damaged downloads) the parts of a candidate a job keeps of its source beyond the quality (source_json)
+SOURCE_KEYS = ("score", "signals", "has_free_slot", "queue_length")
+
+
+def job_source(source: dict | None) -> dict:
+    """What source_json keeps of a candidate: SOURCE_KEYS, those it has, and no more - the signals only as numbers."""
+    kept = {}
+    for key in SOURCE_KEYS:
+        value = (source or {}).get(key)
+        if value is None:
+            continue
+        if key == "signals":
+            if isinstance(value, dict):
+                kept[key] = {str(name): part for name, part in value.items()
+                             if part is None or (isinstance(part, (int, float)) and not isinstance(part, bool))}
+        elif key == "has_free_slot":
+            kept[key] = bool(value)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            kept[key] = value
+    return kept
 
 
 def job_quality(quality: dict | None) -> dict:
@@ -835,8 +865,12 @@ class JobStore:
         job["files"] = json.loads(job.pop("files_json"))
         job["alternatives"] = json.loads(job.pop("alternatives_json", None) or "[]")
         job["tried"] = json.loads(job.pop("tried_json", None) or "[]")
-        if "quality_json" in job:  # list_jobs() leaves it out
+        if "quality_json" in job:
             job["quality"] = json.loads(job.pop("quality_json") or "{}")
+        if "source_json" in job:
+            job["source"] = json.loads(job.pop("source_json") or "{}")
+        if "notice_json" in job:
+            job["notice"] = json.loads(job.pop("notice_json") or "null")
         if "requesters_json" in job:  # list_jobs() only
             job["requesters"] = json.loads(job.pop("requesters_json") or "[]")
         return job
@@ -845,10 +879,11 @@ class JobStore:
 
     async def create_job(self, username: str, directory: str, files: list[dict], release: dict,
                          alternatives: list[dict] | None = None, user: str = LOCAL_USER,
-                         quality: dict | None = None) -> int | None:
+                         quality: dict | None = None, source: dict | None = None) -> int | None:
         """
         Record a download slskd has accepted, and who asked for it (`user` - 2.0.0-player.49), in one
-        transaction: a job nobody asked for would be in nobody's list. `username` is the PEER.
+        transaction: a job nobody asked for would be in nobody's list. `username` is the PEER. `source` is the
+        rest of what its candidate showed (job_source - damaged downloads).
         """
         if not self.available:
             return None
@@ -860,8 +895,8 @@ class JobStore:
                     """
                     INSERT INTO jobs (release_mbid, artist, album, year, username, directory,
                                       release_json, files_json, status, created_at, updated_at,
-                                      alternatives_json, tried_json, quality_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)
+                                      alternatives_json, tried_json, quality_json, source_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         release.get("release_mbid"),
@@ -877,6 +912,7 @@ class JobStore:
                         json.dumps((alternatives or [])[:MAX_ALTERNATIVES]),
                         json.dumps([{"username": username, "directory": directory}]),
                         json.dumps(job_quality(quality)),
+                        json.dumps(job_source(source)),
                     ),
                 )
                 connection.execute("INSERT INTO job_requests (job_id, user, requested_at) VALUES (?, ?, ?)",
@@ -899,7 +935,9 @@ class JobStore:
         at all only for a job "try the next peer" can restart, the one place the panel counts
         them (v0.9.24). Fifty jobs used to decode 1.4 MB of JSON a poll, nearly all of it the
         runners-up's file lists; even having SQLite pull out just the usernames cost 3ms, for
-        rows that mostly finished long ago. get_job() has the whole row.
+        rows that mostly finished long ago. get_job() has the whole row. (Damaged downloads, 27 Nov: every row
+        also has its quality, source and notice, small objects; /jobs' next source reads the one runner-up it
+        describes by itself - next_source_inputs.)
 
         The app's Requests tab (2.0.0-player.12) also wants the release GROUP and the edition a
         row names ("Dummy · 2014 vinyl"). Both are read out of the stored release by SQLite, as
@@ -947,6 +985,7 @@ class JobStore:
                     """
                     SELECT id, release_mbid, artist, album, year, username, directory, files_json,
                            status, error, created_at, updated_at, tried_json, library_grant, album_id,
+                           quality_json, source_json, notice_json,
                            CASE WHEN json_valid(release_json) THEN
                                json_extract(release_json, '$.release_group_mbid')
                            END AS release_group_mbid,
@@ -997,7 +1036,7 @@ class JobStore:
             return []
 
     async def move_to_peer(self, job_id: int, username: str, directory: str, files: list[dict],
-                           tried: list[dict], quality: dict | None = None) -> bool:
+                           tried: list[dict], quality: dict | None = None, source: dict | None = None) -> bool:
         """
         Point a job at another peer's folder and start it again, recording where it has been.
 
@@ -1006,7 +1045,8 @@ class JobStore:
         download appearing beside a dead one - for everyone who asked for it (2.0.0-player.49: its
         requests are the job's, and stay; a requester who had cleared it is left withdrawn, and an
         admin's clearing of it from their list is undone, since it is on its way again). `quality` is the new folder's (job_quality); None keeps what the job
-        had - the same peer asked again.
+        had - the same peer asked again - and `source` the same of the rest of its candidate (job_source). A notice
+        is about an attempt, so any move clears it (damaged downloads: the refusal sets its own after the move).
         """
         if not self.available:
             return False
@@ -1017,11 +1057,13 @@ class JobStore:
                     """
                     UPDATE jobs SET username = ?, directory = ?, files_json = ?, tried_json = ?,
                                     status = 'queued', error = NULL, updated_at = ?,
-                                    quality_json = COALESCE(?, quality_json)
+                                    quality_json = COALESCE(?, quality_json),
+                                    source_json = COALESCE(?, source_json), notice_json = NULL
                     WHERE id = ?
                     """,
                     (username, directory, json.dumps(files), json.dumps(tried), _now(),
-                     None if quality is None else json.dumps(job_quality(quality)), job_id),
+                     None if quality is None else json.dumps(job_quality(quality)),
+                     None if source is None else json.dumps(job_source(source)), job_id),
                 )
                 #? (2.0.0-player.49) on its way again. A requester who had cleared it from their list had
                 #? given up on it: their request becomes a withdrawn one (left), so it stays out of a
@@ -1054,6 +1096,53 @@ class JobStore:
             await asyncio.to_thread(write)
         except Exception:
             logger.error(f"failed to record the peers tried for job {job_id}")
+
+    async def set_notice(self, job_id: int, notice: dict | None) -> None:
+        """(damaged downloads) What a listener is told happened to the download (notice_json), or None for nothing.
+        Leaves updated_at alone: it says when the status last moved."""
+        if not self.available:
+            return
+
+        def write():
+            with self._connect() as connection:
+                connection.execute("UPDATE jobs SET notice_json = ? WHERE id = ?",
+                                   (None if notice is None else json.dumps(notice), job_id))
+
+        try:
+            await asyncio.to_thread(write)
+        except Exception:
+            logger.error(f"failed to record what happened to job {job_id}")
+
+    async def next_source_inputs(self, job_id: int, index: int) -> dict | None:
+        """
+        (damaged downloads) The runner-up at `index` of a job's list, whole - files, quality, score and all - and the
+        release's tracklist, for /jobs' next source (src/source_compare.py). Read by SQLite out of the two JSON
+        columns, as list_jobs reads the usernames, so neither is decoded whole for a row that wants one of each.
+        None when there is no such runner-up, or nothing can be read.
+        """
+        if not self.available:
+            return None
+
+        def read():
+            with self._connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT json_extract(alternatives_json, '$[' || ? || ']') AS alternative,
+                           CASE WHEN json_valid(release_json) THEN json_extract(release_json, '$.tracks') END AS tracks
+                      FROM jobs WHERE id = ?
+                    """, (int(index), job_id)).fetchone()
+                if row is None or row["alternative"] is None:
+                    return None
+                alternative = json.loads(row["alternative"])
+                tracks = json.loads(row["tracks"]) if row["tracks"] else []
+                return {"alternative": alternative if isinstance(alternative, dict) else {},
+                        "tracks": tracks if isinstance(tracks, list) else []}
+
+        try:
+            return await asyncio.to_thread(read)
+        except Exception:
+            logger.debug(f"couldn't read job {job_id}'s next source")
+            return None
 
     async def jobs_with_status(self, statuses: tuple[str, ...]) -> list[dict]:
         """Every job in one of `statuses`, oldest first."""
