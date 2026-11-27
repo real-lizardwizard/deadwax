@@ -1,0 +1,737 @@
+{
+ "_made": "MADE, NOT FETCHED (27 Nov 2026): written for deadwax's tests in the shape of MusicBrainz's /ws/2 JSON and of tests/fixtures/credits/back-in-black-2003-us.json, the one real answer - no such release or artist exists on MusicBrainz. Replace with a real answer when one is fetched (see README.md here).",
+ "id": "c0000002-0000-4000-8000-0000000000c2",
+ "title": "Made Album Two",
+ "status": "Official",
+ "date": "1999-06-14",
+ "country": "GB",
+ "quality": "normal",
+ "disambiguation": "",
+ "packaging": "Jewel Case",
+ "barcode": "",
+ "text-representation": {
+  "language": "eng",
+  "script": "Latn"
+ },
+ "cover-art-archive": {
+  "artwork": false,
+  "count": 0,
+  "front": false,
+  "back": false,
+  "darkened": false
+ },
+ "release-events": [],
+ "artist-credit": [
+  {
+   "name": "The Made Band",
+   "joinphrase": "",
+   "artist": {
+    "id": "b0000002-0000-4000-8000-0000000000b2",
+    "name": "The Made Band",
+    "sort-name": "The Made Band",
+    "type": "Group",
+    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  }
+ ],
+ "relations": [
+  {
+   "type": "instrument",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "guitar"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1999-03",
+   "end": "1999-04",
+   "ended": true,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000002-0000-4000-8000-000000000002",
+    "name": "Ben Player",
+    "sort-name": "Ben Player",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "vocal",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "lead vocals"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": "1999-03",
+   "end": "1999-04",
+   "ended": true,
+   "target-credit": "A. Singer",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000001-0000-4000-8000-000000000001",
+    "name": "Ada Singer",
+    "sort-name": "Ada Singer",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "vocal",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "background vocals"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000002-0000-4000-8000-000000000002",
+    "name": "Ben Player",
+    "sort-name": "Ben Player",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "instrument",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "drums (drum set)"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000003-0000-4000-8000-000000000003",
+    "name": "Cy Drummer",
+    "sort-name": "Cy Drummer",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "instrument",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "guest",
+    "piano"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000004-0000-4000-8000-000000000004",
+    "name": "Di Keys",
+    "sort-name": "Di Keys",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "instrument",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "saxophone",
+    "solo"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000005-0000-4000-8000-000000000005",
+    "name": "Eve Reed",
+    "sort-name": "Eve Reed",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "conductor",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000007-0000-4000-8000-000000000007",
+    "name": "Fay Baton",
+    "sort-name": "Fay Baton",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "performing orchestra",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000006-0000-4000-8000-000000000006",
+    "name": "The Made Strings",
+    "sort-name": "The Made Strings",
+    "type": "Orchestra",
+    "type-id": null,
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "producer",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000008-0000-4000-8000-000000000008",
+    "name": "Gus Knobs",
+    "sort-name": "Gus Knobs",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "producer",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [
+    "executive"
+   ],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000009-0000-4000-8000-000000000009",
+    "name": "Hal Money",
+    "sort-name": "Hal Money",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "engineer",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a000000a-0000-4000-8000-00000000000a",
+    "name": "Ivy Desk",
+    "sort-name": "Ivy Desk",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "mix",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a000000a-0000-4000-8000-00000000000a",
+    "name": "Ivy Desk",
+    "sort-name": "Ivy Desk",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "mastering",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a000000b-0000-4000-8000-00000000000b",
+    "name": "Jo Lathe",
+    "sort-name": "Jo Lathe",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "photography",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a000000c-0000-4000-8000-00000000000c",
+    "name": "Kim Lens",
+    "sort-name": "Kim Lens",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "design",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a000000c-0000-4000-8000-00000000000c",
+    "name": "Kim Lens",
+    "sort-name": "Kim Lens",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  },
+  {
+   "type": "liner notes",
+   "target-type": "artist",
+   "direction": "backward",
+   "attributes": [],
+   "attribute-ids": {},
+   "attribute-values": {},
+   "begin": null,
+   "end": null,
+   "ended": false,
+   "target-credit": "",
+   "source-credit": "",
+   "artist": {
+    "id": "a0000001-0000-4000-8000-000000000001",
+    "name": "Ada Singer",
+    "sort-name": "Ada Singer",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  }
+ ],
+ "media": [
+  {
+   "position": 1,
+   "format": "CD",
+   "title": "",
+   "track-offset": 0,
+   "track-count": 3,
+   "id": "00000001-0000-4000-8000-000000000001",
+   "tracks": [
+    {
+     "id": "d1000001-0000-4000-8000-000000000001",
+     "number": "1",
+     "position": 1,
+     "title": "Opening",
+     "length": 200000,
+     "artist-credit": [],
+     "recording": {
+      "id": "e1000001-0000-4000-8000-000000000001",
+      "title": "Opening",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1999-06-14",
+      "artist-credit": [],
+      "relations": [
+       {
+        "type": "performance",
+        "target-type": "work",
+        "direction": "forward",
+        "attributes": [],
+        "attribute-ids": {},
+        "attribute-values": {},
+        "begin": null,
+        "end": null,
+        "ended": false,
+        "target-credit": "",
+        "source-credit": "",
+        "work": {
+         "id": "f1000001-0000-4000-8000-000000000001",
+         "title": "Opening",
+         "type": "Song",
+         "language": "eng",
+         "languages": [
+          "eng"
+         ],
+         "iswcs": [],
+         "attributes": [],
+         "disambiguation": "",
+         "relations": [
+          {
+           "type": "composer",
+           "target-type": "artist",
+           "direction": "backward",
+           "attributes": [],
+           "attribute-ids": {},
+           "attribute-values": {},
+           "begin": null,
+           "end": null,
+           "ended": false,
+           "target-credit": "",
+           "source-credit": "",
+           "artist": {
+            "id": "a000000d-0000-4000-8000-00000000000d",
+            "name": "Lu Notes",
+            "sort-name": "Lu Notes",
+            "type": "Person",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "GB"
+           }
+          },
+          {
+           "type": "lyricist",
+           "target-type": "artist",
+           "direction": "backward",
+           "attributes": [],
+           "attribute-ids": {},
+           "attribute-values": {},
+           "begin": null,
+           "end": null,
+           "ended": false,
+           "target-credit": "",
+           "source-credit": "",
+           "artist": {
+            "id": "a000000e-0000-4000-8000-00000000000e",
+            "name": "Mo Words",
+            "sort-name": "Mo Words",
+            "type": "Person",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "GB"
+           }
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "id": "d1000002-0000-4000-8000-000000000002",
+     "number": "2",
+     "position": 2,
+     "title": "Middle",
+     "length": 200000,
+     "artist-credit": [],
+     "recording": {
+      "id": "e1000002-0000-4000-8000-000000000002",
+      "title": "Middle",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1999-06-14",
+      "artist-credit": [],
+      "relations": [
+       {
+        "type": "performance",
+        "target-type": "work",
+        "direction": "forward",
+        "attributes": [],
+        "attribute-ids": {},
+        "attribute-values": {},
+        "begin": null,
+        "end": null,
+        "ended": false,
+        "target-credit": "",
+        "source-credit": "",
+        "work": {
+         "id": "f1000002-0000-4000-8000-000000000002",
+         "title": "Middle",
+         "type": "Song",
+         "language": "eng",
+         "languages": [
+          "eng"
+         ],
+         "iswcs": [],
+         "attributes": [],
+         "disambiguation": "",
+         "relations": [
+          {
+           "type": "writer",
+           "target-type": "artist",
+           "direction": "backward",
+           "attributes": [],
+           "attribute-ids": {},
+           "attribute-values": {},
+           "begin": null,
+           "end": null,
+           "ended": false,
+           "target-credit": "",
+           "source-credit": "",
+           "artist": {
+            "id": "a0000001-0000-4000-8000-000000000001",
+            "name": "Ada Singer",
+            "sort-name": "Ada Singer",
+            "type": "Person",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "GB"
+           }
+          },
+          {
+           "type": "composer",
+           "target-type": "artist",
+           "direction": "backward",
+           "attributes": [],
+           "attribute-ids": {},
+           "attribute-values": {},
+           "begin": null,
+           "end": null,
+           "ended": false,
+           "target-credit": "",
+           "source-credit": "",
+           "artist": {
+            "id": "a000000d-0000-4000-8000-00000000000d",
+            "name": "Lu Notes",
+            "sort-name": "Lu Notes",
+            "type": "Person",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "GB"
+           }
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "id": "d1000003-0000-4000-8000-000000000003",
+     "number": "3",
+     "position": 3,
+     "title": "Interlude",
+     "length": 200000,
+     "artist-credit": [],
+     "recording": {
+      "id": "e1000003-0000-4000-8000-000000000003",
+      "title": "Interlude",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1999-06-14",
+      "artist-credit": [],
+      "relations": []
+     }
+    }
+   ]
+  },
+  {
+   "position": 2,
+   "format": "CD",
+   "title": "",
+   "track-offset": 0,
+   "track-count": 2,
+   "id": "00000002-0000-4000-8000-000000000002",
+   "tracks": [
+    {
+     "id": "d2000001-0000-4000-8000-000000000001",
+     "number": "1",
+     "position": 1,
+     "title": "Second Side",
+     "length": 200000,
+     "artist-credit": [],
+     "recording": {
+      "id": "e2000001-0000-4000-8000-000000000001",
+      "title": "Second Side",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1999-06-14",
+      "artist-credit": [],
+      "relations": [
+       {
+        "type": "performance",
+        "target-type": "work",
+        "direction": "forward",
+        "attributes": [],
+        "attribute-ids": {},
+        "attribute-values": {},
+        "begin": null,
+        "end": null,
+        "ended": false,
+        "target-credit": "",
+        "source-credit": "",
+        "work": {
+         "id": "f2000001-0000-4000-8000-000000000001",
+         "title": "Second Side",
+         "type": "Song",
+         "language": "eng",
+         "languages": [
+          "eng"
+         ],
+         "iswcs": [],
+         "attributes": [],
+         "disambiguation": "",
+         "relations": [
+          {
+           "type": "writer",
+           "target-type": "artist",
+           "direction": "backward",
+           "attributes": [],
+           "attribute-ids": {},
+           "attribute-values": {},
+           "begin": null,
+           "end": null,
+           "ended": false,
+           "target-credit": "",
+           "source-credit": "",
+           "artist": {
+            "id": "a0000002-0000-4000-8000-000000000002",
+            "name": "Ben Player",
+            "sort-name": "Ben Player",
+            "type": "Person",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "GB"
+           }
+          },
+          {
+           "type": "writer",
+           "target-type": "artist",
+           "direction": "backward",
+           "attributes": [],
+           "attribute-ids": {},
+           "attribute-values": {},
+           "begin": null,
+           "end": null,
+           "ended": false,
+           "target-credit": "",
+           "source-credit": "",
+           "artist": {
+            "id": "a0000001-0000-4000-8000-000000000001",
+            "name": "Ada Singer",
+            "sort-name": "Ada Singer",
+            "type": "Person",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "GB"
+           }
+          }
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "id": "d2000002-0000-4000-8000-000000000002",
+     "number": "2",
+     "position": 2,
+     "title": "Closing",
+     "length": 200000,
+     "artist-credit": [],
+     "recording": {
+      "id": "e2000002-0000-4000-8000-000000000002",
+      "title": "Closing",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1999-06-14",
+      "artist-credit": [],
+      "relations": []
+     }
+    }
+   ]
+  }
+ ]
+}

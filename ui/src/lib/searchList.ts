@@ -961,12 +961,6 @@ export function groupMaybe(group: ReleaseGroup, marks: Pick<Marks, 'index' | 'pe
 /** What a Top results tile says of something nobody here has (2.0.6). */
 export const notHere = (personal: boolean) => (personal ? 'Not in the collection' : 'Not in your library')
 
-/** Whether a row is from what's saved (2.0.0-player.56) - MusicBrainz's answers kept on disk. Drawn as MusicBrainz's
- *  own row would be: since 2.0.6 (UX batch 3) nothing on the row says it was saved - "saved" read as "you saved this
- *  album", and a listener has no use for where an answer was kept; only a failure under such rows says that these are
- *  earlier results (savedAwayWords). */
-export const isSaved = (row: Row) => 'saved' in row && row.saved === true
-
 /** A MusicBrainz group's kind word in a section, said only when it isn't a plain album ("EP", "Live album"), as Apple
  *  adds " - EP". */
 function groupWord(group: ReleaseGroup): string {

@@ -49,6 +49,291 @@ things it found, each fixed:
   and what is still asked about), app-rules.sim (the deferred Library, the three sizes), and the real
   page before and after with the request log above.
 
+### The speed fixes of 2.1.47 on (the code audit of 27 Nov 2026)
+
+An audit read the code for waits and measured nothing (`deadwax-plans/audit-code-speed.md`). James: "just try
+to make those speed optimizations". Each one below was confirmed in the code and measured before it was
+changed, on generated libraries of 1,060 and 5,000 albums of 12 tracks (album dicts shaped as
+`read_album_dir` makes them, seeded straight into the scan cache - no files; the generated titles are long, so
+a body is about twice a real library's of the same count). The measure that matters for the first two is **how
+long the event loop stands still**: a task that sleeps 1 ms at a time records its longest gap between two
+wake-ups while the request is served on the same loop (httpx's ASGI transport, no network). On one loop that
+gap is how late every other request is - a playing song's next byte range among them.
+
+#### The scan's answer, kept (2.1.47)
+
+**The cause, confirmed.** `/library/albums` (and `/rescan`) scanned in a worker thread and then did everything
+else on the event loop, on every ask: `attach_issues` over every album, then `_library_response` -
+`compact_for_wire`, `json.dumps` (3.8 MB on 1,060 albums), the ETag's hash - and, for a 200,
+`CompressText`'s gzip. Timed one by one in a first run they were 40, 81, 38, 11 and 57 ms, but that was on
+a machine other work was sharing and they add up to more than the route was then measured to hold the loop
+(the table below, which is the figure to go by); what they do say is that no one step is the cause - the
+compaction and the encoding are each as large as the inspection. The ETag saved the download and none of
+the work: a 304 was built whole, then thrown away. The app asks twice a visit (the saved scan, then the
+real one).
+
+**The fix.**
+- **The scan cache has a generation** (`src/library.py` `generation()`): a number that moves each time
+  `_album_cache`'s contents do - a folder a walk reads afresh or drops, one a writer forgets
+  (`forget_cached_album`: every retag, art fetch, delete and move), a seeding from the saved scan, a clear.
+  A scan and a snapshot each carry the generation of the albums they return, or **None when they can't be
+  sure**: a snapshot whose copy of the cache straddled a change, and a walk that something else cut across
+  (it counts its own moves; any other is a writer's). Never a clock. (As first built the number moved only after
+  each change, which left a gap a reader could copy the cache in - corrected in 2.1.53, below.)
+- **The route keeps the encoded answer** (`routes/library.py` `_kept_answers`): the ETag and the body
+  gzipped (only gzipped - a twentieth of the JSON, and a 304 needs neither), one per form asked (saved scan
+  or real, with tracks or without). It is kept BY everything the body is made of: the generation; the
+  albums' paths in order with what this request's `attach_issues` said of each
+  (`metadata_health.decorations()`, by value); and the rest of the body by value. So a review ignored, an
+  import looked at, Navidrome's listing or the folder template changing each make another answer with
+  nothing having to remember to drop the kept one - and a result with no generation keeps nothing.
+- **Off the loop when it must be built**: `attach_issues` and `_pack_scan` (compact, encode, hash, gzip)
+  run through `asyncio.to_thread`. The route answers the gzip itself (`json_etag.answer_packed`:
+  `Content-Encoding: gzip`, `Vary: Accept-Encoding`, which Starlette's GZipMiddleware passes through
+  untouched), so a 200 of a kept body costs no compression either; an asker that doesn't accept gzip gets it
+  unpacked in a worker thread. The ETag is of the same bytes as before, so a browser's stored copy from
+  2.1.46 still answers 304.
+
+**Measured** (`/library/albums?snapshot=true`, no store, the same machine and run):
+
+| | 1,060 albums, before | after | 5,000 albums, before | after |
+| --- | --- | --- | --- | --- |
+| a 304: loop stood still (median of 7) | 82 ms | **13 ms** | 362 ms | **36 ms** |
+| a 304: answered in | 82 ms | **26 ms** | 450 ms | **132 ms** |
+| a 200 of an unchanged library: loop stood still | 102 ms | **13 ms** | 514 ms | **19 ms** |
+| the first 200 (nothing kept): loop stood still | 111 ms | **19 ms** | 471 ms | **87 ms** |
+
+What is left of the loop's gap is not work on the loop - there, an unchanged answer is `decorations()` and a
+comparison, 0.2 ms on 1,060 albums - but the worker threads holding the interpreter's lock in turns of up
+to 5 ms (the snapshot's assembly, `attach_issues`). What is left of the answer's time is those two.
+
+**Don't**: put a per-request value in the body (it was already a rule: the ETag; now it would also defeat
+the kept answer, silently); add a field to `attach_issues` without adding it to `DECORATIONS`
+(tests/test_metadata_health.py holds them together - a field missed is a stale answer); change
+`_album_cache` anywhere but inside `_changing()` (2.1.53 - it was `_moved()` after the change until the review;
+see "The kept answers, after review").
+
+**Not verified**: on a real library, a real disk, or James's server - only the generated one. A real scan
+(not the snapshot) still walks and stats every folder in its thread, which this does not change. `/owned`
+still encodes its smaller answer (ten fields an album) on the loop.
+
+**Tests**: tests/test_library_cache.py "the scan's answer, kept" (ten: the generation and what moves it, a
+walk cut across, an unchanged library not encoded again, never on the loop, each form's own answer, a retag
+in place, a review changing, gzip once and only when accepted), tests/test_metadata_health.py (one).
+
+#### The Needs-a-look count, kept (2.1.48)
+
+**The cause, confirmed.** `/library/queue/summary` - asked as the desktop frame shows, as a phone's You
+shows, and after every change - put the saved scan together in a worker thread and then, on the event loop,
+judged every album against Navidrome's listing and inspected every one (`attach_issues`), each time, to
+return five numbers that had almost never changed.
+
+**The fix** (`routes/library.py` `queue_summary`, `_kept_summary`). The count is kept until what it is the
+count OF changes, and worked out in a worker thread (`_count_queue`) when it must be. What it is kept by,
+none of it a clock:
+- the scan cache's generation (2.1.47) - a retag, a delete, a scan that read a folder afresh;
+- **the review rows by value**: they are read from SQLite on every ask (one `SELECT`, in the store's own
+  thread) and compared. So every writer of `album_review` - an ignore, an un-ignore, a look, an import
+  enrolled by the poller, a row pruned or moved - makes another count without having to say it wrote;
+- `navidrome_listing.stamp()`: it moves with every refresh that lands, every forget, a verdict following a
+  move, verdicts pruned, Navidrome set or unset. `unlisted()`'s own judging doesn't move it, because
+  judging the same albums by the same listing changes no verdict;
+- `metadata_health.settings_read()`: the folder template and COUNTRY_IN_FOLDER, the two settings an issue
+  is judged by.
+
+A kept count is answered without the saved scan being assembled at all.
+
+**Measured** (the same harness, a real SQLite store holding a review row per album):
+
+| | 1,060 albums, before | after | 5,000 albums, before | after |
+| --- | --- | --- | --- | --- |
+| an ask of an unchanged library: loop stood still | 22 ms | **1 ms** | 109 ms | **6.5 ms** |
+| the same ask: answered in | 29 ms | **3.7 ms** | 201 ms | **14 ms** |
+| the first ask (nothing kept): loop stood still | 23 ms | 13 ms | 103 ms | 13 ms |
+
+What is left is reading the review rows and comparing them.
+
+**Don't**: let `inspect_album` read a setting that `settings_read()` doesn't name, or change
+`NavidromeListing`'s listing or verdicts without `_changes` moving - either is a count that goes stale and
+nothing fails. tests/test_navidrome_listing.py walks every way the stamp must move.
+
+**Not verified**: against a real Navidrome (the listing here was unset in the measurement, faked in the
+tests), or on James's server.
+
+**Tests**: tests/test_queue_summary.py "the count, kept" (five), tests/test_navidrome_listing.py (one).
+
+#### The Library's album list: pages together, and kept for a moment (2.1.49)
+
+**The cause, confirmed - and narrower than the audit said.** `/navidrome/album_index` read Navidrome's pages
+of 500 one after another on every ask, and its ETag saved the download but not the asking. But it is not
+asked "on every visit": the web app keeps each scope's list for a minute itself (`albumIndex.ts`
+`INDEX_FRESH_MS`), and so does the iPhone app. So the asks that reach the server are a launch, a minute
+going by, and an Add or Remove - and the part worth most is making each of THOSE faster.
+
+**The fix, in two parts.**
+- **Pages together** (`routes/navidrome.py` `_read_album_index`, `PAGES_AT_ONCE` = 4): the first page alone
+  (a library under 500 albums ends in it: one call, as before), then four at a time, read in order to the
+  first short page - so the list is Navidrome's, in its order, each album once, exactly as page by page. A
+  list that ends inside a round has asked for up to three pages past its end, each an empty answer; one of
+  those failing is nothing, while a page the list needed failing still fails the whole answer.
+- **Kept for 30 seconds** (`src/index_keep.py`, `INDEX_KEEP_S`): the encoded answer (its ETag and gzipped
+  body, made in a worker thread - `json_etag.pack`), per asker, per Navidrome account that answers for them,
+  per scope. The key is the session's user (`local` with logins off) AND the account their client asks as
+  (their own, or the shared one - logins off, break-glass), so one person's list is never another's.
+  It is a clock, so everything deadwax does that changes the list drops what is kept:
+  a star or unstar through deadwax (Add's and the worker's `star` in `stars.star_entry`, Remove's `unstar`),
+  the worker's read-back finding their stars changed somewhere else (`stars.sync_user` - the app asks for
+  the list again as it sees their library move), Navidrome seen to have scanned (`navidrome_listing._refresh` taking a new listing), a Rescan. And when
+  deadwax changes the library itself - a filing, a retag, a delete, a move, all through
+  `library.note_library_changed()` - **nothing is kept for `INDEX_SETTLE_S` (3 minutes)**: Navidrome scans
+  in its own time, which nothing here is told of, so until then every ask reads it afresh as before. A list
+  whose reading a drop cut across is not kept (`epoch`).
+
+**Measured** (the route on a loop of its own, against a fake Navidrome that takes 50 ms a call - the notes'
+own figure for a real one was 0.1 s a page, "A better Library"):
+
+| albums | before | after, first ask | asked again within 30 s |
+| --- | --- | --- | --- |
+| 400 | 60 ms, 1 call | 59 ms, 1 call | **0 ms, none** |
+| 1,200 | 170 ms, 3 calls | **115 ms**, 5 calls | **1 ms, none** |
+| 5,000 | 631 ms, 11 calls | **243 ms**, 13 calls | **1 ms, none** |
+| 10,000 | 1,140 ms, 20 calls | **423 ms**, 20 calls | **2 ms, none** |
+
+**What it costs, said plainly.** A change made somewhere else - a star in Amperfy, a play counted from
+another app - can be up to 30 seconds later in a list than it was (on top of the page's own minute), when
+something asked for the same list in that half minute. A sign-in Navidrome has stopped taking is noticed by
+this route up to 30 seconds later (every other call still notices at once, and a session that has ended is
+refused before the route runs - tests hold that).
+
+**Not verified**: against a real Navidrome - that four `getAlbumList2` at once cost it no more than four in
+a row, that an offset past the end is the cheap empty answer its source says, and what a real page takes.
+How often a kept list is actually asked for on James's server (it may be seldom: see the cause).
+
+**Tests**: tests/test_index_keep.py (nine), tests/test_navidrome_album_index.py (fifteen new, three
+changed on purpose: the two that counted calls now count the round, and "a change in the list is a new ETag"
+now lets the kept list lapse first), one each in test_navidrome_listing.py and test_library_cache.py.
+tests/conftest.py is new: it drops what is kept before every test, since a clock-kept list would otherwise
+answer the next test's ask.
+
+#### First Shuffle: the song pages together (2.1.50)
+
+**The cause, confirmed.** The Library's first Shuffle (and Last.fm's radio, which matches against the same
+list) reads every song Navidrome has - `search3` with an empty query, 2,000 a page - one page after
+another (`routes/navidrome.py` `_shuffle_songs`): 100,000 songs is 51 round trips in a row before the first
+song plays. The list is then kept ten minutes.
+
+**The fix.** The pages after the first are asked for `PAGES_AT_ONCE` (4) at a time and read IN ORDER, each
+by the very rules the page-by-page read applied - a song once, the 413 past `SHUFFLE_MAX`, the end at a
+short page or at a full one that brought nothing new. So the list is the one a page-by-page read makes,
+song for song and in the same order ("every song exactly once" is held by the same tests as before); only
+the waiting is shared. A list that ends inside a round has asked for up to three pages past its end, and a
+Navidrome that ignores the offset is asked five times where it was asked twice.
+
+**`yours` is left as it was**, on purpose: every song is still read and kept by its album. Asking each
+starred album for its own songs (`getAlbum`) would be far fewer songs read for a small library of a large
+store - but whether `getAlbum`'s songs are exactly `search3`'s for that album (a file Navidrome has marked
+missing, their order) was not read from Navidrome's source here, and Last.fm's radio matches against this
+list in this order. Not changed without knowing it is the same list.
+
+**Measured** (the route against a fake Navidrome that takes 50 ms a call; the fake's own JSON is in both):
+
+| songs | before | after |
+| --- | --- | --- |
+| 30,000 (16 pages) | 1,047 ms, 16 calls | **521 ms**, 17 calls |
+| 100,000 (51 pages) | 3,589 ms, 51 calls | **1,660 ms**, 53 calls |
+
+**Not verified**: against a real Navidrome - what four 2,000-song `search3` pages at once cost it (each is a
+scan by rowid; the audit's worry was a library large enough to feel this, which nobody has measured), nor
+on James's server.
+
+What is left at 100,000 songs is not waiting: about 0.3 s of it is deadwax and the fake turning 100,000
+songs to and from JSON, which a second ask (no calls at all) takes too.
+
+**Tests**: tests/test_navidrome_shuffle.py - three new (the pages asked together and the list still
+Navidrome's in its order; a small library is one call; `yours` read together is still only your albums'
+songs), one changed on purpose (a Navidrome that ignores the offset: five calls, not two).
+
+#### The web app's one script: measured, and NOT split (27 Nov 2026)
+
+The audit's third "In the web app" finding was one script with nothing loaded on demand. **Measured on a
+fresh build of 2.1.48** (Node 22.23.4, `npm run build`): `interface/dist/deadwax-player.js` is **830,156
+bytes, 263,434 gzipped** (the audit's 826 KB was near enough; the 110 KB of player.26 was a much smaller
+app). By its source map, the managing pages the audit named - People and its dialogs, Server settings,
+the Event log, Needs a look, Library care, the Edit panel and its editors, with the libs only they use -
+are **102,706 bytes of it, 12.6%**: about 33 KB gzipped at the very most (less in practice - some of those
+libs are read by the main app too). And the script is stamped and kept for a year (2.0.0-player.26), so that is saved
+once per device per upgrade, not per launch.
+
+**Why it was not done - what blocks it:**
+- **A lazily loaded chunk imports the app a second time.** Tried, on a real build: a chunk made by
+  `import()` begins `import{...}from"../deadwax-player.js"` - rollup keeps what the chunk shares with the
+  app (Preact, the hooks, the contexts) in the entry, and the chunk reaches back for it by the entry's
+  plain name. The page loads the entry as `/dist/deadwax-player.js?v=<stamp>`. To a browser those are two
+  modules: opening People would fetch and RUN the whole app again - a second render into the page, a
+  second player - and hand People a second Preact. Making that safe means moving the app out of the
+  stamped entry (a stub that imports a hashed app chunk: one more round trip in series at every cold
+  launch) or naming the entry by hash and having `stamped_page()` find it from a build manifest - a
+  change to how the page, the bench's page, `RevalidateInterfaceAssets` and tests/test_pages.py all work.
+- **A failed chunk can't be promised a working retry.** The rule is that a failed load says so in a
+  listener's words and offers Try again. A browser may remember a failed `import()` for the life of the
+  page (the standard's module map keeps a fetch that failed, and browsers differ in whether they ask
+  again - not checked on the iPhone, which is the phone this runs on), so Try again could go on failing
+  until a reload - and a reload stops the music.
+- **A page left open across an upgrade** would hold an entry naming chunks the new image no longer has:
+  Settings would fail to open until a reload, where today an open page keeps working.
+
+Three new ways to fail, and a rebuilt page-serving scheme, for at most 33 KB once per upgrade. If the
+script is ever split, name the entry by hash first, and count the desktop's visualizer and the turntable
+too (`deck.ts` alone is 30 KB of the 830): a phone that never opens them carries about as much of those
+as of the managing pages.
+
+**The duplicate launch requests** (`/library/owned` and `/me/preferences` asked twice as Search first
+shows, noted at player.26) were looked at again and left: both modules already share an ask that is out
+(`useOwned.ts` `asking`/`again`, `useGetSettings.ts` `asking`), so "one in-flight promise per URL" would
+change nothing - if they are still asked twice it is one ask after another, and telling a needed re-ask
+from a wasted one takes a request log from the running app, which this pass did not take.
+
+#### The audit's unused names, removed (2.1.51)
+
+The same audit found almost no dead code on the server and in the web app. Four names nothing read were
+removed, each after a search of `src/`, `tests/`, `ui/` and `ios/` for a reader: `KINDS` (src/pins.py - the
+web app's `KINDS` in lib/searchList.ts is another thing, and is read), `LEVELS` and its comment
+(src/resample.py), `isSaved` (ui/src/lib/searchList.ts) and `SONG_ROWS_SHOWN` (ui/src/lib/songs.ts - the
+3 it held was the song section's count before 2.0.0-player.55's `PREVIEW`; notes/app-requests-search-get.md
+still names it where it tells that history). Nothing is faster for it. Left on purpose: `HEARD_PER_SECOND`
+(player/deck.ts, an engine file) and `GET /library/queue/new_imports` (kept on purpose).
+
+#### The kept answers, after review (2.1.53)
+
+A review of 2.1.47-2.1.50 found nothing serious and three things, each fixed with a test:
+
+1. **The scan generation moved only after a change.** `_walk` wrote `_album_cache[current]` and moved the
+   number a few statements later (as did `forget_cached_album` and `clear_scan_cache`), so a snapshot - or
+   the Needs-a-look count's lookup - that read the cache in that gap held the NEW contents under the OLD
+   number, matched a kept answer, and sent the body from before the change. 2.1.47's write-up called that
+   harmless ("a cache nothing was changing"); it was wrong about what the reader had copied. **Now the
+   number moves before a change and again after it** (`library._changing()`, around every write), with a
+   count of the changes under way: while one is, the cache is of no generation at all (`generation()` is
+   None), so a reader stamps what it copied only if no change was under way as it began AND the number is the
+   same when it has finished. A walk's own moves are two a change, and its `before + moves` check holds as it
+   did; a seeding that takes nothing changes nothing and moves nothing.
+2. **A play counted through deadwax did not drop the kept album list**, though the list carries `played` and
+   `playCount` and the Library's Recently played and Most played sort by them. The scrobble route now forgets
+   the listener's kept lists after a `submission=true` call - theirs alone (`index_keep.forget(user)`), and
+   nothing on the now-playing call that goes with every song. So that a play, which is frequent, cuts across
+   nobody else's reading, a forget of one person's lists now moves an epoch of their own (`epoch(user)`);
+   only a forget of everybody's, or an unsettle, cuts across everyone's.
+3. **The Needs-a-look count with no saved scan waited on Navidrome.** 2.1.48 moved the review rows and
+   `navidrome_listing.ask()` above the "no saved scan" return, so a fresh install with a slow Navidrome
+   waited up to `LISTING_WAIT_SECONDS` for the imports-only count it had always returned at once.
+   `library.holds_albums(root)` is asked first now - no snapshot is put together for it - and with nothing
+   saved the new imports are counted and returned before the reviews are read or Navidrome is asked.
+
+**Tests**: tests/test_library_cache.py (five: no generation mid-change, each of the three writers changing
+inside one, a snapshot a change began under), tests/test_queue_summary.py (three), tests/test_navidrome_album_index.py
+(one), tests/test_index_keep.py (one rewritten: whose forget cuts across whose reading). **Not measured
+again**: the generation is now read under its lock, twice a snapshot - nanoseconds beside the copy it brackets.
+
 ## Known performance problems (profiled, not guessed)
 
 Measured with 148 releases × 12 tracks:

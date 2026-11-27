@@ -32,7 +32,7 @@ Three rules keep this honest:
 from pathlib import Path
 
 from src.library import edition_from_dirname
-from src.organizer import build_album_dirname, sanitize_filename
+from src.organizer import album_folder_template, build_album_dirname, country_in_folder, sanitize_filename
 
 #? Severities. Only used to sort - the queue shows everything it finds.
 #?   3  the album is not identified. Nothing else about it can be checked against anything.
@@ -152,6 +152,16 @@ def expected_dirname(album: dict) -> str:
     })
 
 
+def settings_read() -> tuple:
+    """
+    (2.1.48) The settings inspect_album() reads, as a value: the folder template and whether a country may
+    name a folder - both through expected_dirname(), the only place a setting reaches a verdict here. What
+    a count kept of attach_issues' answer is kept by, beside the albums, the reviews and Navidrome's listing
+    (routes/library.py queue_summary). A setting this file comes to read is added here.
+    """
+    return (album_folder_template(), country_in_folder())
+
+
 def _is_misfiled(album: dict) -> bool:
     """True when the folder's name disagrees with what its tags say it should be."""
     path = Path(album.get("path") or "")
@@ -258,6 +268,27 @@ def outstanding(issues: list[str], ignored: list[str]) -> list[str]:
     """
     muted = set(ignored or [])
     return [code for code in issues if code not in muted]
+
+
+#? Every field attach_issues() puts on an album - what it decorates a scan's albums with, and so
+#? (2.1.47) what tells two decorated scans of the same albums apart: decorations() below, which the
+#? scan's route keeps its encoded answer by. A field added to attach_issues is added here
+#? (tests/test_metadata_health.py holds the two together).
+DECORATIONS = ("issues", "ignored_issues", "needs_attention", "severity", "first_seen", "imported", "reviewed")
+
+
+def decorations(albums: list[dict]) -> tuple:
+    """
+    What attach_issues() said of each album, in the albums' order, as a value to compare: its path and
+    every DECORATIONS field. Two scans of the same albums (library.generation) are the same answer
+    exactly when this is equal - whatever the reviews, Navidrome's listing or a setting did to get there.
+    """
+    return tuple(
+        (album.get("path"), tuple(album.get("issues") or ()), tuple(album.get("ignored_issues") or ()),
+         album.get("needs_attention"), album.get("severity"), album.get("first_seen"),
+         album.get("imported"), album.get("reviewed"))
+        for album in albums
+    )
 
 
 def attach_issues(albums: list[dict], reviews: dict[str, dict] | None = None,

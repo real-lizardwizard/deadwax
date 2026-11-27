@@ -127,6 +127,35 @@ be had, deadwax says so within seven seconds rather than keeping the app waiting
 images…** in the web app, it needs deadwax's container to reach those sites. Nothing changes for the
 web app, which loads those pictures from the sites itself.
 
+deadwax also adds the route the app's **Info** will draw a song's **credits** from: who played what on it
+(lead vocals first, then other vocals, then each instrument, then an orchestra or conductor), who wrote it, and who
+produced, engineered, mixed and mastered it. An instrument is named as the album credits it where MusicBrainz says
+("lead guitar" and "rhythm guitar" on Back in Black, not "guitar" twice). They come from
+[MusicBrainz](https://musicbrainz.org), and how much MusicBrainz knows differs from album to album, so the app
+always says which of these it is showing:
+
+- **On this song**: MusicBrainz credits this recording itself.
+- **On the album**: MusicBrainz credits the album as a whole, not song by song.
+- **The band in 1980** (the album's year: when it first came out, not the pressing's or a single's date):
+  MusicBrainz has no credits for the album, but its artist is a band, so it shows the members on the album's date,
+  with what each played. Everyone is shown whom MusicBrainz's dates don't rule out, so others may be there who
+  didn't play: where a member joined or left during the album's year and MusicBrainz can't say whether before or
+  after it came out, they're shown with "joined 1980" or "left 1980". When MusicBrainz has no dates for any member,
+  it's **The band's members**: everyone who was ever in the band. A compilation never shows the band, since its songs
+  come from other years.
+- **No credits yet**: MusicBrainz has none for the album, with a link to add them there. When other songs on the
+  album do have credits, the answer says so too. Or the album isn't matched to a MusicBrainz release, so there's
+  nothing to look up (**Edit → Release** matches it).
+
+deadwax finds the song on its release by the recording id in its file, when the file has one (Picard writes it;
+deadwax doesn't). Otherwise it uses the disc and track number, but only when that disc's track numbers in Navidrome
+are exactly the release's. If it can't be sure which track it is, it shows the album's credits rather than another
+song's. It asks MusicBrainz as it asks for everything else, and keeps each album's credits for a month, so
+they're there even while MusicBrainz is down. When MusicBrainz can't be asked and nothing is kept yet, the app says
+the credits can't be asked for just now
+([troubleshooting](troubleshooting.md#a-songs-credits-say-they-cant-be-asked-for-just-now)). Anyone signed in can
+see them, and no setting is needed. The web app doesn't show them yet.
+
 ## What you need
 
 - **A Mac with Xcode.** Xcode 16 or later opens the project. An iPhone on iOS 27 needs **Xcode 27**,

@@ -33,6 +33,7 @@ from collections import Counter
 
 import httpx
 
+from src import index_keep
 from src import library_ledger as rules
 from src.api.navidrome_endpoint import API_VERSION, CLIENT_NAME, NOT_NAVIDROME, NavidromeError, subsonic_body
 from src.auth import KEY_CHANGED, LOGIN_GONE, LoginClient, unseal_credential
@@ -166,6 +167,9 @@ async def star_entry(store, as_user: AsUser, entry: dict, now: float | None = No
         album = (await as_user.call("getAlbum", {"id": album_id})).get("album")
         if not (isinstance(album, dict) and album.get("starred")):
             await as_user.call("star", {"albumId": album_id})
+            #? (2.1.49) their library just changed in Navidrome - and Navidrome has the album, which the
+            #? store's list may not have had: no album list kept from before this answers anybody
+            index_keep.forget()
             album = (await as_user.call("getAlbum", {"id": album_id})).get("album")
     except NavidromeError as e:
         if e.unreachable:
@@ -300,6 +304,10 @@ async def sync_user(store, as_user: AsUser, now: float | None = None, first: boo
             counts["removed"] += 1
     if index_known:
         await store.ledger_synced(user, now)
+    if counts["added"] or counts["removed"] or counts["lost"]:
+        #? (2.1.49) their library was changed somewhere else, and the app asks for their album list again as
+        #? it sees their library move: a list kept from before the change isn't the answer to that
+        index_keep.forget(user)
     return counts
 
 

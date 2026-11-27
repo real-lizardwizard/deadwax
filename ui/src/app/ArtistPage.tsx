@@ -211,10 +211,10 @@ function keptArtist(id: string): KeptArtist {
  * saying why (review).
  *
  * (2.0.13) Their DESCRIPTION (app/useDescription.ts, app/Description.tsx): asked once Navidrome's artist and the
- * facts are in, the albums waiting for it as for their other answers (but not on a page come back to, which draws
- * them on its first frame); its paragraph under Play when it is in hand as they are drawn, else the page's last
- * thing (lib/describe.ts placeOf) - never moving the albums, nor the library's failed notice, under a finger; its
- * subtitle under their name, in a line kept for it.
+ * facts are in; its paragraph always under Play (2.1.52 - until then the page's last thing when it came after the
+ * albums were drawn, which waited for it), in room held for it from the first frame (lib/describe.ts holdsRoom) -
+ * never moving the albums, nor the library's failed notice, under a finger; its subtitle under their name, in a
+ * line kept for it.
  *
  * Every fetch that draws goes through its own latestOnly(): the library's answer, the facts, the
  * discography, the prefetches, a row's bridge and a chip's pressings - and the library's summaries.
@@ -710,21 +710,16 @@ export function ArtistPage({
   const discKnown = groups !== null || discography.state === 'failed' || (!mbid && libraryKnown)
   //? (2.0.13) their description: asked once who they are is settled - Navidrome's artist found or not, and
   //? MusicBrainz's facts in (or failed), so deadwax's lookup of them is the facts' own, already cached. The
-  //? paragraph under the Play row when it is in hand as the albums are drawn - they wait for it too - else at the
-  //? page's foot; the subtitle under their name, in the hero
+  //? paragraph always under the Play row (2.1.52), in room held for it from the first frame - so the albums wait
+  //? for their own answers and not for it, and one landing after them (or after the library's failed notice and its
+  //? Try again) moves nothing; the subtitle under their name, in the hero
   const rowsDrawn = useRef(false)
-  //? (after review) the library's failed notice - its Try again drawn under the top place, before the description is
-  //? asked - counts as drawn below it: a description then goes to the foot, never above that button
   const describing = useDescription('artist',
-    libraryKnown && (!mbid || facts !== null || factsFailed) ? { mbid, navidromeId: libraryId } : null,
-    rowsDrawn.current || library.state === 'failed', id)
+    libraryKnown && (!mbid || facts !== null || factsFailed) ? { mbid, navidromeId: libraryId } : null, id)
   const describedBlock = inBlock('artist', describing.description)
-  //? a page come back to with every other answer from the session draws its albums on its first frame - the
-  //? scroll it is put back to needs them - whether or not its description has come (one still out goes to the foot)
-  const cameBack = useRef(libraryKnown && discKnown && ownedKnown)
   //? ...and once drawn, they stay drawn: Navidrome asked again (an artist found later) never takes
   //? them away while it answers
-  if (waited || (libraryKnown && discKnown && ownedKnown && (describing.settled || cameBack.current))) rowsDrawn.current = true
+  if (waited || (libraryKnown && discKnown && ownedKnown)) rowsDrawn.current = true
   const drawRows = rowsDrawn.current
   const asking = discography.state === 'asking' || !drawRows
 
@@ -998,7 +993,7 @@ export function ArtistPage({
             </div>
           )}
 
-          {describedBlock && describing.at === 'top' && <DescriptionBlock description={describedBlock} at="top" />}
+          <DescriptionBlock kind="artist" description={describedBlock} holding={describing.holding} />
 
           {library.state === 'failed' && (
             <div class="pl-notice">
@@ -1234,9 +1229,6 @@ export function ArtistPage({
               {libraryLast.current && librarySection}
             </div>
           )}
-
-          {/* (2.0.13) a description that came after the albums were drawn: here, where it moves nothing under a finger */}
-          {describedBlock && describing.at === 'foot' && <DescriptionBlock description={describedBlock} at="foot" />}
         </div>
       )}
     </section>

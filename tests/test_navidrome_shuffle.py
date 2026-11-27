@@ -192,7 +192,8 @@ def test_a_navidrome_that_ignores_the_offset_ends_the_read(shuffling, monkeypatc
     answer = signed_in(shuffling, "james").get(f"{SHUFFLE}?scope=store")
 
     assert answer.status_code == 200 and answer.json()["total"] == 100
-    assert len(shuffling.fake.asked("search3")) == 2
+    #? the first page, then one round of PAGES_AT_ONCE whose first page brought nothing new (2.1.50) - and no more
+    assert len(shuffling.fake.asked("search3")) == 1 + navidrome_routes.PAGES_AT_ONCE
 
 
 # ---------------------------------------------------------------- whose
@@ -583,3 +584,53 @@ def test_a_navidrome_that_cant_be_reached_answers_as_every_route_does(shuffling)
 
 def test_with_logins_on_a_shuffle_needs_a_session(shuffling):
     assert TestClient(shuffling.app).get(f"{SHUFFLE}?scope=store").status_code == 401
+
+
+# ---------------------------------------------------------------- the song pages asked for together (2.1.50)
+
+def test_the_song_pages_are_asked_for_together_and_the_list_is_still_navidromes_in_its_order(shuffling, monkeypatch):
+    """Four pages under way at once at most, later ones answering first - and the list kept is the one a
+    page-by-page read makes: every song once, in Navidrome's own order."""
+    import asyncio
+    monkeypatch.setattr(navidrome_routes, "SCAN_PAGE", 50)
+    fake = shuffling.fake
+    out = {"now": 0, "most": 0, "first": None}
+
+    async def slowly(request: httpx.Request) -> httpx.Response:
+        if "search3" not in str(request.url):
+            return fake.handle(request)
+        out["now"] += 1
+        out["most"] = max(out["most"], out["now"])
+        offset = int(parse_qs(urlparse(str(request.url)).query)["songOffset"][0])
+        if out["first"] is None:
+            out["first"] = (offset, out["now"])
+        await asyncio.sleep(0.03 - offset / 20000)
+        out["now"] -= 1
+        return fake.handle(request)
+
+    navidrome.client = httpx.AsyncClient(transport=httpx.MockTransport(slowly), base_url=f"{NAVIDROME}/rest")
+    _, ids, total = whole(signed_in(shuffling, "james"))
+
+    assert total == 450 and sorted(ids) == sorted(song["id"] for song in fake.library)
+    assert out["most"] == navidrome_routes.PAGES_AT_ONCE and out["first"] == (0, 1)
+    (_, kept), = navidrome_routes._shuffle_lists.values()
+    assert list(kept) == [song["id"] for song in fake.library], "Navidrome's order, as read page by page"
+    #? 450 songs, 50 a page: the first, two rounds of four - nine full pages - and the round that finds the end
+    assert sorted(int(q["songOffset"]) for _, q in fake.asked("search3")) == list(range(0, 650, 50))
+
+
+def test_a_library_that_ends_in_its_first_page_of_songs_is_one_call(shuffling):
+    total = signed_in(shuffling, "james").get(f"{SHUFFLE}?scope=store").json()["total"]
+
+    assert total == 450
+    assert [q["songOffset"] for _, q in shuffling.fake.asked("search3")] == ["0"]
+
+
+def test_yours_read_together_is_still_only_the_songs_of_your_albums(shuffling, monkeypatch):
+    monkeypatch.setattr(navidrome_routes, "SCAN_PAGE", 50)
+    shuffling.fake.starred("ethan").update({"al-3", "al-40"})
+
+    _, ids, total = whole(signed_in(shuffling, "ethan"), "yours")
+
+    assert total == 20
+    assert sorted(ids) == sorted(song["id"] for song in shuffling.fake.library if song["albumId"] in ("al-3", "al-40"))

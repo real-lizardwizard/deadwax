@@ -5535,15 +5535,16 @@ html.app-picker-open { overflow: hidden; }
    came from under them; on an album's, Wikidata's one-line subtitle heads them (an artist's is in the hero,
    .app-artist-subtitle). Prose, in the body face (2.0.9: never mono). On the artist page it sits in the body's own
    column (its gap and edges); on an album page, and the album you don't have, at the page's edges as the songs are.
-   At the foot - one that came after what is under its top place was drawn (lib/describe.ts) - it keeps clear of
-   the songs' footer line and the page's links. */
+   (2.1.52) Always in that one place - the foot it went to when it came late is gone - with its room held there
+   until the answer lands (.app-about-room, below). */
 :root {
     --app-about-lines: 3;            /* clamped to this many lines until More */
     --app-about-measure: 68ch;       /* never wider than a comfortable line, whatever the frame */
     --app-about-top: 18px;           /* an album page's: under the hero (or the line under it) */
-    --app-about-foot-top: 6px;       /* at the foot: under the songs' line, above Properties */
     --app-about-gap: 2px;            /* the words to the line under them */
     --app-about-links-gap: 16px;     /* More to "From Wikipedia" */
+    --app-about-settle: var(--duration-slow);   /* the room easing to the words' own height; the words fading in */
+    --app-about-unseen: 0;           /* the words' opacity as they begin to fade in */
 }
 
 .app-about {
@@ -5557,7 +5558,48 @@ html.app-picker-open { overflow: hidden; }
     padding: var(--app-about-top) var(--pl-edge-right) 0 var(--pl-edge-left);
 }
 
-.pl-album-page > .app-about.is-foot { padding-top: var(--app-about-foot-top); }
+/* (2.1.52) The block's ROOM, held while its answer is still to come (app/Description.tsx `holding`), so what is
+   under it is drawn where it will stay and the words land without moving it: as tall as the block usually is - the
+   clamp's lines, the gap, and the line More and the source sit on; an album's with its subtitle's line over them. */
+.app-about-room {
+    height: calc(var(--app-about-lines) * var(--dw-text-heading) * var(--dw-leading-body) + var(--app-about-gap) + var(--pl-hit));
+}
+
+.app-about.is-album > .app-about-room {
+    height: calc(var(--dw-text-footnote) * var(--dw-leading-note) + var(--app-about-gap) + var(--app-about-lines) * var(--dw-text-heading) * var(--dw-leading-body) + var(--app-about-gap) + var(--pl-hit));
+}
+
+/* ...the words that land in it fade in... */
+.app-about.is-arriving > * { animation: app-about-in var(--app-about-settle) var(--dw-ease); }
+
+@keyframes app-about-in {
+    from { opacity: var(--app-about-unseen); }
+}
+
+/* ...and a block that isn't the room's height - shorter words, none at all - is eased to its own, once, by
+   Description.tsx (it measures both heights and sets them; how long and by what curve is here). `data-gone` is the
+   end with nothing drawn: the page's own room around the block - an album page's padding over it, the artist
+   body's gap under it - goes with it, so the block leaving the page afterwards moves nothing. */
+.app-about[data-easing] {
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ...its parts keeping their own height while it does - clipped, never squeezed: a paragraph squeezed by a block
+   opening from nothing would measure as running past its clamp, and be given a More it has no use for */
+.app-about[data-easing] > * { flex-shrink: 0; }
+
+.app-about[data-moving] {
+    transition: height var(--app-about-settle) var(--dw-ease), padding-top var(--app-about-settle) var(--dw-ease), margin-bottom var(--app-about-settle) var(--dw-ease);
+}
+
+.pl-album-page > .app-about[data-gone] { padding-top: 0; }
+.app-artist-body > .app-about[data-gone] { margin-bottom: calc(-1 * var(--app-artist-gap)); }
+
+@media (prefers-reduced-motion: reduce) {
+    .app-about.is-arriving > * { animation: none; }
+    .app-about[data-moving] { transition: none; }
+}
 
 /* Wikidata's one line: "1994 studio album by Portishead" - small, in the body face, above the paragraph */
 .app-about-subtitle {

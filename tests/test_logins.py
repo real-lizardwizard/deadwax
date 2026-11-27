@@ -220,6 +220,8 @@ ROUTES = {
     #? (2.1.44) a radio from a song, for the app's Start Radio and Autoplay: songs of the asker's own scope, asked as
     #? them - tests/test_lastfm_routes.py
     ("GET", "/deadwax/lastfm/radio"): "user",
+    #? (credits, 27 Nov 2026) a song's credits from MusicBrainz for the app's Info, asked as the asker - tests/test_song_credits.py
+    ("GET", "/deadwax/credits/song/{song_id}"): "user",
     #? each user's own library - their starred albums - and the admin's "held by nobody" (2.0.0-player.51,
     #? step 5 - tests/test_personal_libraries.py)
     ("GET", "/deadwax/me/library"): "user",

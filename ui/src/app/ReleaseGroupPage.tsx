@@ -36,7 +36,7 @@ import { hasLibrary } from './useMyLibrary'
 import { refreshOwned, useOwned } from './useOwned'
 import { noticeWords } from '../lib/errorWords'
 import { heroTitleClass } from '../lib/titles'
-import { DESCRIPTION_WAIT_MS, inBlock } from '../lib/describe'
+import { inBlock } from '../lib/describe'
 import { DescriptionBlock } from './Description'
 import { useDescription } from './useDescription'
 
@@ -333,24 +333,13 @@ export function ReleaseGroupPage({
 
   //? (2.0.13) the album's description, by its group's id (Wikipedia's words and Wikidata's subtitle - an album you
   //? don't have has nothing of Navidrome's), asked once the pressings have answered or failed: its MusicBrainz lookup
-  //? never takes a turn of the rate limit ahead of theirs. Under the hero when it is in hand as the tracklist is
-  //? drawn - which waits for it DESCRIPTION_WAIT_MS at most once the pressings are in - else at the page's foot,
-  //? above its links. A page come back to (its pressings from the session on its first frame) draws its tracklist at
-  //? once - the scroll it is put back to needs it
-  const tracksDrawn = useRef<string | null>(null)
-  const cameBack = useRef(answer ? id : null)
-  //? (after review) the pressings' trouble drawn - its Try again where the tracklist would be - is under the top place
-  //? too: a description landing then goes to the foot, never above the button a finger is reaching for
-  const describing = useDescription('album', answer || trouble ? { mbid } : null, tracksDrawn.current === id || !!trouble, id)
+  //? never takes a turn of the rate limit ahead of theirs. Always under the hero (2.1.52): its room is held there
+  //? from the first frame - while the pressings are still out too - so the tracklist is drawn as soon as the
+  //? pressings are in, and a description landing after it (or after the pressings' trouble and its Try again) moves
+  //? nothing under a finger
+  const describing = useDescription('album', answer || trouble ? { mbid } : null, id)
   const describedBlock = inBlock('album', describing.description)
-  const [tracksWaited, setTracksWaited] = useState<string | null>(null)
-  useEffect(() => {
-    if (!answer) return
-    const timer = setTimeout(() => setTracksWaited(id), DESCRIPTION_WAIT_MS)
-    return () => clearTimeout(timer)
-  }, [id, !!answer])
-  if (answer && (describing.settled || tracksWaited === id || cameBack.current === id)) tracksDrawn.current = id
-  const drawTracks = !!answer && tracksDrawn.current === id
+  const drawTracks = !!answer
 
   const releases = (answer?.releases ?? []) as PageRelease[]
   //? the album as credited - Search's group, else the one the pressings carry - for its title and the
@@ -565,7 +554,7 @@ export function ReleaseGroupPage({
         </div>
       </div>
 
-      {describedBlock && describing.at === 'top' && <DescriptionBlock description={describedBlock} at="top" />}
+      <DescriptionBlock kind="album" description={describedBlock} holding={describing.holding} />
 
       {trouble ? (
         <div class="pl-notice app-rg-trouble">
@@ -637,9 +626,6 @@ export function ReleaseGroupPage({
           )}
         </section>
       )}
-
-      {/* (2.0.13) a description that came after the tracklist was drawn: here, where it moves nothing under a finger */}
-      {describedBlock && describing.at === 'foot' && <DescriptionBlock description={describedBlock} at="foot" />}
 
       {/* on musicbrainz.org (2.0.0-player.50), opening beside the app - following a link in the page
           would unload the player: the album, and the pressing chosen */}

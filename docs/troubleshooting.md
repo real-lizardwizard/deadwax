@@ -687,7 +687,7 @@ Your player is showing a picture embedded in the file, or a disc scan (`cd.jpg`)
 disc number. A track's **Pictures in this file** (open it from **Edit → Tags**) shows them. **Get CD art** saves a proper `disc.jpg`, which Navidrome prefers over a
 `cd.jpg`.
 
-## An artist or album has no description, or it's at the foot of the page
+## An artist or album has no description
 
 The short description ([descriptions](player.md#descriptions)) comes, with a Last.fm key (`LASTFM_API_KEY`), from
 Last.fm first, then from the English Wikipedia article that MusicBrainz links to (through Wikidata), then from
@@ -720,11 +720,36 @@ when there's none, so if a page has no description:
   comes, for the next visit): deadwax keeps nothing of a failure, the page has what the others said, and the app asks again when the page next opens, from a minute on. deadwax's own log (the container's output) has a line saying which
   of the Wikipedia side didn't answer ("no description for that artist just now - …").
 
-A description at the **foot** of the page came after what is under its place was drawn - the artist's albums, the
-album's songs, a pressing's tracklist wait for it only a moment - so it was put where it moves nothing under your
-finger - as is one that came after the page said the album's details or the library couldn't be loaded, with
-**Try again** under where it would go. Next time the page opens deadwax has it kept, and it is under the name or the
-hero.
+**A gap under Play and Shuffle that then closes** is the room the page keeps for a description while deadwax asks
+for it (deadwax 2.1.52 on - before that a description that came late went to the foot of the page). When the answer
+is that there's none, the gap closes; open the page again in the same visit and it isn't left. A description is
+always under the name or the hero now, never at the foot.
+
+## A song's credits say they can't be asked for just now
+
+A song's credits in the app's Info ([credits](ios.md)) come from MusicBrainz. "Can't be asked for just now" means
+deadwax had nothing kept for that album, and MusicBrainz didn't answer within eight seconds or couldn't be reached
+(or Navidrome couldn't be asked about the song). deadwax keeps asking MusicBrainz after the app gets that answer.
+Opening Info again a little later usually shows them, and once they've come they're kept for a month and shown even
+while MusicBrainz is down. If it lasts, see whether Settings' Connections says MusicBrainz isn't connected
+([above](#settings-connections-says-musicbrainz-isnt-connected)). deadwax's own log (the container's output) has a
+line starting "credits:" saying which it was. When MusicBrainz was the trouble, the Event log shows it too, in the
+lines every MusicBrainz question writes while it retries and when it gives up.
+
+The other things credits can say:
+
+- **"MusicBrainz has no credits for this album yet"**: add them on MusicBrainz (the link opens the album's
+  release there). deadwax shows them once it asks MusicBrainz about that album again, which can take up to a month.
+  **Clear MusicBrainz's saved answers** (Server settings → **Connections**) makes it ask on the next look.
+- **Credits "on the album" for a song MusicBrainz does credit**: deadwax couldn't be sure which track of the release
+  the song is. The file has no recording id, and that disc's track numbers in Navidrome aren't the release's (a
+  missing or extra track, two songs with one number, or two copies of the album). Matching the album to the release
+  it really is (**Edit → Release**), or fixing the track numbers, fixes it.
+- **The band, with someone who wasn't on the album, or "joined" or "left" beside a name**: MusicBrainz's dates for
+  that member's time in the band don't rule them out, being missing or only a year. Dating the membership more
+  closely on MusicBrainz (the band's page, its members) narrows it, once deadwax asks again.
+- **"This album isn't matched to a release"**: its files carry no MusicBrainz release id, or MusicBrainz no longer
+  has that release. **Edit → Release** matches it.
 
 ## The artist page can't work out who this is
 

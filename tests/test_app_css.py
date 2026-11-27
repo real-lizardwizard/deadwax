@@ -2373,3 +2373,58 @@ def test_the_lyrics_section_comes_before_the_phones_which_is_still_last():
     lyrics = section(APP, LYRICS_HEADING)
     assert ".app-lyrics" in lyrics and not re.search(r"\.app-shell:not\(\.app-desk\)", lyrics)
     assert APP.rstrip().endswith(PHONE_SECTION.rstrip())
+
+
+def test_a_descriptions_room_is_as_tall_as_its_block_and_what_moves_is_eased_by_tokens():
+    """(2.1.52) The description is always in its one place - James: "sometimes the description is at the top and
+    sometimes at the bottom. Let's make it consistently at the top." - so while its answer is still to come the page
+    holds its ROOM, and the words land without moving what is under them. The room's height is made of the block's own
+    parts, term for term: an album's subtitle line, the clamp's lines, the gaps between them, and the line More and
+    the source sit on. A block that isn't that tall - shorter words, none - is eased to its own height by
+    Description.tsx, which measures; how long, by what curve, and what else closes with it are here, in tokens, and
+    nothing moves under reduced motion. The foot it went to when it came late is gone."""
+    lines = "var(--app-about-lines) * var(--dw-text-heading) * var(--dw-leading-body)"
+    assert declarations(APP, ".app-about-room") == {"height": f"calc({lines} + var(--app-about-gap) + var(--pl-hit))"}
+    assert declarations(APP, ".app-about.is-album > .app-about-room") == {
+        "height": f"calc(var(--dw-text-footnote) * var(--dw-leading-note) + var(--app-about-gap) + {lines} + var(--app-about-gap) + var(--pl-hit))"}
+    #? ...each term what the drawn block is made of
+    text, subtitle = declarations(APP, ".app-about-text"), declarations(APP, ".app-about-subtitle")
+    assert (text["font-size"], text["line-height"]) == ("var(--dw-text-heading)", "var(--dw-leading-body)")
+    assert (subtitle["font-size"], subtitle["line-height"]) == ("var(--dw-text-footnote)", "var(--dw-leading-note)")
+    assert declarations(APP, ".app-about-text.is-clamped")["-webkit-line-clamp"] == "var(--app-about-lines)"
+    assert declarations(APP, ".app-about-foot")["min-height"] == "var(--pl-hit)"
+    about = declarations(APP, ".app-about")
+    assert (about["display"], about["flex-direction"], about["gap"]) == ("flex", "column", "var(--app-about-gap)")
+
+    #? the foot is gone, and its token with it
+    assert declarations(APP, ".pl-album-page > .app-about.is-foot") == {} and "--app-about-foot-top" not in ALL_TOKENS
+
+    #? eased, and faded in, by tokens
+    settle = "var(--app-about-settle) var(--dw-ease)"
+    assert ALL_TOKENS["--app-about-settle"] == "var(--duration-slow)"
+    assert declarations(APP, ".app-about[data-moving]") == {
+        "transition": f"height {settle}, padding-top {settle}, margin-bottom {settle}"}
+    assert declarations(APP, ".app-about[data-easing]") == {"box-sizing": "border-box", "overflow": "hidden"}
+    #? a paragraph squeezed by a block opening from nothing would measure as past its clamp, and be given a More
+    assert declarations(APP, ".app-about[data-easing] > *") == {"flex-shrink": "0"}
+    assert declarations(APP, ".app-about.is-arriving > *") == {"animation": f"app-about-in {settle}"}
+    assert declarations(APP, "from", "@keyframes app-about-in") == {"opacity": "var(--app-about-unseen)"}
+    assert ALL_TOKENS["--app-about-unseen"] == "0"
+    reduced = "@media (prefers-reduced-motion: reduce)"
+    assert declarations(APP, ".app-about.is-arriving > *", reduced) == {"animation": "none"}
+    assert declarations(APP, ".app-about[data-moving]", reduced) == {"transition": "none"}
+
+    #? closed to nothing, the page's own room around the block goes with it - so the block leaving the page moves nothing
+    assert declarations(APP, ".pl-album-page > .app-about[data-gone]") == {"padding-top": "0"}
+    assert declarations(APP, ".app-artist-body > .app-about[data-gone]") == {"margin-bottom": "calc(-1 * var(--app-artist-gap))"}
+    assert declarations(APP, ".app-artist-body")["gap"] == "var(--app-artist-gap)"
+
+    #? ...and the block draws those classes and sets those marks, and no height but one it measured
+    ui = Path(__file__).resolve().parent.parent / "ui" / "src"
+    block = (ui / "app" / "Description.tsx").read_text()
+    assert 'class={`app-about is-${kind} is-holding`} aria-hidden="true"' in block and '<div class="app-about-room" />' in block
+    assert "class={`app-about is-${kind}${arriving.current ? ' is-arriving' : ''}`}" in block
+    for mark in ("data-easing", "data-moving", "data-gone"):
+        assert f"'{mark}'" in block, mark
+    assert "element.style.height = `${from}px`" in block and "element.style.height = `${to}px`" in block
+    assert "getBoundingClientRect().height" in block

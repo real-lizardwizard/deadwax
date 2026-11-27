@@ -678,12 +678,13 @@ does - under the artist's **Play** and **Shuffle**, under an album's **Play** an
   description, over the paragraph.
 - **Three lines** of the paragraph, and **More** when there's more - **Less** puts it back. A screen reader reads
   it whole either way. Its links open beside the app, so the music keeps playing.
-- **It never holds the page up.** The page draws as it always did and the description fills in. The albums on an
-  artist's page, an album's songs and a pressing's tracklist wait a moment for it - the songs and the tracklist
-  half a second at most - so it lands above them rather than pushing them down under your finger; one that comes
-  later still goes to the **foot of the page** instead (under the songs, or the tracklist, or the artist's
-  sections), where it moves nothing - as does one that comes after the page has said something couldn't be loaded,
-  with **Try again** under where it would go. A page you come back to (**Back**) draws as it was, at once.
+- **Always in the same place, and it never holds the page up** (deadwax 2.1.52 on). The description sits under
+  **Play** and **Shuffle** (or **Get the album**) whenever there is one - before 2.1.52 one that arrived late went
+  to the foot of the page instead. The page draws as it always did - nothing on it waits for the description any
+  more - and leaves the description's room open in its place until deadwax has answered: the words then fade in
+  there (they simply appear if your device asks for reduced motion) and nothing under them moves. If there turns out to be no
+  description, that room closes, once and gently, and for the rest of the visit the page leaves no room for one.
+  A page you come back to (**Back**) draws as it was, at once.
 - **Kept**: deadwax keeps what Wikipedia and Wikidata said in its database - a found description for a month,
   "there's none" for three days - so a page you've seen before asks them nothing; the app keeps what it was told
   for the rest of the visit. What Last.fm said is kept a week ("it doesn't know them" three days), with the rest of
@@ -885,8 +886,13 @@ opens on **Artist** (Recently added has its own place: the list's grid and **See
 - **Up to date**: the list is asked for again when you add or remove an album, when your library changes in
   Amperfy (with logins on), and otherwise when you open the Library or a page of it more than a minute after
   it was last asked - so **Recently played** and **Most played** can be up to a minute behind, and an album
-  deadwax has just filed shows the next time you look once Navidrome has scanned it.
-- **Big libraries**: each list comes from deadwax in one request (it reads Navidrome's pages of 500 itself),
+  deadwax has just filed shows the next time you look once Navidrome has scanned it. deadwax itself keeps a
+  list it has just read from Navidrome for 30 seconds, for the same person, so that another device of yours
+  or the page opened again doesn't make Navidrome list everything a second time: something changed in
+  another app in that half minute can be that much later still. It keeps nothing for three minutes after it
+  files, edits or deletes an album, and drops what it kept when you add or remove one.
+- **Big libraries**: each list comes from deadwax in one request (it reads Navidrome's pages of 500 itself,
+  four at a time),
   and only the albums near what's on screen are drawn. deadwax lists at most 10,000 albums; past that the
   page says "Showing the first 10000 albums" ([troubleshooting](troubleshooting.md#the-library-shows-the-first-10000-albums)).
 - **Songs** is in Navidrome's own order, with no Find or sort: Search finds songs.

@@ -17,13 +17,15 @@ from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.config import COVER_ART_SIZES, rename_wait_seconds
 from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, disc_face, plan_disc_art,
                           save_disc_art)
+from src.library import generation as scan_generation
+from src.library import holds_albums
 from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, albums_without_tracks, compact_for_wire, delete_album,
                          drain_cache_changes, embedded_pictures, find_artist_art, find_disc_art, library_is_behind,
                          forget_cached_album, load_album_art, load_artist_art,
                          read_album_details, read_artist_mbid, scan_library, seed_cache,
                          snapshot_library, summarize_for_deletion)
 from src.logger import logger
-from src.metadata_health import ISSUE_TYPES, attach_issues
+from src.metadata_health import ISSUE_TYPES, attach_issues, decorations, settings_read
 from src.navidrome_listing import LISTING_FRESH_SECONDS, LISTING_STALE_SECONDS, navidrome_listing
 from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.organizer import is_within
@@ -32,7 +34,7 @@ from src.api.lrclib_endpoint import lrclib
 from src.lyrics import fetch_album_lyrics, read_track_lyrics
 from src.retag import (changes_player_ids, execute_retag, hold_back_rename, move_retagged, plan_cover_art,
                        plan_retag, save_cover_art)
-from src.api.json_etag import json_with_etag
+from src.api.json_etag import answer_packed, json_with_etag, pack
 from src.api.navidrome_endpoint import NavidromeClient, NavidromeError, SignedOut, client_for, navidrome
 from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_SECONDS,
                            SCAN_WAIT_CAP_SECONDS, ScanStatus, WaitState, begin, read_status,
@@ -40,7 +42,7 @@ from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_
 from src.store_index import index_folder, mark_deleted, reconcile_scan, reindex_merged, reindex_moved
 from src.track_tags import execute_tag_edits, plan_tag_edits
 from src.users import LOCAL_USER, current_user, require
-from src import library_ledger
+from src import index_keep, library_ledger
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
 #? rarely and one at a time, so there is nothing to gain from per-request clients and a
@@ -251,12 +253,17 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
     #? a real scan prunes the verdicts of folders it didn't find (unlisted() keeps them when it found
     #? none); a snapshot never does - it lacks a folder a writer has just forgotten
     unlisted = navidrome_listing.unlisted(result["albums"], prune=not result["stale"] and not result["problem"])
-    result["queue"] = attach_issues(result["albums"], reviews, unlisted)
-    result["issue_types"] = ISSUE_TYPES
     #? whether the albums could be checked against Navidrome, read in the same moment as the verdicts
-    #? (a refresh can land while the walk or the reviews are awaited) - no time in it, so an
-    #? unchanged library is still an unchanged body (the ETag's 304)
-    result["navidrome_check"] = navidrome_listing.check()
+    #? (a refresh can land while the walk or the reviews are awaited - or, since 2.1.47, while the
+    #? issues are worked out) - no time in it, so an unchanged library is still an unchanged body
+    #? (the ETag's 304)
+    check = navidrome_listing.check()
+    #? in a worker thread (2.1.47): every album inspected is tens of milliseconds on a thousand albums,
+    #? and on the event loop that was every other request - the audio's byte ranges too - standing still.
+    #? The albums are this request's own copies (library.py), so nothing else reads them meanwhile.
+    result["queue"] = await asyncio.to_thread(attach_issues, result["albums"], reviews, unlisted)
+    result["issue_types"] = ISSUE_TYPES
+    result["navidrome_check"] = check
     #? so the interface can say "your ignores aren't being saved" rather than silently
     #? forgetting them, exactly as the downloads panel does for job tracking
     result["review_tracking_enabled"] = bool(store and store.available)
@@ -287,13 +294,51 @@ _SCAN_HEADERS = {"scanned_at": "X-Scanned-At", "scan_seconds": "X-Scan-Seconds",
                  "cached": "X-Scan-Cached", "stale": "X-Scan-Stale"}
 
 
-def _library_response(request: Request, result: dict, tracks: bool = True) -> Response:
+#? What a scan's result carries that is no part of its body: the headers above, and which generation
+#? of the scan cache its albums are (library.generation - what the kept answer below is kept by).
+_NOT_IN_BODY = (*_SCAN_HEADERS, "generation")
+
+#? The scan's answer as it was last encoded (2.1.47), one per form it is asked in - (the saved scan or
+#? a real one, with tracks or without) -> (what it is the answer TO, its ETag, its body gzipped). See
+#? _library_response.
+_kept_answers: dict[tuple[bool, bool], tuple[tuple, str, bytes]] = {}
+
+
+def _pack_scan(result: dict, tracks: bool) -> tuple[str, bytes]:
+    """A scan's body - compact tracks, or none - encoded, hashed and gzipped. A worker thread's work."""
+    body = {k: v for k, v in result.items() if k not in _NOT_IN_BODY}
+    body["albums"] = compact_for_wire(result["albums"]) if tracks else albums_without_tracks(result["albums"])
+    return pack(body)
+
+
+async def _library_response(request: Request, result: dict, tracks: bool = True) -> Response:
     """
     A scan as the interface is sent it: compact tracks, the volatile fields as headers.
 
     `tracks=False` (2.1.28) leaves each album's tracks and track_defaults out and changes nothing
     else - the scan, the queue, the headers - so its ETag is of a different body and the two forms
     never answer each other's If-None-Match.
+
+    (2.1.47) The body is encoded in a worker thread, and KEPT until the scan it answers is another
+    one. Building it - the tracks compacted, megabytes of JSON, its hash, gzip - with the albums'
+    issues before it held the event loop 82 ms on a thousand albums to answer a 304, and 102 ms for
+    a 200 (measured; notes/performance.md "The scan's answer, kept"), on every visit to the library,
+    paid even to say "nothing changed": every other request waited behind it, a playing song's next
+    byte range among them.
+
+    What the kept answer is kept BY is everything the body is made of, and no clock:
+     - `generation`: which scan cache these albums are (src/library.py) - it moves when a folder is
+       read afresh, dropped, or forgotten by a writer (a retag, an art fetch, a delete, a move), so
+       an edit is never answered from before it. A result that can't say (None) keeps nothing;
+     - the form: the answers with and without tracks are two, and a saved scan's and a real one's
+       are kept apart so that neither pushes the other out where their albums tie-break in another
+       order (they are nearly always the same bytes, held once);
+     - metadata_health.decorations(): the albums' paths in their order, and what THIS request's
+       attach_issues said of each, by value - so a review ignored, an import looked at, Navidrome's
+       listing or a folder template changing each make another answer without anything having to
+       remember to say so;
+     - everything else in the body (the queue's counts, the Navidrome check, the path, the problem),
+       by value.
     """
     def header(key: str) -> str:
         value = result.get(key)
@@ -302,9 +347,27 @@ def _library_response(request: Request, result: dict, tracks: bool = True) -> Re
         return str(int(value)) if key == "stale" else str(value)
 
     headers = {name: header(key) for key, name in _SCAN_HEADERS.items()}
-    body = {k: v for k, v in result.items() if k not in _SCAN_HEADERS}
-    body["albums"] = compact_for_wire(result["albums"]) if tracks else albums_without_tracks(result["albums"])
-    return json_with_etag(request, body, headers)
+
+    form = (bool(result.get("stale")), bool(tracks))
+    answers = None
+    if result.get("generation") is not None:
+        rest = {k: v for k, v in result.items() if k not in _NOT_IN_BODY and k not in ("albums", "artists")}
+        answers = (result["generation"], decorations(result["albums"]), rest)
+
+    kept = _kept_answers.get(form)
+    if answers is not None and kept is not None and kept[0] == answers:
+        _, etag, packed = kept
+    else:
+        etag, packed = await asyncio.to_thread(_pack_scan, result, tracks)
+        if answers is not None:
+            #? the saved scan and the real one are nearly always the same bytes: hold them once
+            for _, other_etag, other_packed in _kept_answers.values():
+                if other_etag == etag:
+                    packed = other_packed
+                    break
+            _kept_answers[form] = (answers, etag, packed)
+
+    return await answer_packed(request, etag, packed, headers)
 
 
 @router.get("/albums")
@@ -345,7 +408,7 @@ async def albums(request: Request, snapshot: bool = False, tracks: bool = True):
                 extra={"frontend": True},
             )
 
-        return _library_response(request, result, tracks)
+        return await _library_response(request, result, tracks)
 
     except Exception as e:
         logger.error(f"Exception in /albums endpoint: {e}")
@@ -417,7 +480,9 @@ async def rescan(request: Request, tracks: bool = True):
     `?tracks=false` answers as /albums' does (2.1.28).
     """
     try:
-        return _library_response(request, await _scan_with_queue(request, True), tracks)
+        #? (2.1.49) a Rescan is "show me what is really there": the Library's kept album lists go too
+        index_keep.forget()
+        return await _library_response(request, await _scan_with_queue(request, True), tracks)
 
     except Exception as e:
         logger.error(f"Exception in /rescan endpoint: {e}")
@@ -1463,6 +1528,24 @@ async def new_imports(request: Request):
     return await store.new_import_summary()
 
 
+#? The Needs-a-look count as it was last worked out (2.1.48): (what it is the count OF, the counts) - see
+#? queue_summary.
+_kept_summary: tuple[tuple, dict] | None = None
+
+
+def _count_queue(albums: list[dict], reviews: dict[str, dict], unlisted: set[str]) -> dict:
+    """queue_summary's counts over a saved scan's albums - every album inspected, so a worker thread's work."""
+    queue = attach_issues(albums, reviews, unlisted)
+    listed = sum(1 for album in albums if album["needs_attention"] or (album["imported"] and not album["reviewed"]))
+    held = {album["path"] for album in albums}
+    #? the same rule attach_issues reads an import by: filed by deadwax, not looked at
+    unscanned = sum(1 for path, review in reviews.items()
+                    if path not in held and review.get("source") == "import" and not review.get("reviewed_at"))
+    return {"known": True, "needs_attention": queue["total"],
+            "new_imports": queue["new_imports"] + unscanned, "total": listed + unscanned,
+            "unscanned_imports": unscanned}
+
+
 @router.get("/queue/summary", dependencies=LIBRARY)
 async def queue_summary(request: Request):
     """
@@ -1490,7 +1573,18 @@ async def queue_summary(request: Request):
     LISTING_STALE_SECONDS (then behind the answer, for the next count).
 
     No LIBRARY_PATH, or no store: zeros, `known` false - still a 200.
+
+    (2.1.48) The count is KEPT until what it is the count of changes, and worked out in a worker thread when
+    it must be. It was every album inspected on the event loop on every ask - 22 ms of every other request
+    standing still on a thousand albums (measured; notes/performance.md "The Needs-a-look count, kept"), as
+    the app opens and after every filing. What it is kept by is everything it is made from, and no clock:
+    the scan cache's generation (library.generation - a retag, a delete, a scan that read a folder afresh),
+    the review rows BY VALUE (read from SQLite on every ask, in the store's own thread: an ignore, a look,
+    an import enrolled each make another count with no writer having to say so), Navidrome's listing and
+    its verdicts (navidrome_listing.stamp), and the settings an issue is judged by
+    (metadata_health.settings_read). A saved scan that can't say which generation it is keeps nothing.
     """
+    global _kept_summary
     root = Config.LIBRARY_PATH or ""
     store = _store(request)
     tracking = bool(store and store.available)
@@ -1500,30 +1594,43 @@ async def queue_summary(request: Request):
     if not root or store is None:
         return answer
 
-    await _ensure_cache_loaded(request)
-    snapshot = await asyncio.to_thread(snapshot_library, root)
-
-    if snapshot is None:
+    async def imports_alone() -> dict:
         imports = await store.new_import_summary()
         count = int(imports.get("count") or 0)
         return {**answer, "new_imports": count, "total": count, "unscanned_imports": count}
 
+    await _ensure_cache_loaded(request)
+    #? (2.1.53, the review) no saved scan: the new imports alone, at once - looked for BEFORE Navidrome is asked,
+    #? as it was until 2.1.48, which read the reviews and asked Navidrome first: on a fresh install with a slow
+    #? Navidrome the badge then waited up to LISTING_WAIT_SECONDS for a count that never needed its answer
+    if not holds_albums(root):
+        return await imports_alone()
     reviews = await store.album_reviews()
-    albums = snapshot["albums"]
     #? Navidrome's listing as the page's /albums judged by it: the one in hand - asked for only when
     #? there is none yet (the first answer waited for, a bounded while) or it is past
     #? LISTING_STALE_SECONDS (behind this count, for the next)
     await navidrome_listing.ask(LISTING_STALE_SECONDS)
-    queue = attach_issues(albums, reviews, navidrome_listing.unlisted(albums))
-    listed = sum(1 for album in albums if album["needs_attention"] or (album["imported"] and not album["reviewed"]))
-    held = {album["path"] for album in albums}
-    #? the same rule attach_issues reads an import by: filed by deadwax, not looked at
-    unscanned = sum(1 for path, review in reviews.items()
-                    if path not in held and review.get("source") == "import" and not review.get("reviewed_at"))
 
-    return {**answer, "known": True, "needs_attention": queue["total"],
-            "new_imports": queue["new_imports"] + unscanned, "total": listed + unscanned,
-            "unscanned_imports": unscanned}
+    #? read together, with nothing awaited between them and the look for a kept count
+    kept = _kept_summary
+    if kept is not None and kept[0] == (root, scan_generation(), navidrome_listing.stamp(), settings_read(), reviews):
+        return {**answer, **kept[1]}
+
+    snapshot = await asyncio.to_thread(snapshot_library, root)
+
+    #? (the saved scan gone since it was looked for - LIBRARY_PATH changed meanwhile)
+    if snapshot is None:
+        return await imports_alone()
+
+    albums = snapshot["albums"]
+    #? the verdicts, and what they were judged by, in one turn of the loop - then the inspecting, off it
+    unlisted = navidrome_listing.unlisted(albums)
+    judged_by = (navidrome_listing.stamp(), settings_read())
+    counts = await asyncio.to_thread(_count_queue, albums, reviews, unlisted)
+    if snapshot.get("generation") is not None:
+        _kept_summary = ((root, snapshot["generation"], *judged_by, reviews), counts)
+
+    return {**answer, **counts}
 
 
 @router.post("/queue/ignore", dependencies=LIBRARY)

@@ -62,6 +62,7 @@ import asyncio
 import time
 from dataclasses import dataclass, replace
 
+from src import index_keep
 from src.api.navidrome_endpoint import NavidromeError, navidrome
 from src.artists import _fold as fold_name
 from src.config import Config
@@ -300,6 +301,9 @@ class NavidromeListing:
         #? path -> the folder's last verdict, for a folder changed since Navidrome last scanned -
         #? merged from every read, pruned only by a real scan that found albums (prune=True)
         self._verdicts: dict[str, bool] = {}
+        #? bumped whenever what unlisted() judges by changes other than by its own judging: a refresh
+        #? landing, a forget, a verdict following a move or pruned - see stamp()
+        self._changes = 0
 
     def forget(self) -> None:
         """Every answer dropped: the next read asks Navidrome afresh."""
@@ -310,6 +314,19 @@ class NavidromeListing:
         self._task = None
         self._generation += 1
         self._verdicts = {}
+        self._changes += 1
+
+    def stamp(self) -> tuple:
+        """
+        (2.1.48) What unlisted() and check() answer BY, as a value: equal again means the same albums would
+        be judged the same, so the Needs-a-look count kept by it (routes/library.py queue_summary) still
+        stands. It moves with every refresh that lands (even one that found nothing new - it is a new
+        listing, asked at another time), every forget, a verdict that followed a move, verdicts pruned by a
+        real scan, and Navidrome being set or unset. unlisted()'s own judging doesn't move it: judging the
+        same albums by the same listing again changes no verdict (judge() is a function of the album and
+        the listing, and passes a kept verdict through as it was).
+        """
+        return (self._changes, Config.navidrome_configured())
 
     def _same_navidrome(self) -> bool:
         current = (Config.NAVIDROME_URL or "", Config.NAVIDROME_USER or "")
@@ -442,6 +459,9 @@ class NavidromeListing:
                     seen_until = began if began is not None else before.last_scan.timestamp() - LISTING_SETTLE_SECONDS
                     settled = quiet and after is not None and not after.scanning and after.last_scan == before.last_scan
                 listing = build_listing(albums, seen_until, settled, asked)
+                #? (2.1.49) Navidrome has scanned since it was last asked (or is scanning): its albums may be
+                #? others now, so no album list kept from before answers anybody (src/index_keep.py)
+                index_keep.forget()
             if generation != self._generation:
                 return
             self.listing, self.problem, self._status = listing, None, before
@@ -455,6 +475,7 @@ class NavidromeListing:
                 return
             self.listing, self.problem, self._status = None, f"{type(e).__name__}: {e}", None
         self._answered = time.monotonic()
+        self._changes += 1
 
     def unlisted(self, albums: list[dict], prune: bool = False) -> set[str]:
         """
@@ -485,7 +506,10 @@ class NavidromeListing:
             if verdict is False:
                 missing.add(path)
         if prune and found:
-            self._verdicts = {path: verdict for path, verdict in self._verdicts.items() if path in found}
+            kept = {path: verdict for path, verdict in self._verdicts.items() if path in found}
+            if len(kept) != len(self._verdicts):
+                self._changes += 1
+            self._verdicts = kept
         return missing
 
     def follow(self, source: str, target: str) -> None:
@@ -500,10 +524,12 @@ class NavidromeListing:
         verdict = self._verdicts.pop(source, None)
         if verdict is not None:
             self._verdicts.setdefault(target, verdict)
+            self._changes += 1
 
     def forget_folders(self) -> None:
         """Every folder's verdict dropped - LIBRARY_PATH moved, so the paths name other folders."""
         self._verdicts = {}
+        self._changes += 1
 
 
 #? One for the process, like the Navidrome client it asks through.
