@@ -81,6 +81,7 @@ struct ArtistView<Desk: View>: View {
     @Environment(Reachability.self) private var reachability
     @Environment(AppNavigation.self) private var navigation
     @Environment(SearchModel.self) private var search
+    @Environment(LibraryModel.self) private var library
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var model: ArtistPageModel
     /// The hero's name has scrolled away: the bar shows it.
@@ -113,7 +114,7 @@ struct ArtistView<Desk: View>: View {
     /// (Speed A, fix 2) The stamp the albums' songs the page asks are kept under for the album pages now (who is signed
     /// in and every write deadwax was told of - KeptAlbumAnswers.stamp). Not `kept`: the body has a `kept` of its own
     /// (the Last.fm answer), which its tasks and pull would read in its place.
-    private var keptStamp: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation) }
+    private var keptStamp: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library) }
 
     /// Who they are on MusicBrainz, as the artist's answer and the library's folders now say (ArtistJoin.mbid).
     private var said: String? { model.mbid(index: search.ownedIndex, version: search.ownedVersion) }

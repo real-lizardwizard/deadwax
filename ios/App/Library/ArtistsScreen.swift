@@ -134,7 +134,7 @@ struct ArtistsScreen: View {
     /// since it was asked (ArtistsModel.askIfOld); `fresh`, a pull, at once.
     private func ask(fresh: Bool) async {
         let artists = self.artists
-        let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation).writes
+        let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library).writes
         guard yours else {
             if fresh { await artists.ask() } else { await artists.askIfOld(writes: writes) }
             return

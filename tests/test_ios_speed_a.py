@@ -46,9 +46,9 @@ def flat(text: str) -> str:
 # ---------------------------------------------------------------------------- fix 1: covers kept on disk
 
 
-def test_covers_alone_go_through_a_session_whose_cache_is_on_disk():
+def test_no_session_stores_anything_and_covers_have_their_own_connections():
     transport = code(APP / "URLSessionTransport.swift")
-    # every other route's sessions keep nothing, exactly as before: ephemeral, no cache, never reading one
+    # every session - the covers' too - keeps nothing, exactly as before: ephemeral, no cache, never reading one
     assert flat(func(transport, "configuration")) == flat("""
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpShouldSetCookies = false
@@ -57,54 +57,89 @@ def test_covers_alone_go_through_a_session_whose_cache_is_on_disk():
         configuration.urlCache = nil
         configuration.timeoutIntervalForRequest = timeout
         return configuration""")
-    # the covers': a disk cache, used as each answer's headers say, cookies off as every other's
-    assert flat(func(transport, "coverConfiguration")) == flat("""
-        guard let cache = coverCache else { return configuration(waiting: timeout) }
-        let configuration = URLSessionConfiguration.default
-        configuration.httpShouldSetCookies = false
-        configuration.httpCookieAcceptPolicy = .never
-        configuration.httpCookieStorage = nil
-        configuration.urlCredentialStorage = nil
-        configuration.requestCachePolicy = .useProtocolCachePolicy
-        configuration.urlCache = cache
-        configuration.timeoutIntervalForRequest = timeout
-        return configuration""")
-    # in a named place in Caches, bounded by Core's number; nothing of it in memory (CoverCache holds the decoded ones)
-    cache = transport[transport.index("static let coverCache: URLCache? = {"):]
-    cache = cache[:cache.index("}()")]
-    assert "for: .cachesDirectory, in: .userDomainMask" in cache
-    assert "caches.appendingPathComponent(CoverDisk.folder, isDirectory: true)" in cache
-    assert "URLCache(memoryCapacity: 0, diskCapacity: CoverDisk.diskBytes, directory: folder)" in cache
-    # a session per kind, the covers' its own - one URLSession made for both, with the redirect rule
+    # (after review) URLCache never stores on its own: no session is given one, none follows the protocol's policy
+    assert re.findall(r"\.urlCache = [^\n]*", transport) == [".urlCache = nil"]
+    assert "URLSessionConfiguration.default" not in transport and "useProtocolCachePolicy" not in transport
+    assert "NetworkUsed" not in transport and "coverConfiguration" not in transport
+    # a session per kind, the covers' its own URLSession (its own connections) from that same configuration
     session = flat(func(transport, "session"))
-    assert ("let configuration = covers ? Self.coverConfiguration(waiting: timeout) : Self.configuration(waiting: timeout)"
-            in session)
     assert "let kind = Kind(timeout: timeout, covers: covers)" in session and "sessions[kind] = session" in session
+    assert ("let session = URLSession(configuration: Self.configuration(waiting: timeout), "
+            "delegate: SameOriginRedirects.shared, delegateQueue: nil)") in session
     # the request's way: the viewer's full size first (its capped read), then a cover, then everything else
     send = flat(func(transport, "send"))
     assert flat("""
             if let most = request.mostBytes {
                 (data, response) = try await CappedRead.read(sent, most: most,
                                                              configuration: Self.configuration(waiting: timeout))
-            } else if CoverDisk.takes(request) {
-                let used = NetworkUsed()
-                (data, response) = try await session(waiting: timeout, covers: true).data(for: sent, delegate: used)
-                answered = used.overNetwork
+            } else if CoverDisk.takes(request), let cache = Self.coverCache {
+                (data, response, answered) = try await cover(request, sent: sent, cache: cache, timeout: timeout)
             } else {
                 (data, response) = try await session(waiting: timeout).data(for: sent)
             }""") in send
-    # a cover the cache answered without asking never says deadwax answered
+    # a cover the disk answered without asking never says deadwax answered
     assert "if answered { heard(true) }" in send and send.count("heard(true)") == 2
-    used = transport[transport.index("private final class NetworkUsed"):]
-    used = used[:used.index("\n}\n")]
-    assert "each.resourceFetchType == .networkLoad" in used
-    assert "SameOriginRedirects.shared.urlSession(session, task: task, willPerformHTTPRedirection: response," in used
-    # the event log's stream keeps its own session, as every route's but the covers'
+    # the event log's stream keeps its own session
     assert "let configuration = Self.configuration(waiting: EventStream.silence)" in func(transport, "streamSession")
-    # Core's rule names the two routes, and nothing else
+    # Core's rule names the two routes, and nothing else - never a download's cover, nor a caller's revalidation
     rule = code(CORE / "CoverDisk.swift")
     assert "public static let routes: [Endpoint] = [Routes.cover, Routes.archiveCover]" in rule
-    assert 'guard request.method == "GET", request.mostBytes == nil else { return false }' in rule
+    assert flat("""guard request.method == "GET", request.mostBytes == nil, request.mayKeepOnDisk,
+              header("If-None-Match", in: request.headers) == nil,
+              header("If-Modified-Since", in: request.headers) == nil else { return false }""") in flat(rule)
+
+
+def test_a_cover_is_stored_by_hand_under_its_address_alone_never_with_the_cookie():
+    transport = code(APP / "URLSessionTransport.swift")
+    # in a named place in Caches, bounded by Core's number, nothing of it in memory; the first build's folder - where
+    # URLCache stored each request with its headers - removed
+    cache = transport[transport.index("static let coverCache: URLCache? = {"):]
+    cache = cache[:cache.index("}()")]
+    assert "for: .cachesDirectory, in: .userDomainMask" in cache
+    assert ("try? FileManager.default.removeItem(at: caches.appendingPathComponent(CoverDisk.oldFolder, "
+            "isDirectory: true))") in cache
+    assert "caches.appendingPathComponent(CoverDisk.folder, isDirectory: true)" in cache
+    assert "URLCache(memoryCapacity: 0, diskCapacity: CoverDisk.diskBytes, directory: folder)" in cache
+    # the key is Core's: the address alone, no header
+    assert flat(func(transport, "coverKey")) == "URLRequest(CoverDisk.key(request))"
+    # one place stores, and only under the key - never the request sent, which carries deadwax's session as Cookie:
+    assert transport.count("storeCachedResponse(") == 1
+    store = flat(func(transport, "store"))
+    assert ("let answer = HTTPURLResponse(url: url, statusCode: 200, httpVersion: \"HTTP/1.1\", headerFields: headers)"
+            in store)
+    assert ("cache.storeCachedResponse(CachedURLResponse(response: answer, data: data, storagePolicy: .allowed), "
+            "for: key)") in store
+    cover = flat(func(transport, "cover", after="private func cover("))
+    assert cover.startswith("let key = Self.coverKey(request) let held = cache.cachedResponse(for: key)")
+    assert cover.count("in: cache)") == 2 and cover.count("under: key, in: cache)") == 2
+    assert "Self.store(held.data, headers: again, under: key, in: cache)" in cover
+    assert "Self.store(data, headers: kept, under: key, in: cache)" in cover
+    assert "sent" not in cover.replace("var asked = sent", "")
+    # what it asks is Core's: the copy while it stands (not deadwax answering), else deadwax with its validators
+    assert "switch CoverDisk.ask(held: heldHeaders, now: Date().timeIntervalSince1970) {" in cover
+    assert "case .kept: if let held { return (held.data, held.response, false) }" in cover
+    assert ("case .revalidate(let validators): for (name, value) in validators "
+            "{ asked.setValue(value, forHTTPHeaderField: name) } revalidating = true") in cover
+    assert "try await session(waiting: timeout, covers: true).data(for: asked)" in cover
+    # a 304 is the copy, kept again by Core's rule; a 200 kept by Core's rule; anything not kept takes the copy away
+    assert ("if http.statusCode == 304, revalidating, let held, let heldHeaders {"
+            " if let again = CoverDisk.revalidated(heldHeaders, by: Self.headers(http), now: now) {") in cover
+    assert "if let kept = CoverDisk.kept(status: http.statusCode, headers: Self.headers(http), now: now) {" in cover
+    assert cover.count("cache.removeCachedResponse(for: key)") == 2
+    # Core's: the four headers kept, never Set-Cookie; a day at most
+    rule = code(CORE / "CoverDisk.swift")
+    assert 'public static let keptHeaders = ["Content-Type", "Cache-Control", "ETag", "Last-Modified"]' in rule
+    assert flat(func(rule, "key")) == 'HTTPRequest(method: "GET", url: request.url)'
+    assert "public static let freshMost = 24 * 60 * 60" in rule
+    assert "return revalidate ? 0 : min(seconds, freshMost)" in rule
+
+
+def test_a_downloaded_albums_cover_is_asked_exactly_as_before():
+    model = code(APP / "Downloads" / "DownloadModel.swift")
+    keep = flat(func(model, "keepAlbum"))
+    assert ("var asked = client.coverRequest(coverID: cover, size: DownloadStore.coverSize)"
+            " asked.mayKeepOnDisk = false let data = try await client.answer(asked).body") in keep
+    assert "client.cover(" not in model
 
 
 def test_a_cover_kept_on_disk_draws_while_deadwax_cant_be_reached():
@@ -114,13 +149,25 @@ def test_a_cover_kept_on_disk_draws_while_deadwax_cant_be_reached():
     assert flat("""
                     if let image = await Task.detached(priority: .userInitiated, operation: { Self.onDisk(request) }).value {
                         self?.landed(key, flight, image, called: false)
+                        self?.keptWhileOffline.insert(key)
                         return image
                     }
                     self?.landed(key, flight, nil, called: false, reached: false)
                     return nil""") in load
     assert "client.archiveCoverRequest(cover, size: size)" in load and "client.coverRequest(coverID: id, size: size)" in load
+    # read under the transport's own key
     on_disk = flat(func(cover, "onDisk"))
-    assert "URLSessionTransport.coverCache?.cachedResponse(for: URLRequest(request))" in on_disk
+    assert "URLSessionTransport.coverCache?.cachedResponse(for: URLSessionTransport.coverKey(request))" in on_disk
+    # (after review) a failure for want of deadwax doesn't keep its minute while it still can't be reached: the disk is
+    # read again
+    assert ("if let at = failedAt[flight], Date().timeIntervalSince(at) < againAfter,"
+            " !(offline && unreached.contains(flight)) { return nil }") in flat(cover)
+    # (after review) and what the disk drew is let go as deadwax comes back, so the next look asks - the transport
+    # revalidating it - rather than drawing the copy from memory for the rest of the run
+    reach = flat(func(cover, "reach"))
+    assert ("if online && offline { for flight in unreached { failedAt[flight] = nil } unreached = []"
+            " for key in keptWhileOffline { images.removeObject(forKey: key as NSString) } keptWhileOffline = [] }") in reach
+    assert "keptWhileOffline.remove(key)" in func(cover, "landed")
 
 
 # ---------------------------------------------------------------------------- fix 2: an album's answer kept
@@ -159,10 +206,29 @@ def test_the_kept_answers_are_per_person_and_drop_on_every_write():
     assert "private var kept = KeptAnswers<Album>(most: KeptAlbums.most)" in store
     # who is signed in (the person counter and the pages' session, both moved by every sign-in change) and every write
     # deadwax was told of: Edit album's to a folder, and every managing write (an apply, a delete, a re-file, a Get)
+    # - and (after review) your library changing: an Add or a Remove anywhere, the store line's too, a delete, the
+    # starred count moving
     assert flat(func(store, "stamp")) == flat("""
         let edits = navigation.albumWrites.values.reduce(0) { (sum: Int, each: Int) -> Int in sum + each }
         return KeptAnswers<Album>.Stamp(person: server.person, session: navigation.session,
-                                        writes: edits + navigation.managingWrites)""")
+                                        writes: edits + navigation.managingWrites + library.yoursChanged)""")
+    library = code(APP / "Models" / "LibraryModel.swift")
+    assert "index.forget(.yours) syncGeneration(.yours) yoursChanged += 1 Task { await askMine() }" in flat(
+        func(library, "libraryChanged"))
+    assert ("guard server.access.hasLibrary else { return } index.forget(.yours) syncGeneration(.yours)"
+            " yoursChanged += 1 Task { await askMine() }") in flat(func(library, "albumDeleted"))
+    assert ("if starredCount.saw(answer) { index.forget(.yours) syncGeneration(.yours) yoursChanged += 1 }"
+            in flat(func(library, "askMine")))
+    # the store line's Add is an Add: it goes through libraryChanged
+    assert flat(func(library, "add")).endswith("libraryChanged()")
+    # every reader of the stamp says whose library it is
+    for path in [APP / "Album" / "AlbumView.swift", APP / "Artist" / "ArtistView.swift",
+                 APP / "Library" / "ArtistsScreen.swift", APP / "Mac" / "Library" / "MacArtistsPage.swift",
+                 APP / "Mac" / "Library" / "MacAlbumsPage.swift"]:
+        text = code(path)
+        calls = re.findall(r"KeptAlbumAnswers\.stamp\([^)]*\)", text)
+        assert calls and all(call == "KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library)"
+                             for call in calls), (path.name, calls)
     rules = code(CORE / "KeptAnswers.swift")
     assert "(a.person, a.session, a.writes) < (b.person, b.session, b.writes)" in rules
     assert flat(func(rules, "adopt")) == flat("""
@@ -176,10 +242,17 @@ def test_the_kept_answers_are_per_person_and_drop_on_every_write():
         return true""")
     # the album page reads and keeps under the stamp of now, its Refresh too - and an Edit's write asks it again
     view = code(APP / "Album" / "AlbumView.swift")
-    assert "private var kept: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation) }" in view
-    loads = re.findall(r"await model\.load\(key: taskKey,[^)]*\)", view)
-    assert len(loads) == 2 and all(call.endswith("downloads: downloads, kept: kept)") for call in loads), loads
-    assert "Task { await model.refresh(client: server.client, player: player, downloads: downloads, kept: kept) }" in view
+    assert ("private var kept: KeptAnswers<Album>.Stamp {"
+            " KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library) }") in flat(view)
+    # (after review) the model's load and refresh take the stamp with no default, so no caller can leave it out - and
+    # each of the page's says `kept`
+    model_sig = flat(model)
+    assert ("func load(key: String, client: DeadwaxClient?, personal: Bool, player: PlayerModel, downloads: DownloadModel,"
+            " kept: KeptAnswers<Album>.Stamp?) async {") in model_sig
+    assert ("func refresh(client: DeadwaxClient?, player: PlayerModel, downloads: DownloadModel,"
+            " kept: KeptAnswers<Album>.Stamp?) async {") in model_sig
+    loads = re.findall(r"await model\.(?:load|refresh)\([^)]*\)", view)
+    assert loads and all(call.endswith("downloads: downloads, kept: kept)") for call in loads), loads
     assert ".onChange(of: navigation.albumWrites[route.id]) { _, _ in refresh() }" in view
     # Play and Shuffle take the songs drawn - a kept answer's at once - in the tap, nothing awaited first
     play = func(view, "play", after="private func play(at index: Int?, shuffle: Bool = false)")
@@ -195,11 +268,25 @@ def test_the_artist_pages_prefetch_fills_the_same_store():
             " next = self.asks.answered(ask, with: found)") in send
     assert "if let kept { self.kept = kept }" in flat(func(model, "load"))
     view = code(APP / "Artist" / "ArtistView.swift")
-    assert "private var keptStamp: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation) }" in view
+    assert ("private var keptStamp: KeptAnswers<Album>.Stamp {"
+            " KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library) }") in flat(view)
     loads = re.findall(r"await model\.load\([^)]*\)", view)
-    assert len(loads) == 5 and all(flat(call).endswith("kept: keptStamp)") for call in loads), loads
+    assert loads and all(flat(call).endswith("kept: keptStamp)") for call in loads), loads
     # (not `kept`: the body's own `kept` is the Last.fm answer, and its tasks and pull would read that one instead)
     assert "let kept = artists.keptLastfm(route.id)" in view
+
+
+def test_the_macs_list_layouts_read_and_keep_the_kept_answers_too():
+    # (after review) the Mac's Albums and Artists in List draw the selected one's Info from the same kept answers, and
+    # fill them, as the pages do
+    albums = flat(func(code(APP / "Mac" / "Library" / "MacAlbumsPage.swift"), "choose"))
+    assert ("await model.load(key: \"\\(server.person)|\\(album.id)\", client: server.client, personal: false,"
+            " player: player, downloads: downloads,"
+            " kept: KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library))") in albums
+    artists = flat(func(code(APP / "Mac" / "Library" / "MacArtistsPage.swift"), "choose"))
+    assert ("await model.load(key: \"\\(server.person)|\\(artist.id)\", client: server.client,"
+            " online: reachability.online, artists: artists,"
+            " kept: KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library))") in artists
 
 
 # ---------------------------------------------------------------------------- fix 3: Edit opens without the whole scan
@@ -252,27 +339,47 @@ def test_the_artists_are_asked_as_they_show_by_the_album_indexs_rule():
             " asking = writes defer { if asked == asks { asking = nil } }") in ask
     assert ("guard asked == asks, epoch == self.epoch else { return }"
             " landed = ListFreshness.Landed(at: Int64(Self.now), writes: writes, settled: settled)") in ask
+    # (after review) the request is the model's, an unstructured task a screen's cancellation can't reach: what
+    # `asking` says is on its way always is, and lands
+    assert ("defer { if asked == asks { asking = nil } } let request = Task<[Artist], Error> { try await client.artists() }"
+            " do { let artists = try await request.value") in ask
+    assert ask.count("client.artists()") == 1
     # another person starts with nothing kept
     assert "landed = nil told = 0 toldMoved = nil asking = nil" in flat(func(model, "reset"))
     # the phone's Artists: shown, or the app back in front on it, by the rule (the task's and the scene's); a pull,
     # and a failure's Try again (the note over the list, the one in its place), at once
     screen = code(APP / "Library" / "ArtistsScreen.swift")
-    assert screen.count("await ask(fresh: false)") == 2 and "Task { await ask(fresh: false) }" in screen
+    assert "await ask(fresh: false)" in screen and "Task { await ask(fresh: false) }" in screen
     assert "await ask(fresh: true)" in flat(func(screen, "pulled"))
     assert "RefreshProblemNote(failure: failure) { Task { await ask(fresh: true) } }" in screen
     assert "if reachability.online { Task { await ask(fresh: true) } } else { reachability.tryNow() }" in screen
     asking = flat(func(screen, "ask"))
-    assert asking.count("if fresh { await artists.ask() } else { await artists.askIfOld(writes: writes) }") == 2
-    assert "let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation).writes" in asking
+    assert "if fresh { await artists.ask() } else { await artists.askIfOld(writes: writes) }" in asking
+    assert "let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library).writes" in asking
+    # nothing on the screen asks but through that
     assert "await ask()" not in screen and "artists.ask()" not in screen.replace("if fresh { await artists.ask() }", "")
     # the Mac's Artists page, by the same rule
     page = code(APP / "Mac" / "Library" / "MacArtistsPage.swift")
-    assert "group.addTask { await artists.askIfOld(writes: writes) }" in page and "artists.ask()" not in page
-    assert "let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation).writes" in page
+    assert "await artists.askIfOld(writes: writes)" in page and "artists.ask()" not in page
+    assert "let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library).writes" in page
     # the Library's Refresh still asks at once
-    assert "Task { await artists.ask() }" in code(APP / "Library" / "LibraryView.swift")
+    assert "await artists.ask()" in code(APP / "Library" / "LibraryView.swift")
     # Core's minute is the album index's own
     assert "public static let freshMs: Int64 = AlbumIndexState.freshMs" in code(CORE / "ListFreshness.swift")
+
+
+def test_an_edits_write_moves_the_count_again_once_navidrome_has_scanned():
+    # (after review) as the page path's albumWritten does: an Edit opened by its folder (no page beneath) moved the
+    # stamp only before the scan; a mark changes no file and moves it once
+    edit = code(APP / "Edit" / "EditAlbumModel.swift")
+    told = flat(func(edit, "told", after="private func told(from: String"))
+    assert told.startswith("guard samePerson else { return } navigation?.managed()")
+    assert told.endswith("guard filesChanged else { return } Task {"
+                         " try? await Task.sleep(for: .milliseconds(AlbumEdit.settleMs))"
+                         " guard self.samePerson else { return } self.navigation?.managed() }")
+    assert "private func told(from: String, deleted: Bool = false, filesChanged: Bool = true) {" in edit
+    assert "told(from: from, filesChanged: false)" in flat(func(edit, "mark"))
+    assert "told(from: before.path)" in flat(func(edit, "wrote")) and "told(from: before.path, deleted: true)" in edit
 
 
 # ---------------------------------------------------------------------------- fix 5: the artist page's requests in order

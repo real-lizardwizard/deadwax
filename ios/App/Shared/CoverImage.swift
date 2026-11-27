@@ -74,9 +74,9 @@ struct CoverImage: View {
     }
 }
 
-/// (Speed A, fix 1) Under these, the bytes are kept on disk by the transport's cover session as deadwax's headers say
+/// (Speed A, fix 1) Under these, the bytes are kept on disk by the transport as deadwax's headers say, a day at most
 /// (URLSessionTransport.coverCache, Core's CoverDisk), so a cold launch draws a cover still fresh without asking, and a
-/// cover kept there draws while deadwax can't be reached (`onDisk`).
+/// cover kept there draws while deadwax can't be reached (`onDisk`) - until it is back (`reach`).
 ///
 /// Covers kept in memory by server, cover id and size: one fetch per cover at a time, a failure not asked again for
 /// a minute under the same session (a sign-in again, or the app coming back to the front, asks again at once).
@@ -100,6 +100,10 @@ final class CoverCache {
     /// deadwax can't be reached (Reachability, phase2-downloads.md 5.4 and 7.1): a cover not kept on the phone isn't
     /// asked for - nothing would answer - and is the empty square until deadwax is back.
     private var offline = false
+    /// (Speed A, after review) The covers drawn from the disk while deadwax couldn't be reached, by their key in
+    /// `images`: let go as it comes back, so a view showing one asks again - the transport then says whether the copy
+    /// still stands or is revalidated - rather than drawing it from memory for the rest of the run.
+    private var keptWhileOffline: Set<String> = []
     /// How long a cover that failed isn't asked again, under the same session.
     nonisolated static let againAfter: TimeInterval = 60
 
@@ -148,7 +152,10 @@ final class CoverCache {
         let key = Self.key(client, id, size)
         if let image = images.object(forKey: key as NSString) { return image }
         let flight = Self.flightKey(key, client)
-        if let at = failedAt[flight], Date().timeIntervalSince(at) < againAfter { return nil }
+        // (Speed A, after review) - but one deadwax wasn't reached for is looked for on the disk again while it still
+        // can't be: a cover that failed as deadwax went away may be kept there
+        if let at = failedAt[flight], Date().timeIntervalSince(at) < againAfter,
+           !(offline && unreached.contains(flight)) { return nil }
         let task: Task<UIImage?, Never>
         if let asking = loading[flight] {
             task = asking.task
@@ -170,6 +177,7 @@ final class CoverCache {
                     } ?? client.coverRequest(coverID: id, size: size)
                     if let image = await Task.detached(priority: .userInitiated, operation: { Self.onDisk(request) }).value {
                         self?.landed(key, flight, image, called: false)
+                        self?.keptWhileOffline.insert(key)
                         return image
                     }
                     self?.landed(key, flight, nil, called: false, reached: false)
@@ -219,10 +227,11 @@ final class CoverCache {
         return UIImage(cgImage: image)
     }
 
-    /// (Speed A) A cover the covers' disk cache holds (URLSessionTransport.coverCache), decoded - however old: read only
-    /// while deadwax can't be reached, when nothing could say whether it still stands.
+    /// (Speed A) A cover the covers' disk cache holds (URLSessionTransport.coverCache, under the key the transport keeps
+    /// it by), decoded - however old: read only while deadwax can't be reached, when nothing could say whether it still
+    /// stands; let go of from memory as deadwax comes back (`reach`).
     nonisolated static func onDisk(_ request: HTTPRequest) -> UIImage? {
-        guard let held = URLSessionTransport.coverCache?.cachedResponse(for: URLRequest(request)),
+        guard let held = URLSessionTransport.coverCache?.cachedResponse(for: URLSessionTransport.coverKey(request)),
               let raw = UIImage(data: held.data) else { return nil }
         return raw.preparingForDisplay() ?? raw
     }
@@ -241,6 +250,8 @@ final class CoverCache {
         if online && offline {
             for flight in unreached { failedAt[flight] = nil }
             unreached = []
+            for key in keptWhileOffline { images.removeObject(forKey: key as NSString) }
+            keptWhileOffline = []
         }
         offline = !online
     }
@@ -258,6 +269,7 @@ final class CoverCache {
         if !off { loading[flight] = nil }
         if let image {
             images.setObject(image, forKey: key as NSString, cost: Self.cost(image))
+            keptWhileOffline.remove(key)
             failedAt[flight] = nil
             unreached.remove(flight)
         } else if !off {

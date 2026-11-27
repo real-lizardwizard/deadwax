@@ -85,6 +85,12 @@ final class LibraryModel {
     /// The generation each scope is on (AlbumIndexState.generation) - what a screen keys its ask on, so a list
     /// forgotten (an Add or a Remove, the starred count moving, older than a minute as it shows) is asked again.
     private(set) var generations: [AlbumScope: Int] = [:]
+    /// (Speed A, after review) One more each time your library is known to have changed - an Add or a Remove (an album
+    /// page's, the store line's), a delete, the starred count moving (a star made elsewhere, heard by /me/library):
+    /// counted in the kept album answers' stamp and the artist page's library check (KeptAlbumAnswers.stamp), so both
+    /// follow it. Not `generations[.yours]`, which also moves for a pull or the list being a minute old - no change at
+    /// all - and would drop every kept answer a minute into a look round the Library. Only grows, past a reset too.
+    private(set) var yoursChanged = 0
     /// The album order, one for both scopes (ALBUM_SORTS; the web's ids, saved per device).
     var sort: AlbumSort = AlbumSort(saved: UserDefaults.standard.string(forKey: LibraryModel.sortKey)) {
         didSet { UserDefaults.standard.set(sort.rawValue, forKey: Self.sortKey) }
@@ -404,6 +410,7 @@ final class LibraryModel {
         if starredCount.saw(answer) {
             index.forget(.yours)
             syncGeneration(.yours)
+            yoursChanged += 1
         }
     }
 
@@ -435,6 +442,7 @@ final class LibraryModel {
     func libraryChanged() {
         index.forget(.yours)
         syncGeneration(.yours)
+        yoursChanged += 1
         Task { await askMine() }
     }
 
@@ -447,6 +455,7 @@ final class LibraryModel {
         guard server.access.hasLibrary else { return }
         index.forget(.yours)
         syncGeneration(.yours)
+        yoursChanged += 1
         Task { await askMine() }
     }
 

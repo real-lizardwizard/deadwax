@@ -114,6 +114,11 @@ final class ArtistsModel {
 
     /// `GET /artists`: the list asked again - drawn in place of the one in hand when it lands (when it differs); a
     /// failure keeps the one in hand and says why.
+    ///
+    /// (Speed A, after review) The request is the model's, not the screen's: an unstructured task, as the album index's
+    /// shared request is, so a screen leaving (its task cancelled) can't call it off. `asking` - which keeps the next
+    /// show from asking again - is then only ever a request really on its way, and its answer lands for whichever
+    /// screen shows next.
     func ask() async {
         guard let client = server.client else { return }
         asks += 1
@@ -124,8 +129,9 @@ final class ArtistsModel {
         let settled = ListFreshness.settled(askedAt: Int64(Self.now), writesMovedAt: toldMoved)
         asking = writes
         defer { if asked == asks { asking = nil } }
+        let request = Task<[Artist], Error> { try await client.artists() }
         do {
-            let artists = try await client.artists()
+            let artists = try await request.value
             guard asked == asks, epoch == self.epoch else { return }
             // (Speed A) the list in hand stands as of now, changed or not
             landed = ListFreshness.Landed(at: Int64(Self.now), writes: writes, settled: settled)

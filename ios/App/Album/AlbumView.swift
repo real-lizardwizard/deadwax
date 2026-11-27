@@ -435,7 +435,7 @@ struct AlbumView<Desk: View>: View {
     /// (Speed A, fix 2) The stamp the session's kept album answers are read and kept under now: who is signed in and
     /// every write deadwax was told of (KeptAlbumAnswers.stamp) - an Edit's write to this album moves it, so the
     /// refresh that follows keeps its answer under the new one and nothing from before is drawn again.
-    private var kept: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation) }
+    private var kept: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library) }
 
     /// What Play and Shuffle take: the album's songs - offline, or with the album gone from the collection, its songs on
     /// this phone, in its order.

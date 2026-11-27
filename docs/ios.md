@@ -7746,36 +7746,45 @@ nothing on the line has moved and nothing works any differently.
   Mac, the Library while deadwax can't be reached (its Downloaded albums) shows the grid and list marks this way too,
   at the size they were; nothing else on the Mac changes.
 
-### Faster (649-655)
+### Faster (670-676)
 
 The app asks deadwax for less of what it already had, so pages you've seen before open sooner. Nothing plays any
 differently.
 
-- **649 Covers after a restart.** **Not done yet.** Scroll your Albums, quit the app (swipe it away), open it and
-  scroll the same albums: the covers are there at once, not grey squares filling in. Quit again, turn WireGuard off and
-  open it: the covers you'd seen still show, where they were grey. Replace an album's cover in Edit album: once
-  Navidrome has scanned, its page and its tile show the new one.
-- **650 An album opened again.** **Not done yet.** Open an album, go back, open it again: its songs are there at once,
+- **670 Covers after a restart.** **Not done yet.** Scroll your Albums, quit the app (swipe it away), open it and scroll
+  the same albums: the covers are there at once, not grey squares filling in (some may be asked again and come back
+  unchanged - a cover is kept a day at most before deadwax is asked whether it still stands). Quit again, turn WireGuard
+  off and open it: the covers you'd seen still show, where they were grey; turn WireGuard back on and they're asked
+  again. Replace an album's cover in Edit album and wait for Navidrome's scan (a few seconds): its page and its tile
+  show the new one. Then quit, open the app again and look at that album's tile and its page: still the new cover, never
+  the old one. Do the same for an artist with Artist images, Save: once Navidrome has scanned, their tile in Artists
+  shows the new picture, after a quit and an open too. If one ever still shows the old picture, it's right again within
+  a day at the latest.
+- **671 An album opened again.** **Not done yet.** Open an album, go back, open it again: its songs are there at once,
   with no wait. Open an artist, wait for Play to light up, then open one of their albums: its songs are there at once
   too, and Play plays them straight away. Change something in Edit album (a title, say) and go back to the album: it
-  shows the change, not the old songs. Sign out and in as someone else: nothing of the first person's albums shows
-  before deadwax answers.
-- **651 Edit album after a restart.** **Not done yet.** Quit the app, open it, and open Edit album on an album (or
+  shows the change, not the old songs - and the same when you opened Edit album from Settings > Manage rather than from
+  the album, once Navidrome has scanned. Add an album to your library (or remove it), from its page or from Get's store
+  line, then open its artist: the album's "in your library" mark follows. Sign out and in as someone else: nothing of
+  the first person's albums shows before deadwax answers.
+- **672 Edit album after a restart.** **Not done yet.** Quit the app, open it, and open Edit album on an album (or
   Settings > Manage > Edit an album): the folder is found sooner than it was on the first try after a restart. Change
   something in it, quit, open it again and edit it: it shows the change.
-- **652 Artists, switching back and forth.** **Not done yet.** In the Library, switch between Albums, Artists and
-  Songs a few times within a minute: Artists doesn't flicker or redraw each time you come back to it (the server's log
-  shows one `/navidrome/artists` for the minute, not one per switch). Wait over a minute and switch again, or pull
-  down on Artists: it asks again. Move an artist's albums under their current name, then go back to Artists: the new
-  name shows once Navidrome has scanned the move (a few seconds; go back to Artists again if it hasn't yet).
-- **653 Artist pages in a row.** **Not done yet.** Open an artist, go back, open another, and another: each page's
+- **673 Artists, switching back and forth.** **Not done yet.** In the Library, switch between Albums, Artists and Songs
+  a few times within a minute: Artists doesn't flicker or redraw each time you come back to it (the server's log shows
+  one `/navidrome/artists` for the minute, not one per switch). Wait over a minute and switch again, or pull down on
+  Artists: it asks again. Move an artist's albums under their current name, then go back to Artists: the new name shows
+  once Navidrome has scanned the move (a few seconds; go back to Artists again if it hasn't yet).
+- **674 Artist pages in a row.** **Not done yet.** Open an artist, go back, open another, and another: each page's
   albums you have are marked as quickly as the first (the server's log shows one `/library/owned` for the run, not one
   per page). Pull down on an artist page: it asks again. Play and Shuffle light up as soon as they did before.
-- **654 Requests, nothing moving.** **Not done yet.** Open Requests with nothing downloading: the server's log shows
+- **675 Requests, nothing moving.** **Not done yet.** Open Requests with nothing downloading: the server's log shows
   `/download/jobs` about once a second, not twice, and the list sits still. Start a download: from the next look the
   progress moves as smoothly as it did before.
-- **655 The Mac, and someone else.** **Not done yet.** Do 649 to 654 on the Mac app too. Then sign in as someone else
-  (or on the other phone): their albums, artists and Edit album show only theirs, never the first person's.
+- **676 The Mac, and someone else.** **Not done yet.** Do 670 to 675 on the Mac app too - in Albums and Artists as a
+  list as well as tiles: open an album or artist by selecting it, select another, then the first again, and its songs
+  are there at once. Then sign in as someone else (or on the other phone): their albums, artists and Edit album show
+  only theirs, never the first person's.
 
 ## What it can't do yet
 

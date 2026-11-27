@@ -142,7 +142,7 @@ final class AlbumModel {
     /// who and which album (the task's id): another than the answers in hand are for drops them all first. `kept` is the
     /// stamp the session's kept answers are read and kept under (KeptAlbumAnswers.stamp) - nil keeps none.
     func load(key: String, client: DeadwaxClient?, personal: Bool, player: PlayerModel, downloads: DownloadModel,
-              kept: KeptAnswers<Album>.Stamp? = nil) async {
+              kept: KeptAnswers<Album>.Stamp?) async {
         if key != self.key {
             self.key = key
             album = nil
@@ -184,7 +184,7 @@ final class AlbumModel {
     /// over what is on screen (what the page last did is told by deadwax's answer now); a failure keeps what is drawn -
     /// and with nothing drawn, says it.
     func refresh(client: DeadwaxClient?, player: PlayerModel, downloads: DownloadModel,
-                 kept: KeptAnswers<Album>.Stamp? = nil) async {
+                 kept: KeptAnswers<Album>.Stamp?) async {
         guard let client, online else { return }
         changed = nil
         refused = nil
@@ -311,8 +311,10 @@ final class AlbumModel {
 /// prefetch (ArtistPageModel); read by an album page as it opens, which draws the answer at once and asks deadwax
 /// behind it. Every read and keep carries the stamp of now (`stamp`): another person, a sign-in again, or any write
 /// deadwax was told of - Edit album's to a folder (albumWrites), an apply, a delete, a re-file, a Get, a mark
-/// (managingWrites) - drops them all at the next look, and an answer asked before lands nowhere. An album deadwax says
-/// is gone, or that its page added or removed, is let go on its own.
+/// (managingWrites), your library changing (LibraryModel.yoursChanged: an Add or Remove anywhere, the store line's
+/// too, the starred count moving) - drops them all at the next look, and an answer asked before lands nowhere. An
+/// album deadwax says is gone, or that its page added or removed, is let go on its own. A star made in Amperfy or the
+/// web that moves no count is healed by the answer asked behind the kept one.
 @MainActor
 final class KeptAlbumAnswers {
     static let shared = KeptAlbumAnswers()
@@ -321,11 +323,11 @@ final class KeptAlbumAnswers {
 
     private init() {}
 
-    /// Who is signed in, and every write deadwax was told of since they were.
-    static func stamp(server: ServerModel, navigation: AppNavigation) -> KeptAnswers<Album>.Stamp {
+    /// Who is signed in, and every write deadwax was told of since they were - your library's changes among them.
+    static func stamp(server: ServerModel, navigation: AppNavigation, library: LibraryModel) -> KeptAnswers<Album>.Stamp {
         let edits = navigation.albumWrites.values.reduce(0) { (sum: Int, each: Int) -> Int in sum + each }
         return KeptAnswers<Album>.Stamp(person: server.person, session: navigation.session,
-                                        writes: edits + navigation.managingWrites)
+                                        writes: edits + navigation.managingWrites + library.yoursChanged)
     }
 
     func answer(_ id: String, stamp: KeptAnswers<Album>.Stamp) -> Album? { kept.answer(id, stamp: stamp) }

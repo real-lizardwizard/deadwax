@@ -24,9 +24,90 @@ import Testing
         var posted = deadwax.coverRequest(coverID: "al-1", size: 300)
         posted.method = "POST"
         #expect(!CoverDisk.takes(posted))
-        // the place and the bound
-        #expect(CoverDisk.folder == "deadwax-covers")
+        // (after review) never a downloaded album's cover - a file of its own, asked as before - nor a caller's own
+        // revalidation of a copy it keeps
+        var download = deadwax.coverRequest(coverID: "al-1", size: 1024)
+        download.mayKeepOnDisk = false
+        #expect(!CoverDisk.takes(download))
+        #expect(deadwax.coverRequest(coverID: "al-1", size: 300).mayKeepOnDisk, "every request may, unless told not")
+        var revalidating = deadwax.coverRequest(coverID: "al-1", size: 300)
+        revalidating.headers["if-none-match"] = "\"abc\""
+        #expect(!CoverDisk.takes(revalidating))
+        // the place - not the first build's, which is removed - and the bound
+        #expect(CoverDisk.folder == "deadwax-cover-disk")
+        #expect(CoverDisk.oldFolder == "deadwax-covers")
         #expect(CoverDisk.diskBytes == 256 * 1024 * 1024)
+    }
+
+    /// (After review) The session's cookie is never written to disk with a cover: the request a cover is kept under is
+    /// its address alone, and what is kept of the answer is the four headers that say what it is and how long it stands.
+    @Test func aCoverIsKeptUnderItsAddressAloneAndNeverWithTheCookie() throws {
+        let (deadwax, _) = client(session: "the-session")
+        let request = deadwax.coverRequest(coverID: "al-1_6566", size: 300)
+        #expect(request.headers["Cookie"] != nil, "the cover is asked with the session, as every route is")
+        let key = CoverDisk.key(request)
+        #expect(key.headers.isEmpty)
+        #expect(key.headers["Cookie"] == nil)
+        #expect(key.url == request.url && key.method == "GET" && key.body == nil)
+        let archive = deadwax.archiveCoverRequest(ArchiveCoverID(.release, "b84ee12a-09ef-421b-82de-0441a926375b"),
+                                                  size: 250)
+        #expect(CoverDisk.key(archive).headers.isEmpty)
+        // a 200's own headers, the four alone - never Set-Cookie, nor anything else deadwax answers
+        let answer = ["Content-Type": "image/jpeg", "cache-control": "public, max-age=31536000, immutable",
+                      "ETag": "\"x1\"", "Last-Modified": "Wed, 26 Nov 2026 10:00:00 GMT",
+                      "Set-Cookie": "deadwax_session=the-session; HttpOnly", "Vary": "Cookie", "Content-Length": "4"]
+        let kept = try #require(CoverDisk.kept(status: 200, headers: answer, now: 1_000))
+        #expect(Set(kept.keys) == Set(CoverDisk.keptHeaders + [CoverDisk.keptAtHeader]))
+        #expect(kept["Cache-Control"] == "public, max-age=31536000, immutable")
+        #expect(kept[CoverDisk.keptAtHeader] == "1000.0")
+        #expect(!kept.values.contains { $0.contains("the-session") })
+        // a placeholder (no-store) and anything but a 200 are never kept
+        #expect(CoverDisk.kept(status: 200, headers: ["Cache-Control": "no-store"], now: 1_000) == nil)
+        #expect(CoverDisk.kept(status: 404, headers: ["Cache-Control": "private, max-age=60"], now: 1_000) == nil)
+        #expect(CoverDisk.kept(status: 304, headers: ["ETag": "\"x1\""], now: 1_000) == nil)
+    }
+
+    /// (After review) A kept cover stands for its max-age - a day at most, whatever Navidrome's year says - and is then
+    /// asked again with its validators; no-cache, or nothing said, asks every time.
+    @Test func aKeptCoverStandsADayAtMostThenIsAskedWithItsValidators() throws {
+        #expect(CoverDisk.freshMost == 86_400)
+        #expect(CoverDisk.freshSeconds("public, max-age=31536000, immutable") == 86_400)
+        #expect(CoverDisk.freshSeconds("private, max-age=604800") == 86_400, "the Archive's week, a day too")
+        #expect(CoverDisk.freshSeconds("private, max-age=60") == 60)
+        #expect(CoverDisk.freshSeconds("public, no-cache") == 0)
+        #expect(CoverDisk.freshSeconds("no-cache, max-age=600") == 0)
+        #expect(CoverDisk.freshSeconds("max-age=-5") == 0)
+        #expect(CoverDisk.freshSeconds("max-age=soon") == 0)
+        #expect(CoverDisk.freshSeconds(nil) == 0)
+        #expect(CoverDisk.freshSeconds("No-Store") == nil)
+        let year = try #require(CoverDisk.kept(status: 200, headers: ["Cache-Control": "public, max-age=31536000, immutable",
+                                                                       "ETag": "\"x1\""], now: 1_000))
+        #expect(CoverDisk.ask(held: year, now: 1_000) == .kept)
+        #expect(CoverDisk.ask(held: year, now: 1_000 + 86_399) == .kept)
+        #expect(CoverDisk.ask(held: year, now: 1_000 + 86_400) == .revalidate(["If-None-Match": "\"x1\""]))
+        #expect(CoverDisk.ask(held: year, now: 999) == .revalidate(["If-None-Match": "\"x1\""]), "the clock moved back")
+        let noCache = try #require(CoverDisk.kept(status: 200, headers: ["Cache-Control": "public, no-cache",
+                                                                          "ETag": "\"x2\"",
+                                                                          "Last-Modified": "Wed, 26 Nov 2026 10:00:00 GMT"],
+                                                  now: 1_000))
+        #expect(CoverDisk.ask(held: noCache, now: 1_000) == .revalidate(["If-None-Match": "\"x2\"",
+                                                                          "If-Modified-Since": "Wed, 26 Nov 2026 10:00:00 GMT"]))
+        // nothing to revalidate by: asked as it is (the copy still draws offline); nothing kept: asked as it is
+        let bare = try #require(CoverDisk.kept(status: 200, headers: ["Content-Type": "image/png"], now: 1_000))
+        #expect(CoverDisk.ask(held: bare, now: 1_000) == .fetch)
+        #expect(CoverDisk.ask(held: nil, now: 1_000) == .fetch)
+        #expect(CoverDisk.ask(held: ["ETag": "\"x3\"", "Cache-Control": "max-age=600"], now: 1_000)
+                == .revalidate(["If-None-Match": "\"x3\""]), "a copy with no time kept stands no longer")
+        // a 304 keeps the copy again as of then, its own Cache-Control and validators over the copy's; no-store drops it
+        let again = try #require(CoverDisk.revalidated(noCache, by: ["cache-control": "private, max-age=600",
+                                                                     "ETag": "\"x2\"", "Content-Type": "text/plain"],
+                                                       now: 5_000))
+        #expect(again["Cache-Control"] == "private, max-age=600" && again["ETag"] == "\"x2\"")
+        #expect(again["Last-Modified"] == "Wed, 26 Nov 2026 10:00:00 GMT" && again["Content-Type"] == nil)
+        #expect(CoverDisk.ask(held: again, now: 5_599) == .kept)
+        #expect(CoverDisk.revalidated(noCache, by: ["Cache-Control": "no-store"], now: 5_000) == nil)
+        let typed = try #require(CoverDisk.revalidated(bare, by: ["Content-Type": "text/html"], now: 5_000))
+        #expect(typed["Content-Type"] == "image/png", "a 304's type says nothing of the body it didn't send")
     }
 
     @Test func aTemplatesPartsAreEachOneSegment() {

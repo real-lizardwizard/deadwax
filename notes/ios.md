@@ -24206,11 +24206,15 @@ Mutations, each made in the source, seen failing, and put back (the files' diges
 James, 27 Nov: "let's leave navidrome and just try to make those speed optimizations". The audit
 (`~/Desktop/Code/deadwax-plans/audit-code-speed.md`, read from the code at ios 8696ce8a, nothing measured) found most of
 the app's waits came from asking for the same thing again; the brief is `speed-app.md` in the same folder. Six fixes,
-one commit each, each cause first confirmed in the code. Nothing the app plays changed (no diff to DeadwaxAudio,
+one commit each, each cause first confirmed in the code - and a seventh after review (7, below), which changed how
+fix 1 keeps covers: where 1 and 7 differ, 7 is how it is. Nothing the app plays changed (no diff to DeadwaxAudio,
 AudioSessionController, QueueController or UpNext), no route was added and Routes.swift's endpoints are as they were.
 Core's parts are SpeedATests.swift's, the app's wiring tests/test_ios_speed_a.py's.
 
 ### 1. Covers kept on disk
+
+(After review the session no longer stores anything itself - covers are stored by hand, under their address alone, and
+kept a day at most: see 7.2 and 7.3. What follows is fix 1 as it was committed.)
 
 **Confirmed:** URLSessionTransport made every session ephemeral with `urlCache = nil` and
 `.reloadIgnoringLocalCacheData`, and covers went through those sessions like any JSON; CoverCache kept the decoded
@@ -24259,7 +24263,7 @@ over the network) - seen failing with the cover branch made `else if false` - an
 `Cookie:` and `private`; the server log across two cold launches should show the second asking only the `no-cache`
 covers, each a 304); that a task's metrics come before its end, so Reachability hears covers that did go out; the 256 MB
 bound holding (CFNetwork evicts on its own schedule); that Navidrome 0.64.2's album cover ids carry the hash, so an Edit's
-new cover is a new URL (check 649).
+new cover is a new URL (check 670).
 
 ### 2. An album's answer kept
 
@@ -24296,7 +24300,7 @@ session's read made `if false`), `test_the_kept_answers_are_per_person_and_drop_
 `test_the_artist_pages_prefetch_fills_the_same_store` (seen failing with its keep taken out).
 
 **Not verified (a device):** the album page drawing its songs on the first frame when opened from an artist's page or
-opened again (check 650); that a write made outside the app (the web's Edit) is the one thing a kept answer can't hear
+opened again (check 671); that a write made outside the app (the web's Edit) is the one thing a kept answer can't hear
 of - it is replaced as soon as deadwax answers behind it.
 
 ### 3. Edit opens without the whole scan
@@ -24331,7 +24335,7 @@ version and garbage are no record; the cookie is never in the bytes; the 304's h
 `test_a_pages_first_read_asks_with_the_scan_kept_on_disk`, seen failing with the first read's ETag made nil.
 
 **Not verified (a device or the server log):** the first Edit of a launch answered by a 304 (the server log shows
-`/library/albums` 304 with no body; check 651, and the audit's "finding the folder" timed on a cold launch against a
+`/library/albums` 304 with no body; check 672, and the audit's "finding the folder" timed on a cold launch against a
 second open); how long a big library's copy takes to read and decode off the main actor.
 
 ### 4. Artists' one-minute rule
@@ -24363,7 +24367,7 @@ the album index's own refreshIfOld, the writes, the settle, a failure, one on it
 again.
 
 **Not verified (a device or the server log):** one `/navidrome/artists` per minute while switching sections (check
-652); the re-file's new name on Artists when going back to it after Navidrome's scan has taken longer than the settle.
+673); the re-file's new name on Artists when going back to it after Navidrome's scan has taken longer than the settle.
 
 ### 5. The artist page's requests in order
 
@@ -24396,7 +24400,7 @@ again), which also pins the prefetch as it was; test_ios_artist_discography's or
 artist) still holds.
 
 **Not verified (a device or the server log):** one `/library/owned` for a run of artist pages opened in a row (check
-653); whether the prefetch's four asks still slow the page's Last.fm and About answers on the JSON session - nothing
+674); whether the prefetch's four asks still slow the page's Last.fm and About answers on the JSON session - nothing
 here measured it.
 
 ### 6. Requests' polling
@@ -24423,4 +24427,133 @@ with the root's half second put back for everything; test_ios_speed_a.py
 `test_a_look_that_changes_nothing_redraws_nothing`, seen failing with the board set on every look again.
 
 **Not verified (a device or the server log):** half as many `/download/jobs` a minute with Requests open and nothing
-moving, and the screen not redrawing between them (check 654); a download someone else starts shows within a second.
+moving, and the screen not redrawing between them (check 675); a download someone else starts shows within a second.
+
+### 7. After review
+
+The review of fixes 1-6 (27 Nov) found nine things; one commit, `iOS: speed - after review`, on ios's merge (the branch
+took `git merge ios` first). The checks are renumbered 670-676 (other slices hold 649-659). Seen failing for each, by
+mutation: 7.1 with `+ library.yoursChanged` taken out of the stamp; 7.2 with the cover stored under the request sent
+(its Cookie with it) and with Core's key keeping the request's headers; 7.4 with the fetch awaited in the screen's task
+again; 7.6 with the second `managed()` taken out; 7.8 with the Mac's Albums `load` back to no `kept:` (which now fails
+to compile too).
+
+**7.1 Your library's changes are in the stamp.** **Confirmed:** an album page's Add or Remove, and the store line's Add
+(LibraryModel.add), call `library.libraryChanged()`, which moved `generations[.yours]` - but the stamp's writes counted
+only albumWrites and managingWrites. So the artist page's library check (OwnedCheck against the stamp's writes) asked
+`/library/owned` no sooner after an Add, and its "in your library" marks stayed as they were; and a kept album answer
+(its `starred`) outlived an Add made anywhere but its own page - the store line's, or one that landed while the artist
+page's prefetch was out, whose answer was then kept after the page's own `forget`. **Now:** `LibraryModel.yoursChanged`,
+one more in `libraryChanged` (every Add and Remove, the store line's and an unanswered one's), in `albumDeleted` (with a
+library of your own) and when /me/library's starred count moved (`askMine`), is counted in KeptAlbumAnswers.stamp's
+writes - `stamp(server:navigation:library:)`, which AlbumView, ArtistView, ArtistsScreen and both Mac pages call - so
+the kept answers and `asksOwned` follow one rule. **Not `generations[.yours]` itself**, as the review put it: the
+generation also moves for a pull and each time the Library's list is a minute old as it shows (`refreshIfOld`), which
+change nothing, and counted in the stamp it would drop every kept album answer about a minute into a look round the
+Library. The counter moves at exactly the generation's moves that are changes. The prefetch race is the stamp's order:
+an answer asked under the stamp before an Add lands nowhere (KeptAnswers' `adopt`). (Artists' freshness reads the same
+writes, so an Add asks Artists again at its next show - one ask.) **Stars made in Amperfy or the web stay healed by the
+answer asked behind:** they move the starred count only once /me/library is next asked; until then a kept answer draws
+with the old star and the answer asked behind it replaces it within its round trip, as before.
+
+**7.2 The session's cookie is never written to disk with a cover.** **Confirmed by reading (no device):** every cover
+request carries the session as a hand-set `Cookie:` (DeadwaxClient.request), fix 1 let URLSession's URLCache store each
+cover on its own, and CFNetwork's Cache.db keeps each cached request, headers and all, beside its answer. **Now it can't
+happen:** no session has a cache - `urlCache = nil` and `.reloadIgnoringLocalCacheData` everywhere, no `.default`
+configuration; the covers' session is an ephemeral URLSession of its own, kept for its own connections (5) - and the
+transport's `cover` stores each cover itself with `storeCachedResponse(_:for:)` (one call in the file, `store`) under
+Core's `CoverDisk.key`: a GET of the address alone, no header at all. What it stores is a response it builds: a 200 with
+only `CoverDisk.keptHeaders` (Content-Type, Cache-Control, ETag, Last-Modified) and `X-Deadwax-Kept-At`, never
+Set-Cookie. Lookups use the same key (`coverKey`, CoverImage.onDisk too), so they hit. What is asked is Core's
+`CoverDisk.ask`: the copy while it stands (`.kept`, nothing asked, and Reachability hears nothing - so `NetworkUsed` is
+gone), else deadwax with If-None-Match and If-Modified-Since from the copy: a 304 is the copy, kept again
+(`revalidated`: the 304's Cache-Control and validators over the copy's, never its Content-Type), a 200 replaces it, and
+an answer that may not be kept (no-store, not a 200) takes it away. A request carrying its own validators, and a
+downloaded album's cover (`mayKeepOnDisk = false`, 7.3), aren't taken. The folder is now `Caches/deadwax-cover-disk`;
+the first build's `Caches/deadwax-covers`, which URLCache filled on its own, is removed as the cache is made
+(`CoverDisk.oldFolder`).
+
+**Where it lives.** The Mac app is sandboxed (Base.xcconfig's ENABLE_APP_SANDBOX, bundle id net.lizardlounge.deadwax),
+so its Caches is the container's:
+`~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Caches/deadwax-cover-disk/` - URLCache's `Cache.db`, with
+`Cache.db-wal` and `Cache.db-shm` beside it and `fsCachedData/` for bodies it keeps as files. On a phone, the same
+folder under the app's container's Library/Caches. To check, after an install and some scrolling: `grep -ral
+deadwax_session ~/Library/Containers/net.lizardlounge.deadwax/Data/Library/Caches` should print nothing (the WAL and the
+old folder included), and `sqlite3 .../deadwax-cover-disk/Cache.db "select count(*) from cfurl_cache_response"` that
+covers are kept. No other session of the app has a cache (Reachability's and the downloads' are `urlCache = nil` too).
+
+**7.3 A cover replaced under the same id: a day at most.** **What moves Navidrome's id** (read at 46c4327,
+46c432719fdd): `model/artwork_id.go`'s `String()` is `s := fmt.Sprintf("%s-%s", id.Kind.prefix, id.ID)` then `return s +
+"_" + id.Hash` when there is one; the struct says `Hash string // content-hash suffix; "" = unknown/none` (the old
+`_<hexTimestamp>` is only parsed, "legacy"); an album's is `ArtworkID{Kind: KindAlbumArtwork, ID: al.ID, Hash:
+al.ImageHash}` and an artist's `ArtworkID{Kind: KindArtistArtwork, ID: ar.ID, Hash: ar.ImageHash}`. The hash is the
+picture's own: `core/artwork/processor.go`'s `acquire()` does `hash, err := hashImage(bytes.NewReader(data))` on the
+image's bytes (an Artwork is "identified by the XXH3-64 hash of its bytes", model/artwork.go) and `persist` stores
+`Hash: art.Hash`. What sets it again is a scan seeing the folder's pictures change: `scanner/walk_dir_tree.go`'s
+`loadDir` keeps `folder.imagesUpdatedAt = utils.TimeNewest(folder.imagesUpdatedAt, fileInfo.ModTime(), folder.modTime)`
+for each image file, `scanner/folder_entry.go`'s `imagesChanged()` compares the names and `prevImagesUpdatedAt.Equal(
+f.imagesUpdatedAt)`, and `scanner/phase_1_folders.go` records a changed folder (`p.imageChanges.record(...)`) for
+`scanner/image_changes.go` to queue its albums and its sole album artists for the artwork worker (every 5 s). So a new
+`cover.jpg` (Edit's cover, which writes a new file) or an artist image written by Artist images, Save moves the id once
+Navidrome has scanned and the worker has run - a new address the disk has never held. **What doesn't:** the seconds
+before the scan (the old id, the old picture - the page asks again after the settle); an id with no hash (`Hash == ""`,
+which deadwax sends as Navidrome's no-cache, revalidated every time); and a picture whose bytes changed without a scan
+seeing it. So the year deadwax passes on (`public, max-age=31536000, immutable`, tests/test_navidrome.py) is trusted no
+further than a day: `CoverDisk.freshMost`, `freshSeconds` capping every max-age (the Archive's week too), then
+revalidated by its ETag. **Downloads are as before:** DownloadModel.keepAlbum asks its 1024 cover with `mayKeepOnDisk =
+false` (HTTPRequest's new field, never sent; DeadwaxClient untouched), so it takes the plain session as it did at
+b51a90a5 and its copy is the file it writes. Check 670 now replaces a cover, waits for the scan, quits and opens again,
+and looks at the tile, the album page and an Artists tile after Artist images, Save.
+
+**7.4 A cancelled Artists ask no longer counts as on its way.** **Confirmed:** `ArtistsModel.ask()` awaited
+`client.artists()` in the caller's task, so a screen leaving cancelled it - and `asking` (ListFreshness's `onItsWay`)
+held the writes it was asked under until the cancelled call returned, while nothing would land. **Now:** the request is
+an unstructured `Task` made inside `ask()`, as the album index's shared request is (LibraryModel's `asking`), and
+`ask()` awaits its value: a screen's cancellation can't reach it, so what `asking` says is on its way is, and its answer
+lands for whichever screen shows next. The guard (`asked == asks`, the epoch) is as it was.
+
+**7.5 Kept answers and the store line's Add, and stars made elsewhere.** 7.1's counter covers the store line's Add and
+the prefetch-after-forget race. Stars made in Amperfy or the web: healed by the answer asked behind the kept one (7.1).
+
+**7.6 An Edit opened by its folder moves the stamp after the scan too.** **Confirmed:** EditAlbumModel's `told()` called
+`navigation.managed()` once, before Navidrome's scan; the page path also calls `albumWritten` again after
+`AlbumEdit.settleMs`, but an Edit opened by its folder (Choose the folder, the Mac's folder list, Needs a look) has no
+page beneath, so an album answer or the Artists list asked in those seconds was kept under a stamp that no longer moved.
+**Now:** `told()` calls `managed()` again after `AlbumEdit.settleMs` (the same person still), for every write - an
+apply, Tags, the cover, a Get, a delete; a mark (`filesChanged: false`) changes no file and moves it once.
+test_ios_needs_look's two pins of the mark's call now name it.
+
+**7.7 Offline covers.** **Confirmed:** a cover drawn from the disk while deadwax couldn't be reached sat in the memory
+cache for the rest of the run, never asked again as deadwax came back; and a cover that failed for want of deadwax kept
+its minute even offline, so the disk wasn't read for it (a cover that failed as deadwax went away). **Now:** CoverCache
+notes what it drew from disk offline (`keptWhileOffline`) and lets go of it in `reach(online: true)`, so a view showing
+it - whose task id holds whether deadwax can be reached - asks again (the transport answers from the copy while it
+stands, else revalidates), drawing the copy meanwhile; and a failure in `unreached` doesn't keep its minute while
+offline: the disk is looked at again.
+
+**7.8 The Mac's list layouts read and keep the kept answers.** **Confirmed:** MacAlbumsPage's and MacArtistsPage's
+`choose` (List's selection) called `load` without `kept:`, so they neither drew a kept answer nor kept theirs. **Now:**
+both pass `KeptAlbumAnswers.stamp(server:navigation:library:)`, and AlbumModel's `load` and `refresh` take `kept:` with
+no default, so no caller can leave it out (ArtistPageModel's keeps its default: Top Songs and Similar Artists load their
+own models without the store, as before).
+
+**7.9 The tests pin what matters.** test_ios_speed_a.py no longer counts the album page's two `load`s, the artist page's
+five or the Artists screen's calls, nor LibraryView's exact `Task { await artists.ask() }`: each `load` and `refresh` of
+the pages says `kept:`, every stamp names the library, and LibraryView still asks at once.
+
+**Tests:** SpeedATests `aCoverIsKeptUnderItsAddressAloneAndNeverWithTheCookie` (the key has no header though the request
+carries the Cookie; the four headers kept, never Set-Cookie; no-store and non-200s never kept),
+`aKeptCoverStandsADayAtMostThenIsAskedWithItsValidators` (a year capped at a day, the Archive's week too, no-cache and
+none asking every time, the validators, the 304's merge) and `onlyTheCoversAreKeptOnDisk` (a download's and a
+revalidation aren't taken); test_ios_speed_a.py `test_no_session_stores_anything_and_covers_have_their_own_connections`,
+`test_a_cover_is_stored_by_hand_under_its_address_alone_never_with_the_cookie`,
+`test_a_downloaded_albums_cover_is_asked_exactly_as_before`, the offline test extended,
+`test_the_kept_answers_are_per_person_and_drop_on_every_write` (the counter and every caller),
+`test_the_macs_list_layouts_read_and_keep_the_kept_answers_too`, the Artists test (the unstructured request) and
+`test_an_edits_write_moves_the_count_again_once_navidrome_has_scanned`.
+
+**Not verified (a device, the Mac's disk or the server log):** that CFNetwork stores a response built by hand on disk at
+all, and gives it back (the server log across two cold launches should show the second asking only covers kept over a
+day, each a 304 - check 670); that Cache.db holds no `deadwax_session` after the next Mac install (the grep above); that
+the old folder is gone; that Edit's new cover and Artist images' Save each show after the scan and after a relaunch
+(check 670); the "in your library" marks following an Add from the store line (check 671).
