@@ -7516,13 +7516,13 @@ every other page.
 Have something playing with a few songs queued, and a song with synced lyrics. Open the panel from the buttons beside
 the play bar, or from View > Queue, Info, Lyrics and EQ.
 
-- **617 No bar, no Done.** **Not done yet.** On the Mac, open each of Queue, Info, Lyrics and EQ. No tab has a bar
-  with a title or a **Done** across its top: its page starts right under the panel's tabs. **Escape** still puts the
-  panel away from any tab, and so do the View keys and a click on the open tab, as before.
+- **617 No bar, no Done.** **Not done yet.** On the Mac, open each of Queue, Info and Lyrics. No tab has a bar with
+  a title or a **Done** across its top: its page starts right under the panel's tabs. **Escape** still puts the
+  panel away from any tab, the EQ's too, and so do the View keys and a click on the open tab, as before.
   - While you're typing in a field (the Library's Find, say), Escape belongs to the field, as before.
   - In the Queue's **Edit**, the first Escape ends Edit and the next one puts the panel away.
-  - In the EQ, the page the tab opens on has no bar either. The pages you go on to from it, such as Correction or a
-    filter, still have the old bar and its Done for now.
+  - The EQ keeps its old bar for now, with its **•••** (Rename…) and **Done**, on every page: its own redraw comes
+    next. Check that **•••** > **Rename…** still renames the output.
 - **618 Info, a song.** **Not done yet.** With nothing selected in the Library, Info shows the song that's playing.
   - At the top: its cover, square; the title, large and bold; the artist in purple; the album and year under them;
     and a line of the file's facts in Courier Prime (format, size, rate).
@@ -7552,7 +7552,7 @@ the play bar, or from View > Queue, Info, Lyrics and EQ.
     playing is in a 44-tall row with a purple edge and its small cover. The rows under it follow View > Row Size.
   - **Edit** turns into **Done**, and each row gets a minus to remove it, as before.
   - Everything the Queue did before is still there.
-  - While it loads, the dark box in the middle no longer has frosted glass.
+  - While older songs load, the small box at the top of the list no longer has frosted glass.
 - **622 Lyrics.** **Not done yet.**
   - At the top: the song's title and artist, with a small green **synced** chip when the lines are timed.
   - Each line has its time at the left in Courier Prime.
@@ -7565,8 +7565,8 @@ the play bar, or from View > Queue, Info, Lyrics and EQ.
   Album info. The cover, title and artist are at the top. Each group is a grey heading over rows on thin lines, with
   no grey cells. A link row opens and a copy button copies, as before.
 - **624 Both phones.** **Not done yet.** On Green Anole, check 623. The Queue, Info and Lyrics should look exactly as
-  before, except that the Queue's loading box now has a dark ground in place of frosted glass. On Ethan's phone, check
-  623, or say "not done yet".
+  before, except that while older songs load, the spinner at the top of the Queue sits on the page's own ground, with
+  no frosted glass or box. On Ethan's phone, check 623, or say "not done yet".
 
 ## What it can't do yet
 

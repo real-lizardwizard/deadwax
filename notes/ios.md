@@ -20385,8 +20385,16 @@ None of these is a Mac name (test_ios_mac_reach.py), so a phone file's Mac half 
   **`.dockBack(_ words: String?)`** goes on a page pushed on a dock tab's stack: it hides the stack's bar on that page
   and puts DockBack at its top, and the click calls the page's own dismiss. With nil, nothing changes, so a page both
   devices push says `.dockBack(inSidePanel ? InfoWords.title : nil)` (Info's Album info) and the phone keeps its Back.
-  **R17**: put `.dockBack(inSidePanel ? <the EQ's words> : nil)` on each EQDestination page and drop EQDoneButton's
-  `inSidePanel` branch. That removes DockDone's last caller, so delete DockDone too.
+  **R17** (as R16's review left it): the EQ is the one tab that keeps its bar, root and pages, so R17 does all of it
+  from its own files and needs no line of DockEQ. On the root, in EQScreen's own `top` while `inSidePanel`: hide the
+  bar (`.toolbar(.hidden, for: .navigationBar)`) and draw a DockHeader holding what the bar held - the ••• (`more`:
+  Rename…, and Back to AutoEq's in Advanced) - with "EQ on" if the drawing wants it there. On each EQDestination page:
+  `.dockBack(inSidePanel ? EQWords.nowPlaying : nil)` ("‹ EQ"). Then drop EQDoneButton's `inSidePanel` branch, which
+  leaves DockDone with no caller. DockDone is defined in MacPanels.swift, where R19 also changes one line (Sources'
+  `.dockHoldsEscape()`): delete DockDone there, or leave it for the coordinator - the two edits are far apart and merge
+  cleanly.
+- **R19**: draw Search again in a DockHeader in MacSourcesTab, make its Close the dock's (Escape, the View key, the
+  tab), and remove `.dockHoldsEscape()` from MacPanel's `.sources` case - the one line of MacPanels.swift it needs.
 - **DockType** gives the dock's type on Typeface.Mac: title (h3 bold), words, control, small, label, heading (label
   semibold), readout and smallReadout (Courier Prime). **DockLook** gives the drawings' sizes: side 16, gap 14, cover
   112, the artist's picture 96, the header's 10/12/2 and 6, rows 8 in, the playing row 44 with a 30 cover, a fact's
@@ -20427,13 +20435,14 @@ None of these is a Mac name (test_ios_mac_reach.py), so a phone file's Mac half 
   time in Courier Prime 36 wide, `acct` when lit and t3 otherwise, then the words in `selt` when lit, t3 synced or
   text plain. The lit row is on `selbg`. Following, the hold and the tap are the phone's own code, unchanged: no
   Follow button. Try again is a DW `.btn`.
-- **The EQ** (DockEQ): only its root's bar is hidden. Its pushed pages keep the system's bar and DockDone until R17.
+- **The EQ** (DockEQ): (R16's review) its bar kept, root and pages, as it was - its title, the root's ••• and DockDone
+  (no key of its own now: Escape is the panel's) - until R17.
 
 ### Tests
 
-**tests/test_ios_dock_look.py** (new, 11 tests) covers:
+**tests/test_ios_dock_look.py** (new, 11 tests; 13 after review) covers:
 
-- no bar, title or Done on any tab;
+- no bar, title or Done on any tab but the EQ's (which keeps its bar, its ••• and Done until R17);
 - Escape through DockEscapeKey and MacFrame.escape, and the holds;
 - DockHeader and DockBack;
 - tokens only (no old Palette, Corners, system styles, bordered buttons, inset lists, LabeledContent or materials);
@@ -20475,13 +20484,54 @@ No typing-rule mutation: R16 draws no field.
   drawing them would mean an await before the play. Go to artist leads to them.
 - **The album header's chips and the mono facts line**: only the year is in hand.
 - **Lyrics' "From LRCLIB" foot**: the app doesn't know the source.
-- The EQ root's ••• (Rename… of the output shown) was in its bar, so it can't be reached on the Mac until R17 draws
-  that page's header.
 - The album action row is in the dock only, not in the right-click sheet.
 - DockArtistInfo asks About with the library index's mbid, which may differ from the artist page's own, so About may
   be asked for afresh.
 - **Not verified**: how any of it looks or reads on the Mac or the phone (checks 617-624). The Mac smoke run wasn't
   done, because James's app was running.
+
+### After review
+
+One review. **Fixed:**
+
+- **The EQ's ••• was out of reach on the Mac** (important): hiding DockEQ's root bar took its ••• with it - Rename… of
+  the output shown, which nothing else on the Mac offers, and Back to AutoEq's in Advanced. DockEQ's root keeps
+  its bar now, exactly as before R16 (its title, the ••• and Done), so a build installed before R17 loses nothing. R17
+  draws the root's header from EQScreen's own `top` (the hand-over above). test_no_dock_tab_has_a_bar_a_title_or_a_done
+  pins the bar's ••• and Done in place and fails with the root's bar hidden again.
+- **The phone's loading spinner sat on a grey box** (important): the overlay's new ground was DWPalette.card on both
+  devices, a grey box on the phone (R1c). QueueLoadingGround gives the phone the sheet's own ground (DWPalette.panel,
+  NowPlayingSheet's presentationBackground), square and edgeless, so it only hides the rows under it; the Mac keeps
+  the card's ground with a hairline at a box's corners. Pinned whole, by device.
+- **The phone digest missed parts the phone runs** (nit): rowLabel, note, the Edit row, `text`, `title`, the four row
+  modifiers, Try again and Info's `page` were checked by substring or not at all. A new test,
+  `test_the_phones_halves_of_the_shared_parts_are_r3bs`, digests each one's phone branch; the first six (rowLabel,
+  note and the four modifiers) and `page` are word for word as at 8696ce8a, the Edit
+  row's, `text`'s and `title`'s R3b's code with the Mac branch taken out around it (checked by hand: the same views).
+- **Row Size wasn't held** (nit): removing `.dockRowHeight()` from DockQueueRow passed every test.
+  test_the_docks_rows_follow_row_size pins DockRowHeight whole and its use in DockQueueRow and DockSongRow.
+- **The Mac's copy row was two VoiceOver elements** (nit): one element now, its label, words and lines, with Copy as a
+  named action (plan 3.3).
+- **The Queue's `.navh` cut "Next from …" short with no `.help`** (nit): it has its whole words now, pinned where it is.
+- Docs: DockLook's and DockFact's comments said the fact label is 84 wide (dw.css's `.kv`); it is Albums.dc.html's 76.
+  DockArtistInfo's comment no longer promises the artist page's very words (below).
+
+**Judged, left:**
+
+- **The artist's About** asks with Navidrome's own MusicBrainz id for the artist (the row's), where the page asks with
+  what the library's folders or Which artist is this? say. They are usually the same id; where they differ, or
+  Navidrome has none, the dock asks afresh (deadwax keeps descriptions 30 days, so the cost is one request) and may
+  show another description, or Navidrome's words. Matching the page would mean the page's model in the dock.
+- **Two-line Queue rows at Medium**: worked out with ios_fonts' Libre Franklin metrics (1.212 em a line), the title
+  (13) and line (12) take about 31 of Medium's 40, so they fit; Small (30) draws one line. The drawing's rows are one
+  line because its songs are an album's, which `showsLines` draws as titles alone here too.
+- **History and Clear in a •••** with Autoplay and "Repeat one": the test's numbers hold (five buttons need more than
+  the 376 the header has). The fold is a ViewThatFits beside Edit in DockHeader's HStack; only the Mac can say that
+  the ViewThatFits is offered what is left after Edit (check 621).
+- The playing row's corner is a box's 5, as the slice text says; Album.dc.html draws it at 4.
+- Album info on the phone paints the page's black, so pushed inside Now Playing's Info sheet (#131219) it is a step
+  darker than Info; from an album's ••• it matches the other pages. Check 623 says how it reads.
+- A lyric break's three dots in the dock are still drawn in `Color.primary` (the phone's shared breakRow).
 
 ## The redesign, slice R7: Search, Get and Sources (2026-11-25)
 

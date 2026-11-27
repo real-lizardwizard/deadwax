@@ -18,9 +18,10 @@ import SwiftUI
 /// (The panel review's R16 - notes/ios.md "The panel review, R16: the Mac's dock tabs (2026-11-26)"; James, 26 Nov:
 /// "on mac, if i go to "info" next to the play bar, everything is still rounded") No tab's page has a system bar, a
 /// title or a Done: it starts right under the folder tabs, its own controls in a DockHeader, a page pushed inside it
-/// with DockBack in place of the system's back. The panel closes with Escape - this view's own key (DockEscapeKey),
-/// through MacFrame.escape, the main window's one owner, as DockDone's key had it - with the tab's View key, or a click
-/// on the open tab. A page that has an Escape of its own for now says so (`dockHoldsEscape`), and the panel's key stands
+/// with DockBack in place of the system's back. (R16's review) The EQ alone keeps its bar for now, root and pages - its
+/// ••• (Rename…, Back to AutoEq's) lives there until R17 draws the EQ's own header. The panel closes with Escape - this
+/// view's own key (DockEscapeKey), through MacFrame.escape, the main window's one owner, as DockDone's key had it - with
+/// the tab's View key, or a click on the open tab. A page that has an Escape of its own for now says so (`dockHoldsEscape`), and the panel's key stands
 /// aside while it does: the Queue's Done in Edit, and Sources' Close until R19 makes it the dock's.
 struct MacPanel: View {
     let tab: MacDock.Tab
@@ -147,8 +148,9 @@ extension EnvironmentValues {
     @Entry var inSidePanel = false
 }
 
-/// (R3) The dock's Done - (R16) left only on the pages the EQ pushes on its stack (EQDoneButton), which keep the system's
-/// bar until R17 gives them DockBack: the panel put away. No key of its own now: Escape is the panel's (DockEscapeKey).
+/// (R3) The dock's Done - (R16) left only on the EQ's pages, its root and those it pushes on its stack (EQDoneButton),
+/// which keep the system's bar until R17 draws the root's header and gives the pages DockBack: the panel put away. No
+/// key of its own now: Escape is the panel's (DockEscapeKey).
 struct DockDone: View {
     let words: String
 
@@ -185,8 +187,8 @@ enum DockType {
 
 /// (R16) The dock's sizes, each a drawing's: Albums.dc.html's and Artists.dc.html's panels (16 in, 14 between, the
 /// cover 112, the artist 96), Album.dc.html's header (10 above, 12 in, 2 below, 6 between) and its rows (8 in from the
-/// panel's sides, the song playing 44 tall with a 30 cover), `.kv`'s label (84) and Playlist.dc.html's header (12 above,
-/// 14 in, 10 below).
+/// panel's sides, the song playing 44 tall with a 30 cover), a fact's label (76, Albums.dc.html's Properties' own -
+/// dw.css's `.kv` has 84) and Playlist.dc.html's header (12 above, 14 in, 10 below).
 enum DockLook {
     static let side: CGFloat = 16
     static let gap: CGFloat = 14
@@ -370,7 +372,7 @@ struct DockGroup<Content: View>: View {
     }
 }
 
-/// (R16) A fact in a dock tab's group (`.kv`, Albums.dc.html's Properties): its label in the second colour, 84 wide
+/// (R16) A fact in a dock tab's group (`.kv`, Albums.dc.html's Properties): its label in the second colour, 76 wide
 /// (wrapping inside that), its value beside it on the label's baseline - in Courier Prime where it is a number, a time,
 /// a path or a format (`mono`), selectable, to copy - and an optional note under the value. Every line wraps: nothing
 /// is cut short. One element for VoiceOver: the label, the value, the note.
@@ -562,8 +564,10 @@ private struct DockAlbumInfo: View {
 
 /// The artist selected (R16: Artists.dc.html's panel): their round picture (96), their name (18, bold), their albums'
 /// count where Navidrome counts them, Go to artist (the drawing's Open artist) at the right - and A4's About under them,
-/// the very words the artist page draws (AboutModel, AboutBlock's question from what the row knows: Navidrome's id and
-/// its MusicBrainz id, the session's answer drawn at once when the page asked it). The drawing's Play and Shuffle are
+/// the artist page's own About (AboutModel, AboutBlock's question from what the row knows: Navidrome's id and its
+/// MusicBrainz id). (R16's review) Usually the very words the page draws: the page asks with the id the library's
+/// folders or a Which artist is this? choice say, the row with Navidrome's own, so where those differ - or Navidrome has
+/// none - About is asked afresh and may say what the page doesn't. The drawing's Play and Shuffle are
 /// left out: the row holds none of the artist's songs, and a play is never made with an answer awaited. Its chips ("3 in
 /// your library") are the artist page's counts, which the row hasn't either.
 private struct DockArtistInfo: View {
@@ -633,8 +637,10 @@ private struct DockArtistInfo: View {
 /// sheet's), its pages pushed on it. (R3's review) The Mac's one EQ: a file shared to deadwax, dropped on the window or
 /// chosen in File > Import EQ File… shows this tab (SharedEQFile) and its preview comes up over it as the EQ sheet's did -
 /// once the tab has been up a moment (one presented as it is drawn isn't shown), over the page as it stands, Cancel's
-/// answer if it is put away; Import… on the page keeps its own (EQImportRows). (R16) Its root's bar hidden, as every
-/// tab's is: the pages pushed on it keep the system's bar, and DockDone, until R17 gives them DockBack.
+/// answer if it is put away; Import… on the page keeps its own (EQImportRows). (R16's review) Its bar kept, root and
+/// pages, as they were - its title, the root's ••• (Rename…, and Back to AutoEq's in Advanced) and DockDone - the one
+/// tab that keeps one, so nothing the EQ offers is lost before R17 draws the root's header (a DockHeader, from
+/// EQScreen's own `top`) and gives the pages DockBack. Escape is the panel's, as on every tab.
 private struct DockEQ: View {
     @Environment(AppNavigation.self) private var navigation
     @State private var stack = EQSheetStack()
@@ -644,7 +650,6 @@ private struct DockEQ: View {
     var body: some View {
         NavigationStack(path: $stack.path) {
             EQScreen(opened: .now)
-                .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: EQRoute.self) { (route: EQRoute) in
                     EQDestination(route: route)
                 }

@@ -5,7 +5,8 @@ rounded." No slice had redrawn the inside of the dock's tabs; this holds what R1
 
   - No tab's page has a system bar, a title or a Done; Escape still puts the panel away - MacPanel's own key, through
     MacFrame.escape, the one owner - standing aside while a page holds Escape itself (the Queue's Done in Edit,
-    Sources' Close until R19). The EQ hides only its root's bar: its pushed pages keep the system's until R17.
+    Sources' Close until R19). (R16's review) The EQ alone keeps its bar, root and pages, until R17 draws its header:
+    its root's ••• (Rename…, Back to AutoEq's) is there, and the Mac has nowhere else to reach it.
   - DockHeader and DockBack, the dock's two pieces R17 and R19 build on: a row of `.btn.sm`s, and `‹ <where you came
     from>` in the accent in a pushed page's bar's place (`.dockBack`).
   - Info (a song, an album, an artist), the Queue and Lyrics in the dock's own type, tokens only - no inset list, no
@@ -98,11 +99,19 @@ def test_no_dock_tab_has_a_bar_a_title_or_a_done():
         drawn = member(panels, page)
         for gone in ("NavigationStack", ".navigationTitle(", "DockDone(", ".toolbar {", "ToolbarItem"):
             assert gone not in drawn, f"{page}: {gone}"
-    #? the EQ's root alone loses its bar: its pushed pages keep the system's, and DockDone, until R17
+    #? (R16's review) the EQ alone keeps its bar, root and pages, as before R16: its root's ••• (Rename…, Back to
+    #? AutoEq's) is in that bar, so hiding it lost Rename on the Mac - R17 draws the root's header and the pages' DockBack
     dock_eq = flat(member(panels, "struct DockEQ: View"))
-    assert ("EQScreen(opened: .now) .toolbar(.hidden, for: .navigationBar) .navigationDestination(for: EQRoute.self)"
-            in dock_eq)
-    assert "DockDone(words: EQWords.Screen.done)" in flat(code(source("EQ/EQRoute.swift")))
+    assert "NavigationStack(path: $stack.path) { EQScreen(opened: .now) .navigationDestination(for: EQRoute.self)" in dock_eq
+    assert ".toolbar" not in dock_eq
+    eq_top = flat(member(code(source("EQ/EQScreen.swift")), "private func top"))
+    assert (".navigationTitle(EQWords.Screen.title) .navigationBarTitleDisplayMode(done == nil && !inSidePanel ? .large : "
+            ".inline) .toolbar { ToolbarItem(placement: .topBarTrailing) { more(output, setting: setting, advanced: "
+            "advanced) } } .eqDoneButton()") in eq_top
+    assert "Button(EQWords.Screen.rename, systemImage: \"pencil\") { askRename(key) }" in flat(
+        member(code(source("EQ/EQScreen.swift")), "private func more"))
+    assert "if inSidePanel { ToolbarItem(placement: .confirmationAction) { DockDone(words: EQWords.Screen.done) } }" in flat(
+        code(source("EQ/EQRoute.swift")))
     #? Info's and the Queue's Mac pages hide the stack's bar; neither has a toolbar of its own now
     info = flat(code(source(INFO)))
     assert "macPage(tabs: tabs, tab: tab, admin: admin) .toolbar(.hidden, for: .navigationBar)" in info
@@ -180,7 +189,8 @@ def test_the_tabs_draw_in_the_looks_tokens_only():
     queue = code(source(QUEUE))
     found[QUEUE] = old_look("".join(member(queue, name) for name in (
         "private func macTop", "private var macModes", "private func macPlaying", "private func macHeading",
-        "private func macWords", "struct QueueTryAgain: ViewModifier")).replace(".buttonStyle(.borderless)", "", 1))
+        "private func macWords", "struct QueueTryAgain: ViewModifier", "struct QueueLoadingGround: ViewModifier"))
+        .replace(".buttonStyle(.borderless)", "", 1))
     found[LYRICS] = old_look(member(code(source(LYRICS)), "private func dockedLine"))
     assert found == {name: [] for name in found}, found
     #? the Queue's list on the panel's ground on the Mac: a plain list, no inset rows, no material over it
@@ -188,8 +198,17 @@ def test_the_tabs_draw_in_the_looks_tokens_only():
     assert "} else { content .listStyle(.plain) .scrollContentBackground(.hidden)" in look
     assert ".insetGrouped" not in queue and "Material" not in queue
     overlay = flat(queue[queue.index("if history.loading && !editing {"):queue.index(".accessibilityLabel(UpNextWords.loadingEarlier)")])
-    assert ".background(DWPalette.card, in: DWCorners.boxShape) .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line))" in overlay
+    assert overlay == "if history.loading && !editing { ProgressView() .padding(10) .modifier(QueueLoadingGround(phone: phone)) .padding(.top, 8) ", overlay
+    #? (R16's review) no material on either device, and no grey box on the phone (R1c): the sheet's own ground there,
+    #? square and edgeless; the Mac's box, the card's ground with its hairline at a box's corners
+    ground = flat(member(queue, "struct QueueLoadingGround: ViewModifier")).strip()
+    assert ground == ("let phone: Bool @ViewBuilder func body(content: Content) -> some View { if phone { content "
+                      ".background(DWPalette.panel) } else { content .background(DWPalette.card, in: DWCorners.boxShape) "
+                      ".overlay(DWCorners.boxShape.strokeBorder(DWPalette.line)) } }"), ground
     #? the old chips and the inset card are gone
+    #? (R16's review) a `.navh` cut short keeps its whole words for the pointer
+    assert ".font(DockType.heading) .foregroundStyle(DWPalette.label) .lineLimit(1) .help(words)" in flat(
+        member(queue, "private func macHeading"))
     for gone in ("struct Chip: View", "private func playingCard", "private var modes:", "private func macToolbar"):
         assert gone not in queue, gone
 
@@ -232,6 +251,12 @@ def test_info_for_an_album_and_an_artist():
     phone = flat(member(album, "private func phoneRow"))
     assert "case .plain where row.lines.isEmpty: PhoneKV(label: row.label, value: row.value)" in phone
     assert "PhoneGo {" in phone and "ErrorNote(text: AlbumInfoWords.notOpened)" in phone
+    #? (R16's review) the Mac's row to copy is one element for VoiceOver, Copy its named action (plan 3.3)
+    mac_row = flat(member(album, "private func macRow"))
+    assert ("case .copyable: HStack(alignment: .firstTextBaseline, spacing: DockLook.headerGap) { DockFact(label: "
+            "row.label, value: row.value, mono: true, note: note) copyButton(row) } .accessibilityElement(children: "
+            ".ignore) .accessibilityLabel(([row.label, row.value] + row.lines).joined(separator: \", \")) "
+            ".accessibilityActions { Button(AlbumInfoWords.copyName(row.label)) { copy(row) } } case .link:") in mac_row
     #? the artist: Artists.dc.html's round picture, the name, Go to artist, and A4's About - no Play without songs
     artist = flat(member(code(source(PANELS)), "struct DockArtistInfo: View"))
     assert "ArtistPicture(id: artist.preview?.coverArt, side: DockLook.picture, pixels: CoverSize.tile)" in artist
@@ -241,6 +266,26 @@ def test_info_for_an_album_and_an_artist():
             "online: reachability.online)") in artist
     assert "player." not in artist, "no Play or Shuffle: the row holds none of the artist's songs"
 
+
+
+def test_the_docks_rows_follow_row_size():
+    #? (R16's review) View > Row Size sizes the dock's lists as it does the Mac's tables: the Queue's rows (and its Edit
+    #? rows, the same words) and Album info's songs - exactly its height, never a number of their own
+    panels = code(source(PANELS))
+    height = flat(member(panels, "struct DockRowHeight: ViewModifier")).strip()
+    assert height == ("@Environment(\\.macRowSize) private var rowSize func body(content: Content) -> some View { "
+                      "content.frame(height: CGFloat(rowSize.rowHeight)) }"), height
+    queue_row = flat(member(panels, "struct DockQueueRow<Mark: View>: View"))
+    assert "let two = !line.isEmpty && rowSize != .small" in queue_row
+    assert queue_row.count(".dockRowHeight()") == 1
+    assert ".padding(.horizontal, DockLook.rowSide) .dockRowHeight() .contentShape(Rectangle())" in queue_row
+    song_row = flat(member(panels, "struct DockSongRow: View"))
+    assert ".padding(.horizontal, DockLook.rowSide) .dockRowHeight() .overlay(alignment: .bottom)" in song_row
+    #? and the Queue draws its rows, out of Edit and in it, as DockQueueRow on the Mac
+    queue = code(source(QUEUE))
+    assert flat(member(queue, "private func macWords")).count("DockQueueRow(") == 1
+    assert "macWords(track, lines: lines)" in flat(member(queue, "private func rowLabel"))
+    assert "macWords(row.track, lines: lines)" in flat(member(queue, "private func editRow"))
 
 def test_every_play_is_an_existing_call_made_in_the_click():
     tools = flat(member(code(source(ALBUM_INFO)), "private func macTools"))
@@ -351,6 +396,45 @@ def test_the_phones_queue_and_info_are_as_r3b_drew_them():
     assert (".foregroundStyle(.white, .red) .font(Typeface.symbol(.title3)) .frame(minWidth: 44, minHeight: 44)"
             in edit[:edit.index("} else {")])
 
+
+
+#? (R16's review) and the phone's HALVES of the parts both devices run - the block each runs on the phone (the `if phone`
+#? or `if let sheet` branch; `text` and `title` whole, the phone's alone now) - digested the same way. The first six and
+#? Info's page are word for word as at 8696ce8a. The Edit row's, `text`'s and `title`'s are R3b's own code with the Mac's
+#? branch taken out from around it (the same views on the phone), Try again's is R3b's `.borderless` moved into a
+#? modifier, and the loading ground is R16's: the sheet's own ground on the phone, where the material was.
+PHONE_HALVES = {
+    (QUEUE, "private func rowLabel", "if phone {"): "77ae0ba7cb5f7a67",
+    (QUEUE, "private func note", "if phone {"): "c2c07a1b73937cd3",
+    (QUEUE, "struct QueuePhoneRow: ViewModifier", "if phone {"): "666ff3379fe720d1",
+    (QUEUE, "struct QueueListLook: ViewModifier", "if phone {"): "4e722f5e2e2f58d0",
+    (QUEUE, "struct QueueRowHeight: ViewModifier", "if phone {"): "302e21fb7a97d416",
+    (QUEUE, "struct QueuePhoneNote: ViewModifier", "if phone {"): "f1258c07a61f1811",
+    (INFO, "private func page", "if let sheet {"): "ef2c72332217b0c8",
+    (QUEUE, "private func editRow", "if phone {"): "5fb52dee0de20913",
+    (QUEUE, "private func text", None): "2d71370637938d9d",
+    (QUEUE, "private func title", None): "09a98fc0372dc6ab",
+    (QUEUE, "struct QueueTryAgain: ViewModifier", "if phone {"): "89ab05c8aa9764b3",
+    (QUEUE, "struct QueueLoadingGround: ViewModifier", "if phone {"): "dd74244dae4f96e7",
+}
+
+
+def phone_half(text: str, declaration: str, opener) -> str:
+    """The phone's branch of the member declared as `declaration` (its block after `opener`), or the member whole."""
+    body = member(text, declaration)
+    if opener is None:
+        return flat(body).strip()
+    return flat(block(body, body.index(opener) + len(opener) - 1)).strip()
+
+
+def test_the_phones_halves_of_the_shared_parts_are_r3bs():
+    found = {key: hashlib.sha256(phone_half(code(source(key[0])), key[1], key[2]).encode("utf-8")).hexdigest()[:16]
+             for key in PHONE_HALVES}
+    assert found == PHONE_HALVES, {key: digest for key, digest in found.items() if digest != PHONE_HALVES[key]}
+    #? spelled out: the phone's Try again as R3b drew it, and the loading spinner on the sheet's own ground
+    queue = code(source(QUEUE))
+    assert phone_half(queue, "struct QueueTryAgain: ViewModifier", "if phone {") == "content .buttonStyle(.borderless)"
+    assert phone_half(queue, "struct QueueLoadingGround: ViewModifier", "if phone {") == "content .background(DWPalette.panel)"
 
 def test_album_info_is_flat_on_the_phone():
     #? (R16) Album info's phone half: PhoneGroups on hairlines, no face drawn - only the page's own black under it

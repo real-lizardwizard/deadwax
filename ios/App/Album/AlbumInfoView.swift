@@ -299,9 +299,16 @@ struct AlbumInfoList: View {
         case .plain:
             DockFact(label: row.label, value: row.value, note: note)
         case .copyable:
+            //? (R16's review) one element for VoiceOver - its label, its words, its lines - with Copy its named action,
+            //? the Mac's rule (plan 3.3): the glyph is for the pointer
             HStack(alignment: .firstTextBaseline, spacing: DockLook.headerGap) {
                 DockFact(label: row.label, value: row.value, mono: true, note: note)
                 copyButton(row)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(([row.label, row.value] + row.lines).joined(separator: ", "))
+            .accessibilityActions {
+                Button(AlbumInfoWords.copyName(row.label)) { copy(row) }
             }
         case .link:
             VStack(alignment: .leading, spacing: 4) {

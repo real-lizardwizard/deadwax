@@ -632,8 +632,8 @@ def test_the_librarys_top_sits_under_the_status_bar():
     assert 'LabeledContent("Top") {\n                Text(model.libraryTop?.line ?? "Not measured yet")' in debug_view
     assert "KeyWindow.safeArea.bottom" in (APP / "Root" / "MainTabs.swift").read_text(encoding="utf-8")
     sources = {path.relative_to(APP).as_posix(): path.read_text(encoding="utf-8") for path in APP.rglob("*.swift")}
-    #? (the panel review's R16) and the Mac's dock: no tab's page has a bar - Info's and the Queue's Mac halves, the
-    #? EQ's root and a page pushed with DockBack (MacPanels) - none of them the phone's top
+    #? (the panel review's R16) and the Mac's dock: no tab's page has a bar - Info's and the Queue's Mac halves and a
+    #? page pushed with DockBack (MacPanels; the EQ keeps its bar until R17) - none of them the phone's top
     assert sorted(name for name, text in sources.items() if ".toolbar(.hidden, for: .navigationBar)" in text) == [
         "Info/InfoView.swift", "Library/LibraryView.swift", "Player/MacPanels.swift", "UpNext/UpNextScreen.swift"]
     # what reaches the top edge (any ignore but the bottom's alone): the Library top's fill, RootView's background, Now

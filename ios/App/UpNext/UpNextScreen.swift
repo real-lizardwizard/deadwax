@@ -301,11 +301,10 @@ struct UpNextScreen: View {
                     //? (app 0.8) an older page on its way: over the list's top, so nothing in it moves
                     .overlay(alignment: .top) {
                         if history.loading && !editing {
-                            //? (R16) on the look's card, both devices - no material
+                            //? (R16) no material: the sheet's own ground on the phone, a box of the look's on the Mac
                             ProgressView()
                                 .padding(10)
-                                .background(DWPalette.card, in: DWCorners.boxShape)
-                                .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line))
+                                .modifier(QueueLoadingGround(phone: phone))
                                 .padding(.top, 8)
                                 .accessibilityLabel(UpNextWords.loadingEarlier)
                         }
@@ -701,6 +700,8 @@ struct UpNextScreen: View {
             .font(DockType.heading)
             .foregroundStyle(DWPalette.label)
             .lineLimit(1)
+            //? (R16's review) "Next from …" cut short in the 400 keeps its whole for the pointer
+            .help(words)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, DockLook.headerSide - DockLook.rowInset)
             .padding(.top, Self.navhAbove)
@@ -1122,6 +1123,24 @@ private struct UpNextDownload: ViewModifier {
 
     private func words(_ state: SongDownload, notHere: Bool) -> String {
         (notHere ? DownloadWords.notOnDevice(Platform.device) : DownloadWords.songLine(state, device: Platform.device)) ?? ""
+    }
+}
+
+/// (R16) The ground under the loading spinner over the list's top, in place of the material - (R16's review) the
+/// sheet's own ground on the phone, square, with no edge (R1c: no grey box), so it only hides the rows under it; on the
+/// Mac a box of the look's, the card's ground with its hairline at a box's corners.
+private struct QueueLoadingGround: ViewModifier {
+    let phone: Bool
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if phone {
+            content
+                .background(DWPalette.panel)
+        } else {
+            content
+                .background(DWPalette.card, in: DWCorners.boxShape)
+                .overlay(DWCorners.boxShape.strokeBorder(DWPalette.line))
+        }
     }
 }
 
