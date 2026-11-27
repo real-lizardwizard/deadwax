@@ -513,11 +513,17 @@ stay, and had a retag's plan say all of it with the cover off too. As it stands:
   library itself; audio directly in that folder (NOT_AN_ALBUM); `lstat`, so a link is refused in words
   (`LINK_NOT_REMOVED`, "is a link to somewhere else, which deadwax won't remove") and never followed; a
   regular file with an image extension; still there (gone already is said - "…was already gone, so there
-  was nothing to remove" - and is no error); never the file just written; the identity the plan saw; and
-  the new cover there to see (a removal that ran before the write, or after a failed one, finds none and
-  refuses). What the plan refused as `"link"` or `"not_an_album"` is said in the same words; a kept
-  `"not_a_cover_name"` needs none. A failed `unlink` is a problem in words, never a crash and never a
-  rollback of the tags.
+  was nothing to remove" - and is no error); never the file just written; the identity the plan saw; the
+  new cover there to see (a removal that ran before the write, or after a failed one, finds none and
+  refuses); and the new cover synced to disk before the unlink (`_sync_to_disk`, main's review on
+  `speed`): `write_bytes` then `unlink` with nothing between could, after a power cut in the seconds
+  after, leave an empty `cover.jpg` and no old cover. The new file is `fsync`ed - required: failing, the
+  old cover stays and it's said ("…the new cover couldn't be made safe on disk first: …") - then its
+  folder, as far as the filesystem allows (not every one can sync a folder, and refusing there would keep
+  old covers for good). The same-named overwrite has nothing to remove and so no sync: like every
+  `write_bytes` in the writers, it truncates the old file first, which is unchanged here. What the plan
+  refused as `"link"` or `"not_an_album"` is said in the same words; a kept `"not_a_cover_name"` needs
+  none. A failed `unlink` is a problem in words, never a crash and never a rollback of the tags.
 - **Then it checks the new cover is the one shown**: `find_cover_file` over that listing, without the file
   removed. Another cover that still outranks it is said - "saved cover.jpg, but cover.jpeg is still shown
   first - another cover in the album's folder, left as it was" - and never removed too: only the one file
@@ -555,7 +561,11 @@ stay, and had a retag's plan say all of it with the cover off too. As it stands:
   lone odd-named image; the audio guard, at the plan, at the write and both; a link named in `removes`;
   the identity check; `_same_file`, which on the case-sensitive disk only the hard-link test catches - as
   on CI's ubuntu), and three for the cover off (its fields left empty again; a merge clearing them; Apply
-  acting on `removes` without an `action`). **Assumed**: OpenMediaVault's disks behave as the
+  acting on `removes` without an `action`). The sync, a third commit:
+  `test_the_new_cover_is_synced_to_disk_before_the_old_one_is_removed` (both writers) watches `os.fsync` by
+  device and inode and `Path.unlink` by name, and four mutations each failed it on the Mac's disk - the
+  file's fsync dropped, the folder's dropped, the call dropped, the sync moved after the unlink.
+  **Assumed**: OpenMediaVault's disks behave as the
   case-sensitive image did; the Archive's thumbnails stay JPEGs; not run against James's library.
 
 ### Looking at a cover close up (v0.6.12)

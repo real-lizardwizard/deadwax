@@ -327,7 +327,8 @@ def remove_replaced_cover(directory: Path, written: Path, plan: dict | None, lib
     - never the file just written - the same name, or the same file under another name (a hard link,
       or `Cover.jpg` on a case-insensitive disk, where it IS `cover.jpg`): that one was overwritten;
     - the very file the plan saw: its `removes_identity` (device, inode, size, mtime) unchanged;
-    - with the new cover there to see.
+    - with the new cover there to see;
+    - and synced to disk, the file and then its folder (_sync_to_disk), before the old one is unlinked.
 
     What the plan refused (`removes_refused` "link" or "not_an_album") is said here too, in the same
     words; "not_a_cover_name" needs no words - the new cover is shown before that image, and it stays.
@@ -420,6 +421,13 @@ def _remove_one(directory: Path, written: Path, name: str, identity, entries: li
     if not there:
         return None, f"{left} - the new cover couldn't be found after saving it"
 
+    #? the new cover on disk before the old one goes: without it a power cut in the seconds after could leave an empty
+    #? cover.jpg and no old cover (the review of the cover removal, on speed)
+    unsynced = _sync_to_disk(written, directory)
+    if unsynced:
+        logger.error(f"could not sync the new cover {written.name} in {directory} to disk: {unsynced}")
+        return None, f"{left} - the new cover couldn't be made safe on disk first: {unsynced}"
+
     try:
         old.unlink()
     except OSError as e:
@@ -429,6 +437,37 @@ def _remove_one(directory: Path, written: Path, name: str, identity, entries: li
     logger.info(f"removed the old cover {name} from {directory.name} - {written.name} replaces it",
                 extra={"frontend": True})
     return name, None
+
+
+def _sync_to_disk(written: Path, directory: Path) -> str | None:
+    """
+    fsync the new cover, then its folder, so both its bytes and its entry are on disk before the old cover is
+    unlinked. (Why it couldn't, or None.) The file's sync is required - without it nothing is removed. The folder's
+    is as well as the filesystem allows: not every one can sync a folder, and refusing there would keep old covers
+    for good on such a disk.
+    """
+    try:
+        fd = os.open(written, os.O_RDONLY)
+    except OSError as e:
+        return e.strerror or str(e)
+    try:
+        os.fsync(fd)
+    except OSError as e:
+        return e.strerror or str(e)
+    finally:
+        os.close(fd)
+
+    try:
+        fd = os.open(directory, os.O_RDONLY)
+    except OSError:
+        return None
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+    return None
 
 
 def _shown_instead(entries: list[Path] | None, written: Path, removed: str | None, dry_run: bool) -> str | None:

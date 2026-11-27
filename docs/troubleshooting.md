@@ -696,6 +696,10 @@ editor after **Apply**, and in the **Event log** either way:
   being fetched.* Something rewrote or replaced the old cover in the moments between deadwax choosing it
   and saving the new one, so it may not be the file deadwax chose; it's left alone. Look at the folder,
   and replace the cover again if the old one should still go.
+- *Saved cover.jpg, but the old folder.jpg was left where it is - the new cover couldn't be made safe on
+  disk first: …* deadwax makes sure the new cover is really on the disk before it deletes the old one, so
+  that a power cut just then can't leave you with neither, and the disk refused. Both covers are there;
+  check the disk (the words after the colon say what it answered), then replace the cover again.
 - *Saved cover.jpg, but the old folder.jpg couldn't be removed: …* The new cover is saved (and an
   **Apply**'s tags are written, and stay), but the user deadwax runs as isn't allowed to delete that
   file. Delete it yourself, or give the folder's files to that user.

@@ -660,6 +660,68 @@ def test_a_removal_that_fails_is_said_and_the_tags_stay_written(tmp_path, monkey
     assert (directory / "folder.jpg").read_bytes() == OLD
 
 
+def watch_syncs_and_unlinks(monkeypatch, fsync_fails: bool = False) -> list[tuple]:
+    """Every os.fsync (by the file's device and inode) and Path.unlink (by name), in the order they happen."""
+    events = []
+    real_fsync, real_unlink = os.fsync, Path.unlink
+
+    def fsync(fd):
+        info = os.fstat(fd)
+        events.append(("fsync", (info.st_dev, info.st_ino)))
+        if fsync_fails:
+            raise OSError(5, "Input/output error")
+        return real_fsync(fd)
+
+    def unlink(self, missing_ok=False):
+        events.append(("unlink", self.name))
+        return real_unlink(self, missing_ok)
+
+    monkeypatch.setattr(os, "fsync", fsync)
+    monkeypatch.setattr(Path, "unlink", unlink)
+    return events
+
+
+@pytest.mark.parametrize("writer", WRITERS)
+def test_the_new_cover_is_synced_to_disk_before_the_old_one_is_removed(tmp_path, writer, monkeypatch):
+    """A power cut in the seconds after a replace must not leave an empty cover.jpg and no old cover: the new file
+    is fsynced, then its folder, before the old one is unlinked - in Apply's path and the cover alone's."""
+    directory = album(tmp_path, "folder.jpg")
+    events = watch_syncs_and_unlinks(monkeypatch)
+
+    plan, done = replace(writer, tmp_path)
+
+    assert done["removed"] == "folder.jpg" and done["problems"] == []
+    new, folder = (directory / "cover.jpg").stat(), directory.stat()
+    removal = events.index(("unlink", "folder.jpg"))
+    assert ("fsync", (new.st_dev, new.st_ino)) in events[:removal], "the new cover's bytes, before the unlink"
+    assert ("fsync", (folder.st_dev, folder.st_ino)) in events[:removal], "and its folder's entry"
+    assert events.index(("fsync", (new.st_dev, new.st_ino))) < events.index(("fsync", (folder.st_dev, folder.st_ino)))
+
+
+@pytest.mark.parametrize("writer", WRITERS)
+def test_a_new_cover_that_cant_be_synced_keeps_the_old_one(tmp_path, writer, monkeypatch):
+    directory = album(tmp_path, "folder.jpg")
+    events = watch_syncs_and_unlinks(monkeypatch, fsync_fails=True)
+
+    plan, done = replace(writer, tmp_path)
+
+    assert (done["written"], done["removed"]) == ("cover.jpg", None)
+    assert done["problems"] == ["saved cover.jpg, but the old folder.jpg was left where it is - the new cover couldn't "
+                                "be made safe on disk first: Input/output error"]
+    assert ("unlink", "folder.jpg") not in events
+    assert (directory / "folder.jpg").read_bytes() == OLD and (directory / "cover.jpg").read_bytes() == NEW[0]
+
+
+def test_a_cover_overwritten_in_place_needs_no_sync_and_removes_nothing(tmp_path, monkeypatch):
+    album(tmp_path, "cover.jpg")
+    events = watch_syncs_and_unlinks(monkeypatch)
+
+    plan, done = replace("alone", tmp_path)
+
+    assert (done["removed"], done["problems"]) == (None, [])
+    assert events == [], "nothing to remove, so nothing synced first"
+
+
 # ---------------------------------------------------------------- a dry run, and the event log
 
 def test_a_dry_run_names_what_it_would_remove_and_removes_nothing(tmp_path):
