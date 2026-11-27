@@ -7494,7 +7494,7 @@ the purple is as it was.
 - **615 Find.** **Not done yet.** On the phone, from a fresh start: tap the magnifying glass - the field comes up under
   the top with the keyboard, and the app keeps answering. Type a few letters (the page narrows), switch pages, then
   **Cancel**. Then the magnifying glass, the page switch and the ••• each work again, and the top hasn't moved at any
-  point. With Find open, You > Debug's Library top line ends its reasons with "kept, Find open"; after Cancel it says
+  point. With Find open, Settings > Debug's Library top line ends its reasons with "kept, Find open"; after Cancel it says
   "nothing presented" again. On Ethan's phone too, or "not done yet".
 - **616 The greys.** **Not done yet.** Every grey word is brighter - a page's quiet line, a row's second line, the
   headings' small words, the tab bar's other tabs, a field's prompt - and still a step down from white, the brightest
@@ -7617,7 +7617,7 @@ the play bar, or from View > Queue, Info, Lyrics and EQ.
 Nothing on them works any differently. Only the EQ's Correction search and a filter's editor are left for their own
 slice.
 
-- **645 Debug.** **Not done yet.** You > Settings > Debug is black, with grey headings over rows on thin lines and no
+- **645 Debug.** **Not done yet.** Settings > Debug is black, with grey headings over rows on thin lines and no
   grey boxes. Every line it had is still there, in the same order: deadwax's **Check** and its report, Test sounds
   (with the record's engine beside the song), Hi-res, Playing and its three buttons, Turntable, EQ and **Muffle what
   plays**, the Engine log with **Copy** and **Share**, Downloads, Your library, Library, and how long this install
