@@ -665,7 +665,7 @@ Your player is showing a picture embedded in the file, or a disc scan (`cd.jpg`)
 disc number. A track's **Pictures in this file** (open it from **Edit → Tags**) shows them. **Get CD art** saves a proper `disc.jpg`, which Navidrome prefers over a
 `cd.jpg`.
 
-## An artist or album has no description, or it's at the foot of the page
+## An artist or album has no description
 
 The short description ([descriptions](player.md#descriptions)) comes, with a Last.fm key (`LASTFM_API_KEY`), from
 Last.fm first, then from the English Wikipedia article that MusicBrainz links to (through Wikidata), then from
@@ -698,11 +698,10 @@ when there's none, so if a page has no description:
   comes, for the next visit): deadwax keeps nothing of a failure, the page has what the others said, and the app asks again when the page next opens, from a minute on. deadwax's own log (the container's output) has a line saying which
   of the Wikipedia side didn't answer ("no description for that artist just now - …").
 
-A description at the **foot** of the page came after what is under its place was drawn - the artist's albums, the
-album's songs, a pressing's tracklist wait for it only a moment - so it was put where it moves nothing under your
-finger - as is one that came after the page said the album's details or the library couldn't be loaded, with
-**Try again** under where it would go. Next time the page opens deadwax has it kept, and it is under the name or the
-hero.
+**A gap under Play and Shuffle that then closes** is the room the page keeps for a description while deadwax asks
+for it (deadwax 2.1.52 on - before that a description that came late went to the foot of the page). When the answer
+is that there's none, the gap closes; open the page again in the same visit and it isn't left. A description is
+always under the name or the hero now, never at the foot.
 
 ## The artist page can't work out who this is
 
