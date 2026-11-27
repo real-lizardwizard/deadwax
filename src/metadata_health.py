@@ -32,7 +32,7 @@ Three rules keep this honest:
 from pathlib import Path
 
 from src.library import edition_from_dirname
-from src.organizer import build_album_dirname, sanitize_filename
+from src.organizer import album_folder_template, build_album_dirname, country_in_folder, sanitize_filename
 
 #? Severities. Only used to sort - the queue shows everything it finds.
 #?   3  the album is not identified. Nothing else about it can be checked against anything.
@@ -150,6 +150,16 @@ def expected_dirname(album: dict) -> str:
         "original_year": album.get("original_year") or "",
         "edition_label": edition_from_dirname(Path(album.get("path") or "").name),
     })
+
+
+def settings_read() -> tuple:
+    """
+    (2.1.48) The settings inspect_album() reads, as a value: the folder template and whether a country may
+    name a folder - both through expected_dirname(), the only place a setting reaches a verdict here. What
+    a count kept of attach_issues' answer is kept by, beside the albums, the reviews and Navidrome's listing
+    (routes/library.py queue_summary). A setting this file comes to read is added here.
+    """
+    return (album_folder_template(), country_in_folder())
 
 
 def _is_misfiled(album: dict) -> bool:

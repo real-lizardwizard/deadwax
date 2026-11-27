@@ -261,3 +261,95 @@ def test_no_library_and_no_store_answer_zeros(root, store, monkeypatch):
     answer = client(store).get(SUMMARY)
     assert answer.status_code == 200
     assert answer.json() == {**zeros, "tracking_enabled": True}
+
+
+# ---------------------------------------------------------------- the count, kept (2.1.48)
+
+def count_inspections(monkeypatch):
+    """Counts every working-out of the count, and notes whether any ran on the event loop."""
+    real = route._count_queue
+    seen = {"counts": 0, "on_the_loop": 0}
+
+    def counted(albums, reviews, unlisted):
+        seen["counts"] += 1
+        try:
+            asyncio.get_running_loop()
+            seen["on_the_loop"] += 1
+        except RuntimeError:
+            pass
+        return real(albums, reviews, unlisted)
+
+    monkeypatch.setattr(route, "_count_queue", counted)
+    return seen
+
+
+def test_the_count_is_kept_while_nothing_it_counts_has_changed(root, store, monkeypatch):
+    clean_album(root)
+    untagged_album(root)
+    app = client(store)
+    app.get(ALBUMS)
+    seen = count_inspections(monkeypatch)
+
+    first = app.get(SUMMARY).json()
+    assert seen == {"counts": 1, "on_the_loop": 0}, "worked out once, in a worker thread"
+
+    #? asked again - and the saved scan isn't even put together for it
+    monkeypatch.setattr(route, "snapshot_library", lambda *_: (_ for _ in ()).throw(AssertionError("assembled again")))
+    assert app.get(SUMMARY).json() == first
+    assert app.get(SUMMARY).json() == first
+    assert seen["counts"] == 1
+
+
+def test_a_review_written_is_counted_at_the_next_ask(root, store, monkeypatch):
+    """The review rows are read on every ask and compared by value: no writer has to say it wrote."""
+    untagged_album(root)
+    app = client(store)
+    issues = app.get(ALBUMS).json()["albums"][0]["issues"]
+    seen = count_inspections(monkeypatch)
+    assert app.get(SUMMARY).json()["total"] == 1
+
+    run(store.ignore_album_issues(UNTAGGED, issues))
+    assert app.get(SUMMARY).json()["total"] == 0
+    run(store.record_albums_seen([{"path": "Someone/Just Filed (2024)"}], source="import"))
+    assert app.get(SUMMARY).json()["total"] == 1, "an import filed since the scan, though no folder was read"
+    assert seen["counts"] == 3
+
+
+def test_a_folder_changed_is_counted_at_the_next_ask(root, store, monkeypatch):
+    clean_album(root)
+    directory = untagged_album(root)
+    app = client(store)
+    app.get(ALBUMS)
+    seen = count_inspections(monkeypatch)
+    assert app.get(SUMMARY).json()["total"] == 1
+
+    #? a writer forgets the folder it wrote (a retag moves no mtime): the saved scan is another one
+    library.forget_cached_album(str(directory))
+    assert app.get(SUMMARY).json()["total"] == 0
+    #? and the scan that reads it again is another still
+    app.get(ALBUMS)
+    assert app.get(SUMMARY).json()["total"] == 1
+    assert seen["counts"] == 3
+
+
+def test_a_setting_an_issue_is_judged_by_is_counted_at_the_next_ask(root, store, monkeypatch):
+    clean_album(root)
+    app = client(store)
+    app.get(ALBUMS)
+    seen = count_inspections(monkeypatch)
+    assert app.get(SUMMARY).json()["total"] == 0
+
+    #? every folder is misfiled by another template's lights
+    monkeypatch.setattr(Config, "ALBUM_FOLDER_TEMPLATE", "{year} - {album}")
+    assert app.get(SUMMARY).json()["total"] == 1
+    assert seen["counts"] == 2
+
+
+def test_the_settings_an_issue_reads_are_the_ones_the_count_is_kept_by(monkeypatch):
+    from src.metadata_health import settings_read
+
+    before = settings_read()
+    monkeypatch.setattr(Config, "ALBUM_FOLDER_TEMPLATE", "{year} - {album}")
+    templated = settings_read()
+    monkeypatch.setattr(Config, "COUNTRY_IN_FOLDER", "on")
+    assert len({before, templated, settings_read()}) == 3

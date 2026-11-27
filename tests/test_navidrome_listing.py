@@ -795,3 +795,47 @@ def test_a_folder_deadwax_moves_keeps_its_verdict_at_its_new_path(navidrome_set)
     #? merged into a folder with a verdict of its own: that one stands
     cache.follow(moved["path"], dummy["path"])
     assert cache._verdicts == {"Portishead/Dummy (1994)": True}
+
+
+# ---------------------------------------------------------------- the stamp a kept count is kept by (2.1.48)
+
+def test_the_stamp_moves_with_everything_a_verdict_is_made_from(navidrome_set, monkeypatch):
+    """routes/library.py keeps the Needs-a-look count by it: a change it missed would be a count gone stale."""
+    fake = FakeNavidrome([nav("Dummy", release=DUMMY_CD)])
+    cache = NavidromeListing(fake)
+    stamps = [cache.stamp()]
+
+    def moved(why):
+        stamps.append(cache.stamp())
+        assert stamps[-1] != stamps[-2], why
+        assert len(set(stamps)) == len(stamps), "never a stamp it has been before"
+
+    run(cache.ask(0))
+    moved("Navidrome's first answer")
+    asked(cache)
+    moved("a refresh that found no scan since: still a listing asked at another time")
+
+    gone = folder("Portishead/Third (2008)", album="Third", release="33333333-3333-4333-8333-333333333333")
+    here = folder("Portishead/Dummy (1994)", release=DUMMY_CD)
+    assert cache.unlisted([here, gone]) == {"Portishead/Third (2008)"}
+    assert cache.stamp() == stamps[-1], "judging moves nothing"
+    assert cache.unlisted([here, gone]) == {"Portishead/Third (2008)"} and cache.stamp() == stamps[-1]
+
+    cache.follow("Portishead/Third (2008)", "Portishead/Third (2008) [Deluxe]")
+    moved("a verdict followed its folder")
+    cache.follow("Nobody/Nothing", "Nobody/Nothing else")
+    assert cache.stamp() == stamps[-1], "no verdict to carry, nothing moved"
+
+    assert cache.unlisted([here], prune=True) == set()
+    moved("a real scan pruned the verdict of a folder it didn't find")
+    assert cache.unlisted([here], prune=True) == set() and cache.stamp() == stamps[-1], "nothing left to prune"
+
+    cache.forget_folders()
+    moved("LIBRARY_PATH moved")
+    fake.down = True
+    asked(cache)
+    moved("a refresh that failed")
+    cache.forget()
+    moved("a Navidrome setting changed")
+    monkeypatch.setattr(Config, "NAVIDROME_URL", "")
+    moved("Navidrome unset")

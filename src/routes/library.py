@@ -17,13 +17,14 @@ from src.api.musicbrainz_endpoint import MusicBrainzUnavailable
 from src.config import COVER_ART_SIZES, rename_wait_seconds
 from src.disc_art import (choose_from_caa, choose_from_fanarttv, disc_art_filename, disc_face, plan_disc_art,
                           save_disc_art)
+from src.library import generation as scan_generation
 from src.library import (MIME_BY_EXTENSION, SCAN_FORMAT, albums_without_tracks, compact_for_wire, delete_album,
                          drain_cache_changes, embedded_pictures, find_artist_art, find_disc_art, library_is_behind,
                          forget_cached_album, load_album_art, load_artist_art,
                          read_album_details, read_artist_mbid, scan_library, seed_cache,
                          snapshot_library, summarize_for_deletion)
 from src.logger import logger
-from src.metadata_health import ISSUE_TYPES, attach_issues, decorations
+from src.metadata_health import ISSUE_TYPES, attach_issues, decorations, settings_read
 from src.navidrome_listing import LISTING_FRESH_SECONDS, LISTING_STALE_SECONDS, navidrome_listing
 from src.matching import AUDIO_EXTENSIONS, file_extension
 from src.organizer import is_within
@@ -1523,6 +1524,24 @@ async def new_imports(request: Request):
     return await store.new_import_summary()
 
 
+#? The Needs-a-look count as it was last worked out (2.1.48): (what it is the count OF, the counts) - see
+#? queue_summary.
+_kept_summary: tuple[tuple, dict] | None = None
+
+
+def _count_queue(albums: list[dict], reviews: dict[str, dict], unlisted: set[str]) -> dict:
+    """queue_summary's counts over a saved scan's albums - every album inspected, so a worker thread's work."""
+    queue = attach_issues(albums, reviews, unlisted)
+    listed = sum(1 for album in albums if album["needs_attention"] or (album["imported"] and not album["reviewed"]))
+    held = {album["path"] for album in albums}
+    #? the same rule attach_issues reads an import by: filed by deadwax, not looked at
+    unscanned = sum(1 for path, review in reviews.items()
+                    if path not in held and review.get("source") == "import" and not review.get("reviewed_at"))
+    return {"known": True, "needs_attention": queue["total"],
+            "new_imports": queue["new_imports"] + unscanned, "total": listed + unscanned,
+            "unscanned_imports": unscanned}
+
+
 @router.get("/queue/summary", dependencies=LIBRARY)
 async def queue_summary(request: Request):
     """
@@ -1550,7 +1569,18 @@ async def queue_summary(request: Request):
     LISTING_STALE_SECONDS (then behind the answer, for the next count).
 
     No LIBRARY_PATH, or no store: zeros, `known` false - still a 200.
+
+    (2.1.48) The count is KEPT until what it is the count of changes, and worked out in a worker thread when
+    it must be. It was every album inspected on the event loop on every ask - 22 ms of every other request
+    standing still on a thousand albums (measured; notes/performance.md "The Needs-a-look count, kept"), as
+    the app opens and after every filing. What it is kept by is everything it is made from, and no clock:
+    the scan cache's generation (library.generation - a retag, a delete, a scan that read a folder afresh),
+    the review rows BY VALUE (read from SQLite on every ask, in the store's own thread: an ignore, a look,
+    an import enrolled each make another count with no writer having to say so), Navidrome's listing and
+    its verdicts (navidrome_listing.stamp), and the settings an issue is judged by
+    (metadata_health.settings_read). A saved scan that can't say which generation it is keeps nothing.
     """
+    global _kept_summary
     root = Config.LIBRARY_PATH or ""
     store = _store(request)
     tracking = bool(store and store.available)
@@ -1561,6 +1591,17 @@ async def queue_summary(request: Request):
         return answer
 
     await _ensure_cache_loaded(request)
+    reviews = await store.album_reviews()
+    #? Navidrome's listing as the page's /albums judged by it: the one in hand - asked for only when
+    #? there is none yet (the first answer waited for, a bounded while) or it is past
+    #? LISTING_STALE_SECONDS (behind this count, for the next)
+    await navidrome_listing.ask(LISTING_STALE_SECONDS)
+
+    #? read together, with nothing awaited between them and the look for a kept count
+    kept = _kept_summary
+    if kept is not None and kept[0] == (root, scan_generation(), navidrome_listing.stamp(), settings_read(), reviews):
+        return {**answer, **kept[1]}
+
     snapshot = await asyncio.to_thread(snapshot_library, root)
 
     if snapshot is None:
@@ -1568,22 +1609,15 @@ async def queue_summary(request: Request):
         count = int(imports.get("count") or 0)
         return {**answer, "new_imports": count, "total": count, "unscanned_imports": count}
 
-    reviews = await store.album_reviews()
     albums = snapshot["albums"]
-    #? Navidrome's listing as the page's /albums judged by it: the one in hand - asked for only when
-    #? there is none yet (the first answer waited for, a bounded while) or it is past
-    #? LISTING_STALE_SECONDS (behind this count, for the next)
-    await navidrome_listing.ask(LISTING_STALE_SECONDS)
-    queue = attach_issues(albums, reviews, navidrome_listing.unlisted(albums))
-    listed = sum(1 for album in albums if album["needs_attention"] or (album["imported"] and not album["reviewed"]))
-    held = {album["path"] for album in albums}
-    #? the same rule attach_issues reads an import by: filed by deadwax, not looked at
-    unscanned = sum(1 for path, review in reviews.items()
-                    if path not in held and review.get("source") == "import" and not review.get("reviewed_at"))
+    #? the verdicts, and what they were judged by, in one turn of the loop - then the inspecting, off it
+    unlisted = navidrome_listing.unlisted(albums)
+    judged_by = (navidrome_listing.stamp(), settings_read())
+    counts = await asyncio.to_thread(_count_queue, albums, reviews, unlisted)
+    if snapshot.get("generation") is not None:
+        _kept_summary = ((root, snapshot["generation"], *judged_by, reviews), counts)
 
-    return {**answer, "known": True, "needs_attention": queue["total"],
-            "new_imports": queue["new_imports"] + unscanned, "total": listed + unscanned,
-            "unscanned_imports": unscanned}
+    return {**answer, **counts}
 
 
 @router.post("/queue/ignore", dependencies=LIBRARY)

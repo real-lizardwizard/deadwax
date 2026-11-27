@@ -115,6 +115,47 @@ still encodes its smaller answer (ten fields an album) on the loop.
 walk cut across, an unchanged library not encoded again, never on the loop, each form's own answer, a retag
 in place, a review changing, gzip once and only when accepted), tests/test_metadata_health.py (one).
 
+#### The Needs-a-look count, kept (2.1.48)
+
+**The cause, confirmed.** `/library/queue/summary` - asked as the desktop frame shows, as a phone's You
+shows, and after every change - put the saved scan together in a worker thread and then, on the event loop,
+judged every album against Navidrome's listing and inspected every one (`attach_issues`), each time, to
+return five numbers that had almost never changed.
+
+**The fix** (`routes/library.py` `queue_summary`, `_kept_summary`). The count is kept until what it is the
+count OF changes, and worked out in a worker thread (`_count_queue`) when it must be. What it is kept by,
+none of it a clock:
+- the scan cache's generation (2.1.47) - a retag, a delete, a scan that read a folder afresh;
+- **the review rows by value**: they are read from SQLite on every ask (one `SELECT`, in the store's own
+  thread) and compared. So every writer of `album_review` - an ignore, an un-ignore, a look, an import
+  enrolled by the poller, a row pruned or moved - makes another count without having to say it wrote;
+- `navidrome_listing.stamp()`: it moves with every refresh that lands, every forget, a verdict following a
+  move, verdicts pruned, Navidrome set or unset. `unlisted()`'s own judging doesn't move it, because
+  judging the same albums by the same listing changes no verdict;
+- `metadata_health.settings_read()`: the folder template and COUNTRY_IN_FOLDER, the two settings an issue
+  is judged by.
+
+A kept count is answered without the saved scan being assembled at all.
+
+**Measured** (the same harness, a real SQLite store holding a review row per album):
+
+| | 1,060 albums, before | after | 5,000 albums, before | after |
+| --- | --- | --- | --- | --- |
+| an ask of an unchanged library: loop stood still | 22 ms | **1 ms** | 109 ms | **6.5 ms** |
+| the same ask: answered in | 29 ms | **3.7 ms** | 201 ms | **14 ms** |
+| the first ask (nothing kept): loop stood still | 23 ms | 13 ms | 103 ms | 13 ms |
+
+What is left is reading the review rows and comparing them.
+
+**Don't**: let `inspect_album` read a setting that `settings_read()` doesn't name, or change
+`NavidromeListing`'s listing or verdicts without `_changes` moving - either is a count that goes stale and
+nothing fails. tests/test_navidrome_listing.py walks every way the stamp must move.
+
+**Not verified**: against a real Navidrome (the listing here was unset in the measurement, faked in the
+tests), or on James's server.
+
+**Tests**: tests/test_queue_summary.py "the count, kept" (five), tests/test_navidrome_listing.py (one).
+
 ## Known performance problems (profiled, not guessed)
 
 Measured with 148 releases × 12 tracks:
