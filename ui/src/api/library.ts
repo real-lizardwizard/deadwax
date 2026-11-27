@@ -1,6 +1,6 @@
 import { fetchOk, get, post } from './http'
 import type {
-  ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, DeleteResult,
+  ArtistImagesPreview, ArtistImagesResult, ArtistSearchResult, ArtistSummary, CoverSavedAnswer, DeleteResult,
   DeletionSummary, HeldByNobody,
   LibraryAlbum, LibraryResponse, LyricsSummary, OwnedResponse, QueueSummaryResponse, RetagPlan,
   RetagRelease, RetagResponse, TagEditPlan, TagEditResponse, TrackDetailsResponse, TrackLyrics,
@@ -220,7 +220,7 @@ export function markReviewed(albumPath: string): Promise<{ reviewed: boolean }> 
 export function fetchCoverArt(
   albumPath: string,
   options: { replace?: boolean; releaseMbid?: string | null } = {},
-): Promise<{ written: string | null; replaced: string | null }> {
+): Promise<CoverSavedAnswer> {
   return post('/library/art/fetch', {
     album_path: albumPath,
     replace: options.replace ?? false,

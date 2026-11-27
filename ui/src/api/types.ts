@@ -1108,6 +1108,22 @@ export interface RetagArtPlan {
   /** The cover file already in the folder, if any. */
   existing: string | null
   /**
+   * (cover removal, 27 Nov) The cover file Apply deletes once the new one is saved: the existing one's name on a
+   * replace (a same-named one is written over instead, decided as it's written). Null when nothing is deleted - a
+   * download, no cover asked for, a merge into a folder with a cover, a cover only inside the files, and a replace that
+   * keeps the image there (one that isn't cover-named, or a link). Absent from a server from before it removed anything.
+   */
+  removes?: string | null
+  /** Why a replace keeps the cover file there, when it's refused rather than just not cover-named: 'link'. */
+  removes_refused?: string | null
+  /** The other cover-named files in the folder, which Apply leaves where they are. */
+  also_covers?: string[]
+  /**
+   * Those of them that will still be shown before this pressing's cover - null when that can't be known before it's
+   * fetched (a cover at full size: its file's name follows its type).
+   */
+  still_shown_first?: string[] | null
+  /**
    * The size a fetch would ask the Archive for: '250' | '500' | '1200' | 'full'. Laid on by the
    * preview route from COVER_ART_SIZE, so the editor can say which it will be.
    */
@@ -1185,6 +1201,19 @@ export interface RetagResults {
 export interface RetagResponse {
   plan: RetagPlan
   results: RetagResults
+}
+
+/**
+ * The cover alone's answer (POST /library/art/fetch): the file written, and the cover file there before it
+ * (`replaced`, null with none). (cover removal, 27 Nov) Since a replace deletes the cover it replaces: the file it
+ * removed (`removed` - null when it wrote over that very file, or removed nothing), and what it has to say about the
+ * old cover (`problems`: one left where it was, one still shown first). Both absent from a server from before.
+ */
+export interface CoverSavedAnswer {
+  written: string | null
+  replaced?: string | null
+  removed?: string | null
+  problems?: string[]
 }
 
 /* ===== library: editing tags by hand ===== */

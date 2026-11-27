@@ -136,8 +136,43 @@ matched to MusicBrainz** (point at the first for the release id). You:
 3. **Read the preview**. It shows every tag that would change, file by file; whether the folder
    would move or be renamed (to follow the template, or the artist's current name); and, when
    the album is split across folders, whether it would merge.
-4. **Cover art**: tick **Download cover art** to save the release's cover from the Cover Art
-   Archive, and compare it with the one you have (**Compare full size…**) before replacing it.
+4. **Cover art**: tick **Save this pressing's cover** to save the release's cover from the Cover
+   Art Archive. When the folder already has a cover - one that came with the download, say - the
+   box reads **Replace your cover with this pressing's**, and the line under it says what that does:
+   *This album already has a cover. With this on, Apply deletes it and saves this pressing's cover
+   in its place — at 1200 × 1200. It can't be undone.* (the size is `COVER_ART_SIZE`'s: `1200`
+   here, `500` by default). When the album's only cover is inside its music files, that line
+   reads *This album's cover is stored inside its music files. This one will be saved beside them
+   — at 1200 × 1200 — and shown instead. The files keep theirs, so nothing is lost.* With the box
+   ticked and nothing to fetch - the release has no MusicBrainz id, or the files join a folder
+   that has a cover of its own - it says that instead: *This pressing has no cover to save.*
+   (*Your cover is kept: this pressing has none to save in its place.* with a cover there), or *No
+   cover is saved: the folder these files are joining keeps its own.* When the image there is one
+   Apply keeps - not named like a cover (`cdart.png`, `scan001.jpg`) - the line, ticked or not,
+   says *This folder already has an image (cdart.png). This pressing's cover will be saved beside
+   it, at 1200 × 1200, and shown instead. The image already there stays.*; when it's a link, *Your
+   cover (folder.jpg) is a link to somewhere else, so it stays.* Either way nothing is replaced, so
+   the box reads **Save this pressing's cover**. Compare the two
+   (**Compare full size…**) before ticking it. Under what would change, a line of its own says
+   *Your cover is kept.* or *Your cover will be replaced with this pressing's.* (*This pressing's
+   cover will be shown instead. The image already there (cdart.png) stays.* when it's kept, or
+   the link line), and
+   when another cover file in the folder would still be shown before the new one, it says so:
+   *cover.jpeg will still be the cover you see. It isn't removed.* - or, saving at full size, when
+   the new file's name isn't known until it's fetched, *cover.jpeg may still be the cover you
+   see.* Below the two covers, **Replace your cover with this one** swaps the cover alone and
+   changes nothing else, then says *Replaced your cover (cover.png) with this pressing's.* - once
+   the old file is gone. Where nothing is replaced it's **Save this cover**: with no cover file in
+   the folder (it then says *Saved this pressing's cover (cover.jpg).*), and over an image Apply
+   keeps or a link, the tooltip following the same reading of the folder - *This folder already
+   has an image (cdart.png). This one will be saved beside it and shown instead. The image already
+   there stays.*, or *Your cover (folder.jpg) is a link to somewhere else, so it stays. Nothing
+   else changes.* When the old file is gone but another cover is still shown first, it says both:
+   *Replaced your cover (Cover.jpg) with this pressing's. cover.jpeg will still be the cover you
+   see. It isn't removed.* - each file named as it is on disk, capitals and all, since on a disk
+   that tells case apart `cover.jpeg` and `Cover.jpeg` are two files. When the old one was left
+   where it was, it says that instead (*Saved
+   cover.jpg, but the old folder.jpg is a link to somewhere else, which deadwax won't remove.*).
 5. **Apply** writes the tags, fetches the cover and moves the folder. There's no undo, which is
    why the preview shows everything first. When the apply changes both the album's tags and its
    folder, it writes the tags, pauses, then renames. That pause lets Navidrome see the new tags

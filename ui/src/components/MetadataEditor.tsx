@@ -34,6 +34,12 @@ import {
   appliedWords,
   applyingLabel,
   changeSummary,
+  coverHint,
+  coverLine,
+  coverOnlyHint,
+  coverOnlyLabel,
+  coverSaved,
+  coverToggle,
   mergeWords,
   moveLabel,
   planningLabel,
@@ -632,6 +638,9 @@ export function MetadataEditor(
   const renameWait = plan ? renameWaitWords(plan) : null
   const merging = plan ? mergeWords(plan) : null
   const foundCurrent = releases.some((r) => isCurrentRelease(r, taggedRelease))
+  //? (cover words, review) the preview the cover box's words follow - none while one is being redone (it was made with
+  //? the tick as it was), and none before the first or after one failed: the folder as the scan read it, then
+  const coverPlan = planning ? null : plan
 
   //? What put this album in the queue. Recomputed from the album prop rather than passed in,
   //? so it follows the refreshed album after an apply and the list visibly shrinks as you fix
@@ -660,7 +669,8 @@ export function MetadataEditor(
         //? already names when nothing is selected
         releaseMbid: selectedId ?? album.release_mbid ?? null,
       })
-      setArtResult(`Saved ${result.written}${result.replaced ? `, replacing ${result.replaced}` : ''}.`)
+      //? (cover words, 27 Nov) a cover replaced says it was yours, and which file it was (lib/retagPlan.ts)
+      setArtResult(coverSaved(result, album.art))
       onApplied(album.path)
     } catch (caught) {
       setArtResult(sayError(caught, '', { failed: "Couldn't save the cover." }))
@@ -886,37 +896,29 @@ export function MetadataEditor(
                     type="button"
                     class="columns-toggle-button"
                     disabled={savingArt}
-                    title={
-                      album.art
-                        ? 'Replace the cover on disk with this one, and change nothing else.'
-                        : 'Save this cover into the album folder, and change nothing else.'
-                    }
+                    title={coverOnlyHint(coverPlan, album.art)}
                     onClick={() => void saveArtOnly()}
                   >
+                    {/* (cover words, 27 Nov) only a cover file a replace takes away is replaced - an image it keeps,
+                        a cover inside the files, or none, and this is saved ("Save this cover", App Design's); its
+                        words follow the preview's cover, its preview too (lib/retagPlan.ts) */}
                     {savingArt
                       ? <Loading label="Saving…" />
-                      : album.art ? 'Replace cover only' : 'Save cover only'}
+                      : coverOnlyLabel(coverPlan, album.art)}
                   </button>
 
                   {artResult && <span class="text white-tertiary metadata-hint">{artResult}</span>}
                 </div>
               )}
 
+              {/* (cover words, 27 Nov) the cover there said as yours where a replace takes it away ("Save this
+                  pressing's cover" where it stays), and the line under the tick following the preview for what the
+                  page shows - or, without one, the folder as the scan read it (lib/retagPlan.ts) */}
               <label class="metadata-checkbox">
                 <input type="checkbox" checked={fetchArt}
                        onChange={(e) => setFetchArt((e.target as HTMLInputElement).checked)} />
-                <span class="text default-secondary">
-                  {plan?.art.existing ? `Replace ${plan.art.existing}` : 'Download cover art'}
-                </span>
-                <span class="text white-tertiary metadata-hint">
-                  {plan?.art.existing
-                    ? 'This album already has a cover - only replace it if the new one is better'
-                    : 'From the Cover Art Archive, saved into the album folder'}
-                  {/* the size is chosen in the settings tab, so say which one this will be */}
-                  {plan?.art.size
-                    ? ` — ${plan.art.size === 'full' ? 'at full size' : `at ${plan.art.size} × ${plan.art.size}`}`
-                    : ''}
-                </span>
+                <span class="text default-secondary">{coverToggle(coverPlan, album.art)}</span>
+                <span class="text white-tertiary metadata-hint">{coverHint(coverPlan, fetchArt, album.art)}</span>
               </label>
 
               {planning && (
@@ -984,6 +986,10 @@ export function MetadataEditor(
 
             {!applyError && plan && !plan.empty && (
               <span class="text default-muted metadata-summary">{changeSummary(plan)}</span>
+            )}
+            {/* (cover words, 27 Nov) a cover there gets a line of its own: kept, or replaced */}
+            {!applyError && plan && !plan.empty && coverLine(plan) !== null && (
+              <span class="text default-muted metadata-summary">{coverLine(plan)}</span>
             )}
 
             {/*

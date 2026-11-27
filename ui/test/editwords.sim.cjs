@@ -76,10 +76,197 @@ console.log('\nthe Release tab: what Apply will do (lib/retagPlan.ts)')
   check('the summary: files, then the cover and the folder',
     [R.changeSummary(plan()), R.changeSummary(plan({ changed_file_count: 1, file_count: 1 })), R.changeSummary(plan({ changed_file_count: 0 }))],
     ['3 of 12 files would change', '1 of 1 file would change', '0 of 12 files would change'])
-  check('...a cover downloaded and the folder renamed; a cover replaced and the files joining the other disc',
-    [R.changeSummary(plan({ art: { action: 'download' }, moves: true })), R.changeSummary(plan({ art: { action: 'replace' }, moves: true, merge: true }))],
+  check('...a cover downloaded and the folder renamed; a cover replaced (said on its own line) and the files joining the other disc',
+    [R.changeSummary(plan({ art: { action: 'download' }, moves: true })), R.changeSummary(plan({ art: { action: 'replace', existing: 'cover.png' }, moves: true, merge: true }))],
     ['3 of 12 files would change, the cover would be downloaded, and the folder would be renamed',
-      '3 of 12 files would change, the cover would be replaced, and the files would join the other disc'])
+      '3 of 12 files would change, and the files would join the other disc'])
+  //? (cover words, 27 Nov) a cover the folder has: its own line, whether it stays or goes; none with no cover there
+  check('the cover\'s line: kept with the box off (or nothing to fetch), replaced with it on; none with no cover there',
+    [R.coverLine(plan({ art: { action: '', reason: '', existing: 'cover.jpg' } })),
+      R.coverLine(plan({ art: { action: '', reason: 'no release to fetch art for', existing: 'cover.jpg' } })),
+      R.coverLine(plan({ art: { action: 'replace', reason: '', existing: 'cover.jpg' } })),
+      R.coverLine(plan()), R.coverLine(plan({ art: { action: 'download', reason: '', existing: null } }))],
+    ['Your cover is kept.', 'Your cover is kept.', "Your cover will be replaced with this pressing's.", null, null])
+  //? (cover words, review) the cover box: a preview's cover when there is one, else the scan's; the line following
+  //? the preview - asked for and not planned says so - else what the tick does, by the cover there
+  const file = { action: '', reason: '', existing: 'cover.jpg', size: '1200' }
+  const none = { action: '', reason: '', existing: null, size: '1200' }
+  check('the tick: your cover by the preview, else by the scan; a cover only inside the files, or none, is saved',
+    [R.coverToggle(plan({ art: file }), ''), R.coverToggle(plan({ art: none }), 'file'), R.coverToggle(null, 'file'),
+      R.coverToggle(null, 'embedded'), R.coverToggle(null, '')],
+    ["Replace your cover with this pressing's", "Save this pressing's cover", "Replace your cover with this pressing's",
+      "Save this pressing's cover", "Save this pressing's cover"])
+  check('...its line, a cover file there: what the tick does (off or on) and its size; before a preview, the scan\'s cover',
+    [R.coverHint(plan({ art: file }), false, 'file'), R.coverHint(plan({ art: { ...file, action: 'replace', size: 'full' } }), true, 'file'),
+      R.coverHint(null, false, 'file')],
+    ["This album already has a cover. With this on, Apply deletes it and saves this pressing's cover in its place — at 1200 × 1200. It can't be undone.",
+      "This album already has a cover. With this on, Apply deletes it and saves this pressing's cover in its place — at full size. It can't be undone.",
+      "This album already has a cover. With this on, Apply deletes it and saves this pressing's cover in its place. It can't be undone."])
+  check('...a cover only inside the files: saved beside them and shown instead, the files keeping theirs; with none, downloaded',
+    [R.coverHint(plan({ art: none }), false, 'embedded'), R.coverHint(null, false, 'embedded'), R.coverHint(plan({ art: { ...none, action: 'download' } }), true, '')],
+    ["This album's cover is stored inside its music files. This one will be saved beside them — at 1200 × 1200 — and shown instead. The files keep theirs, so nothing is lost.",
+      "This album's cover is stored inside its music files. This one will be saved beside them and shown instead. The files keep theirs, so nothing is lost.",
+      'From the Cover Art Archive, saved into the album folder — at 1200 × 1200'])
+  check('...asked for and not planned: no id to look one up by, or the files join a folder with a cover of its own',
+    [R.coverHint(plan({ art: { ...file, reason: 'this release has no MusicBrainz id to look art up by' } }), true, 'file'),
+      R.coverHint(plan({ art: none }), true, ''), R.coverHint(plan({ art: file, moves: true, merge: true }), true, 'file'),
+      R.coverHint(null, true, 'file')],
+    ['Your cover is kept: this pressing has none to save in its place.', 'This pressing has no cover to save.',
+      'No cover is saved: the folder these files are joining keeps its own.',
+      "This album already has a cover. With this on, Apply deletes it and saves this pressing's cover in its place. It can't be undone."])
+  check('Compare covers\' button and its line, before a preview: a cover file replaced, a cover inside the files outshone, else saved',
+    ['file', 'embedded', ''].map((art) => [R.coverOnlyLabel(null, art), R.coverOnlyHint(null, art)]),
+    [['Replace your cover with this one', "Deletes your current cover and saves this one. Nothing else changes. It can't be undone."],
+      ['Save this cover', "This album's cover is stored inside its music files. This one will be saved beside them and shown instead. The files keep theirs, so nothing is lost."],
+      ['Save this cover', 'Save this cover into the album folder, and change nothing else.']])
+  check('...and what it did: your cover replaced, named; one saved beside the files\' own; one saved beside a cover file; this pressing\'s, with none',
+    [R.coverSaved({ written: 'cover.jpg', replaced: 'cover.png' }, 'file'), R.coverSaved({ written: 'cover.jpg', replaced: null }, 'embedded'),
+      R.coverSaved({ written: 'cover.jpg', replaced: null }, 'file'), R.coverSaved({ written: 'cover.jpg', replaced: '' }, '')],
+    ["Replaced your cover (cover.png) with this pressing's.",
+      "Saved cover.jpg. This album's cover is stored inside its music files. This one is shown instead; the files keep theirs.", 'Saved cover.jpg.',
+      "Saved this pressing's cover (cover.jpg)."])
+  //? (cover removal, 27 Nov) the server names the file a replace deletes (plan.art.removes) and the one it did
+  //? (`removed`, with its `problems`): "It can't be undone." and "Replaced your cover" follow them, and an answer from a
+  //? server from before - no such fields - keeps the words it had
+  const REPLACES = "This album already has a cover. With this on, Apply deletes it and saves this pressing's cover in its place"
+  const replacing = { ...file, action: 'replace' }
+  check('"deletes it" and "It can\'t be undone." only when the preview says the file goes - with the tick off too (the server\'s final: what a replace WOULD do); before one and from an older server, as before',
+    [R.coverHint(plan({ art: { ...replacing, removes: 'cover.jpg' } }), true, 'file'),
+      R.coverHint(plan({ art: replacing }), true, 'file'),
+      R.coverHint(plan({ art: { ...file, removes: 'cover.jpg' } }), false, 'file'),
+      R.coverHint(plan({ art: { ...file, existing: 'cdart.png', removes: null, removes_refused: 'not_a_cover_name', also_covers: [], still_shown_first: [] } }), false, 'file'),
+      R.coverHint(plan({ art: file }), false, 'file'),
+      R.coverHint(null, true, 'file')],
+    [`${REPLACES} — at 1200 × 1200. It can't be undone.`, `${REPLACES} — at 1200 × 1200. It can't be undone.`,
+      `${REPLACES} — at 1200 × 1200. It can't be undone.`,
+      "This folder already has an image (cdart.png). This pressing's cover will be saved beside it, at 1200 × 1200, and shown instead. The image already there stays.",
+      `${REPLACES} — at 1200 × 1200. It can't be undone.`, `${REPLACES}. It can't be undone.`])
+  //? (cover removal, review) a replace that deletes nothing - the image there isn't cover-named, or is a link - keeps it
+  const keeping = { ...replacing, existing: 'cdart.png', removes: null, removes_refused: 'not_a_cover_name', also_covers: [], still_shown_first: [] }
+  check('...a replace that deletes nothing: the image there stays, and the new one is shown instead unless another still is',
+    [R.coverHint(plan({ art: keeping }), true, 'file'), R.coverHint(plan({ art: { ...keeping, size: undefined } }), true, 'file'),
+      R.coverHint(plan({ art: { ...keeping, still_shown_first: ['cover.jpg'] } }), true, 'file'),
+      R.coverLine(plan({ art: keeping })), R.coverLine(plan({ art: { ...keeping, still_shown_first: ['cover.jpg'] } }))],
+    ["This folder already has an image (cdart.png). This pressing's cover will be saved beside it, at 1200 × 1200, and shown instead. The image already there stays.",
+      "This folder already has an image (cdart.png). This pressing's cover will be saved beside it and shown instead. The image already there stays.",
+      "This folder already has an image (cdart.png). This pressing's cover will be saved beside it, at 1200 × 1200. The image already there stays.",
+      "This pressing's cover will be shown instead. The image already there (cdart.png) stays.",
+      "The image already there stays. cover.jpg will still be the cover you see. It isn't removed."])
+  check('...at full size, and without a size, with another cover still the one you see',
+    [R.coverHint(plan({ art: { ...keeping, size: 'full' } }), true, 'file'),
+      R.coverHint(plan({ art: { ...keeping, size: undefined, still_shown_first: null, also_covers: ['cover.jpeg'] } }), true, 'file')],
+    ["This folder already has an image (cdart.png). This pressing's cover will be saved beside it, at full size, and shown instead. The image already there stays.",
+      "This folder already has an image (cdart.png). This pressing's cover will be saved beside it. The image already there stays."])
+  check('...another cover still shown first, said before Apply: the one known, or - its name unknown - those that may be',
+    [R.coverLine(plan({ art: { ...replacing, removes: 'cover.png', also_covers: ['cover.jpeg'], still_shown_first: ['cover.jpeg'] } })),
+      R.coverLine(plan({ art: { ...replacing, removes: 'cover.png', also_covers: ['cover.jpeg', 'folder.jpg'], still_shown_first: null } })),
+      R.coverLine(plan({ art: { ...replacing, removes: 'cover.png', also_covers: ['cover.jpeg'], still_shown_first: [] } })),
+      R.coverLine(plan({ art: { ...replacing, removes: 'cover.png', also_covers: [], still_shown_first: null } })),
+      R.coverLine(plan({ art: replacing }))],
+    ["Your cover will be replaced with this pressing's. cover.jpeg will still be the cover you see. It isn't removed.",
+      "Your cover will be replaced with this pressing's. cover.jpeg or folder.jpg may still be the cover you see.",
+      "Your cover will be replaced with this pressing's.", "Your cover will be replaced with this pressing's.",
+      "Your cover will be replaced with this pressing's."])
+  check('...listed as one, by or',
+    [['a'], ['a', 'b'], ['a', 'b', 'c']].map((names) => R.coverShownFirst({ still_shown_first: null, also_covers: names })),
+    ['a may still be the cover you see.', 'a or b may still be the cover you see.', 'a, b or c may still be the cover you see.'])
+  //? (cover removal, final) a link the server won't remove: why it stays, never "deletes" or "can't be undone" - under
+  //? the tick (off or on), under the summary (with another cover still shown first after it) and in Compare covers
+  const linking = { ...replacing, existing: 'folder.jpg', removes: null, removes_refused: 'link', also_covers: [], still_shown_first: [] }
+  const LINKED = 'Your cover (folder.jpg) is a link to somewhere else, so it stays.'
+  const linkWords = [R.coverHint(plan({ art: linking }), true, 'file'), R.coverHint(plan({ art: { ...linking, action: '' } }), false, 'file'),
+    R.coverLine(plan({ art: linking })), R.coverLine(plan({ art: { ...linking, also_covers: ['cover.jpeg'], still_shown_first: ['cover.jpeg'] } })),
+    R.coverOnlyHint(plan({ art: linking }), 'file'), R.coverOnlyHint(plan({ art: { ...linking, action: '' } }), '')]
+  check('a cover that is a link: it stays, said why, wherever the cover is said',
+    linkWords, [LINKED, LINKED, LINKED, `${LINKED} cover.jpeg will still be the cover you see. It isn't removed.`,
+      `${LINKED} Nothing else changes.`, `${LINKED} Nothing else changes.`])
+  check('...and none of them says it deletes, or that it can\'t be undone', linkWords.some((line) => /delet|undone/i.test(line)), false)
+  check('Compare covers, its preview the retag preview\'s cover: the file goes (and another may still be shown); kept under another name; none there; an older server',
+    [R.coverOnlyHint(plan({ art: { ...file, removes: 'cover.jpg', also_covers: [], still_shown_first: [] } }), 'file'),
+      R.coverOnlyHint(plan({ art: { ...file, existing: 'Cover.jpg', removes: 'Cover.jpg', also_covers: ['cover.jpeg'], still_shown_first: ['cover.jpeg'] } }), 'file'),
+      R.coverOnlyHint(plan({ art: keeping }), 'file'), R.coverOnlyHint(plan({ art: { ...keeping, action: '' } }), 'embedded'),
+      R.coverOnlyHint(plan({ art: { ...keeping, still_shown_first: ['cover.gif'] } }), 'file'),
+      R.coverOnlyLabel(plan({ art: keeping }), ''), R.coverOnlyLabel(plan({ art: none }), 'file'), R.coverOnlyHint(plan({ art: none }), 'file'),
+      R.coverOnlyHint(plan({ art: file }), 'file')],
+    ["Deletes your current cover and saves this one. Nothing else changes. It can't be undone.",
+      "Deletes your current cover and saves this one. Nothing else changes. It can't be undone. cover.jpeg will still be the cover you see. It isn't removed.",
+      'This folder already has an image (cdart.png). This one will be saved beside it and shown instead. The image already there stays.',
+      'This folder already has an image (cdart.png). This one will be saved beside it and shown instead. The image already there stays.',
+      'This folder already has an image (cdart.png). This one will be saved beside it. The image already there stays. cover.gif will still be the cover you see. It isn\'t removed.',
+      'Save this cover', 'Save this cover', 'Save this cover into the album folder, and change nothing else.',
+      "Deletes your current cover and saves this one. Nothing else changes. It can't be undone."])
+  const shownFirst = "saved cover.jpg, but cover.jpeg is still shown first - another cover in the album's folder, left as it was"
+  const linked = "saved cover.jpg, but the old folder.jpg is a link to somewhere else, which deadwax won't remove"
+  check('...what the cover alone did, from a server that removes the old cover: replaced only once it is gone - removed, or written over',
+    [R.coverSaved({ written: 'cover.jpg', replaced: 'folder.jpg', removed: 'folder.jpg', problems: [] }, 'file'),
+      R.coverSaved({ written: 'cover.jpg', replaced: 'folder.jpg', removed: 'folder.jpg' }, 'file'),
+      R.coverSaved({ written: 'cover.jpg', replaced: 'cover.jpg', removed: null, problems: [] }, 'file'),
+      R.coverSaved({ written: 'cover.jpg', replaced: 'Cover.jpg', removed: null, problems: [] }, 'file'),
+      R.coverSaved({ written: 'cover.png', replaced: 'cover.jpg', removed: null, problems: [] }, 'file'),
+      R.coverSaved({ written: 'cover.jpg', replaced: null, removed: null, problems: [] }, 'embedded'),
+      R.coverSaved({ written: 'cover.jpg', replaced: null, removed: null, problems: [] }, '')],
+    ["Replaced your cover (folder.jpg) with this pressing's.", "Replaced your cover (folder.jpg) with this pressing's.",
+      "Replaced your cover (cover.jpg) with this pressing's.", "Replaced your cover (Cover.jpg) with this pressing's.", 'Saved cover.png.',
+      "Saved cover.jpg. This album's cover is stored inside its music files. This one is shown instead; the files keep theirs.",
+      "Saved this pressing's cover (cover.jpg)."])
+  //? (App Design, 27 Nov) the old one gone and another still shown first: both said, the replace first, the other cover
+  //? named from the server's sentence and said as before Apply - its name as the server gives it, even at the
+  //? sentence's start (App Design: on a disk that tells case apart, cover.jpeg and Cover.jpeg are two files)
+  check('...the old one gone - removed, or written over - and another still shown first: both, in that order',
+    [R.coverSaved({ written: 'cover.jpg', replaced: 'folder.jpg', removed: 'folder.jpg', problems: [shownFirst] }, 'file'),
+      R.coverSaved({ written: 'cover.jpg', replaced: 'cover.jpg', removed: null, problems: [shownFirst] }, 'file'),
+      R.coverSaved({ written: 'cover.png', replaced: 'cover.png', removed: 'cover.png',
+        problems: ["saved cover.png, but Cover.gif is still shown first - another cover in the album's folder, left as it was"] }, 'file')],
+    ["Replaced your cover (folder.jpg) with this pressing's. cover.jpeg will still be the cover you see. It isn't removed.",
+      "Replaced your cover (cover.jpg) with this pressing's. cover.jpeg will still be the cover you see. It isn't removed.",
+      "Replaced your cover (cover.png) with this pressing's. Cover.gif will still be the cover you see. It isn't removed."])
+  check('...the name\'s case kept as it is on disk: cover.jpeg stays lower case, Cover.jpeg keeps its capital',
+    ['cover.jpeg', 'Cover.jpeg'].map((shown) => R.coverSaved({ written: 'cover.jpg', replaced: 'Cover.jpg', removed: 'Cover.jpg',
+      problems: [`saved cover.jpg, but ${shown} is still shown first - another cover in the album's folder, left as it was`] }, 'file')),
+    ["Replaced your cover (Cover.jpg) with this pressing's. cover.jpeg will still be the cover you see. It isn't removed.",
+      "Replaced your cover (Cover.jpg) with this pressing's. Cover.jpeg will still be the cover you see. It isn't removed."])
+  check('...a sentence that isn\'t that one, or names another file written, said as the server says it after "Replaced"',
+    [R.coverSaved({ written: 'cover.jpg', replaced: 'folder.jpg', removed: 'folder.jpg', problems: ['something else went wrong'] }, 'file'),
+      R.coverSaved({ written: 'cover.png', replaced: 'folder.jpg', removed: 'folder.jpg', problems: [shownFirst] }, 'file'),
+      R.coverSaved({ written: 'cover.jpg', replaced: 'folder.jpg', removed: 'folder.jpg',
+        problems: ["saved cover.jpg, but  is still shown first - another cover in the album's folder, left as it was"] }, 'file')],
+    ["Replaced your cover (folder.jpg) with this pressing's. Something else went wrong.",
+      "Replaced your cover (folder.jpg) with this pressing's. Saved cover.jpg, but cover.jpeg is still shown first - another cover in the album's folder, left as it was.",
+      "Replaced your cover (folder.jpg) with this pressing's. Saved cover.jpg, but  is still shown first - another cover in the album's folder, left as it was."])
+  check('...the old one left where it was: what the answer has to say, said instead, never "replaced"',
+    [R.coverSaved({ written: 'cover.jpg', replaced: 'folder.jpg', removed: null, problems: [linked, shownFirst] }, 'file'),
+      R.coverSaved({ written: 'cover.png', replaced: 'cover.jpg', removed: null, problems: [shownFirst] }, 'file')],
+    ["Saved cover.jpg, but the old folder.jpg is a link to somewhere else, which deadwax won't remove. Saved cover.jpg, but cover.jpeg is still shown first - another cover in the album's folder, left as it was.",
+      "Saved cover.jpg, but cover.jpeg is still shown first - another cover in the album's folder, left as it was."])
+  //? (cover removal, final) src/retag.py's own sentences for an old cover left where it was: a folder with no music of
+  //? its own (the cover alone's alone - a retag refuses such a folder), one changed since the plan, one already gone; and
+  //? an image under another name, kept, with nothing to say
+  const noMusic = "saved cover.jpg, but the old front.jpg was left where it is - the folder holds no music of its own, so it isn't taken for an album"
+  const changed = 'saved cover.jpg, but the old folder.jpg was left where it is - it changed while the new cover was being fetched'
+  const gone = 'saved cover.jpg - the old folder.jpg was already gone, so there was nothing to remove'
+  const leftWords = [noMusic, changed, gone].map((line) => R.coverSaved({ written: 'cover.jpg', replaced: 'folder.jpg', removed: null, problems: [line] }, 'file'))
+  check('...the server\'s own sentence for a cover left where it was - no music in the folder, changed, already gone - and a kept image saved beside',
+    [...leftWords, R.coverSaved({ written: 'cover.jpg', replaced: 'cdart.png', removed: null, problems: [] }, 'file')],
+    ["Saved cover.jpg, but the old front.jpg was left where it is - the folder holds no music of its own, so it isn't taken for an album.",
+      'Saved cover.jpg, but the old folder.jpg was left where it is - it changed while the new cover was being fetched.',
+      'Saved cover.jpg - the old folder.jpg was already gone, so there was nothing to remove.', 'Saved cover.jpg.'])
+  check('...never "Replaced"', leftWords.some((line) => /[Rr]eplaced/.test(line)), false)
+  //? (App Design, 27 Nov) the labels say "Replace" only where the file goes - named as removed (or written over), or
+  //? no preview that says - and never beside a line that says the old one stays
+  const goes = { ...file, removes: 'cover.jpg', also_covers: [], still_shown_first: [] }
+  const outsideAlbum = { ...keeping, existing: 'front.jpg', removes_refused: 'not_an_album' }
+  const labelled = [goes, { ...goes, action: 'replace' }, keeping, { ...keeping, action: '' }, linking, { ...linking, action: '' }, outsideAlbum]
+  check('the tick and Compare covers\' button: "Replace" where the file goes, "Save" where it stays (kept, a link, no music)',
+    labelled.map((art) => [R.coverToggle(plan({ art }), 'file'), R.coverOnlyLabel(plan({ art }), 'file')]),
+    [["Replace your cover with this pressing's", 'Replace your cover with this one'], ["Replace your cover with this pressing's", 'Replace your cover with this one'],
+      ["Save this pressing's cover", 'Save this cover'], ["Save this pressing's cover", 'Save this cover'],
+      ["Save this pressing's cover", 'Save this cover'], ["Save this pressing's cover", 'Save this cover'],
+      ["Save this pressing's cover", 'Save this cover']])
+  check('...no label says "Replace" beside a line that says the old one stays',
+    labelled.flatMap((art) => [[R.coverToggle(plan({ art }), 'file'), R.coverHint(plan({ art }), true, 'file')],
+      [R.coverToggle(plan({ art }), 'file'), R.coverHint(plan({ art }), false, 'file')],
+      [R.coverOnlyLabel(plan({ art }), 'file'), R.coverOnlyHint(plan({ art }), 'file')]])
+      .some(([label, line]) => /Replace/.test(label) && /stays/.test(line)), false)
   check('Apply while it works: plain, waiting for Navidrome (no number), or its seconds',
     [R.applyingLabel(null), R.applyingLabel(plan()), R.applyingLabel(plan({ rename_wait: 90, rename_by: 'navidrome' })), R.applyingLabel(plan({ rename_wait: 10, rename_by: 'timer' }))],
     ['Applying', 'Applying', 'Applying, waiting for Navidrome', 'Applying, renaming in 10s'])
@@ -168,10 +355,13 @@ console.log('\nthe editors draw them, and keep none of the words themselves')
   const dialog = code('components/DeleteAlbumDialog.tsx')
   check('the release editor: each line through lib/retagPlan.ts',
     ['renameWaitWords(plan)', 'mergeWords(plan)', '{NOTHING_TO_CHANGE}', 'changeSummary(plan)', 'applyingLabel(plan)', 'appliedWords(results)',
-      'writeFailedWords(results.failed)', 'planningLabel(loadingRelease)', 'moveLabel(plan)', '{ failed: PREVIEW_FAILED }', '{ failed: APPLY_FAILED }'].map((call) => editor.includes(call)),
-    Array(11).fill(true))
+      'writeFailedWords(results.failed)', 'planningLabel(loadingRelease)', 'moveLabel(plan)', '{ failed: PREVIEW_FAILED }', '{ failed: APPLY_FAILED }',
+      '{coverLine(plan)}', '{coverToggle(coverPlan, album.art)}', '{coverHint(coverPlan, fetchArt, album.art)}',
+      'title={coverOnlyHint(coverPlan, album.art)}', ': coverOnlyLabel(coverPlan, album.art)}', 'setArtResult(coverSaved(result, album.art))',
+      'const coverPlan = planning ? null : plan'].map((call) => editor.includes(call)),
+    Array(18).fill(true))
   check('...and none of their words, nor the helpers, kept there',
-    [/would change|Nothing to change\.|Applying, |stays behind|renames the folder once|moved the folder to match|Couldn't write|Couldn't (?:work out|apply) the changes|Fetching the tracklist/.test(editor),
+    [/would change|Nothing to change\.|Applying, |stays behind|renames the folder once|moved the folder to match|Couldn't write|Couldn't (?:work out|apply) the changes|Fetching the tracklist|Your cover (?:is kept|will be replaced)|[Yy]our cover|Download cover art|saved into the album folder|cover only|music files|It can't be undone|is a link to somewhere|already has an image|Saved \$\{/.test(editor),
       /function (?:discWords|applyingLabel)\b/.test(editor)],
     [false, false])
   check('the tag editor: the placeholder and the note through lib/tagEdit.ts, and none of their words',
