@@ -16,6 +16,8 @@ The app's Swift read as text, as the other look tests read it:
   here from MainTabs' placing and Core's TabBarFoot), the banners are safe-area insets with Try again's reach inside.
 - The cover viewer's close: a bare glyph on the phone in a 44 target, the Mac's round key on the Mac.
 - Tokens only; "Queue", never "Up Next".
+- (R18's review) Every action the slice redrew round, read whole where it is: what each button does and what holds it
+  back, as it was - and Songs' Shuffle still PlayerModel's call in the tap, nothing awaited first.
 """
 
 import importlib.util
@@ -186,9 +188,13 @@ def test_add_to_a_playlist_is_rows_on_hairlines_and_the_macs_box():
     # each row the phone's Library row (iArtists': its cover, its two lines, its hairline), the Mac's a box row
     row = struct(picker, "PickerRow")
     mac, phone = phone_look.halves(row, "if Platform.mac {")
-    assert phone.startswith(" LibraryListRow(title: name, line: line ?? \"\", lines: typeSize.isAccessibilitySize ? 2 : 1) "
-                            "{ mark(side: LibraryLook.rowCover) }"), phone
-    assert "mark(side: SheetLook.macCover)" in mac and ".font(SheetLook.words) .sheetRow() .help(name)" in mac
+    # (R18's review) each half whole, not by substring: a face, a frame or a lost Spacer added to either fails
+    assert phone == (" LibraryListRow(title: name, line: line ?? \"\", lines: typeSize.isAccessibilitySize ? 2 : 1) "
+                     "{ mark(side: LibraryLook.rowCover) } trailing: { EmptyView() } "), phone
+    assert mac == (" HStack(spacing: 10) { mark(side: SheetLook.macCover) Text(name) .foregroundStyle(DWPalette.head) "
+                   ".lineLimit(1) .truncationMode(.tail) Spacer(minLength: 8) if let line { Text(line) "
+                   ".font(SheetLook.small) .foregroundStyle(DWPalette.t2) .lineLimit(1) } } .font(SheetLook.words) "
+                   ".sheetRow() .help(name) "), mac
     assert "static let macCover: CGFloat = 20" in code(SHEET)
     # VoiceOver hears a row as one: its name and its line
     assert ('.accessibilityElement(children: .ignore) .accessibilityLabel([name, line].compactMap { $0 }'
@@ -461,3 +467,71 @@ def test_tokens_only_and_the_queue_is_the_queue():
                              r"caption2|largeTitle)\b", part), name
     for name in sorted(phone_look.R18_PAGES) + [MAC_PLAYLISTS, LIBRARY, ALBUMS, SONGS, PLAYLISTS, EDIT]:
         assert "Up Next" not in code(name), name
+
+
+# ----------------------------------------------------------------------------- the actions, as they were
+
+#? (R18's review) every action the slice redrew round, read whole where it is: what each button does and what holds it
+#? back - so a mutation that adds to the wrong playlist, skips the question, saves no order, picks no folder, opens the
+#? gate's other button, swaps Can't reach deadwax's two, or drops a busy guard fails here, not only on a device
+WIRING = [
+    (PICKER, "ForEach(rows) { playlist in Button { model.add(to: playlist, mode: .ask, playlists: playlists, "
+             "player: player, admin: server.access.seesDetail) } label: { PickerRow(cover: playlist.coverArt, "
+             "name: playlist.name, line: playlists.writes.adding(playlist.id) != nil ? PlaylistWords.adding : "
+             "PlaylistRules.songCount(playlist.songCount), symbol: nil) } .buttonStyle(.plain) .disabled(busy) "),
+    (PICKER, "} else { Button { guard !playlists.writes.busy else { return } model.making = true } label: { "
+             "PickerRow(cover: nil, name: PlaylistWords.newPlaylistRow, line: nil, symbol: \"plus\") } "
+             ".buttonStyle(.plain) .disabled(busy) "),
+    (PICKER, "SheetButtons { (stacked: Bool) in Button { model.add(to: question.playlist, mode: .add, playlists: "
+             "playlists, player: player, admin: server.access.seesDetail) } label: { SheetButtonWords(adding != nil && "
+             "adding == asked.yes.mode ? PlaylistWords.adding : asked.yes.label) } .buttonStyle(DWButtonStyle(kind: "
+             ".pri, fills: stacked)) .disabled(playlists.writes.busy) Button { if let mode = asked.no.mode { "
+             "model.add(to: question.playlist, mode: mode, playlists: playlists, player: player, admin: "
+             "server.access.seesDetail) } else { model.back() } } label: { SheetButtonWords(adding != nil && adding == "
+             "asked.no.mode ? PlaylistWords.adding : asked.no.label) } .buttonStyle(DWButtonStyle(fills: stacked)) "
+             ".disabled(playlists.writes.busy) }"),
+    (PICKER, "Button(action: send) { words(busy ? PlaylistWords.creating : PlaylistWords.create) } "
+             ".buttonStyle(DWButtonStyle(kind: .pri, fills: stacked)) .disabled(blank || busy || busyOutside)"),
+    (LIBRARY, "ForEach(LibraryPages.shown(order, personal: personal)) { (page: LibraryPage) in Text(page.title) "),
+    (LIBRARY, ".onMove { (from: IndexSet, to: Int) -> Void in saved = LibraryPages.saved(LibraryPages.moved(order, "
+              "personal: personal, from: from, to: to)) } Text(LibrarySwitchWords.orderFooter) "),
+    (LIBRARY, ".environment(\\.editMode, .constant(.active))"),
+    (FOLDER, "ForEach(choices.shown) { (album: ScanAlbum) in Button { pick(album.path) } label: { FolderRow(album: "
+             "album) } .buttonStyle(.plain) .disabled(!online) "),
+    (LIBRARY, "if closed.tryAgain { Button { Task { await library.checkNavidrome() } } label: { if "
+              "library.checkingNavidrome { ProgressView() .tint(DWPalette.text) } else { "
+              "SheetButtonWords(NavidromeGate.tryAgain) } } .buttonStyle(DWButtonStyle(kind: .pri, fills: stacked)) "
+              ".disabled(library.checkingNavidrome) .accessibilityLabel(NavidromeGate.tryAgain) } if closed.setUp { "
+              "Button { setUp() } label: { SheetButtonWords(NavidromeGate.setUp) } .buttonStyle(DWButtonStyle(kind: "
+              ".pri, fills: stacked)) } if NavidromeGate.showsDownloaded("),
+    (UNREACHABLE, "VStack(spacing: 12) { Button { Task { await server.check() } } label: { "
+                  "SheetButtonWords(UnreachedLines.tryAgain) } .buttonStyle(DWButtonStyle(kind: .pri, size: .large, "
+                  "fills: true)) Button { server.changeAddress() } label: { SheetButtonWords(UnreachedLines.changeAddress) "
+                  "} .buttonStyle(DWButtonStyle(size: .large, fills: true)) }"),
+    (ALBUMS, "private func buttons(_ stacked: Bool) -> some View { Button { asked = true downloads.follower.on = true } "
+             "label: { SheetButtonWords(AutoDownloadWords.turnOn) } .buttonStyle(DWButtonStyle(kind: .pri, fills: "
+             "stacked)) Button { asked = true } label: { SheetButtonWords(AutoDownloadWords.notNow) } "
+             ".buttonStyle(DWButtonStyle(fills: stacked)) }"),
+    (MINE, "switch action { case .add: Button { if !busy { act(action) } } label: { SheetButtonWords(words) } "
+           ".buttonStyle(DWButtonStyle(kind: .pri, fills: stacked)) case .remove: Button { if !busy { act(action) } } "
+           "label: { SheetButtonWords(words) } .buttonStyle(DWButtonStyle(fills: stacked)) }"),
+    (BANNER, "if reachability.reach == .unreachable { Button(reachability.probing ? DownloadWords.trying : "
+             "DownloadWords.tryAgain) { reachability.tryNow() } .buttonStyle(DWButtonStyle()) "
+             ".disabled(reachability.probing) .transition(.opacity) }"),
+    (BANNER, "Button { withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { open.toggle() } } label: {"),
+    (BANNER, ".onChange(of: reachability.reach) { _, reach in if reach == .online { open = false } }"),
+    (COVER, "Button(action: action) { Image(systemName: \"xmark\")"),
+]
+
+
+def test_each_action_is_wired_as_it_was():
+    for name, wired in WIRING:
+        assert flat(code(name)).count(wired) == 1, f"{name}: {wired[:80]}"
+    # Songs' Shuffle still the tap's own call: shuffleAll, whose plays are PlayerModel's, nothing awaited before them
+    songs = flat(code(SONGS))
+    assert songs.count("Button(action: shuffleAll) {") == 1
+    shuffle = flat(declaration(code(SONGS), "private func shuffleAll()"))
+    assert ("guard let taken = shuffles.take(.allSongs, level: PlaylistPlay.songsLevel(player.normalization)) else "
+            "{ return } player.play(shuffled: taken)") in shuffle
+    assert "player.play(playlist: here, at: nil, shuffle: true)" in shuffle
+    assert "await" not in shuffle and "Task" not in shuffle

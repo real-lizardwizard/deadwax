@@ -20433,6 +20433,52 @@ LibraryListRow face; the Downloaded top's own words outside the first ask (not i
 **Not verified**: anything on a device (checks 631-638) - how the sheets read, the notice's ground over a moving list,
 the banner's tint on the Mac, the round key's look against the cover, a tap beside the ✕.
 
+### After review
+
+The review found no change in what anything does: every action the slice redrew round (Add to a playlist's rows, New
+playlist…, the question's two answers, Create, Edit order's move, Choose the folder's pick, the gate's two buttons and
+when each shows, Can't reach deadwax's two, the first ask's answers, Mine's busy guard, the banner's Try again and its
+opening, the cover's close, Songs' Shuffle) reads as it did. The notice's `.allowsHitTesting(false)` is new on the tabs'
+and the Mac's notice (Now Playing's had it): nothing ever tapped the notice, so a tap where it lies now reaches what is
+under it. The arithmetic test re-derives MainTabs' placing honestly - the notice's foot is `home + room + 8`, the bar's
+top `content + below(home)`, and TabBarFoot.room is exactly their difference - and AppTabBar's targets stay inside its
+measured height (the seek line takes no touch). But the tests pinned the wiring only by substring or not at all: of
+the review's fifteen mutations, run against eighteen look and Mac test files, nine passed every one - the picker's rows
+taking a tap while an add is out, a row's add skipping the duplicates question (`mode: .add` for `.ask`), Mine acting
+while busy, the gate's Set up Navidrome shown always, Can't reach deadwax's two actions swapped, Edit order saving
+nothing, Choose the folder picking nothing, the banner's Try again probing nothing, and the Mac picker row's Spacer
+gone. (Caught already: the first ask's Turn On losing `follower.on`, by the Mac halves' digest alone; the cover's close
+doing nothing; the notice taking touches; the name's well gone; a grey box on a phone row; Shuffle behind a `Task`.)
+Fixed in the tests alone, no Swift changed:
+
+- **`test_each_action_is_wired_as_it_was`** (tests/test_ios_sheets_look.py, new): each action above read whole, where it
+  is, each exactly once - and shuffleAll's two plays PlayerModel's, with no `await` or `Task` in it.
+- **The picker's row compared whole** on each device (it was a `startswith` and two substrings): a lost Spacer, a face
+  or a frame on either half fails.
+
+All nine now fail test_ios_sheets_look (the eight wiring ones `test_each_action_is_wired_as_it_was`, the Spacer
+`test_add_to_a_playlist_is_rows_on_hairlines_and_the_macs_box`), each applied alone and restored. Re-run: pyflakes on
+the test file; tests/test_ios_sheets_look.py (12) and tests/test_source_bytes.py pass.
+
+Judged and left:
+
+- **The Mac's round close key** is DWRaised on a Circle in `.btn`'s colours, 36 across: dw.css's `.key` is lighter
+  (#423e4f to #1f1d27, a #4d4959 edge, a 0.16 sheen, a 2 pt #0b0a0f ring, a 0.6 drop) and 34. CoverViewer.swift is
+  shared and may not name MacPalette or MacKeyStyle (test_ios_mac_reach); `.key`'s colours as DWPalette tokens would be
+  App/Look's, outside this slice. For the coordinator.
+- **The picker's Mac rows stay at Row Size's Small.** The sheet is put up by DesktopFrame's `.appSheet`, outside its
+  `.environment(\.macRowSize, …)`, so even a reader there would get Small; and test_ios_mac_rows keeps `macRowSize`,
+  `MacRowSize` and `MacRowSizeStore` to App/Mac, DesktopFrame and MacCommands. A clean route needs DesktopFrame (R19's)
+  to hand a shared-zone value in - MacRowSizing's own rule today is that a sheet reads Small.
+- **The Navidrome gate's two purple buttons** never show together: Core's NavidromeGate gives `tryAgain` or `setUp`,
+  never both (pinned in test_every_old_face_in_the_slice_is_the_looks_button).
+- **The phone's notice, black inside a hairline**, is the flat rule's (R1c) and the review's "a DWPalette ground with a
+  hairline"; it is opaque, so a list under it doesn't show through.
+- **For the devices**: Edit order's footer is a row of the List now (a plain List's section footer floats), so a drag
+  past it should settle back above it - only the phone says so; the bare white ✕ over a zoomed-in pale cover; the Mac's
+  Can't reach deadwax and the first ask's headings at the Mac's 13 semibold (SheetLook.title), a point over the 12
+  under them - whether that reads as a heading.
+
 ## The redesign, slice R7: Search, Get and Sources (2026-11-25)
 
 The plan is ~/Desktop/Code/deadwax-plans/mac-redesign-build.md 3.4, "R7 - Search, Get and Sources", and the drawings
