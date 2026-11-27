@@ -267,8 +267,12 @@ struct ArtistView<Desk: View>: View {
                 .macSheet()
         }
         .task(id: taskKey) {
-            // which of MusicBrainz's albums are yours is the library's folders' word: asked again as the page shows
-            search.refreshOwned()
+            // which of MusicBrainz's albums are yours is the library's folders' word: (Speed A, fix 5) asked as the page
+            // opens only when it isn't in hand or a write was told of since a page last asked - as the album page asks;
+            // a pull asks again
+            if reachability.online, artists.asksOwned(inHand: search.ownedIndex != nil, writes: keptStamp.writes) {
+                search.refreshOwned()
+            }
             await model.load(key: taskKey, client: server.client, online: reachability.online, artists: artists,
                              kept: keptStamp)
         }
@@ -315,6 +319,8 @@ struct ArtistView<Desk: View>: View {
                 reachability.tryNow()
                 return
             }
+            // (Speed A, fix 5) the library's word on which albums are yours asked again too
+            search.refreshOwned()
             await model.load(key: taskKey, client: server.client, online: true, artists: artists, again: true,
                              kept: keptStamp)
             if model.asks.someMissing { model.again(client: server.client) }

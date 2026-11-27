@@ -191,4 +191,17 @@ import Testing
         #expect(!ListFreshness.asks(landed: landed, writes: 3, failed: true, onItsWay: 3, now: 1_000 + 120_000))
         #expect(ListFreshness.asks(landed: landed, writes: 4, failed: false, onItsWay: 3, now: 1_000 + 1))
     }
+
+    // MARK: fix 5 - the artist page's requests in order
+
+    @Test func anArtistPageAsksWhichAlbumsAreYoursOnlyWhenItIsNotInHandOrAWriteCame() {
+        // not in hand (the first page of a launch, another person): asked, whatever was asked before
+        #expect(OwnedCheck.asks(inHand: false, writes: 0, askedUnder: nil))
+        #expect(OwnedCheck.asks(inHand: false, writes: 2, askedUnder: 2))
+        // in hand, and an artist page has asked under these writes: not asked again - as the album page doesn't
+        #expect(!OwnedCheck.asks(inHand: true, writes: 2, askedUnder: 2))
+        // in hand, but no artist page has asked since the person signed in, or a write came since one did: asked
+        #expect(OwnedCheck.asks(inHand: true, writes: 0, askedUnder: nil))
+        #expect(OwnedCheck.asks(inHand: true, writes: 3, askedUnder: 2))
+    }
 }

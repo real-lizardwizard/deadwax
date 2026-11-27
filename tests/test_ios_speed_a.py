@@ -273,3 +273,31 @@ def test_the_artists_are_asked_as_they_show_by_the_album_indexs_rule():
     assert "Task { await artists.ask() }" in code(APP / "Library" / "LibraryView.swift")
     # Core's minute is the album index's own
     assert "public static let freshMs: Int64 = AlbumIndexState.freshMs" in code(CORE / "ListFreshness.swift")
+
+
+# ---------------------------------------------------------------------------- fix 5: the artist page's requests in order
+
+
+def test_an_artist_page_asks_which_albums_are_yours_only_when_it_has_to():
+    view = code(APP / "Artist" / "ArtistView.swift")
+    opened = view[view.index(".task(id: taskKey) {"):]
+    opened = flat(block(opened, opened.index("{")))
+    # as it opens: only when the index isn't in hand or a write was told of since a page last asked (Core's OwnedCheck)
+    assert opened.startswith(
+        "if reachability.online, artists.asksOwned(inHand: search.ownedIndex != nil, writes: keptStamp.writes) {"
+        " search.refreshOwned() } await model.load(")
+    # a pull asks it again, before the rest
+    pull = view[view.index(".pullToRefresh {"):]
+    pull = flat(block(pull, pull.index("{")))
+    assert "search.refreshOwned() await model.load(key: taskKey, client: server.client, online: true" in pull
+    model = code(APP / "Models" / "ArtistsModel.swift")
+    assert flat(func(model, "asksOwned")) == (
+        "guard OwnedCheck.asks(inHand: inHand, writes: writes, askedUnder: ownedAskedUnder) else { return false }"
+        " ownedAskedUnder = writes return true")
+    assert "ownedAskedUnder = nil" in flat(func(model, "reset"))
+    # Play and Shuffle: the songs prefetch is as it was - begun with the artist's answer, every album, Play lit once
+    # they are in hand (the covers have had their own session since fix 1, so the prefetch holds none of them back)
+    page = code(APP / "Models" / "ArtistPageModel.swift")
+    assert flat(func(page, "askAlbums")) == (
+        "let order = ArtistPage.playOrder(ArtistPage.rows(answer?.album ?? [])) send(asks.want(order), client: client)")
+    assert "if answer != nil { askAlbums(client) }" in page

@@ -24002,3 +24002,37 @@ again.
 
 **Not verified (a device or the server log):** one `/navidrome/artists` per minute while switching sections (check
 652); the re-file's new name on Artists when going back to it after Navidrome's scan has taken longer than the settle.
+
+### 5. The artist page's requests in order
+
+**Confirmed:** two causes, of which one is still real.
+
+- **The library check, real.** ArtistView's `.task(id: taskKey)` called `search.refreshOwned()` - `/library/owned` -
+  every time an artist page opened, "asked again as the page shows", where the album page asks only while the index
+  isn't in hand (`search.ownedIndex == nil`). With an ETag it is mostly a 304, but it is a round trip at the page's
+  opening, deadwax works out the whole answer to know its ETag, and it takes one of the JSON session's few connections
+  (four per host on iOS) while the page's own asks wait for them.
+- **The song prefetch against the covers, no longer real.** At b51a90a5 the transport kept one URLSession per timeout,
+  and covers and JSON both waited 8 s, so they shared one session and its connections: the four albums' songs the page
+  asks at once (`ArtistPage.atOnce`) held covers back. Since fix 1 covers go through their own session (its own
+  connections, its own disk cache), so the prefetch can't hold one back. Starting the prefetch after the covers would
+  now only make Play and Shuffle wait - they light once every album's songs are in hand - which the brief says not to
+  do, so the prefetch is as it was: begun with the artist's answer (or the kept one), in play order, four at a time.
+
+**Now:** as an artist page opens, `/library/owned` is asked only when `ArtistsModel.asksOwned(inHand:writes:)` says
+(Core's `OwnedCheck`): the index not in hand - as the album page asks - or a write told of (KeptAlbumAnswers.stamp's
+`writes`) since an artist page last asked. A pull asks it again first, and the page's own Move asks it twice as before
+(`moved()`, now and after the settle). Search, Get, a filing and the other pages ask it as they did.
+
+**What drops what's kept:** the owned index is SearchModel's, as before: another person (`reset`) drops it, and the
+artists' record of the writes a page asked under with it. A write told of asks at the next artist page; a write made
+elsewhere (the web, another phone) is heard at the next Search, pull or filing.
+
+**Tests:** SpeedATests `anArtistPageAsksWhichAlbumsAreYoursOnlyWhenItIsNotInHandOrAWriteCame`; test_ios_speed_a.py
+`test_an_artist_page_asks_which_albums_are_yours_only_when_it_has_to` (seen failing with the check made unconditional
+again), which also pins the prefetch as it was; test_ios_artist_discography's order (the library asked before the
+artist) still holds.
+
+**Not verified (a device or the server log):** one `/library/owned` for a run of artist pages opened in a row (check
+653); whether the prefetch's four asks still slow the page's Last.fm and About answers on the JSON session - nothing
+here measured it.

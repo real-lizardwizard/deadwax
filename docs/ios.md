@@ -7666,6 +7666,9 @@ differently.
   shows one `/navidrome/artists` for the minute, not one per switch). Wait over a minute and switch again, or pull
   down on Artists: it asks again. Move an artist's albums under their current name, then go back to Artists: the new
   name shows once Navidrome has scanned the move (a few seconds; go back to Artists again if it hasn't yet).
+- **653 Artist pages in a row.** **Not done yet.** Open an artist, go back, open another, and another: each page's
+  albums you have are marked as quickly as the first (the server's log shows one `/library/owned` for the run, not one
+  per page). Pull down on an artist page: it asks again. Play and Shuffle light up as soon as they did before.
 
 ## What it can't do yet
 

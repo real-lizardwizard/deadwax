@@ -67,6 +67,8 @@ final class ArtistsModel {
     @ObservationIgnored private var told = 0
     @ObservationIgnored private var toldMoved: Int64?
     @ObservationIgnored private var asking: Int?
+    /// (Speed A, fix 5) The writes told of when an artist page last asked the library which albums are yours.
+    @ObservationIgnored private var ownedAskedUnder: Int?
     /// Each kind of list's shelf, the order made of it and what was last drawn - and what each was made from.
     @ObservationIgnored private var shelves: [Kind: (stamp: Stamp, shelf: ArtistShelf)] = [:]
     @ObservationIgnored private var sorted: [Kind: (stamp: Stamp, order: ArtistOrder, places: [Int])] = [:]
@@ -237,6 +239,15 @@ final class ArtistsModel {
         pages[page.route.id] = ShownArtistPage(page)
     }
 
+    /// (Speed A, fix 5 - notes/ios.md "Speed A: what's asked again") An artist page opening: whether it asks the library
+    /// which albums are yours again - not while the index is in hand and no write was told of since a page last asked
+    /// (Core's OwnedCheck), as the album page doesn't. `writes` is KeptAlbumAnswers.stamp's.
+    func asksOwned(inHand: Bool, writes: Int) -> Bool {
+        guard OwnedCheck.asks(inHand: inHand, writes: writes, askedUnder: ownedAskedUnder) else { return false }
+        ownedAskedUnder = writes
+        return true
+    }
+
     /// The artist page showing for the artist, if one still is.
     func page(_ id: String) -> ArtistPageModel? { pages[id]?.page }
 
@@ -284,6 +295,7 @@ final class ArtistsModel {
         told = 0
         toldMoved = nil
         asking = nil
+        ownedAskedUnder = nil
         serial = 0
         shelves = [:]
         sorted = [:]
