@@ -117,6 +117,14 @@ ALONE = [
     ("Edit/TagsPages.swift",
      "self.init(file: file, mono: Typeface.Phone.mono(.extraSmall), words: Typeface.Phone.text(.small))",
      "a file's changes in Edit tags' preview, each readout a line of its own in TagFileChanges' VStacks"),
+    # (the panel review's R16) the Mac dock's two readout faces, named once (DockType) for the dock's pages in files
+    # both devices share: each use sits on its words' first baseline - a fact's value (DockFact), a song's number and
+    # length (DockSongRow), a Queue row's length beside one line (DockQueueRow), a lyric's time (LyricsView) - or is
+    # centred on two lines, as iQueue's are; tests/test_ios_dock_look.py holds each
+    ("Player/MacPanels.swift", "static var readout: Font { Typeface.Mac.mono(.label) }",
+     "the dock's readout face (.mono.xs), named once: its uses are DockType.readout's"),
+    ("Player/MacPanels.swift", "static var smallReadout: Font { Typeface.Mac.mono(.small) }",
+     "the dock's small readout face (.mono.s), named once: its uses are DockType.smallReadout's"),
 ]
 
 

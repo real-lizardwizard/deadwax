@@ -254,17 +254,19 @@ def test_a_shared_eq_file_on_the_mac_shows_in_the_docks_eq():
 def test_a_dock_tab_with_nothing_to_be_about_says_so():
     """R3's review, 6: Info with nothing selected and nothing playing drew a blank InfoView with no heading, and a
     folder tab clicked to the Queue with nothing queued an empty list. Each says "Nothing playing" now (MacDock.empty),
-    under its name, with the dock's Done."""
+    under its name - (R16) in the dock's own type, quiet and centred, no title and no Done (Escape is the panel's)."""
     panels = bare(PANELS)
     panel = member(panels, "struct MacPanel: View")
     body = member(panel, "var body: some View")
     empty = "if let words = MacDock.empty(tab, playing: player.current != nil, selected: selection?.subject != nil) {"
     assert empty in body
-    assert body.index(empty) < body.index("DockEmpty(tab: tab, words: words)") < body.index("page")
+    assert body.index(empty) < body.index("DockEmpty(words: words)") < body.index("page")
     assert "switch tab {" not in body and "switch tab {" in member(panel, "var page: some View")
     shown = member(panels, "struct DockEmpty: View")
-    for part in ("Text(words)", ".navigationTitle(MacDock.Words.tab(tab))", "DockDone()", ".foregroundStyle(Palette.quiet)"):
+    for part in ("Text(words)", ".font(DockType.words)", ".foregroundStyle(DWPalette.t3)", ".multilineTextAlignment(.center)"):
         assert part in shown, part
+    for gone in (".navigationTitle(", "DockDone(", "NavigationStack", "Palette.quiet"):
+        assert gone not in shown, gone
     #? Info's own subject is the same rule's: never InfoView without a song playing
     info = member(panels, "struct DockInfo: View")
     assert "MacDock.infoSubject(selected: selected.map(Self.kind), playing: player.current != nil)" in info
@@ -344,7 +346,7 @@ def test_the_dock_and_the_sheet_draw_with_tokens_alone():
             assert raw not in text, f"{path.name}: {raw}"
         assert not re.search(r"\bradius: \d", text) and "Color." not in text, f"{path.name}: a raw colour or radius"
     panels = bare(PANELS)
-    assert ".font(Typeface.Mac.text(.label).weight(.semibold))" in panels and ".foregroundStyle(DWPalette.t2)" in panels
+    assert ".font(DockType.heading)" in panels and ".foregroundStyle(DWPalette.t2)" in panels
     assert ".background(DWPalette.panel)" in panels
     dock = bare(DOCK)
     assert "public static let tabs: [Tab]" not in dock, "Sources is in the strip only while a Get page is open"

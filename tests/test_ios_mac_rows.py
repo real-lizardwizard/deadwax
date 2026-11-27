@@ -421,10 +421,11 @@ def test_the_frame_hands_the_one_choice_down():
     sizing = flat(bare(source(SIZING)))
     assert "private struct MacRowSizeKey: EnvironmentKey { static let defaultValue: MacRowSize = .standard }" in sizing
     assert "var macRowSize: MacRowSize { get { self[MacRowSizeKey.self] } set { self[MacRowSizeKey.self] = newValue } }" in sizing
-    # the iPhone draws none of it: the Mac's files, the frame and the menus alone name it
+    # the iPhone draws none of it: the Mac's files, the frame and the menus alone name it - and (R16) the dock's rows
+    # (MacPanels' DockQueueRow and .dockRowHeight, the side panel's: one of test_ios_mac_reach's frame files)
     for name, code in sources.items():
         if re.search(r"\b(MacRowSize|macRowSize|MacRowSizeStore|RowSizeAlternateKey)\b", code):
-            assert name.startswith("Mac/") or name in (FRAME, COMMANDS), name
+            assert name.startswith("Mac/") or name in (FRAME, COMMANDS, "Player/MacPanels.swift"), name
     # and in Core, the Mac's own files and Requests' columns - and (R7) Search's table and Get's tracklist
     for path in sorted(CORE.glob("*.swift")):
         if re.search(r"\bMacRowSize\b", bare(path.read_text(encoding="utf-8"))):
