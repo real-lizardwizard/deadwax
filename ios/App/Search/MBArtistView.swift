@@ -12,6 +12,11 @@ import SwiftUI
 ///
 /// No description, no links and no Play (question 9: Phase 7's). Nothing is asked, and none of their albums drawn, while
 /// deadwax can't be reached: "Their albums show once deadwax is back." - the page asks once it is.
+///
+/// (The panel review's R19 - notes/ios.md "The panel review, R19: Get, and old type left in redrawn pages
+/// (2026-11-27)") In the look's type and colours on both devices (the Mac borrows this page): no old palette, corners or
+/// system text styles, no shadow under the picture (as the artist page's hero), Studio only and Try again the look's
+/// buttons, each row's line a hairline. Every word, row and action is as it was.
 struct MBArtistView: View {
     let route: MBArtistRoute
 
@@ -51,7 +56,9 @@ struct MBArtistView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text(route.name)
-                    .font(Typeface.headline)
+                    .font(Platform.mac ? Typeface.Look.text(.field).weight(.semibold)
+                          : Typeface.Phone.text(.topName).weight(.semibold))
+                    .foregroundStyle(DWPalette.text)
                     .lineLimit(1)
                     .opacity(nameInBar ? 1 : 0)
                     .accessibilityHidden(!nameInBar)
@@ -79,11 +86,12 @@ struct MBArtistView: View {
         let about: String = MBArtistPage.factsLine(model.facts)
         return VStack(spacing: 0) {
             ArtistPicture(id: nil, side: Self.pictureSide, pixels: CoverSize.hero)
-                .shadow(color: .black.opacity(0.35), radius: 14, y: 6)
                 .padding(.top, 8)
                 .accessibilityHidden(true)
+            // iArtist's name, 28/700 - Typeface's one 28 (the artist page's hero draws it so too)
             Text(route.name)
                 .font(Typeface.title.bold())
+                .foregroundStyle(DWPalette.text)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .padding(.top, 18)
@@ -91,8 +99,8 @@ struct MBArtistView: View {
             // who they are: wrapping as the web's line does, its two lines held from the first (at any text size), so
             // nothing below moves as it lands or as it turns out longer than one
             Text(about.isEmpty ? " " : about)
-                .font(Typeface.subheadline)
-                .foregroundStyle(Palette.quiet)
+                .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
                 .multilineTextAlignment(.center)
                 .lineLimit(2, reservesSpace: true)
                 .padding(.top, 4)
@@ -105,16 +113,21 @@ struct MBArtistView: View {
 
     private var albumsHead: some View {
         HStack(alignment: .firstTextBaseline) {
+            // the artist page's heading (ArtistSectionHead's): semibold, in the heading's colour
             Text(ArtistWords.albumsHeading)
-                .font(Typeface.title3.weight(.semibold))
+                .font(Platform.mac ? Typeface.Look.text(.field).weight(.semibold)
+                      : Typeface.Phone.text(.strip).weight(.semibold))
+                .foregroundStyle(DWPalette.head)
                 .accessibilityAddTraits(.isHeader)
             Spacer(minLength: 8)
             if reachability.online {
+                // still a toggle (said as one, on or off), drawn as the look's small button - lit while on
                 Toggle(MBArtistPage.studioOnly, isOn: Binding(get: { model.studioOnly }, set: { (_: Bool) -> Void in
                     model.toggleStudio(client: server.client, online: reachability.online)
                 }))
                 .toggleStyle(.button)
-                .font(Typeface.footnote)
+                .buttonStyle(DWButtonStyle(kind: model.studioOnly ? .on : .normal, size: .small))
+                .fixedSize()
             }
         }
         .padding(.top, 24)
@@ -148,7 +161,8 @@ struct MBArtistView: View {
             HStack(spacing: 10) {
                 ProgressView()
                 Text(MBArtistPage.loading)
-                    .foregroundStyle(Palette.quiet)
+                    .font(Platform.mac ? Typeface.Look.text(.field) : Typeface.Phone.text(.row))
+                    .foregroundStyle(DWPalette.t2)
             }
             .accessibilityElement(children: .combine)
             .padding(.top, 12)
@@ -167,6 +181,7 @@ struct MBArtistView: View {
                         reachability.tryNow()
                     }
                 }
+                .buttonStyle(DWButtonStyle())
                 .disabled(reachability.probing)
             }
             .padding(.top, 12)
@@ -180,7 +195,9 @@ struct MBArtistView: View {
 
 /// One of their albums (ArtistPage.tsx's row, MusicBrainz's): its cover through deadwax's relay, its title, and "1994 ·
 /// in your library · 2 pressings" with the tick for one marked (MBArtistPage.marked). Read as one; busy while the id
-/// bridge is asked. The library's artist page draws their albums you don't have with it too (15 Nov).
+/// bridge is asked. The library's artist page draws their albums you don't have with it too (15 Nov). (R19) In the
+/// look's type and colours: the cover at the look's chip corners (the Mac's 3, the phone's square), the tick green,
+/// the line the second colour, the chevron the third, the row's hairline under its words.
 struct MBArtistAlbumRow: View {
     let row: MBArtistPage.Row
     let line: String
@@ -195,20 +212,21 @@ struct MBArtistAlbumRow: View {
                     ArchiveCover(addresses: ArchiveCoverID.addresses(release: nil, group: row.group.id),
                                  size: ArchiveCoverSize.row)
                         .frame(width: LibraryRow.cover, height: LibraryRow.cover)
-                        .clipShape(Corners.artShape)
+                        .clipShape(DWCorners.chipShape)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.title)
-                            .foregroundStyle(.primary)
+                            .font(Platform.mac ? Typeface.Look.text(.field) : Typeface.body)
+                            .foregroundStyle(DWPalette.text)
                         HStack(alignment: .firstTextBaseline, spacing: 4) {
                             if marked {
                                 Image(systemName: "checkmark")
                                     .font(Typeface.symbol(.caption2).weight(.bold))
-                                    .foregroundStyle(Palette.held)
+                                    .foregroundStyle(DWPalette.greenText)
                                     .accessibilityHidden(true)
                             }
                             Text(line.isEmpty ? " " : line)
-                                .font(Typeface.subheadline)
-                                .foregroundStyle(Palette.quiet)
+                                .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                                .foregroundStyle(DWPalette.t2)
                         }
                     }
                     .lineLimit(1)
@@ -219,7 +237,7 @@ struct MBArtistAlbumRow: View {
                     } else {
                         Image(systemName: "chevron.right")
                             .font(Typeface.symbol(.footnote).weight(.semibold))
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(DWPalette.t3)
                             .accessibilityHidden(true)
                     }
                 }
@@ -231,7 +249,8 @@ struct MBArtistAlbumRow: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel([row.title, line].filter { (part: String) -> Bool in !part.isEmpty }.joined(separator: ", "))
             .accessibilityValue(busy ? SearchWords.loading : "")
-            Divider().padding(.leading, LibraryRow.textInset)
+            DWRule(colour: Platform.mac ? DWPalette.rowline : DWPalette.rowRule)
+                .padding(.leading, LibraryRow.textInset)
         }
     }
 }

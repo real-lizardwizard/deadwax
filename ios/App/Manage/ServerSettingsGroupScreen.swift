@@ -138,6 +138,9 @@ struct SettingCard: View {
 /// of the values it takes; a field - a secure one for a secret, its placeholder "•••••••• (set)" never its value - in
 /// the readout face (`.in.mono`), with no capitals or autocorrection and the URL keyboard for an address. Every field is
 /// a box: the look's well (SettingWell). Typing drafts it in the app's model; Return only puts the keyboard away.
+/// (The panel review's R19) The Mac's menu is the look's pop-up (DWPopUp, the chosen value's words and the caret), its
+/// menu the very Picker the system's pop-up was - the same binding, the same choices and tags - so a choice sends
+/// exactly what it sent.
 struct SettingControl: View {
     let setting: ServerSetting
     let row: ServerSettings.Row
@@ -161,18 +164,19 @@ struct SettingControl: View {
         case .choices:
             let choices = ServerSettings.pickerChoices(setting, value: row.value)
             if Platform.mac {
-                Picker(selection: value) {
-                    ForEach(choices) { (choice: ServerSettings.Choice) in
-                        Text(choice.label).tag(choice.value)
+                DWPopUp(words: Self.chosen(choices, value: row.value)) {
+                    Picker(selection: value) {
+                        ForEach(choices) { (choice: ServerSettings.Choice) in
+                            Text(choice.label).tag(choice.value)
+                        }
+                    } label: {
+                        Text(setting.key)
                     }
-                } label: {
-                    Text(setting.key)
+                    .pickerStyle(.inline)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .tint(DWPalette.acc)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityLabel(setting.key)
+                .accessibilityValue(Self.chosen(choices, value: row.value))
             } else {
                 // (R14's review) the phone's: a menu whose label is the whole row, 44 tall - out of a Form's row a menu
                 // Picker takes a tap on its own words alone. The choices are the Picker's, inline in the menu, the one

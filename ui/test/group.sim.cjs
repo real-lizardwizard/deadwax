@@ -145,8 +145,8 @@ exports.takeOpener = (event) => event.currentTarget
 //? (2.0.13) the album's description: what it was asked with kept, what it answers the test's - by default settled
 //? with none, so the tracklist waits for nothing more than it did
 fs.writeFileSync(path.join(OUT, 'app/useDescription.js'), `
-exports.useDescription = (kind, ids, below, page) => {
-  globalThis.__group.describeAsks.push([kind, ids, below, page])
+exports.useDescription = (kind, ids, page) => {
+  globalThis.__group.describeAsks.push([kind, ids, page])
   return globalThis.__group.describing
 }
 `)
@@ -161,7 +161,7 @@ const stateAsks = []
 globalThis.__group = {
   owned: null,
   describeAsks: [],
-  describing: { description: null, settled: true, at: null },
+  describing: { description: null, settled: true, holding: false },
   //? how many times the page asked the library again (2.0.0-player.52, second review: every time it shows)
   ownedAsks: 0,
   storeState(body, signal) {
@@ -1025,54 +1025,36 @@ async function main() {
     //? groups the session has kept no pressings of: pages opened for the first time
     const FIRST = 'aaaaaaaa-1111-4000-8000-000000000001', SECOND = 'aaaaaaaa-1111-4000-8000-000000000002'
     G.describeAsks.length = 0
-    G.describing = { description: null, settled: false, at: null }
+    G.describing = { description: null, settled: false, holding: true }
     answers.push(answering(dummy))
     const { draw } = page({ id: FIRST })
     draw()
-    check('not asked while the pressings are out - its MusicBrainz lookup never takes a turn ahead of theirs', G.describeAsks.at(-1), ['album', null, false, FIRST])
+    const blocks = () => find((node) => node.type?.name === 'DescriptionBlock')
+    check('not asked while the pressings are out - its MusicBrainz lookup never takes a turn ahead of theirs', G.describeAsks.at(-1), ['album', null, FIRST])
+    check('...its room held under the hero from this first frame: one block, an album\'s, told to hold', blocks().map((node) => [node.props.kind, node.props.description, node.props.holding]), [['album', null, true]])
     await settle()
     draw()
-    check('...the pressings in: asked, by the group\'s id alone (an album you don\'t have has nothing of Navidrome\'s)', G.describeAsks.at(-1), ['album', { mbid: FIRST }, false, FIRST])
-    check('the pressings in, the description not: the tracklist waits, saying it is loading', [classed('app-rg-track').length, text(classed('app-asking')[0])], [0, 'Loading…'])
+    check('...the pressings in: asked, by the group\'s id alone (an album you don\'t have has nothing of Navidrome\'s)', G.describeAsks.at(-1), ['album', { mbid: FIRST }, FIRST])
+    check('the pressings in, the description not: the tracklist drawn at once (it waits for nothing), under the room still held', [classed('app-rg-track').length > 0, blocks().map((node) => node.props.holding)], [true, [true]])
     const WIKI = { paragraph: { text: 'Dummy is the debut studio album by Portishead.', source: 'wikipedia', url: 'https://en.wikipedia.org/wiki/Dummy_(album)' },
       subtitle: '1994 studio album by Portishead' }
-    const before = G.describeAsks.length
-    G.describing = { description: WIKI, settled: true, at: 'top' }
+    G.describing = { description: WIKI, settled: true, holding: false }
     draw()
-    const blocks = () => find((node) => node.type?.name === 'DescriptionBlock')
-    check('...it came: under the hero - subtitle and paragraph together - then the tracklist',
-      [blocks().map((node) => node.props.at), blocks()[0]?.props.description.subtitle, classed('app-rg-track').length > 0, G.describeAsks[before][2]],
-      [['top'], WIKI.subtitle, true, false])
+    check('...it came: in that same one block under the hero - subtitle and paragraph together',
+      [blocks().map((node) => [node.props.kind, node.props.holding]), blocks()[0]?.props.description.subtitle, classed('app-rg-track').length > 0],
+      [[['album', false]], WIKI.subtitle, true])
     const kids = tree.props.children.flat(Infinity).filter((node) => node && typeof node === 'object')
     check('...between the hero and the tracklist', [kids.findIndex((node) => node.props?.class === 'pl-album-hero') < kids.findIndex((node) => node.type?.name === 'DescriptionBlock'),
       kids.findIndex((node) => node.type?.name === 'DescriptionBlock') < kids.findIndex((node) => node.props?.class === 'app-rg-tracks')], [true, true])
-    draw()
-    check('...the page told the tracklist is drawn, from then on', G.describeAsks.at(-1)[2], true)
-    G.describing = { description: WIKI, settled: true, at: 'foot' }
-    draw()
-    const foot = tree.props.children.flat(Infinity).filter((node) => node && typeof node === 'object')
-    check('one placed at the foot: under the tracklist, above the links to MusicBrainz', [blocks().map((node) => node.props.at),
-      foot.findIndex((node) => node.type?.name === 'DescriptionBlock') > foot.findIndex((node) => node.props?.class === 'app-rg-tracks'),
-      foot.findIndex((node) => node.type?.name === 'DescriptionBlock') < foot.findIndex((node) => node.props?.class === 'app-rg-links')], [['foot'], true, true])
+    check('...and nowhere under the tracklist: the foot it went to when it came late is gone (2.1.52)',
+      kids.slice(kids.findIndex((node) => node.props?.class === 'app-rg-tracks')).some((node) => node.type?.name === 'DescriptionBlock'), false)
 
     //? come back to (Back) with its description still out: its pressings from the session - the tracklist on the first
     //? frame, which the scroll put back needs
-    G.describing = { description: null, settled: false, at: null }
+    G.describing = { description: null, settled: false, holding: true }
     const back = page({ id: FIRST })
     back.draw()
-    check('come back to, the description still out: the tracklist on the first frame', classed('app-rg-track').length > 0, true)
-
-    //? never answering: the tracklist drawn after DESCRIPTION_WAIT_MS all the same
-    answers.push(answering(slowRush))
-    const late = page({ id: SECOND })
-    late.draw()
-    await settle()
-    late.draw()
-    check('the description never coming: the tracklist waits...', classed('app-rg-track').length, 0)
-    const due = timers.filter((timer) => timer.ms === 500 && timer.live)
-    due.forEach((timer) => timer.fn())
-    late.draw()
-    check('...DESCRIPTION_WAIT_MS at most, then drawn without it', [due.length > 0, classed('app-rg-track').length > 0], [true, true])
+    check('come back to, the description still out: the tracklist on the first frame, the room held over it', [classed('app-rg-track').length > 0, blocks().map((node) => node.props.holding)], [true, [true]])
 
     //? the pressings failing: asked all the same (Wikipedia may still know it), the trouble said
     answers.push(() => Promise.reject(new Error('MusicBrainz away')))
@@ -1082,12 +1064,14 @@ async function main() {
     await settle()
     failing.draw()
     check('the pressings failed: the description asked all the same', G.describeAsks.at(-1).slice(0, 2), ['album', { mbid: THIRD }])
-    //? (after review) its trouble - Try again where the tracklist would be - drawn before the description could land:
-    //? told it is under the top place, so a description goes to the foot, never above that button
-    check('...told that what is under the top place is drawn: the trouble, its Try again', [classed('app-rg-trouble').length, G.describeAsks.at(-1)[2]], [1, true])
+    //? (2.1.52) the room is there before the trouble is: a description landing later moves neither it nor Try again
+    const failed = tree.props.children.flat(Infinity).filter((node) => node && typeof node === 'object')
+    check('...its room held above the trouble and its Try again', [classed('app-rg-trouble').length,
+      failed.findIndex((node) => node.type?.name === 'DescriptionBlock') >= 0,
+      failed.findIndex((node) => node.type?.name === 'DescriptionBlock') < failed.findIndex((node) => String(node.props?.class).includes('app-rg-trouble'))], [1, true, true])
     globalThis.setTimeout = realTimeout
     globalThis.clearTimeout = realClear
-    G.describing = { description: null, settled: true, at: null }
+    G.describing = { description: null, settled: true, holding: false }
   }
 
   console.log(failures ? `\n${failures} FAILED` : '\nall passed')

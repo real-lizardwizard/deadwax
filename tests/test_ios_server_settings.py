@@ -363,9 +363,10 @@ def test_the_pages_draw_as_the_spec_says():
             < listing.index("PhoneStrip(options: tabs,") < listing.index("ForEach(sections.first { $0.tab == shown }"))
     assert "NavigationLink(value: AppRoute.serverSettingsGroup(group.id))" in listing
     assert "GroupRow(label: group.label, mark: marks[group.id])" in listing
-    # a row's control: a menu Picker for choices, a SecureField for a secret, the URL keyboard for an address, no
+    # a row's control: a Picker for choices in a menu (the phone's row, the Mac's pop-up - R19), a SecureField for a secret, the URL keyboard for an address, no
     # autocorrection or capitals - and a locked one says so
-    assert ".pickerStyle(.menu)" in group
+    assert group.count("Picker(selection: value)") == 2 and group.count(".pickerStyle(.inline)") == 2
+    assert "DWPopUp(words: Self.chosen(choices, value: row.value))" in group
     assert "SecureField(setting.key, text: value, prompt: Text(row.placeholder))" in group
     assert ".keyboardType(ServerSettings.isAddress(setting.key) ? .URL : .default)" in group
     assert ".textInputAutocapitalization(.never)" in group and ".autocorrectionDisabled()" in group

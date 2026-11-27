@@ -19,6 +19,14 @@ import SwiftUI
 /// iArtists' tall row (the cover at 44, the name, the line under it in the second colour, its hairline), the switches
 /// the purple ones, Remove All Downloads the red button. Every row, choice and swipe is as it was: the Storage limit and
 /// Download over among them.
+///
+/// (The panel review's R19 - notes/ios.md "The panel review, R19: Get, and old type left in redrawn pages
+/// (2026-11-27)") The old type left in it moved to the phone's own sizes, each the very size it was (the headline
+/// its 17 semibold; an error's detail the small words, where it was the system's monospace - the readout face stays
+/// out of this page, as 25 Nov's review had it; the rows' titles keep Typeface.body, LibraryListRow's), the covers at
+/// the look's corners, the swipe's red the look's - and on the Mac, which borrows this page, the Storage limit and
+/// Download over the look's pop-up (DWPopUp, as the Mac's own Settings draws the same two), the phone keeping iOS's
+/// menu as Settings' other pages do. Every word, choice and swipe is as it was.
 struct DownloadsScreen: View {
     @Environment(DownloadModel.self) private var downloads
     @Environment(PlayerModel.self) private var player
@@ -310,7 +318,7 @@ private struct StorageSection: View {
                         .fixedSize(horizontal: false, vertical: true)
                 } else {
                     Text(DownloadWords.nothingYetHeadline)
-                        .font(Typeface.headline)
+                        .font(Typeface.Phone.text(.topName).weight(.semibold))
                 }
                 DownloadBar(fraction: over ? 1 : fraction(bytes, limit: limit), amber: over)
                     .padding(.vertical, 2)
@@ -333,12 +341,18 @@ private struct StorageSection: View {
                                  over ? DownloadWords.overLimit(limit) : nil].compactMap { $0 }.joined(separator: ". "))
 
             SettingsChoiceRow(title: DownloadWords.storageLimit) {
-                Picker(DownloadWords.storageLimit, selection: $downloads.storageLimit) {
-                    ForEach(StorageLimit.allCases, id: \.self) { choice in
-                        Text(choice.label).tag(choice)
+                if Platform.mac {
+                    // (R19) the Mac's pop-up, its menu the very Picker
+                    DWPopUp(words: downloads.storageLimit.label) {
+                        storageLimitPicker
+                            .pickerStyle(.inline)
                     }
+                    .accessibilityLabel(DownloadWords.storageLimit)
+                    .accessibilityValue(downloads.storageLimit.label)
+                } else {
+                    storageLimitPicker
+                        .pickerStyle(.menu)
                 }
-                .pickerStyle(.menu)
             }
 
             if downloads.otherBytes > 0 {
@@ -373,6 +387,16 @@ private struct StorageSection: View {
             ListNote(words: DownloadWords.storageFooter)
         }
         .flatRows()
+    }
+
+    /// The Storage limit's choices, on either device's face.
+    private var storageLimitPicker: some View {
+        @Bindable var downloads = downloads
+        return Picker(DownloadWords.storageLimit, selection: $downloads.storageLimit) {
+            ForEach(StorageLimit.allCases, id: \.self) { choice in
+                Text(choice.label).tag(choice)
+            }
+        }
     }
 
     /// The bar's fill: what's here over the limit - with No limit, over what's here and the phone's free space.
@@ -704,16 +728,20 @@ private struct DownloadOverSection: View {
         let chosen = DownloadWords.over(downloads.downloadOver, device: Platform.device)
         Section {
             SettingsChoiceRow(title: DownloadWords.downloadOver) {
-                Picker(DownloadWords.downloadOver, selection: Binding<DownloadOver>(get: { downloads.downloadOver },
-                                                                                  set: { (choice: DownloadOver) -> Void in
-                                                                                      downloads.downloadOver = choice
-                                                                                  })) {
-                    ForEach(DownloadOver.allCases, id: \.self) { (choice: DownloadOver) in
-                        Text(DownloadWords.over(choice, device: Platform.device).name).tag(choice)
+                if Platform.mac {
+                    // (R19) the Mac's pop-up, its menu the very Picker
+                    DWPopUp(words: chosen.name) {
+                        overPicker
+                            .pickerStyle(.inline)
                     }
+                    .accessibilityLabel(DownloadWords.downloadOver)
+                    .accessibilityValue(chosen.name)
+                    .accessibilityHint(chosen.note)
+                } else {
+                    overPicker
+                        .pickerStyle(.menu)
+                        .accessibilityHint(chosen.note)
                 }
-                .pickerStyle(.menu)
-                .accessibilityHint(chosen.note)
             }
             .padding(.top, CGFloat(PhoneLook.groupAbove))
             // (R9) the group's note, flat: its own row under the choice, as Settings' other pages draw theirs
@@ -731,6 +759,18 @@ private struct DownloadOverSection: View {
             .padding(.top, SettingsLook.noteAbove)
         }
         .flatRows()
+    }
+
+    /// Download over's two choices, on either device's face.
+    private var overPicker: some View {
+        Picker(DownloadWords.downloadOver, selection: Binding<DownloadOver>(get: { downloads.downloadOver },
+                                                                          set: { (choice: DownloadOver) -> Void in
+                                                                              downloads.downloadOver = choice
+                                                                          })) {
+            ForEach(DownloadOver.allCases, id: \.self) { (choice: DownloadOver) in
+                Text(DownloadWords.over(choice, device: Platform.device).name).tag(choice)
+            }
+        }
     }
 }
 
@@ -842,7 +882,7 @@ private struct FailedRow: View {
             if server.access.seesDetail, let detail = row.reason.detail, !detail.isEmpty {
                 DisclosureGroup(ErrorWords.forWhoever) {
                     Text(detail)
-                        .font(Typeface.mono(.footnote))
+                        .font(Typeface.Phone.text(.small))
                         .foregroundStyle(DWPalette.t2)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1020,7 +1060,7 @@ private struct AlbumLine<Lines: View, Trailing: View>: View {
                 HStack(alignment: .center, spacing: 0) {
                     CoverImage(id: album?.coverArt, size: LibraryLook.rowCover)
                         .frame(width: LibraryLook.rowCover, height: LibraryLook.rowCover)
-                        .clipShape(Corners.artShape)
+                        .clipShape(DWCorners.chipShape)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(album?.name ?? "")
                             .font(Typeface.body)
@@ -1102,7 +1142,7 @@ private struct Removable: ViewModifier {
                 EmptyView()
             } else if asks {
                 Button(DownloadWords.remove, systemImage: "trash") { ask() }
-                    .tint(Palette.danger) // the destructive swipe's own red
+                    .tint(DWPalette.redChipText) // the destructive swipe's own red
             } else {
                 Button(DownloadWords.remove, systemImage: "trash", role: .destructive) {
                     remove()

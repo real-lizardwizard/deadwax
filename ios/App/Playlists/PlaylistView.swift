@@ -443,7 +443,10 @@ struct PlaylistView<Desk: View>: View {
     // MARK: Edit
 
     /// Edit's form: why Done was refused (at its top, where Done scrolls to), the name, the description, sharing and its
-    /// note, the songs not listed just now and what Done does to them; the songs; Delete playlist, last.
+    /// note, the songs not listed just now and what Done does to them; the songs; Delete playlist, last. (The panel
+    /// review's R19) In the look's type and colours on both devices (the Mac draws Edit here too): the notes and the
+    /// songs' heading the small size, the name's warning the red words, the rows' titles white and their artists the
+    /// second colour, the (-) a glyph of its own with the red button's face behind its minus.
     @ViewBuilder private func editSections() -> some View {
         if let edit = model.edit {
             Section {
@@ -466,8 +469,8 @@ struct PlaylistView<Desk: View>: View {
                     .modifier(DWWellField(focus: $typing, field: .name))
                 if model.needsName {
                     Text(PlaylistWords.needsAName)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(.red)
+                        .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.redChipText)
                 }
                 TextField(PlaylistWords.descriptionField, text: commentBinding, axis: .vertical)
                     .lineLimit(2...6)
@@ -482,8 +485,8 @@ struct PlaylistView<Desk: View>: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle(PlaylistWords.sharedWithEveryone, isOn: publicBinding)
                     Text(PlaylistWords.sharedNote)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityHidden(true)
                 }
@@ -511,7 +514,8 @@ struct PlaylistView<Desk: View>: View {
                         .textCase(nil)
                         .accessibilityAddTraits(.isHeader)
                 }
-                .font(Typeface.footnote)
+                .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                .foregroundStyle(DWPalette.t2)
             }
 
             Section {
@@ -547,21 +551,22 @@ struct PlaylistView<Desk: View>: View {
             } label: {
                 Image(systemName: "minus.circle.fill")
                     .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .red)
+                    .foregroundStyle(DWPalette.redText, DWPalette.redFace)
                     .font(Typeface.symbol(.title3))
                     .frame(minWidth: 44, minHeight: 44)
                     .contentShape(Rectangle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .disabled(model.busy)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
-                    .foregroundStyle(.primary)
+                    .font(Platform.mac ? Typeface.Look.text(.field) : Typeface.body)
+                    .foregroundStyle(DWPalette.text)
                 if !row.artist.isEmpty {
                     Text(row.artist)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(Platform.mac ? Typeface.Look.text(.smallButton) : Typeface.Phone.text(.small))
+                        .foregroundStyle(DWPalette.t2)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -948,14 +953,15 @@ private struct PlaylistSongRow: View {
     }
 }
 
-/// A page's quiet line: a state in words, not a failure.
+/// A page's quiet line: a state in words, not a failure. (R19) The phone's 16 (`.go`, callout's very size and style),
+/// the Mac's words; the second colour.
 private struct QuietLine: View {
     let text: String
 
     var body: some View {
         Text(text)
-            .font(Typeface.callout)
-            .foregroundStyle(Palette.quiet)
+            .font(Platform.mac ? Typeface.Look.text(.field) : Typeface.Phone.text(.row))
+            .foregroundStyle(DWPalette.t2)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity)

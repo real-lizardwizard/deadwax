@@ -1938,7 +1938,7 @@ def test_the_sources_sheet_runs_the_very_search_again_offline_and_lets_it_go_as_
     # (finding 4) let go as the sheet starts going - a swipe let go, Cancel, the page's binding - and nothing from it
     # after: no answer lands, no pick, no download
     # (R7) the Mac's dock holds the page while its Get is open, the tab switched away from and back: there the Get's end
-    # lets it go (closeDock, AppNavigation.endSources), never the page's going
+    # lets it go (AppNavigation.endSources - since R19 the panel put away, MacSourcesTab), never the page's going
     assert ".background(SheetGoing { model.close() })" in sheet and ".onDisappear { if !docked { model.close() } }" in sheet
     assert "model.close()\n                        dismiss()" in sheet
     view = _code((app / "Search" / "GroupView.swift").read_text(encoding="utf-8"))
@@ -1955,7 +1955,8 @@ def test_search_again_sits_in_the_bar_as_well_as_under_the_cards():
     app = CORE.parent.parent.parent / "App"
     sheet = _code((app / "Get" / "SourcesSheet.swift").read_text(encoding="utf-8"))
     toolbar = _block(sheet, sheet.index("{", sheet.index(".toolbar {")))
-    assert "if foundFolders {" in toolbar and "ToolbarItem(placement: .topBarTrailing) {" in toolbar
+    # (the panel review's R19) wherever there is a bar: in the Mac's dock, the dock's header's (tests/test_ios_get_look.py)
+    assert "if foundFolders && !docked {" in toolbar and "ToolbarItem(placement: .topBarTrailing) {" in toolbar
     assert toolbar.index("placement: .cancellationAction") < toolbar.index("againInBar")
     # offered only while folders found are shown: not searching, no error, no store box, something found
     found_folders = _block(sheet, sheet.index("{", sheet.index("private var foundFolders: Bool")))

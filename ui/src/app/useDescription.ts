@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 
 import { getDescription } from '../api/describe'
 import {
-  describeKey, descriptionOf, inBlock, keepDescription, keptDescription, pageKeyOf, placeOf, rememberPageKey,
-  type DescribeIds, type DescribeKind, type DescribePlace, type Description,
+  NOTHING_TO_ASK, describeKey, descriptionOf, holdsRoom, inBlock, keepDescription, keptDescription, pageKeyOf, rememberPageKey,
+  type DescribeIds, type DescribeKind, type Description,
 } from '../lib/describe'
 import { latestOnly } from '../lib/latest'
 
@@ -48,20 +48,22 @@ export function askDescription(key: string): Promise<Description | null> {
  * description.
  *
  * Answers `description` (null while there is none), `settled` (deadwax has answered - or failed - for what was
- * asked, or there was nothing to ask: what a page holds its rows back for) and `at`, where the page's block goes -
- * lib/describe.ts placeOf, judged once by whether `belowDrawn` (what lies under the top place is on screen) when the
- * block (lib/describe.ts inBlock) first has something, and kept for the page - `page`, the page's own id: a page drawn
- * again for another artist or album places its description afresh.
+ * asked, or there was nothing to ask) and (2.1.52) `holding`: whether the page holds the block's room meanwhile -
+ * lib/describe.ts holdsRoom - so the words land where they will stay and nothing under them moves. From the first
+ * frame, before anything can be asked; never where an answer is kept (the words, or a kept none, are drawn at
+ * once); and not again once this page has been answered "none". `page` is the page's own id: a page drawn again
+ * for another artist or album starts afresh. A page settled with nothing to ask by is remembered so
+ * (NOTHING_TO_ASK), and holds no room when it is come back to.
  *
  * WHILE THE QUESTION CHANGES - the ids going unsettled a moment (the artist page's library asked again, About's Try
  * again), or a new question (Navidrome's artist found later, an Edit that gave the album another release group) - the
  * description drawn for this page stays drawn until the new question's answer replaces it: it never goes and comes
  * back, moving what is under it twice.
  */
-export function useDescription(kind: DescribeKind, ids: DescribeIds | null, belowDrawn: boolean, page: string): {
+export function useDescription(kind: DescribeKind, ids: DescribeIds | null, page: string): {
   description: Description | null
   settled: boolean
-  at: DescribePlace | null
+  holding: boolean
 } {
   const key = ids ? describeKey(kind, ids) : null
   const [answer, setAnswer] = useState<{ key: string; found: Description | null } | null>(null)
@@ -82,8 +84,9 @@ export function useDescription(kind: DescribeKind, ids: DescribeIds | null, belo
   //? with the ids still being settled, the question this page asked last time - its answer, when kept, drawn now
   const pageKey = `${kind}:${page}`
   if (key) rememberPageKey(pageKey, key)
+  else if (ids !== null) rememberPageKey(pageKey, NOTHING_TO_ASK)
   const asked = key ?? (ids === null ? pageKeyOf(pageKey) : null)
-  const fromKept = asked ? keptDescription(asked) : undefined
+  const fromKept = asked === null ? undefined : asked === NOTHING_TO_ASK ? null : keptDescription(asked)
   const mine = answer && answer.key === key ? answer : null
   const answered = fromKept !== undefined || mine !== null
   const settled = answered || (ids !== null && key === null)
@@ -95,11 +98,11 @@ export function useDescription(kind: DescribeKind, ids: DescribeIds | null, belo
   else if (settled) shown.current.description = null
   const description = shown.current.description
 
-  const place = useRef<{ page: string; at: DescribePlace | null }>({ page, at: null })
-  place.current = {
-    page,
-    at: placeOf(place.current.page === page ? place.current.at : null, inBlock(kind, description) !== null, belowDrawn),
-  }
+  //? answered "none" while this page has been up: its room closed once, and stays closed
+  const closed = useRef<{ page: string; yes: boolean }>({ page, yes: false })
+  if (closed.current.page !== page) closed.current = { page, yes: false }
+  const block = inBlock(kind, description)
+  if (settled && block === null) closed.current.yes = true
 
-  return { description, settled, at: inBlock(kind, description) ? place.current.at : null }
+  return { description, settled, holding: holdsRoom(settled, block, closed.current.yes) }
 }

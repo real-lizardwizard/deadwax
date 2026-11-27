@@ -64,8 +64,14 @@ import Testing
         #expect(PhoneLook.metaTrail == PhoneLook.metaLead, "iLibrary's line is 16 in at either side")
         // a glyph's target reaches 4 past its box sideways, into the 12 between it and the switch - never to it
         #expect((phone.target - PhoneLook.circle) / 2 < PhoneLook.rowGap)
-        // the line's glyphs fit the line, their targets reaching above and below it as every target does
-        #expect(PhoneLook.metaGlyph < PhoneLook.meta && PhoneLook.sidesRule < PhoneLook.meta)
+        // (27 Nov) the line's choices fit the line, their targets reaching above and below it as every target does; a
+        // glyph's box and a chosen one's line inside a choice's height
+        #expect(PhoneLook.opt < PhoneLook.meta && PhoneLook.optGlyph < PhoneLook.opt)
+        #expect(DWFlat.chosenLine < PhoneLook.opt && phone.target > PhoneLook.opt)
+        // (27 Nov's review) a glyph's ink inside its box as drawn - so the box is what the line holds - until the
+        // line's cap: at the footnote's 17 of 13 (xxLarge) it still fits, at its 19 (xxxLarge) the box grows to it
+        #expect(PhoneLook.optInk < PhoneLook.optGlyph)
+        #expect(PhoneLook.optInk * 17 / 13 <= PhoneLook.optGlyph && PhoneLook.optInk * 19 / 13 > PhoneLook.optGlyph)
         // the mini player's cover is its height less its top edge; Play's target fits it
         #expect(PhoneLook.miniCover == PhoneLook.mini - 1 && PhoneLook.miniPlay < PhoneLook.mini)
         // a tab item sits in the bar under its room, and the lit line stands on the bar's top edge, over its hairline
@@ -134,6 +140,52 @@ import Testing
         #expect(MetaLine.wordsRoom(343, end: 131, folded: true) == 343)
         #expect(MetaLine.wordsRoom(343, end: 0, folded: false) == 343)
         #expect(MetaLine.wordsRoom(100, end: 131, folded: false) == 0)
+    }
+
+    /// (27 Nov - the Library's line underlines what is chosen) The line's end as LibraryLineEnd draws it now: each
+    /// choice its words or glyph and 3 either side (`.opt`), the two of a pair 6 apart with no hairline between, and the
+    /// pairs the line's 6 and the pair's 14 apart - iLibrary's numbers.
+    @Test func aQuietLinesEndIsItsChoicesAtTheirSpacing() {
+        #expect([PhoneLook.opt, PhoneLook.optPadding, PhoneLook.optGlyph] == [28, 3, 17])
+        #expect([PhoneLook.pairGap, PhoneLook.pairAfter, PhoneLook.metaGap] == [6, 14, 6])
+        // Grid and List as drawn, each 17 in its 23: 23 + 6 + 23
+        #expect(MetaLine.end([[17, 17]]) == 52)
+        // Yours | All alone (Artists', Playlists', Songs'): "Yours" 30 and "All" 15 - 36 + 6 + 21, where R2b's hairline
+        // and its 10 either side made it 66
+        #expect(MetaLine.end([[30, 15]]) == 63)
+        // both, on Albums: 52, then 6 + 14, then 63
+        #expect(MetaLine.end([[17, 17], [30, 15]]) == 135)
+        // nothing at the end: no pair drawn, no room between them
+        #expect(MetaLine.end([]) == 0 && MetaLine.end([[], []]) == 0)
+        #expect(MetaLine.end([[], [30, 15]]) == 63, "Grid and List on Albums alone: Yours | All with no room before it")
+        #expect(MetaLine.end([[17, 17], []]) == 52, "Grid and List with no Yours | All after them: no 14")
+        // a pair's choices each hold their room - a wider word widens the end by itself alone
+        #expect(MetaLine.end([[17, 17], [31.5, 15]]) - MetaLine.end([[17, 17], [30, 15]]) == 1.5)
+    }
+
+    /// (27 Nov) And the line gives way at its new end exactly as before (R2b's review): the first of its ways whose
+    /// width fits - one line, the count's noun dropped, then its end folded - the end now its choices at their spacing.
+    @Test func aQuietLineFoldsAtItsNewEnd() {
+        let albums = MetaLine.end([[17, 17], [30, 15]])
+        let sides = MetaLine.end([[30, 15]])
+        // on a 375 pt phone's 343: words 196 wide and Albums' end of 135 are 196 + 12 + 135 = 343, one line
+        #expect(MetaLine.width(words: 196, end: albums, folded: false) == 343)
+        #expect(MetaLine.fit(full: 196, short: 150, end: albums, room: 343) == .full)
+        #expect(MetaLine.fit(full: 196.5, short: 150, end: albums, room: 343) == .short, "the noun dropped first")
+        #expect(MetaLine.fit(full: 300, short: 196.5, end: albums, room: 343) == .folded, "then folded, in full")
+        #expect(MetaLine.fit(full: 350, short: 343, end: albums, room: 343) == .foldedShort)
+        // R2b's end for the same words (Grid and List 28 square, 2 apart, 10 and 6 before Yours, a hairline 10 either
+        // side) was 58 + 16 + 66 = 140: a line 196 wide went short there, and is whole now
+        #expect(MetaLine.fit(full: 196, short: 150, end: 140, room: 343) == .short)
+        // Yours | All alone leaves the words 343 - 12 - 63 = 268
+        #expect(MetaLine.wordsRoom(343, end: sides, folded: false) == 268)
+        #expect(MetaLine.fit(full: 268, short: 200, end: sides, room: 343) == .full)
+        #expect(MetaLine.fit(full: 268.5, short: 200, end: sides, room: 343) == .short)
+        // folded, the end alone on its line: as wide as it, at the trailing edge, 32 under the words' line
+        let folded = MetaLine.place(words: LookSize(width: 300, height: 18), end: LookSize(width: albums, height: 28),
+                                    room: 343, folded: true)
+        #expect(folded.end == LookBox(x: 343 - albums, y: 32 + 2, width: albums, height: 28))
+        #expect(MetaLine.width(words: 300, end: albums, folded: true) == 300)
     }
 
     /// (R2b, its review) The line's two ends where they are drawn: on one line, the words leading and the end trailing,

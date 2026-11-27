@@ -748,6 +748,9 @@ its row by key; one called `rowLine` through `map`, which passed the index as `p
 
 ### Descriptions on the artist and album pages (2.0.13)
 
+**Where it sits changed in 2.1.52** - always the top place, its room held; the top-or-foot rule told below
+(`placeOf`, the rows' waits) is history. See "Always at the top (2.1.52)" at the end of this section.
+
 James (2026-10-24): "I want to have the little descriptions for the artists and albums displayed on their
 respective pages" - Apple Music's blurbs, in the release with 2.0.10's icons. The artist page, the album page
 and the album you don't have each show a short description, three lines with More / Less, its source under it,
@@ -928,6 +931,82 @@ the source), Deezer's words in it, VoiceOver on an iPhone (the disclosure), Safa
 ResizeObserver path on a real phone, a right-to-left description, the artist hero under a real iPhone's status
 bar (safe-area-inset-top) with a two-line name, the subtitle and the facts (measured with the inset set by hand
 only, after the second review).
+
+#### Always at the top (2.1.52)
+
+James (2026-11-27): "I've also noticed sometimes the description is at the top and sometimes at the bottom.
+Let's make it consistently at the top." The rule above - `placeOf`, the top when in hand as what lies under it
+was drawn and the foot when later, the rows waiting `DESCRIPTION_WAIT_MS` for it - is REPLACED. It kept its
+promise (nothing moved under a finger) by giving the description two places, and a description that is
+sometimes under Play and sometimes under everything reads as a page that can't make up its mind. The same
+rule is being given to the iPhone and Mac apps.
+
+**The new rule: one place, its room held.**
+- **Always the top place** on each of the three pages (the artist's body after Play and before Albums; an
+  album page's under the hero and the Add / Remove line, above the songs; the album you don't have's under
+  the hero, above the pressings' trouble and the tracklist). The foot, `placeOf`, `DescribePlace`,
+  `DESCRIPTION_WAIT_MS`, the hook's `belowDrawn` argument and `at` answer, the pages' `songsDrawn` /
+  `tracksDrawn` / `cameBack` waits and `--app-about-foot-top` are gone.
+- **Nothing waits for it.** The album's songs and the pressings' tracklist are drawn as soon as they are in
+  hand, the artist's albums with their own answers (`ROWS_WAIT_MS` still theirs). A Try again notice no
+  longer changes anything: the room is there before it.
+- **The room** (`lib/describe.ts` `holdsRoom`, the hook's `holding`): while an answer is still to come and
+  the block has nothing to draw, the page holds the block's room - from the first frame, before anything can
+  be asked (the ids still settling). Its height is CSS, made of the block's own parts term for term
+  (`.app-about-room`): the clamp's three lines, the gap, and the 44px line More and the source sit on; an
+  album's with its subtitle's line and gap over them. **The brief said "the subtitle line and the lines the
+  block clamps to"; the More / source line is counted too**, because nearly every description has it
+  (Wikipedia's always has its credit) and without it the commonest landing would grow by 44px.
+- **A kept answer holds no room**: the words are drawn at once (no fade), and a kept "none" is simply
+  nothing - the page's last question is remembered (`rememberPageKey`), and now also that it had nothing to
+  ask by (`NOTHING_TO_ASK`), so both are settled on the first frame. An unsure none (kept a minute) holds the
+  room again after its minute, as nothing is kept then.
+- **Landing**: words that weren't there as the block was first drawn fade in (`is-arriving`,
+  `--app-about-settle`, the slow duration token; `animation: none` under reduced motion).
+- **None closes the room once, gently**: the block's height is eased to nothing and the block then leaves
+  the page. And once a page has been answered none while it is up, its room stays closed while the question
+  changes under it (`closed` in the hook) - words that come after all open it for themselves, eased from
+  nothing.
+- **A block that isn't the room's height is eased to its own**, the same way: shorter words (one line, no
+  link), or taller (an album's subtitle run onto a second line on a phone - it still wraps, as it did).
+  `Description.tsx` measures both heights (`getBoundingClientRect`, to the part of a pixel) and sets them as
+  the only inline style it ever writes; the duration, the curve and what else closes are app.css's
+  (`[data-easing]`, `[data-moving]`, `[data-gone]`). Only a change after the first drawing is eased.
+- **What else closes with it** (`[data-gone]`): an album page's padding over the block, and the artist
+  body's gap under it (a negative margin of `--app-artist-gap`), so the closed block leaving the page
+  afterwards moves nothing. A block closed to nothing is LEFT closed (its marks kept) until it has left:
+  cleared first, the page's own room would be back for a frame.
+- **A block drawn out of sight is never eased from a height it never had**: a page under a hidden tab's pane
+  measures as nothing, so a change from a drawn block that measured nothing is set at once.
+- **Its parts are never squeezed while it eases** (`[data-easing] > * { flex-shrink: 0 }`): found in the
+  browser - a block opening from nothing squeezed its paragraph to no height, which measured as running past
+  its clamp, and the one-line description was given a More it then lost.
+
+**Verified.** The sims (describe.sim: `holdsRoom`, the hook's `holding` through every case it had for `at`,
+the block's three states, and the easing against an element that can be measured and marked - the first
+drawing never eased, equal heights not eased, the height's own transitionend or the clock ending it, the
+close left closed, a change mid-ease, More opened since; artist.sim and group.sim: one block, in its place,
+told to hold, the rows drawn without it, never the body's last thing). tests/test_app_css.py: the room's
+height term for term, the tokens, reduced motion, the marks. **In a browser** (Chromium, the real
+theme.css, player.css and app.css, the real `DescriptionBlock` compiled alone and drawn between a stand-in
+hero and a stand-in song list - NOT the whole app: there is no Navidrome on this machine):
+
+| at 390 wide | the block | what is under it |
+| --- | --- | --- |
+| an album's room, then three lines + More + From Wikipedia landing | 149.45px -> 149.45px | stayed at 212.56 |
+| an artist's room, then the same words | 111.25px -> 111.25px | stayed at 465.66 |
+| none: the room closed | 149.45 -> 0, eased, then gone | its last eased position is where it is without the block (63.12; the artist's 182.97) |
+| one line, no link | 149.45 -> 39.75, eased | followed it, no step |
+| a subtitle on two lines | 149.45 -> 167.64, eased | followed it |
+| words where there was nothing | 0 -> 39.75, eased, no More | started where it was |
+
+At 1440 wide (13px): 140.75 -> 140.73 and 102.55 -> 102.53 - two hundredths of a pixel, three lines of 13px
+text not being exactly three times its line-height; not eased (under half a pixel).
+
+**Not verified**: in the app itself, on any of the three real pages, on the iPhone, or under reduced motion
+(the tokens make the durations 1ms there and the rules say none; not looked at). The album page's Add /
+Remove line, over the block, already holds its own place while whose the album is is still to come
+(2.0.0-player.52), so the songs drawn sooner are not pushed by it either - read in the code, not watched.
 
 ### Recently played on Home (2.0.15)
 

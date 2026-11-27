@@ -20658,6 +20658,165 @@ Judged and left:
   Can't reach deadwax and the first ask's headings at the Mac's 13 semibold (SheetLook.title), a point over the 12
   under them - whether that reads as a heading.
 
+## The panel review, R19: Get, and old type left in redrawn pages (2026-11-27)
+
+The panel review's slice R19 (panel-review.md rows M8, M9, M19, M20, P6 and P10; checks 639-644), after R16. James chose
+to have Get's store line redrawn, though R7 had kept it as it was; the Mac's Sources still sat under a system bar, its
+Close the bar's; and pages already redrawn kept the old Palette and the system's text styles in corners no drawing
+showed. Nothing Get or Sources does changed: the same searches, filters, sorts, Get and gates
+(`server.access.can(.request)` untouched), and every word is as it was.
+
+- **The Mac's Sources, no bar** (Get/SourcesSheet, Mac/Search/MacSourcesTab): in the dock (`docked`, `kept != nil`)
+  the page hides the stack's bar (`.toolbar(docked ? .hidden : .automatic, for: .navigationBar)`) and draws
+  `dockHeader` in its place - R16's DockHeader with the subtitle at the left (`.s .q`, wrapping) and, while folders
+  found are shown (as the bar's was), **Search again** at the right as a `.btn.sm`, `.on` while its words are open
+  above the chips: the same `toggleAgain(.top)` the bar's sent, the bar's not drawn there. Close and the bar's Search
+  again are drawn only where there is a bar (`!docked`). The old `closeDock()` went with Close.
+- **Its Close is the dock's**: MacPanel's own Escape (DockEscapeKey, through MacFrame.escape - a field with the cursor
+  gets Escape first, `.field`), and the panel put away is the Get over, as Close was: MacSourcesTab's `.onDisappear`
+  calls `navigation.endSources()` when `navigation.macPanel == nil`, so a tab switched to (macPanel another tab) keeps
+  the Get, and a Get replaced (`.id`) or already over is nothing to end. Close's Escape stood aside while the words were
+  edited (`.escapeCloses(!model.edited)`, so Escape never threw edited words away); the tab now holds Escape for that
+  time alone, `.dockHoldsEscape(get.request.search.edited)`, and R16's whole-tab hold is gone from MacPanel's
+  `.sources` case - the one line of MacPanels.swift this slice changed at first. Sources has no View key; its close is
+  Escape or (after review, below) a click on its open folder tab; the View keys of the other tabs switch to theirs,
+  keeping the Get, as before.
+- **Sources' states in the look's type, both devices**: the state's line (searching, nothing found, nothing lossless,
+  none through the chips, refused - `stateText`) the card row's words (the phone's `.go` 16, the Mac's 13) in --text,
+  what goes with it (This takes a few seconds, why nothing lossless, Searched for, why it didn't pick) the small size in
+  --t2. The query field the look's well: DWWell (square on the phone, `.in`'s 4 on the Mac), the plain field in the
+  field's type and --fieldText, the focus ring off, 8 inside (`.in`'s padding-left), a tap anywhere on it focusing it -
+  R1c's typing walk reads it as WELL now (was OWN). Search again under the cards DWButtonStyle, across the page.
+- **Get's store line** (Get/StoreLineView): the Mac's Get.dc.html `.box` - DWPalette.card in DWCorners.boxShape (5),
+  its 1 pt --line edge, 12 inside (the Get panel's `.col` padding) - the title --head (green when held), 13 semibold,
+  the lines --t2 at the small size, the last --t3; the phone's flat on the black, the title the phone's 16 semibold.
+  Join and Add DWButtonStyle (was SecondaryPill through `face(_:)`), dimmed by DWPalette.off while busy - a
+  deliberate change, kept after review: the dimming MineBlock's, PlaylistPicker's and MacAlbumPage's busy buttons have,
+  where --app-job-busy's 0.75 was; the error DWPalette.redChipText.
+- **Manual search's Search** (Get/ManualSearchSheet): `DWButtonStyle(kind: .pri, size: .large, fills: true)` where
+  PrimaryFace was; the footer the phone's `.s`.
+- **The old type and Palette** - each moved to the very size it was where the phone has one (Typeface.Phone's:
+  headline's 17 semibold to `.topName` semibold, callout 16 to `.row`, footnote 13 to `.small`, caption 12 to `.extraSmall`; the
+  system's `mono(.footnote)` for an error's raw detail to the words' `.small`, the readout face being for numbers that
+  tick since 25 Nov's review - test_ios_palette's BACK_IN_WORDS keeps it out of Downloads), the Mac's through Typeface.Look's roles (field 13, smallButton 12,
+  chip 11.5). Typeface.body stays: Libre Franklin's 17 scaled with body is the phone's row title (LibraryListRow's,
+  R2's; test_ios_settings_look pins Downloads' rows to it), and a row R19 gave a font where it inherited one takes it
+  on the phone, the very size and style it had. Palette.quiet to --t2, `.tertiary` to --t3, held/amber/danger to greenText/amberText/redChipText,
+  Corners.artShape to DWCorners.chipShape, Divider to DWRule:
+  - **MBArtistView**: the bar's name, the about line, Albums' heading (ArtistSectionHead's semibold --head), the
+    loading line, the rows (title, tick, line, chevron, the cover's corners, the hairline); the picture's shadow gone
+    (the artist page's hero has none); Studio only still a Toggle, drawn `DWButtonStyle(kind: on ? .on : .normal,
+    size: .small)`; Try again DWButtonStyle.
+  - **DownloadsScreen**: the headline, the error's detail, the covers' corners, the swipe's red; on the
+    Mac (Settings > Downloading and downloaded…) **Storage limit** and **Download over** are DWPopUp, their menus the
+    very Pickers (`storageLimitPicker`, `overPicker` - each the Picker it was, word for word, declared once and drawn
+    `.inline` in the pop-up, `.menu` on
+    the phone as Settings' other pages keep iOS's menu) - MacSettingsRoot draws the same two the same way.
+  - **AlbumHero**'s DownloadLine: `.xs` semibold, --t2, amber's words for didn't.
+  - **PlaylistView**'s Edit (editSections, editRow) and QuietLine: the notes and the songs' heading small --t2, Needs a
+    name redChipText, the rows' titles --text and artists --t2, the (-) the red button's face and words
+    (`DWPalette.redText, DWPalette.redFace`, `.plain` where `.borderless` was).
+  - **PressingPickerSheet**'s rows: the facts and note the small size (SheetLook.small's two, spelled out for
+    test_ios_search_look's phone fonts), In your library `.xs` / chip semibold green.
+  - **ErrorNote**: the line the card row's words, the detail and the disclosure the small words, the detail --t2. Its
+    colour otherwise the caller's, as before.
+  - **ServerSettingsGroupScreen**'s choice setting on the Mac: DWPopUp with the chosen value's words
+    (`Self.chosen(choices, value: row.value)`, the phone row's own), its menu the very Picker - `selection: value`, the
+    choices tagged `choice.value` - drawn `.inline`, so a choice sends exactly what the system pop-up sent. The phone's
+    menu is R14's, untouched.
+  - **DesktopFrame**: the drawer's shadow black at 0.2, as it always was (Palette.well's value), named in the frame -
+    `private static let drawerDrop` (after review: R19 had it DWPalette.buttonDrop, a button's 1-px drop at 0.45, more
+    than twice as dark) - and the panel's hairline DWPalette.frame (--frame, the very #22202b).
+  - **RootView**: the sign-in's ground the page's (`Platform.mac ? DWPalette.bg : DWPalette.page`), not
+    `Color(.systemBackground)`.
+- **Row Size into Add to a playlist** (R18's left item): DesktopFrame reads the store once (`private var rowSize`) and
+  hands it to the frame's lists as before and, as plain numbers, into the sheet it puts up over itself -
+  `.environment(\.sheetRowSize, SheetRowSize(height:cover:))` on PlaylistPicker. SheetRowSize and the `sheetRowSize`
+  entry are declared in DesktopFrame (a frame file, so not a Mac name test_ios_mac_reach keeps out of shared files),
+  nil by default; PickerRow's Mac half reads it (`rowSize?.cover ?? SheetLook.macCover`, `.frame(minHeight:
+  rowSize?.height ?? SheetLook.rowHeight)` before `.sheetRow()`), the phone's never does. test_ios_mac_rows' rules hold:
+  only the frame hands `macRowSize` down, MacRowSizeStore.shared read once there.
+
+Kept where the phone has no size of its own (Typeface.Phone has none at 20, 22 or 28): AlbumHero's title (22 bold, 20
+over 60 letters) and artist (20), MBArtistView's name (28 bold, the artist page's hero's), the Storage bar's amount
+(22), and **PeopleScreen.swift:370**'s person's name (iPerson's 20/700) - left untouched rather than moved to a size
+it isn't. A Phone size at 20/22/28 in Shared/Typeface.swift would let them go; for the coordinator. Not built from
+Get.dc.html (as R7): Pin, Show all 14, the per-card signal chips.
+
+Words keys: none changed (iphone.json, mac.json untouched).
+
+**Tests**: tests/test_ios_get_look.py (new, 11): the Mac's Sources with no bar and one Search again in the dock's
+header (one Button, one `toggleAgain`); the dock's Close (Escape held only while the words are edited, the panel put
+away ends the Get, R16's whole-tab hold gone, MacDock.escape answering a field first); the states and the query field
+in the look's type and well; the store line's box on the Mac (DWCorners.box's 5) and nothing under it on the phone, the
+old faces gone from every file R19 redrew; Manual search's primary; no old Palette or system type where R19 drew (the
+20/22/28 kept, counted, and Typeface.body allowed); each moved to its very size; the choice setting's pop-up round the
+very Picker, compared with the phone's; Downloads' two pop-ups and their Pickers, each declared once; the frame's tokens
+and Row Size handed into the picker, by the frame alone; every word as it was (each file's set of word expressions -
+the first argument of each Text, Button, Toggle, Picker, Label, pop-up, accessibility label, value and hint - counted
+and sampled: read against b51a90a5 none went, and the only ones new are the dock header's subtitle and Search again
+and the pop-ups' labels, each a copy of words the page already drew). Changed on purpose: test_ios_dock_look (Sources'
+hold), test_ios_search_look (FLAT[SHEET] the well, the olds empty, the query's well, the dock's Close),
+test_ios_mac (Sources' Escape guard, the drawer's shadow), test_ios_mac_rows (`rowSize`), test_ios_manage_look and
+test_ios_server_settings (the Mac's pop-up), test_ios_palette (the store line's colours, RootView's ground, a header's
+face through a ternary of Typeface's), test_ios_phone_look (Sources' query WELL, the manual search's asserts,
+R19_PAGES in SLICES), test_ios_sheets_look (the picker's Mac row), test_ios_contract and test_ios_manual_search (Close
+and the bar's Search again only where there is a bar).
+
+Mutations, each applied alone and restored: Search again sent twice from DockHeader (caught by
+test_the_macs_sources_has_no_bar_and_one_search_again_in_the_dock_header); the store line's box radius off its token
+(test_ios_get_look's box test, test_ios_palette's corners and Sources colours, test_ios_search_look's values); a raw
+Palette back in AlbumHero (two of test_ios_get_look's); a choice setting tagging its old value
+(test_a_choice_setting_sends_exactly_what_the_system_picker_sent); a ground under the phone's store line (the box test,
+test_the_phone_is_flat_in_search_get_and_sources); Sources' query on `.roundedBorder` (test_ios_phone_look's typing
+walk, test_ios_get_look's field); the panel put away keeping the Get (the dock's Close test,
+test_the_tab_goes_when_its_get_page_is_left); Row Size not handed in (the frame's test).
+
+Palette.frameBorder and Palette.well have no reader left (DeadwaxApp.swift keeps them; not this slice's to tidy);
+Palette.busy went after review, below.
+
+### After review
+
+The review asked for nothing to be fixed and found the behaviour right; one more commit tidied five things:
+
+- **The drawer's shadow back at 0.2** (DesktopFrame): `private static let drawerDrop = Color.black.opacity(0.2)`,
+  named in the frame rather than a DWPalette line (another slice edits DWPalette.swift) - the look's tests take a
+  frame's own named constant, and check 643 ("look as before") is true again.
+- **A busy Join or Add stays DWPalette.off** (above, a deliberate change); nothing read `Palette.busy` any more, so it
+  went from DeadwaxApp.swift with test_ios_palette's two lines pinning it (`--app-job-busy` 0.75 and the `static let`).
+- **A click on the open folder tab closes the dock** (James's decision 1, 26 Nov, panel-review.md:72: "It closes with
+  Escape, the tab's View key, or a click on the open tab" - check 617 already said so, and MacPanel's binding called
+  `showPanel`, `shown`'s rule, which leaves the open tab open). Core's `MacDock.clicked(shown, asked, getOpen:,
+  sourcesEdited:)` is toggled's rule - the open tab nil, another switched to, Sources' Get gate kept - but Sources' open
+  tab while its words are edited answers `shown`, as Escape does nothing then: edited words are never lost to a click.
+  MacPanel's folder tabs' binding calls its `clicked(_:)`, which reads the Get's own `edited`
+  (`navigation.macSources?.request.search.edited`, the very one MacSourcesTab holds Escape by) and calls showPanel or
+  closePanel by MacDock's answer (AppNavigation's macPanel is private(set), and App/Shared/Routes.swift is not touched).
+  The panel put away by a click ends the Get through MacSourcesTab's `.onDisappear`, as Escape's does. `shown` stays
+  for the bar's ••• Info and EQ and Settings' Open the EQ. MacDock's header comment, `shown`'s doc and MacDockTests
+  (`aFolderTabClickedClosesTheOpenTabAndSwitchesFromAnother`: every shown, asked and gate against toggled, and the
+  hold) say so; docs/ios.md's side panel paragraph, Choose a source and check 639 too.
+- **Check 639 says only what the code guarantees**: with the cursor in the words Escape is the field's (MacFrame.escape
+  answers `.field`) and the panel stays - not that "the field lets go first", which is the system's to do or not.
+- **Sources' dock header is not drawn while it would hold nothing** (no subtitle, no folders found yet): `if
+  !request.subtitle.isEmpty || foundFolders { dockHeader }`. MacPanels' "until R19" comments (MacPanel's doc, the
+  `.sources` case, `dockHoldsEscape`'s doc) brought up to date. PeopleScreen's 20 bold name left, as asked.
+
+Tests: test_ios_get_look gains the click's test (MacPanel's binding and `clicked(_:)`, no `showPanel(chosen)` or
+`MacDock.shown(` in MacPanel, MacDock.clicked's text, the Get's own `edited`); its docstring now says only what is true
+(Sources has no View key); its header and shadow asserts follow the code, as test_ios_mac's shadow assert does.
+Mutations, each applied alone and restored: the folder tab's click back to `navigation.showPanel(chosen)` (caught by
+test_a_click_on_the_open_folder_tab_closes_the_dock_and_never_loses_edited_words and
+test_the_panels_are_one_at_a_time_and_never_modal); MacDock.clicked without the edited hold (MacDockTests'
+aFolderTabClickedClosesTheOpenTabAndSwitchesFromAnother); the drawer's shadow back to buttonDrop (test_ios_get_look's
+and test_ios_mac's frame tests); the dock header drawn while empty
+(test_the_macs_sources_has_no_bar_and_one_search_again_in_the_dock_header); and the first commit's panel put away
+keeping the Get, again (both its tests).
+
+**Not verified**: anything on a device (checks 639-644) - the dock's header against the folder tabs, Escape's three
+cases with the cursor and edited words, a click on the open Sources tab with words edited and not, the store line's box
+beside the cards, the pop-ups' menus, the drawer's shadow, the picker's rows at Medium and Large.
+
 ## The panel review, R20: the known holdouts (2026-11-26)
 
 James asked for "a full review of the design on every pannel", and decided that the pages with no drawing are drawn from
@@ -23838,6 +23997,209 @@ which compares both Mac About views whole; `..._more_opens_the_whole_words_besid
   album page's row doing nothing (borderless); VoiceOver reading the words as one element with its More / Less and link
   actions, and the headings rotor stopping on About (its heading a header now).
 - Offline: a page opened before drawing its kept About, one not opened since the app started drawing none (504).
+
+## The Library's line underlines what is chosen (27 Nov)
+
+James, on the phone: **"on iOS in library, it's not immediately clear which of 'yours' or 'all' is selected, and most
+others in that row. Ideas for improving that?"** The design session (App Design) showed him three ways
+(~/Desktop/Code/deadwax-plans/mac-redesign/iLibraryLine.dc.html, kept for the record) and he chose the first: **"Yeah I
+like the underline"**. The design is iphone-redesign.md's "Changed 27 Nov: the Library's line underlines what is
+chosen", dw.css's new block (`.meta .opt`, `.opt.on`, `.opt svg`, `.pair`, and `.said`, option C's - copied into
+ios/design/dw.css whole, at its end: the canvas has the credits block before it, which this copy doesn't yet), drawn on
+iLibrary, iArtists and iPlaylists. It supersedes R2b's "white is where you are and purple is what a tap goes to".
+
+What is his and what is the design session's: the underline is his choice of the three. The rest - grey until chosen,
+the switch's own line, "a purple line means chosen; purple words mean a link" as one rule for the phone, the hairline
+gone, the sizes - is the design session's, drawn and sent with the choice.
+
+Built on the ios branch at b51a90a5. The app is still 0.13 (13), `__version__` untouched, no project change, no engine
+file touched. Other slices ran beside it (the Library's top into iOS's navigation bar, the album, artist and
+release-group bars, Speed A's models): none of their files is touched here - LibraryView.swift, LibraryTop.swift, Core's
+TopClearance and DebugModel are as they were.
+
+### What was built
+
+**A choice** (`LineChoice`, LibraryLine.swift - `.meta .opt`): each of Grid, List, Yours and All. Until it is chosen, in
+the line's third colour (DWPalette.t3, `--t3`, the count's own grey); chosen, white (DWPalette.text) over the accent's
+2 pt line - and a word semibold too (`.opt.on`'s 600; a glyph's weight is the same either way, as the drawing's stroke
+is). 3 either side of its words or glyph (the line as wide as the two, as `.opt.on`'s inset shadow is), 28 tall at
+least, the line at its foot; 13 pt words (Typeface.Phone `.meta`, `.opt`'s font-size). A glyph is the same SF Symbol as
+before (`square.grid.2x2`, `list.bullet`, medium) in a box 17 at least (`.opt svg`), where it had a 28 pt square -
+since the review fitted to the drawing's ink (`resizable`, `scaledToFit`, a frame of PhoneLook.optInk's 12.75 scaled
+with the line's words), so the box is what the line holds; on the Mac its own 13 pt symbol, as before (see "After
+review").
+
+**The line under it is the switch's own** - `DWChosenLine` (DWSegmented.swift), the overlay R1c drew inline in
+DWSegmented's phone segment, now a ViewModifier of its own: the accent's DWFlat.chosenLine at the foot, hidden from
+VoiceOver. DWSegmented's phone segment and LibraryLineEnd's choices both take it, so there is one lit line, not a
+second drawn for the line. (PhoneStrip and Sources' strip still draw their own copy of it inline, as R1c and R7 left
+them: outside this change.) It is NOT phone-only, as the first pass had it: the Mac's offline Library draws the line
+(see "The Mac"), so DWChosenLine is in DWSegmented's pinned Mac half, re-pinned (see "After review").
+
+**Pairs** (`.meta .pair`): Grid and List one pair, Yours and All the other, the two of a pair 6 apart, each choice
+holding its half of that 6 inside its target (as PhoneStrip's words hold half their gap), so every point of a pair
+answers a tap and the pair is as wide as drawn. **No hairline between Yours and All**: DWPalette.metaRule, PhoneLook's
+sidesGap and sidesRule and the hairline's @ScaledMetric are gone. Grid and List's pair is 14 before Yours | All, on the
+line's own 6, only where Yours | All follows.
+
+**Purple words** are only the order with its caret (PhoneMetaLink, a Menu's label) and Playlists' New playlist… - as
+they were; nothing in the line's end names the accent now.
+
+**Nothing else in the line moved**: PhoneMeta, its four ways and its Layout are R2b's review's (a doc comment aside);
+the count and the order lead, Grid and List then Yours | All trail; the callers (AlbumsScreen, ArtistsScreen,
+PlaylistsScreen, SongsScreen) are unchanged.
+
+**The sizes, as tokens** (PhoneLook, Core): `opt` 28 (`.meta .opt height`), `optPadding` 3 (`.opt padding-left`),
+`optGlyph` 17 (`.opt svg width`), `optInk` 12.75 (drawn: the svgs' ink, after review), `pairGap` 6 (`.pair gap`),
+`pairAfter` 14 (drawn: iLibrary's first `.pair`'s inline `margin-right: 14px` - in PHONE_FROM_DRAWINGS beside `meta`,
+`metaTrail` and `optInk`). `meta` stays 32 and `metaGap` 6. They replace R2b's metaGlyph 28, metaGlyphGap 2,
+metaGlyphsAfter 10, sidesGap 10 and sidesRule 12.
+
+**VoiceOver**: as before - Grid and List each a button, the shown one selected; Yours | All a group, "Your library or
+all music", the side shown selected. The line is decoration and never heard; the chosen one is also white where the
+others are grey, and a word semibold.
+
+### The fold
+
+The line gives way inside itself exactly as R2b's review made it (MetaLine: one line, the count's noun dropped, then its
+end folded, then folded with the noun dropped - PhoneMeta's ViewThatFits of the four, measured as drawn). What moves is
+the end's width. Core's new `MetaLine.end(_:)` says it from its choices' own widths: each choice plus 3 either side, a
+pair's two 6 apart, the pairs 6 + 14 apart, no pair with nothing in it - what LibraryLineEnd's HStacks draw (PhoneMeta
+measures the real thing; `end` is for the arithmetic, as `fit` is). DWLookTests holds it
+(`aQuietLinesEndIsItsChoicesAtTheirSpacing`, `aQuietLineFoldsAtItsNewEnd`), and test_ios_library_look.py holds Core's
+body word for word and does the arithmetic with it.
+
+In the bundled faces, with the glyphs in their box of 17 (the symbols fitted to the drawing's ink since the review,
+so nothing here is a guess at a symbol's width): Albums' end is 142.5 where R2b's was 147.5 at the standard size (150.6
+of 155.6 at xLarge) - each glyph's choice 23 where its box was 28, Grid and List 6 apart where they were 2, 20 before
+Yours where they were 16, and 3 less for the hairline's room. Every other page's end (Yours | All alone) is 3 narrower
+(70.5 of 73.5). Eight cells of R2b's tables moved, all on Albums' line with Yours | All, every one toward one line:
+
+| size | count | order | R2b (375 / 393 / 402) | now |
+| --- | --- | --- | --- | --- |
+| standard | 140 albums | Year, newest first | S S F | S **F** F |
+| standard | 2318 albums | Year, newest first | S S S | S S **F** |
+| standard | 12 of 2318 albums | Recently added | f S S | **S** S S |
+| standard | 1234 of 2318 albums | Artist | S F F | **F** F F |
+| standard | 1234 of 2318 albums | Recently added | f f S | f **S** S |
+| standard | 1234 of 2318 albums | Year, newest first | f f f | f f **S** |
+| xLarge | 140 albums | Year, newest first | f S S | **S** S S |
+| xLarge | 12 of 2318 albums | Artist | S S F | S **F** F |
+
+(F one line, S the count's noun dropped, f folded; two of them - 1234 of 2318 under "Recently added" at the standard
+size, 140 under the longest at xLarge - back to what R2b's Noto Sans drew.) So at the standard size a library's count
+still never folds the line on any of the three phones under any order; Find's count never folds it on 402 under any
+order (R2b: but for a four-figure find under the longest); on 393 only a four-figure find under a Year order does (R2b:
+under "Recently added" too); on 375, under "Recently added" only a four-figure find (R2b: any find in a four-figure
+library), under "Year, oldest first" a four-figure library's, and under the longest every find, as R2b's. The other pages never fold at the standard size or at xLarge, as
+before; folded, every end fits a line of its own at every size.
+
+(The first pass, a1e16198, took the glyphs at 1.3 of the body's 17, the symbol drawn at its own size: its end was
+152.7, and its seven moved cells all moved the other way. The review found that a guess: an SF Symbol at that size is
+some 18-20 of ink, so the box never bound and the line's width was the guess's - at 1.2 four of the seven would not
+have moved.)
+
+### Departures from the brief and the drawing
+
+- **The line is 32, not 34.** The brief said 34; iLibraryLine's sketches of the three ways draw `.meta` 34, but
+  iLibrary, iArtists and iPlaylists - where the design says it is drawn - still draw 32, and the design says nothing
+  else in the line moves. A 28 pt choice sits in 32 with 2 above and below.
+- **"14 between the pairs" is 20 between the pairs' boxes**: the drawing's 14 is the first pair's margin in the line's
+  flex row, whose own gap of 6 comes on top of it, so a browser draws 20 (R2b read `.views`' margin-right 10 the same
+  way: 16). Between the glyph's ink and "Yours", about 28.
+- **A glyph is fitted to the drawing's ink, not its own size** (after review): the symbol `resizable`, `scaledToFit`
+  in a frame of 12.75 (PhoneLook.optInk) scaled with the line's words, in its box of 17 - its choice 23, as the
+  drawing's is. The ink is the box's until xxxLarge, the line's cap, where it is 18.6 and the box grows to hold it
+  (lookSquare a minimum on the phone), never cut. A resizable symbol keeps its weight (medium) and scales its stroke
+  with it, as the drawing's stroke of 2 scales with its svg.
+- **The pair's 6 is inside the targets**, half each - the drawing has no targets.
+- The drawing writes VoiceOver's label "Grid, chosen" on the chosen glyph; the app says "Grid" with the selected trait,
+  as every other choice in the app.
+
+### The Mac
+
+The Mac's own Library pages (MacAlbumsPage, MacArtistsPage, MacPlaylistsPage) draw neither PhoneMeta nor LibraryLineEnd,
+and change nothing. Its Library root borrows the phone's pager in two places (LibraryView's `desk` is nil there): the
+Songs page, whose line is PhoneMeta with the count alone - LibraryLineEnd(.songs, sides: nil) is empty, Yours | All
+never showing on the Mac (`!Platform.mac && LibraryPages.sides(...)`) - so it is as it was; and the root's Downloaded
+albums while deadwax can't be reached (LibraryRootList's `.downloaded` - LibraryView's `pager` passes no desk for it,
+so AlbumsScreen draws the phone's page and its LibraryLineEnd), whose line ends in Grid and List: those take the new
+look there too (grey, the chosen one white over the lit line, 6 apart), each its own 13 pt symbol as before, in its box
+of 17 exactly (lookSquare is exact on the Mac), so 23 wide where they were 28. So the Mac draws DWChosenLine: the
+first pass had it phone-only in test_ios_mac_halves.py and the Mac's half of DWSegmented pinned unchanged, which the
+review found wrong - it is in the Mac's half now, re-pinned (see "After review").
+
+### After review (27 Nov)
+
+The review found no functional bug, but three things the tests claimed that the code didn't bear out:
+
+1. **DWChosenLine is not phone-only.** Offline, the Mac's Library shows the Downloaded albums: LibraryView's `pager`
+   passes no desk for `.downloaded`, so AlbumsScreen draws the phone's page, whose LibraryLineEnd's LineChoice takes
+   DWChosenLine. It is out of test_ios_mac_halves.py's PHONE_ONLY, and DWSegmented's Mac half re-pinned on purpose:
+   a804e4bbec16c8f3 (computed here, as the review had it), where 8d680fda0b85a713 was the switch's Mac half alone -
+   unchanged, the difference DWChosenLine's.
+2. **The glyphs drawn as the drawing draws them, so the tables stop resting on a guess.** The drawing's 17 px svg has
+   12.75 of ink (its paths run 4 to 20 of the viewBox's 24, the stroke of 2 square-capped: 3 to 21). The symbol drawn
+   at the body's size was some 18-20 of ink, so the 17 box never bound and the glyph's width was the test's guess
+   (1.3 of 17) alone. Now PhoneLook.optInk 12.75 (drawn: held by PHONE_FROM_DRAWINGS, and worked out from the paths
+   and dw.css's `.opt svg` stroke by test_ios_library_look.py), and the phone's symbol `resizable`, `scaledToFit` in a
+   frame of it, a @ScaledMetric relative to the line's own words (Typeface.Phone `.meta`, the footnote): the box of 17
+   binds at every size to xxLarge (16.7), and at xxxLarge, the line's cap, the ink is 18.6 and the box grows to it
+   rather than cut it. The tables are recomputed from the bound box ("The fold"), and the test's SYMBOL and BODY are
+   gone. The Mac's offline line keeps its own 13 pt symbol (`if Platform.mac`), in its exact box of 17.
+3. **Stale words**: test_ios_library_look.py's docstring still said R2b's "white where you are and purple what a tap goes
+   to"; it says what is drawn now.
+
+### Tests, and what each was seen catching
+
+- test_ios_library_look.py: `test_the_chosen_one_is_underlined_and_purple_words_only_open_something` (dw.css's
+  `.opt`/`.opt.on` read through the cascade - the grey the line's `--t3`, the line the switch's `inset 0 -2px 0
+  #c084fc` - LineChoice's body exactly, each choice's selected trait, DWChosenLine's body exactly and DWSegmented's use
+  of it, the glyph's face exactly on the phone and the Mac since the review, no other colour and no rule in the line's
+  end, metaRule and sidesRule gone, the order's and New playlist…'s accent),
+  `test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens` (the five tokens against dw.css and the drawing, and
+  since the review the ink worked out from the drawn paths, its ScaledMetric with the line's words and the one size it
+  outgrows the box at; 13 pt, and no number of its own in LibraryLine.swift), and R2b's two rewritten: the end's structure (the
+  pairs, the halves, no hairline) and the fit tables at the new spacing.
+- test_ios_phone_look.py: PHONE_FROM_DRAWINGS gains `pairAfter` 14 and (after review) `optInk` 12.75 (every PhoneLook
+  token is held to dw.css or a drawing, so the six new ones are). test_ios_mac_halves.py: DWSegmented re-pinned with
+  DWChosenLine in its Mac half (after review; the first pass had it in PHONE_ONLY).
+- Core: DWLookTests' `aQuietLinesEndIsItsChoicesAtTheirSpacing` and `aQuietLineFoldsAtItsNewEnd` new, and
+  `thePhonesPiecesFitTogether`'s line (the choice inside the line, the glyph's box and the lit line inside the choice).
+
+Mutations, each made in the source, seen failing, and put back (the files' digests checked after):
+
+| mutation | caught by |
+| --- | --- |
+| the chosen one purple again (LineChoice's `DWPalette.text` as `.acc`) | test_the_chosen_one_is_underlined_and_purple_words_only_open_something |
+| the hairline between Yours and All put back (a vertical DWRule between the two words) | test_grid_and_list_are_on_albums_alone_and_yours_all_only_where_it_was, and the underline test |
+| the accent line on the unchosen one (`DWChosenLine(on: !on)`) | the underline test |
+| New playlist… grey (its `DWPalette.acc` as `.t3`) | the underline test |
+| a word without VoiceOver's selected trait | the underline test |
+| a lit line of its own drawn inline instead of the switch's DWChosenLine | the underline test |
+| the pair's half-6 written as `CGFloat(3)` | test_grid_and_list_..., test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens |
+| Core's `end` without the pairs' 14 | test_each_pages_line_fits_or_gives_way_without_cutting_a_word; in swift test, aQuietLinesEndIsItsChoicesAtTheirSpacing and aQuietLineFoldsAtItsNewEnd |
+| Core's `end` without a choice's 3 either side | aQuietLinesEndIsItsChoicesAtTheirSpacing, aQuietLineFoldsAtItsNewEnd |
+| Core's `end` with no 6 between a pair's two | aQuietLinesEndIsItsChoicesAtTheirSpacing, aQuietLineFoldsAtItsNewEnd |
+| (review) DWChosenLine's line at the top, not the foot | test_the_macs_half_of_each_shared_piece_is_pinned, and the underline test |
+| (review) DWChosenLine heard by VoiceOver | test_the_macs_half_of_each_shared_piece_is_pinned, and the underline test |
+| (review) the glyph's ink 14, not the drawing's 12.75 | test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens, test_phonelook_is_the_phones_rules_size_by_size |
+| (review) the glyph's ink 16, outgrowing the box at xLarge | those two, and test_each_pages_line_fits_or_gives_way_without_cutting_a_word (xLarge, 140 albums, "Year, newest first": fSS where it is SSS) |
+| (review) the phone's symbol at its own size again, not fitted to the ink | the underline test (the glyph's face held exactly) |
+| (review) the ink scaled with the body, not the line's words | test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens |
+
+### Not verified - only a phone can say (check 654)
+
+- That the chosen one reads at a glance on James's and Ethan's phones, at the standard and the largest text size: the
+  grey (#a8a8bc since the greys lifted) beside the white, the 2 pt line under a word as short as "All" (about 21 pt with
+  its room) and under a glyph.
+- That Grid and List, fitted to the drawing's ink (12.75 at the standard size), read clearly and not too small beside
+  the 13 pt words, and that their medium stroke scaled down looks like the drawing's; that Albums' line gives way where
+  the tables say and ViewThatFits takes the ways in Core's order.
+- The Mac's offline Downloaded line: its own 13 pt symbols, grey, the chosen one over the lit line (built, not looked
+  at).
+- A tap in the 6 between two of a pair taking the nearer; the targets' reach above and below, inside the pager.
+- VoiceOver reading each choice as before, the chosen one selected, and never the line.
 
 ## Speed A: what's asked again (2026-11-27)
 

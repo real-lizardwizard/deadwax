@@ -59,7 +59,8 @@ struct DWSegmented<Value: Hashable>: View {
     }
 
     /// (R1c) A phone segment: its words semibold (`.seg button`), white over the accent's line when chosen, else in the
-    /// second colour - the line as wide as the segment, at its foot (`.seg button.on`'s inset 0 -2px 0 var(--acc)).
+    /// second colour - the line as wide as the segment, at its foot (`.seg button.on`'s inset 0 -2px 0 var(--acc)):
+    /// DWChosenLine, which the Library's line under the switch draws too.
     private func phoneSegment(_ option: Value) -> some View {
         let on = option == chosen
         let look = DWLook.here
@@ -74,14 +75,7 @@ struct DWSegmented<Value: Hashable>: View {
                 .padding(.horizontal, CGFloat(large ? look.largeSegmentPadding : look.segmentPadding))
                 .frame(maxWidth: large ? .infinity : nil)
                 .lookHeight(large ? look.largeSegmentHeight : look.segmentHeight)
-                .overlay(alignment: .bottom) {
-                    if on {
-                        Rectangle()
-                            .fill(DWPalette.acc)
-                            .frame(height: CGFloat(DWFlat.chosenLine))
-                            .accessibilityHidden(true)
-                    }
-                }
+                .modifier(DWChosenLine(on: on))
                 .contentShape(DWTarget(face: Rectangle()))
         }
         .buttonStyle(.plain)
@@ -172,5 +166,26 @@ struct DWSegmentedNeed: View {
         .hidden()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// (R1c's, its own piece since 27 Nov - notes/ios.md "The Library's line underlines what is chosen (27 Nov)") The
+/// chosen one's mark on the phone: the accent's 2 pt line at the foot of what it marks, as wide as it - a switch's
+/// segment (`.seg button.on`'s `inset 0 -2px 0 var(--acc)`), and a choice in the Library's line under that switch
+/// (LibraryLineEnd: `.meta .opt.on`, the same line). A mark drawn at its size whatever the text's, and decoration:
+/// VoiceOver never hears it, and hears the chosen one by its `.isSelected`; its words are white (and semibold) besides.
+struct DWChosenLine: ViewModifier {
+    let on: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(alignment: .bottom) {
+                if on {
+                    Rectangle()
+                        .fill(DWPalette.acc)
+                        .frame(height: CGFloat(DWFlat.chosenLine))
+                        .accessibilityHidden(true)
+                }
+            }
     }
 }

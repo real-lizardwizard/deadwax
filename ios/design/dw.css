@@ -366,3 +366,13 @@
 .dw.ph .tabbar { background: #000; border-top-color: #1c1b22; }
 .dw.ph .foot2, .dw.ph .home { background: none; }
 .dw.ph .foot2 { border-top-color: #1c1b22; }
+
+/* The Library's line, which one is chosen (James, 27 Nov: "it's not immediately clear which of 'yours' or 'all' is
+   selected, and most others in that row"). The first drawing made the chosen one white and the other purple, while
+   the tab bar and every strip mark the chosen one WITH purple. .opt is a choice in the line: grey until chosen, then
+   white over the same lit line the switch above it uses. iLibraryLine.dc.html shows the three ways offered. */
+.dw .meta .opt { height: 28px; display: inline-flex; align-items: center; padding: 0 3px; border: 0; background: none; color: var(--t3); font-size: 13px; }
+.dw .meta .opt.on { color: #fff; font-weight: 600; box-shadow: inset 0 -2px 0 var(--acc); }
+.dw .meta .opt svg { display: block; width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; }
+.dw .meta .pair { display: inline-flex; align-items: center; gap: 6px; }
+.dw .meta .said { color: #fff; font-weight: 600; }

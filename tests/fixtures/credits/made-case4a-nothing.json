@@ -1,0 +1,144 @@
+{
+ "_made": "MADE, NOT FETCHED (27 Nov 2026): written for deadwax's tests in the shape of MusicBrainz's /ws/2 JSON and of tests/fixtures/credits/back-in-black-2003-us.json, the one real answer - no such release or artist exists on MusicBrainz. Replace with a real answer when one is fetched (see README.md here).",
+ "id": "c0000004-0000-4000-8000-0000000000c4",
+ "title": "Made Album Four",
+ "status": "Official",
+ "date": "2011-09-09",
+ "country": "GB",
+ "quality": "normal",
+ "disambiguation": "",
+ "packaging": "Jewel Case",
+ "barcode": "",
+ "text-representation": {
+  "language": "eng",
+  "script": "Latn"
+ },
+ "cover-art-archive": {
+  "artwork": false,
+  "count": 0,
+  "front": false,
+  "back": false,
+  "darkened": false
+ },
+ "release-events": [],
+ "artist-credit": [
+  {
+   "name": "Wes Alone",
+   "joinphrase": "",
+   "artist": {
+    "id": "a0000021-0000-4000-8000-000000000021",
+    "name": "Wes Alone",
+    "sort-name": "Wes Alone",
+    "type": "Person",
+    "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  }
+ ],
+ "relations": [],
+ "media": [
+  {
+   "position": 1,
+   "format": "CD",
+   "title": "",
+   "track-offset": 0,
+   "track-count": 2,
+   "id": "00000001-0000-4000-8000-000000000001",
+   "tracks": [
+    {
+     "id": "d4000001-0000-4000-8000-000000000001",
+     "number": "1",
+     "position": 1,
+     "title": "Track 1",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "Wes Alone",
+       "joinphrase": "",
+       "artist": {
+        "id": "a0000021-0000-4000-8000-000000000021",
+        "name": "Wes Alone",
+        "sort-name": "Wes Alone",
+        "type": "Person",
+        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e4000001-0000-4000-8000-000000000001",
+      "title": "Track 1",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "2011-09-09",
+      "artist-credit": [
+       {
+        "name": "Wes Alone",
+        "joinphrase": "",
+        "artist": {
+         "id": "a0000021-0000-4000-8000-000000000021",
+         "name": "Wes Alone",
+         "sort-name": "Wes Alone",
+         "type": "Person",
+         "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    },
+    {
+     "id": "d4000002-0000-4000-8000-000000000002",
+     "number": "2",
+     "position": 2,
+     "title": "Track 2",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "Wes Alone",
+       "joinphrase": "",
+       "artist": {
+        "id": "a0000021-0000-4000-8000-000000000021",
+        "name": "Wes Alone",
+        "sort-name": "Wes Alone",
+        "type": "Person",
+        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e4000002-0000-4000-8000-000000000002",
+      "title": "Track 2",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "2011-09-09",
+      "artist-credit": [
+       {
+        "name": "Wes Alone",
+        "joinphrase": "",
+        "artist": {
+         "id": "a0000021-0000-4000-8000-000000000021",
+         "name": "Wes Alone",
+         "sort-name": "Wes Alone",
+         "type": "Person",
+         "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    }
+   ]
+  }
+ ]
+}

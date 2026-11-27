@@ -30,8 +30,6 @@ import re
 
 from src.artists import _fold as fold_name
 
-KINDS = ("album", "artist")
-
 #? How many pins Home holds. Each album pin is looked up in Navidrome as Home asks for them (one
 #? getAlbum apiece, side by side), and two columns of fifty cards is already a long Home.
 PINS_MAX = 50

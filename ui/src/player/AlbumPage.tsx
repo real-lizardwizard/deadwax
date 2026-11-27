@@ -31,7 +31,7 @@ import type { Player } from './usePlayer'
 import { accessNow, seesDetail, useAccess } from '../app/access'
 import { errorNote } from '../app/ErrorNote'
 import { heroTitleClass } from '../lib/titles'
-import { DESCRIPTION_WAIT_MS, inBlock } from '../lib/describe'
+import { inBlock } from '../lib/describe'
 import { DescriptionBlock } from '../app/Description'
 import { useDescription } from '../app/useDescription'
 
@@ -110,8 +110,9 @@ import { useDescription } from '../app/useDescription'
  *
  * Since 2.0.13 the album's DESCRIPTION (app/useDescription.ts, app/Description.tsx) - Wikidata's one-line subtitle
  * and Navidrome's or Wikipedia's paragraph - asked once the bridge has answered for this album (on a page come back
- * to, the answer it had is drawn from its first frame): under the hero when it is in hand as the songs are drawn -
- * they wait for it DESCRIPTION_WAIT_MS at most - else at the foot, above Properties (lib/describe.ts placeOf).
+ * to, the answer it had is drawn from its first frame): always under the hero (2.1.52 - until then at the page's
+ * foot when it came after the songs were drawn, which waited half a second for it). The songs wait for nothing
+ * now: the block's room is held from the first frame until the answer lands (lib/describe.ts holdsRoom).
  *
  * Since 2.0.0-player.57 (Up Next, shuffle and repeat) every song's row ends with a ••• and the bar has one for
  * the whole album, between the phone's Edit and the pin - each opening the song menu (App's QueueMenu: Play
@@ -244,20 +245,12 @@ export function AlbumPage({
   }, [album?.id])
 
   //? (2.0.13) the album's description - asked once the bridge has said which MusicBrainz album this is (its release
-  //? group: Wikipedia's words), with Navidrome's id beside it (Navidrome's own). Under the hero when it is in hand as
-  //? the songs are drawn - they wait for it DESCRIPTION_WAIT_MS at most - else at the page's foot, so a late one
-  //? moves no song under a finger. Once drawn, the songs stay drawn (an edit's refresh keeps them)
-  const songsDrawn = useRef<string | null>(null)
+  //? group: Wikipedia's words), with Navidrome's id beside it (Navidrome's own). Always under the hero (2.1.52): its
+  //? room is held there from the first frame, so the songs are drawn as soon as they are in hand and a description
+  //? landing after them moves none of them under a finger
   const describing = useDescription('album', storeFor === id
-    ? { mbid: store?.release_group_mbid ?? null, navidromeId: id } : null, songsDrawn.current === id, id)
-  const [songsWaited, setSongsWaited] = useState<string | null>(null)
-  useEffect(() => {
-    if (!album) return
-    const timer = setTimeout(() => setSongsWaited(id), DESCRIPTION_WAIT_MS)
-    return () => clearTimeout(timer)
-  }, [id, !!album])
-  if (album && (describing.settled || songsWaited === id)) songsDrawn.current = id
-  const drawSongs = !!album && songsDrawn.current === id
+    ? { mbid: store?.release_group_mbid ?? null, navidromeId: id } : null, id)
+  const drawSongs = !!album
   //? its subtitle and paragraph, together - an album's hero holds Play and the chips from its first frame, so the
   //? subtitle heads the block rather than landing in the hero above them
   const describedBlock = inBlock('album', describing.description)
@@ -516,7 +509,7 @@ export function AlbumPage({
         </div>
       )}
 
-      {describedBlock && describing.at === 'top' && <DescriptionBlock description={describedBlock} at="top" />}
+      <DescriptionBlock kind="album" description={describedBlock} holding={describing.holding} />
 
       {error ? errorNote(error, { class: 'pl-notice', gone: ALBUM_GONE }) : null}
       {!drawSongs && !error && <div class="pl-spinner" aria-label="Loading" />}
@@ -568,9 +561,6 @@ export function AlbumPage({
           {total ? `, ${formatDuration(total)}` : ''}
         </p>
       )}
-
-      {/* (2.0.13) a description that came after the songs were drawn: here, where it moves nothing under a finger */}
-      {describedBlock && describing.at === 'foot' && <DescriptionBlock description={describedBlock} at="foot" />}
 
       {/* what the main page's details pane said of the album (2.0.0-player.44), once the bridge has answered */}
       <AlbumProperties rows={albumProperties(store, storeFailed, releaseSaid, undefined, albumEdit(access.permissions).editors)} />

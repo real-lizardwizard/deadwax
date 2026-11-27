@@ -5,6 +5,7 @@ import time
 import httpx
 from collections import deque, OrderedDict
 from typing import NamedTuple
+from src import credits
 from src.artists import artist_query
 from src.config import Config
 from src.logger import logger
@@ -305,6 +306,24 @@ def _answered(answer) -> bool:
     return isinstance(answer, dict) and answer.get("status") != "failed"
 
 
+#? (credits, 27 Nov 2026) a song's credits: one release with its recordings' and works' relations to artists - its own
+#? lookup, never RELEASE_FULL_INC's (that one is asked for every pressing looked at, and would grow several times over).
+#? `release-groups` for the album's date: its release group's first release (original_year's), never a recording's
+CREDITS_INC = "recordings+artist-credits+artist-rels+recording-level-rels+work-rels+work-level-rels+release-groups"
+
+
+def _kept_parsed(endpoint: str, params: dict | None) -> bool:
+    """The one lookup kept PARSED rather than as MusicBrainz sent it (credits): src/credits.py kept() is what is
+    kept of it, in memory and on disk, so a box set's answer isn't kept whole."""
+    return endpoint.startswith("release/") and (params or {}).get("inc") == CREDITS_INC
+
+
+def _current(endpoint: str, params: dict | None, value) -> bool:
+    """A kept answer still of the shape kept now - always, for every answer kept as MusicBrainz sent it; for the
+    parsed one, only when its CREDITS_SHAPE is today's (an old shape is asked for afresh)."""
+    return not _kept_parsed(endpoint, params) or credits.is_current(value)
+
+
 def _distinct(items) -> list[dict]:
     """Each id once, the first kept: the pages of one browse are asked seconds apart, and an edit on
     MusicBrainz between them can still move an item across their boundary (2.0.0-player.54)."""
@@ -462,7 +481,7 @@ class MusicBrainzClient:
             #? budget - and therefore up to a second of somebody's time - on a question already
             #? answered. See ResponseCache for what does and does not get stored.
             entry = self.cache.entry(endpoint, params)
-            if entry is not None:
+            if entry is not None and _current(endpoint, params, entry[0]):
                 logger.debug(f"MusicBrainz cache hit for {endpoint}")
                 return entry[0] if browse is None else browse.cached(*entry, stale=False)
 
@@ -498,7 +517,7 @@ class MusicBrainzClient:
         if saved_answers is None:
             return None
         found = await saved_answers.get(ResponseCache.disk_key(endpoint, params))
-        if found is None:
+        if found is None or not _current(endpoint, params, found[0]):
             return None
         payload, fetched_at = found
         self.cache.put(endpoint, params, payload, fetched_at=fetched_at)
@@ -625,6 +644,10 @@ class MusicBrainzClient:
                 #? had come back - turning a bad minute into a bad hour. On disk too (2.0.0-player.54),
                 #? where it would be a bad month: the same one place, the same successes.
                 payload = response.json()
+                if _kept_parsed(endpoint, params):
+                    #? (credits) parsed before it is kept anywhere - and a refresh behind an old one parses too
+                    fetched_at = fetched_at if fetched_at is not None else self.cache.now()
+                    payload = credits.kept(payload, fetched_at)
                 if keep:
                     self.cache.put(endpoint, params, payload, fetched_at=fetched_at)
                     if disk and self.cache.disk is not None:
@@ -781,6 +804,24 @@ class MusicBrainzClient:
         """
         return await self.request_with_retries(
             f"release/{release_mbid}", {"inc": self.RELEASE_FULL_INC, "fmt": "json"}
+        )
+
+    #? (credits) its own lookup - see CREDITS_INC above
+    CREDITS_INC = CREDITS_INC
+
+    async def get_release_credits(self, release_mbid: str) -> dict:
+        """
+        One release's credits (credits, 27 Nov 2026): who performed, wrote and produced each recording on it, and
+        the release's own credits - for a song's Info. Its own `inc` (CREDITS_INC), never RELEASE_FULL_INC's.
+
+        Through request_with_retries like every lookup - the pace, the user agent, the hour in memory and the month
+        on disk (a lookup's freshness: an old answer answered at once and asked for again behind it) - but KEPT
+        PARSED: what comes back, from MusicBrainz or a cache, is src/credits.py kept()'s shape (Back in Black's
+        93 KB answer is 20 KB kept, 1.3 KB compressed on disk against the whole answer's 9.3), or
+        request_with_retries' error dict.
+        """
+        return await self.request_with_retries(
+            f"release/{release_mbid}", {"inc": self.CREDITS_INC, "fmt": "json"}
         )
 
     #? What an artist page is made of. `url-rels` is doing double duty: it carries the links

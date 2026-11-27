@@ -1,0 +1,250 @@
+{
+ "_made": "MADE, NOT FETCHED (27 Nov 2026): written for deadwax's tests in the shape of MusicBrainz's /ws/2 JSON and of tests/fixtures/credits/back-in-black-2003-us.json, the one real answer - no such release or artist exists on MusicBrainz. Replace with a real answer when one is fetched (see README.md here).",
+ "id": "c0000005-0000-4000-8000-0000000000c5",
+ "title": "Made Hits",
+ "status": "Official",
+ "date": "2001-04-02",
+ "country": "GB",
+ "quality": "normal",
+ "disambiguation": "",
+ "packaging": "Jewel Case",
+ "barcode": "",
+ "text-representation": {
+  "language": "eng",
+  "script": "Latn"
+ },
+ "cover-art-archive": {
+  "artwork": false,
+  "count": 0,
+  "front": false,
+  "back": false,
+  "darkened": false
+ },
+ "release-events": [],
+ "artist-credit": [
+  {
+   "name": "The Made Quartet",
+   "joinphrase": "",
+   "artist": {
+    "id": "b0000003-0000-4000-8000-0000000000b3",
+    "name": "The Made Quartet",
+    "sort-name": "The Made Quartet",
+    "type": "Group",
+    "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+    "disambiguation": "",
+    "country": "GB"
+   }
+  }
+ ],
+ "relations": [],
+ "media": [
+  {
+   "position": 1,
+   "format": "CD",
+   "title": "",
+   "track-offset": 0,
+   "track-count": 4,
+   "id": "00000005-0000-4000-8000-000000000005",
+   "tracks": [
+    {
+     "id": "d5000001-0000-4000-8000-000000000001",
+     "number": "1",
+     "position": 1,
+     "title": "Hit 1",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "The Made Quartet",
+       "joinphrase": "",
+       "artist": {
+        "id": "b0000003-0000-4000-8000-0000000000b3",
+        "name": "The Made Quartet",
+        "sort-name": "The Made Quartet",
+        "type": "Group",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e5000001-0000-4000-8000-000000000001",
+      "title": "Hit 1",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1976-05-01",
+      "artist-credit": [
+       {
+        "name": "The Made Quartet",
+        "joinphrase": "",
+        "artist": {
+         "id": "b0000003-0000-4000-8000-0000000000b3",
+         "name": "The Made Quartet",
+         "sort-name": "The Made Quartet",
+         "type": "Group",
+         "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    },
+    {
+     "id": "d5000001-0000-4000-8000-000000000002",
+     "number": "2",
+     "position": 2,
+     "title": "Hit 2",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "The Made Quartet",
+       "joinphrase": "",
+       "artist": {
+        "id": "b0000003-0000-4000-8000-0000000000b3",
+        "name": "The Made Quartet",
+        "sort-name": "The Made Quartet",
+        "type": "Group",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e5000001-0000-4000-8000-000000000002",
+      "title": "Hit 2",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1978-06-02",
+      "artist-credit": [
+       {
+        "name": "The Made Quartet",
+        "joinphrase": "",
+        "artist": {
+         "id": "b0000003-0000-4000-8000-0000000000b3",
+         "name": "The Made Quartet",
+         "sort-name": "The Made Quartet",
+         "type": "Group",
+         "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    },
+    {
+     "id": "d5000001-0000-4000-8000-000000000003",
+     "number": "3",
+     "position": 3,
+     "title": "Hit 3",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "The Made Quartet",
+       "joinphrase": "",
+       "artist": {
+        "id": "b0000003-0000-4000-8000-0000000000b3",
+        "name": "The Made Quartet",
+        "sort-name": "The Made Quartet",
+        "type": "Group",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e5000001-0000-4000-8000-000000000003",
+      "title": "Hit 3",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1981-02-14",
+      "artist-credit": [
+       {
+        "name": "The Made Quartet",
+        "joinphrase": "",
+        "artist": {
+         "id": "b0000003-0000-4000-8000-0000000000b3",
+         "name": "The Made Quartet",
+         "sort-name": "The Made Quartet",
+         "type": "Group",
+         "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    },
+    {
+     "id": "d5000001-0000-4000-8000-000000000004",
+     "number": "4",
+     "position": 4,
+     "title": "Hit 4",
+     "length": 200000,
+     "artist-credit": [
+      {
+       "name": "The Made Quartet",
+       "joinphrase": "",
+       "artist": {
+        "id": "b0000003-0000-4000-8000-0000000000b3",
+        "name": "The Made Quartet",
+        "sort-name": "The Made Quartet",
+        "type": "Group",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "",
+        "country": "GB"
+       }
+      }
+     ],
+     "recording": {
+      "id": "e5000001-0000-4000-8000-000000000004",
+      "title": "Hit 4",
+      "length": 200000,
+      "video": false,
+      "disambiguation": "",
+      "first-release-date": "1985-09-09",
+      "artist-credit": [
+       {
+        "name": "The Made Quartet",
+        "joinphrase": "",
+        "artist": {
+         "id": "b0000003-0000-4000-8000-0000000000b3",
+         "name": "The Made Quartet",
+         "sort-name": "The Made Quartet",
+         "type": "Group",
+         "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+         "disambiguation": "",
+         "country": "GB"
+        }
+       }
+      ],
+      "relations": []
+     }
+    }
+   ]
+  }
+ ],
+ "release-group": {
+  "id": "a0000005-0000-4000-8000-0000000000a5",
+  "title": "Made Hits",
+  "primary-type": "Album",
+  "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+  "secondary-types": [
+   "Compilation"
+  ],
+  "secondary-type-ids": [
+   "dd2a21e1-0c00-3729-a7a0-de60b84eb5d1"
+  ],
+  "first-release-date": "1990-10-01",
+  "disambiguation": ""
+ }
+}

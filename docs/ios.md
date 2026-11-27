@@ -127,6 +127,35 @@ be had, deadwax says so within seven seconds rather than keeping the app waiting
 images…** in the web app, it needs deadwax's container to reach those sites. Nothing changes for the
 web app, which loads those pictures from the sites itself.
 
+deadwax also adds the route the app's **Info** will draw a song's **credits** from: who played what on it
+(lead vocals first, then other vocals, then each instrument, then an orchestra or conductor), who wrote it, and who
+produced, engineered, mixed and mastered it. An instrument is named as the album credits it where MusicBrainz says
+("lead guitar" and "rhythm guitar" on Back in Black, not "guitar" twice). They come from
+[MusicBrainz](https://musicbrainz.org), and how much MusicBrainz knows differs from album to album, so the app
+always says which of these it is showing:
+
+- **On this song**: MusicBrainz credits this recording itself.
+- **On the album**: MusicBrainz credits the album as a whole, not song by song.
+- **The band in 1980** (the album's year: when it first came out, not the pressing's or a single's date):
+  MusicBrainz has no credits for the album, but its artist is a band, so it shows the members on the album's date,
+  with what each played. Everyone is shown whom MusicBrainz's dates don't rule out, so others may be there who
+  didn't play: where a member joined or left during the album's year and MusicBrainz can't say whether before or
+  after it came out, they're shown with "joined 1980" or "left 1980". When MusicBrainz has no dates for any member,
+  it's **The band's members**: everyone who was ever in the band. A compilation never shows the band, since its songs
+  come from other years.
+- **No credits yet**: MusicBrainz has none for the album, with a link to add them there. When other songs on the
+  album do have credits, the answer says so too. Or the album isn't matched to a MusicBrainz release, so there's
+  nothing to look up (**Edit → Release** matches it).
+
+deadwax finds the song on its release by the recording id in its file, when the file has one (Picard writes it;
+deadwax doesn't). Otherwise it uses the disc and track number, but only when that disc's track numbers in Navidrome
+are exactly the release's. If it can't be sure which track it is, it shows the album's credits rather than another
+song's. It asks MusicBrainz as it asks for everything else, and keeps each album's credits for a month, so
+they're there even while MusicBrainz is down. When MusicBrainz can't be asked and nothing is kept yet, the app says
+the credits can't be asked for just now
+([troubleshooting](troubleshooting.md#a-songs-credits-say-they-cant-be-asked-for-just-now)). Anyone signed in can
+see them, and no setting is needed. The web app doesn't show them yet.
+
 ## What you need
 
 - **A Mac with Xcode.** Xcode 16 or later opens the project. An iPhone on iOS 27 needs **Xcode 27**,
@@ -386,7 +415,8 @@ menus and keys, and these differences.
   them, one at a time, 400 points wide. Open it from the bar's Queue, Lyrics, Info and EQ buttons (each lit
   while its tab shows), the •••'s Info and EQ, or **View > Queue** ⌥⌘U, **Lyrics** ⌥⌘L, **Info** ⌘I and **EQ** ⌥⌘E, each ticked while its tab shows; or click a
   tab to move to it. A tab's key (or menu item) shows its tab - opening the panel if it's shut, switching to it if
-  another tab shows - and closes the panel when its tab is the one showing; a tab's **Done** or Escape closes it too.
+  another tab shows - and closes the panel when its tab is the one showing; a click on the tab that's showing, a
+  tab's **Done** or Escape closes it too (not **Sources** while its search words are changed and not yet searched).
   With the window 1280 points wide or more the panel is a column of its own and the page narrows beside it; narrower,
   it lies over the page's right edge. Either way the page, the sidebar and the bar still answer. The Queue is the
   phone's, Lyrics the lines Now Playing shows on the phone, lit as they're sung, and the EQ the phone's EQ page for
@@ -767,8 +797,10 @@ it, and the page goes back to its top.
 Under the top each page has its own quiet line, all words, nothing boxed: how many there are ("3012 albums"), then -
 on Albums and Artists - its order, in purple (tap it to choose another), or on Playlists **New playlist…**. At the
 end of Albums' line are its **grid** and **list** marks, and - with a library of your own - every page's line ends
-with **Yours | All** (below). On the line, white is where you are and purple is what a tap takes you to: the layout
-showing and the side you're on are white, the other of each purple. Where a line is too long for the phone's width
+with **Yours** and **All** (below). Each of those is grey until it's the one chosen: the layout showing and the side
+you're on are white over a short purple line, the same line the switch above marks its page with (and VoiceOver says
+"selected"). Purple words on the line are only ever something to tap that opens or goes somewhere: the order, with
+its little arrow, and **New playlist…**. Where a line is too long for the phone's width
 (a long order, a big count, Find's "12 of 140", a larger text size), the count gives way first - "140 · Recently
 added", the number without its word (VoiceOver still says "140 albums") - and only where even that is too long does
 the line's end move onto a line of its own under the words, at the right, the count saying its word again. The
@@ -1926,7 +1958,11 @@ may have been added anyway. If it isn't in your library soon, add it again." Add
 ("Dummy · CD · 1994 · GB · Go! Beat"), **Close** at its left. On the Mac it opens in the side panel instead, as its
 **Sources** tab, beside the album's page: the page stays where it is while you choose, the chips and sort as you left
 them if you look at another tab and back, and the tab goes - its search stopped - when you leave the album's page
-(back, another page or another sidebar row), as the sheet does when it closes. deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
+(back, another page or another sidebar row), as the sheet does when it closes. The tab has no bar: the album and
+pressing are at the panel's top left, **Search again** at its right (lit while its words are open), and there's no
+Close - Escape, or a click on the open **Sources** tab, puts the panel away, which stops the search and ends the Get as
+Close did (with the cursor in the words, Escape is the field's and the panel stays; with words changed and not yet
+searched, neither does anything, so they aren't thrown away). deadwax searches Soulseek for that pressing - "Looking for “Dummy” by
 Portishead…" and "This takes a few seconds." while it does - and each folder found is a card, as in the web app's
 sheet (see [Downloading](downloading.md#choosing-a-source)):
 
@@ -6752,7 +6788,8 @@ pages, in the order you keep (Edit order), the page you're on white over a purpl
 row of buttons under it. Under the row each
 page has one quiet line of words: how many, its order (tap it to change it) or Playlists' **New playlist…**, and at its
 end Albums' grid and list marks, then **Yours | All** with a library of your own - white where you are, purple what a
-tap goes to. **All** shows the whole collection's albums, artists and songs as the pages, where the •••'s All music
+tap goes to (since 654, grey until chosen and the chosen one underlined). **All** shows the whole collection's albums,
+artists and songs as the pages, where the •••'s All music
 used to push them. The ••• is Shuffle, **Downloaded**, Refresh and Edit order.
 
 - **526 Albums as a list.** **Not done yet.** On the Mac, choose **List** in the Albums toolbar: every other row is
@@ -6781,11 +6818,11 @@ used to push them. The ••• is Shuffle, **Downloaded**, Refresh and Edit or
 - **530 The pages.** **Not done yet.** Tap each page in the switch: the page moves to it and it lights. Swipe between
   the pages: the lit page follows. **••• > Downloaded** opens Downloaded; turn WireGuard off on Yours and the ••• has
   **Your albums** in its place instead. The order on a page's line changes the order, the grid and list marks at the
-  end of Albums' line switch it (the one showing white, the other purple), and pulling a page down still shuffles.
-  With a library of your own, **All** at the end of a page's line shows the whole collection's Albums, Artists and
-  Songs, and **Yours** your own again - Songs never beside your own albums; the side you're on is white, the other
-  purple. On All's Songs, turn WireGuard off: All and its Songs stay; tap Yours, and Yours | All goes until deadwax is
-  back. The magnifying glass opens Find under the top; Cancel closes it.
+  end of Albums' line switch it (the one showing white, the other purple - grey since 654), and pulling a page down
+  still shuffles. With a library of your own, **All** at the end of a page's line shows the whole collection's Albums,
+  Artists and Songs, and **Yours** your own again - Songs never beside your own albums; the side you're on is white,
+  the other purple (grey since 654). On All's Songs, turn WireGuard off: All and its Songs stay; tap Yours, and
+  Yours | All goes until deadwax is back. The magnifying glass opens Find under the top; Cancel closes it.
 - **531 Both phones.** **Not done yet.** On Green Anole, the rest - the other tabs, the player, Now Playing, an album,
   Edit album and the EQ - are as before. On Ethan's phone, 529 and 530, or "not done yet". At the standard text size,
   Albums' line on Green Anole drops its count's word with a count in the thousands and **Year, newest first**, or
@@ -7610,6 +7647,48 @@ the play bar, or from View > Queue, Info, Lyrics and EQ.
   no grey box, and a tap near it still closes. On the Mac it is a round glossy key.
 - **638 Both phones.** **Not done yet.** On Green Anole, 631-637. On Ethan's phone, 631-637, or "not done yet".
 
+#### Get, and old type left in redrawn pages (639-644)
+
+**Not done yet.** Get's box for an album already in the store is drawn like the rest of Get now, and on the Mac
+Choose a source has no bar of its own in the side panel. The last of the old type and colours is gone from pages
+already redrawn: an artist found on MusicBrainz, Downloaded, an album's download line, a playlist's Edit, a pressing's
+rows, the lines that say what went wrong, and the Mac's Server settings. Nothing works any differently, and every word
+is the same.
+
+- **639 Sources on the Mac.** **Not done yet.** Get an album you don't have: the **Sources** tab has no bar across its
+  top - the album and pressing at the left, and once folders are found **Search again** at the right, a small button
+  lit while its words are open above the chips (click it again to close them). There's no Close: Escape puts the
+  panel away and ends the Get, as Close did - open the album's page again and Get the album searches afresh. Get it
+  again and click the open **Sources** tab: the panel goes away and the Get ends the same way. Click in the search
+  words and press Escape: the panel stays. Change the words without searching, then press Escape or click the open
+  **Sources** tab: nothing happens, and the words are still there. Switch to the Queue and back: the Get is as you left
+  it.
+- **640 The box for an album you have.** **Not done yet.** Get a pressing that's already in the store (or already
+  downloading): on the Mac its box is the cards' box - the dark card, a thin edge and small rounded corners - with its
+  title in white (green when it's yours), the lines under it in grey, and **Add to my library** or **Join this
+  download** the Mac's own button. On the phone the same words and button sit flat on the black, with no box. Both
+  still do what they did.
+- **641 Sources' words.** **Not done yet.** On both devices: "Looking for “…”…" while it searches, "Nothing found for
+  “…”.", "41 sources found - none match your filters." and Soulseek's refusal are in the app's own type, white with the
+  smaller lines under them in grey; "Searched for “…”" under the cards too. Tap **Search again**: the words are in a
+  dark sunken box, square on the phone and with the Mac's small rounded corners, its edge purple while you type; a
+  tap anywhere on the box puts the cursor in it. **Search again** under the cards is the app's own button.
+- **642 Manual search and the Mac's pop-ups.** **Not done yet.** Search > Search Soulseek by hand: **Search** is the
+  large purple button across the page, dimmed until both fields are filled. On the Mac, Settings > Manage > Server
+  settings: a setting with choices is the Mac's own pop-up, its value at the left with a small triangle; choose
+  another and the setting is drafted exactly as before. On the Mac, Settings > **Downloading and downloaded…**:
+  **Storage limit** and **Download over** are the same pop-ups, and choosing does what it did.
+- **643 The old type left.** **Not done yet.** In the app's own type and greys, with no iOS grey or red: an artist
+  found on MusicBrainz (its albums' rows over thin lines, **Studio only** a small button lit while on, no shadow
+  under the picture); Downloaded (the rows' names, a failed download's detail in small grey words); an album's
+  download line under its badge (amber when it didn't); a playlist's **Edit** (the notes and songs heading small and
+  grey, "Needs a name" red, the songs' (-) a red circle); a pressing's rows in Choose a pressing; what went wrong
+  (the line, and "For whoever runs deadwax" with its detail in small grey words); and the black behind Sign in
+  after a sign-out. On the Mac, the shadow down the side panel where it lies over the page, and the line beside it,
+  look as before. Add to a playlist's rows follow View > Row Size.
+- **644 Both phones.** **Not done yet.** On Green Anole, 640-643. On Ethan's phone, 640-643, or "not done yet". On
+  the Mac, 639-643.
+
 #### The known holdouts (645-648)
 
 **Not done yet.** The last pages that kept iOS's grey grouped lists are flat now: Settings' Debug, an artist's
@@ -7643,6 +7722,29 @@ slice.
   Tags, a button).
 - **648 Both phones.** **Not done yet.** On Green Anole, 645-647. On Ethan's phone, 645-647, or "not done yet". On
   the Mac, 645, 646 and the full-screen cover.
+
+### The Library's line shows what is chosen (654)
+
+You said it wasn't clear which of Yours and All was chosen on the Library's line, nor which of the grid and list
+marks (27 Nov), and chose the underline. Each of the four is grey now until it's the chosen one, which is white over
+a short purple line, the same line the switch above it marks its page with; a chosen word is bold too. There's no
+thin line between Yours and All any more: the two words sit side by side. Purple words on the line are only what
+opens something or takes you somewhere, the order with its little arrow and **New playlist…**. The grid and list
+marks are a little smaller than before, the size the design draws them, and grow with the text size; otherwise
+nothing on the line has moved and nothing works any differently.
+
+- **654 Which one is chosen.** **Not done yet.** On each Library page - Albums, Artists, Playlists, and on All the
+  Songs page - say at a glance which of the grid and list marks (Albums only) and which of **Yours** and **All** is
+  chosen: the chosen one white over a short purple line, the other grey. Tap the other one: the white and the line
+  move to it. The order (Albums' and Artists', with its little arrow) and Playlists' **New playlist…** are still
+  purple, and still open their menu and their sheet. With VoiceOver on, the chosen one is read as "selected". Then
+  at the largest text size (the iPhone's Settings > Accessibility > Display & Text Size > Larger Text, at its end): the
+  same, nothing cut short, and where a line is too long it still drops its count's word first, then puts the marks
+  and Yours and All on a line of their own under the words. Say if the grey reads too faint beside the white, if the
+  purple line is easy to miss under a small word like **All**, if the grid and list marks look too small beside the
+  words, and whether a tap just between two of them takes the nearer. On Ethan's phone too, or "not done yet". On the
+  Mac, the Library while deadwax can't be reached (its Downloaded albums) shows the grid and list marks this way too,
+  at the size they were; nothing else on the Mac changes.
 
 ### Faster (649-655)
 

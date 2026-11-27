@@ -63,7 +63,8 @@ def test_the_sources_sheet_is_the_page_in_a_stack_of_its_own():
     assert "let pushed: Bool" in page
     # the Cancel only on a sheet of its own - a pushed page has Back
     cancel = page.index("placement: .cancellationAction")
-    assert re.search(r"if !pushed \{\s*ToolbarItem\($", page[:cancel]), page[cancel - 200:cancel]
+    # (the panel review's R19) nor in the Mac's dock, where there is no bar: its Close is the dock's
+    assert re.search(r"if !pushed (?:&& !docked )?\{\s*ToolbarItem\($", page[:cancel]), page[cancel - 200:cancel]
     # who builds which: the album's Get the sheet, the manual search the page pushed - nobody else either
     builds = {name: (code.count("SourcesSheet("), code.count("SourcesPage(")) for name, code in app.items()
               if "SourcesSheet(" in code or "SourcesPage(" in code}

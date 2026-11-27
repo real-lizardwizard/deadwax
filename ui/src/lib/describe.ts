@@ -17,11 +17,12 @@
  *    a blip kept as "none" for the days a phone keeps the app open. The question each page asked is remembered too, so
  *    a page come back to while its ids are still being settled (the album page's bridge, asked again) draws its kept
  *    answer on its first frame.
- *  - WHERE THE PARAGRAPH GOES (`placeOf`): NOTHING MOVES UNDER A FINGER. Under the name or the hero (`top`) when it is
- *    in hand by the time what lies under that place is drawn - the artist's albums, the album's songs, the pressings'
- *    tracklist, each held back for it a moment (the artist's albums within ROWS_WAIT_MS, as they wait for their other
- *    answers; the songs and the tracklist DESCRIPTION_WAIT_MS); one landing later goes to the page's foot (`foot`),
- *    where it pushes nothing a finger is reaching for. Once placed, it stays where it is for the page.
+ *  - WHERE THE PARAGRAPH GOES: ALWAYS UNDER THE NAME OR THE HERO, AND NOTHING JUMPS (2.1.52 - James: "sometimes the
+ *    description is at the top and sometimes at the bottom. Let's make it consistently at the top."). Until then
+ *    it was at the top only when in hand as what lies under that place was drawn, and at the page's foot when it
+ *    came later; the rows under it waited for it a moment. Now the rows wait for nothing: while an answer is still
+ *    to come the page HOLDS THE BLOCK'S ROOM (`holdsRoom`), and the words land in it. A kept answer is drawn at once
+ *    with no room; a kept "none" holds none; an answer of none closes the room, once (app/Description.tsx).
  *  - WHERE THE SUBTITLE GOES (`inBlock`): an artist's under their name, in the hero, on one line - in a line the hero
  *    keeps for it above the name until it comes (app.css), so a hero that outgrew its 240px (a two-line name under an
  *    iPhone's status bar) doesn't grow again as it lands. An album's hero has no room kept (Play and the chips sit in
@@ -66,11 +67,9 @@ export interface DescribeIds {
   navidromeId?: string | null
 }
 
-export type DescribePlace = 'top' | 'foot'
-
-/** How long an album's songs, or the pressings' tracklist, wait for the description before they are drawn without
- *  it - what Info waits for its two answers (useInfoDetails.ts INFO_SETTLE_MS): a cached answer comes well inside it. */
-export const DESCRIPTION_WAIT_MS = 500
+/** What a page remembers it asked when who it is was settled with nothing to ask by: there is no description, and
+ *  none to hold room for when the page is come back to. */
+export const NOTHING_TO_ASK = ''
 
 /** How many answers the session keeps. */
 export const DESCRIPTIONS_KEPT = 200
@@ -184,12 +183,12 @@ export function forgetDescriptions(): void {
 }
 
 /**
- * Where the block goes on its page: where it was put already (`was`), else - the first time it has something to
- * draw (`present`) - under the name or hero when what lies under that place isn't drawn yet, at the foot when it is.
- * Null while there is nothing.
+ * (2.1.52) Whether the page holds the block's room: an answer is still to come (`settled` false), the block has
+ * nothing to draw meanwhile (`block` - inBlock's), and the page hasn't already been answered "none" while it has been
+ * up (`closed`): a room closed once stays closed while the question changes under it (the artist's library asked
+ * again, an Edit) - words that come after all open it for themselves. A page whose answer is kept is settled on its
+ * first frame, so it holds none: the words, or nothing.
  */
-export function placeOf(was: DescribePlace | null, present: boolean, belowDrawn: boolean): DescribePlace | null {
-  if (was) return was
-  if (!present) return null
-  return belowDrawn ? 'foot' : 'top'
+export function holdsRoom(settled: boolean, block: Description | null, closed: boolean): boolean {
+  return !settled && block === null && !closed
 }

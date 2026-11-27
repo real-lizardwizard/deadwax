@@ -106,9 +106,6 @@ OUTPUT_BITS = 24
 #? and its gain. Bump it whenever what a levelled copy holds changes - the rounding, the depth.
 LEVEL_FORMAT_VERSION = 1
 
-#? The levels a copy can be made at: the song's own gain, or its album's.
-LEVELS = ("album", "track")
-
 #? How much of each neighbour is taken as context, in input samples. The VHQ filter reaches +-548
 #? input samples at 4:1 and +-1120 at 8:1 (to -200 dB); measured, 1024 samples of context left an
 #? 8:1 join at -152 dB, and this reaches -215. Plenty at 2:1 and 4:1.
