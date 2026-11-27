@@ -257,8 +257,8 @@ async def _scan_with_queue(request: Request, force: bool, snapshot: bool = False
     #? issues are worked out) - no time in it, so an unchanged library is still an unchanged body
     #? (the ETag's 304)
     check = navidrome_listing.check()
-    #? in a worker thread (2.1.47): every album inspected is 40 ms on a thousand albums, and on the
-    #? event loop that was 40 ms of every other request - the audio's byte ranges too - standing still.
+    #? in a worker thread (2.1.47): every album inspected is tens of milliseconds on a thousand albums,
+    #? and on the event loop that was every other request - the audio's byte ranges too - standing still.
     #? The albums are this request's own copies (library.py), so nothing else reads them meanwhile.
     result["queue"] = await asyncio.to_thread(attach_issues, result["albums"], reviews, unlisted)
     result["issue_types"] = ISSUE_TYPES
@@ -319,10 +319,11 @@ async def _library_response(request: Request, result: dict, tracks: bool = True)
     never answer each other's If-None-Match.
 
     (2.1.47) The body is encoded in a worker thread, and KEPT until the scan it answers is another
-    one. Building it - the tracks compacted, megabytes of JSON, its hash, gzip - was 170 ms of the
-    event loop on a thousand albums (measured; notes/performance.md "The scan's answer, kept"), on
-    every visit to the library, paid even to say "nothing changed": every other request waited
-    behind it, a playing song's next byte range among them.
+    one. Building it - the tracks compacted, megabytes of JSON, its hash, gzip - with the albums'
+    issues before it held the event loop 82 ms on a thousand albums to answer a 304, and 102 ms for
+    a 200 (measured; notes/performance.md "The scan's answer, kept"), on every visit to the library,
+    paid even to say "nothing changed": every other request waited behind it, a playing song's next
+    byte range among them.
 
     What the kept answer is kept BY is everything the body is made of, and no clock:
      - `generation`: which scan cache these albums are (src/library.py) - it moves when a folder is

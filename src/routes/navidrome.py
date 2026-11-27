@@ -986,6 +986,15 @@ async def _shuffle_songs(request: Request, user: str, scope: str) -> tuple[str, 
     SCAN_PAGE at a time (in Navidrome's natural order, by rowid - persistence/sql_search.go, read at 0.64.2), each
     song once (a scan between pages can move a rowid); `yours` only those of the albums the asker starred
     (getAlbumList2 starred, STARRED_PAGE at a time). Kept SHUFFLE_LIST_TTL_S per (user, scope); one build at a time.
+
+    (2.1.50) The song pages after the first are asked for PAGES_AT_ONCE at a time (_pages_at, as /album_index's
+    are) and READ IN ORDER, each by the rules a page-by-page read applies - a song once, the 413 past SHUFFLE_MAX,
+    the end at a short page or at a full one that brought nothing new - so the list is the one a page-by-page read
+    makes, song for song and in the same order; only the waiting is shared. A list that ends inside a round has
+    asked for up to three pages past its end. `yours` is still every song read and kept by its album: asking each
+    starred album for its own songs would be fewer calls for a small library of a large store, but whether
+    getAlbum's songs are exactly search3's for that album (a file Navidrome has marked missing, their order) is
+    not something read from its source here, and Last.fm's radio matches against this list in this order.
     """
     key = (user, scope)
     lock = _shuffle_builds.setdefault(key, asyncio.Lock())
@@ -1014,25 +1023,36 @@ async def _shuffle_songs(request: Request, user: str, scope: str) -> tuple[str, 
         #? drops a song this build has read and its list will name
         songs: list[dict] = []
         seen: set[str] = set()
-        offset = 0
-        while True:
+
+        async def ask(offset: int) -> list:
             body = await client.call("search3", {
                 "query": "", "artistCount": 0, "albumCount": 0, "songCount": SCAN_PAGE, "songOffset": offset,
             })
-            page = (body.get("searchResult3") or {}).get("song") or []
-            before = len(seen)
-            for song in page:
-                if not isinstance(song, dict) or not isinstance(song.get("id"), str) or song["id"] in seen:
-                    continue
-                seen.add(song["id"])
-                if albums is None or song.get("albumId") in albums:
-                    songs.append({name: song[name] for name in SHUFFLE_FIELDS if name in song})
-            if len(seen) > SHUFFLE_MAX:
-                raise HTTPException(status_code=413, detail=SHUFFLE_TOO_BIG)
-            #? a short page is the end - and so is a full one that brought nothing new (a server that ignores the offset)
-            if len(page) < SCAN_PAGE or len(seen) == before:
-                break
-            offset += SCAN_PAGE
+            return (body.get("searchResult3") or {}).get("song") or []
+
+        offset = 0
+        more = True
+        while more:
+            #? the first page alone (a small library ends in it), then PAGES_AT_ONCE under way together
+            offsets = [offset + n * SCAN_PAGE for n in range(1 if offset == 0 else PAGES_AT_ONCE)]
+            for page in await _pages_at(ask, offsets):
+                if isinstance(page, BaseException):
+                    raise page
+                before = len(seen)
+                for song in page:
+                    if not isinstance(song, dict) or not isinstance(song.get("id"), str) or song["id"] in seen:
+                        continue
+                    seen.add(song["id"])
+                    if albums is None or song.get("albumId") in albums:
+                        songs.append({name: song[name] for name in SHUFFLE_FIELDS if name in song})
+                if len(seen) > SHUFFLE_MAX:
+                    raise HTTPException(status_code=413, detail=SHUFFLE_TOO_BIG)
+                #? a short page is the end - and so is a full one that brought nothing new (a server that ignores
+                #? the offset); the pages of this round past it are not read
+                if len(page) < SCAN_PAGE or len(seen) == before:
+                    more = False
+                    break
+            offset = offsets[-1] + SCAN_PAGE
         ids = tuple(_kept_song(song) for song in songs)
         _shuffle_lists[key] = (time.monotonic(), ids)
         return ids

@@ -63,10 +63,14 @@ gap is how late every other request is - a playing song's next byte range among 
 #### The scan's answer, kept (2.1.47)
 
 **The cause, confirmed.** `/library/albums` (and `/rescan`) scanned in a worker thread and then did everything
-else on the event loop, on every ask: `attach_issues` over every album (40 ms on 1,060 albums), then
-`_library_response` - `compact_for_wire` (81 ms), `json.dumps` (38 ms, 3.8 MB), the ETag's hash (11 ms) - and,
-for a 200, `CompressText`'s gzip (57 ms). The ETag saved the download and none of the work: a 304 was built
-whole, then thrown away. The app asks twice a visit (the saved scan, then the real one).
+else on the event loop, on every ask: `attach_issues` over every album, then `_library_response` -
+`compact_for_wire`, `json.dumps` (3.8 MB on 1,060 albums), the ETag's hash - and, for a 200,
+`CompressText`'s gzip. Timed one by one in a first run they were 40, 81, 38, 11 and 57 ms, but that was on
+a machine other work was sharing and they add up to more than the route was then measured to hold the loop
+(the table below, which is the figure to go by); what they do say is that no one step is the cause - the
+compaction and the encoding are each as large as the inspection. The ETag saved the download and none of
+the work: a 304 was built whole, then thrown away. The app asks twice a visit (the saved scan, then the
+real one).
 
 **The fix.**
 - **The scan cache has a generation** (`src/library.py` `generation()`): a number that moves each time
@@ -208,6 +212,84 @@ changed on purpose: the two that counted calls now count the round, and "a chang
 now lets the kept list lapse first), one each in test_navidrome_listing.py and test_library_cache.py.
 tests/conftest.py is new: it drops what is kept before every test, since a clock-kept list would otherwise
 answer the next test's ask.
+
+#### First Shuffle: the song pages together (2.1.50)
+
+**The cause, confirmed.** The Library's first Shuffle (and Last.fm's radio, which matches against the same
+list) reads every song Navidrome has - `search3` with an empty query, 2,000 a page - one page after
+another (`routes/navidrome.py` `_shuffle_songs`): 100,000 songs is 51 round trips in a row before the first
+song plays. The list is then kept ten minutes.
+
+**The fix.** The pages after the first are asked for `PAGES_AT_ONCE` (4) at a time and read IN ORDER, each
+by the very rules the page-by-page read applied - a song once, the 413 past `SHUFFLE_MAX`, the end at a
+short page or at a full one that brought nothing new. So the list is the one a page-by-page read makes,
+song for song and in the same order ("every song exactly once" is held by the same tests as before); only
+the waiting is shared. A list that ends inside a round has asked for up to three pages past its end, and a
+Navidrome that ignores the offset is asked five times where it was asked twice.
+
+**`yours` is left as it was**, on purpose: every song is still read and kept by its album. Asking each
+starred album for its own songs (`getAlbum`) would be far fewer songs read for a small library of a large
+store - but whether `getAlbum`'s songs are exactly `search3`'s for that album (a file Navidrome has marked
+missing, their order) was not read from Navidrome's source here, and Last.fm's radio matches against this
+list in this order. Not changed without knowing it is the same list.
+
+**Measured** (the route against a fake Navidrome that takes 50 ms a call; the fake's own JSON is in both):
+
+| songs | before | after |
+| --- | --- | --- |
+| 30,000 (16 pages) | 1,047 ms, 16 calls | **521 ms**, 17 calls |
+| 100,000 (51 pages) | 3,589 ms, 51 calls | **1,660 ms**, 53 calls |
+
+**Not verified**: against a real Navidrome - what four 2,000-song `search3` pages at once cost it (each is a
+scan by rowid; the audit's worry was a library large enough to feel this, which nobody has measured), nor
+on James's server.
+
+What is left at 100,000 songs is not waiting: about 0.3 s of it is deadwax and the fake turning 100,000
+songs to and from JSON, which a second ask (no calls at all) takes too.
+
+**Tests**: tests/test_navidrome_shuffle.py - three new (the pages asked together and the list still
+Navidrome's in its order; a small library is one call; `yours` read together is still only your albums'
+songs), one changed on purpose (a Navidrome that ignores the offset: five calls, not two).
+
+#### The web app's one script: measured, and NOT split (27 Nov 2026)
+
+The audit's third "In the web app" finding was one script with nothing loaded on demand. **Measured on a
+fresh build of 2.1.48** (Node 22.23.4, `npm run build`): `interface/dist/deadwax-player.js` is **830,156
+bytes, 263,434 gzipped** (the audit's 826 KB was near enough; the 110 KB of player.26 was a much smaller
+app). By its source map, the managing pages the audit named - People and its dialogs, Server settings,
+the Event log, Needs a look, Library care, the Edit panel and its editors, with the libs only they use -
+are **102,706 bytes of it, 12.6%**: about 33 KB gzipped at the very most (less in practice - some of those
+libs are read by the main app too). And the script is stamped and kept for a year (2.0.0-player.26), so that is saved
+once per device per upgrade, not per launch.
+
+**Why it was not done - what blocks it:**
+- **A lazily loaded chunk imports the app a second time.** Tried, on a real build: a chunk made by
+  `import()` begins `import{...}from"../deadwax-player.js"` - rollup keeps what the chunk shares with the
+  app (Preact, the hooks, the contexts) in the entry, and the chunk reaches back for it by the entry's
+  plain name. The page loads the entry as `/dist/deadwax-player.js?v=<stamp>`. To a browser those are two
+  modules: opening People would fetch and RUN the whole app again - a second render into the page, a
+  second player - and hand People a second Preact. Making that safe means moving the app out of the
+  stamped entry (a stub that imports a hashed app chunk: one more round trip in series at every cold
+  launch) or naming the entry by hash and having `stamped_page()` find it from a build manifest - a
+  change to how the page, the bench's page, `RevalidateInterfaceAssets` and tests/test_pages.py all work.
+- **A failed chunk can't be promised a working retry.** The rule is that a failed load says so in a
+  listener's words and offers Try again. A browser may remember a failed `import()` for the life of the
+  page (the standard's module map keeps a fetch that failed, and browsers differ in whether they ask
+  again - not checked on the iPhone, which is the phone this runs on), so Try again could go on failing
+  until a reload - and a reload stops the music.
+- **A page left open across an upgrade** would hold an entry naming chunks the new image no longer has:
+  Settings would fail to open until a reload, where today an open page keeps working.
+
+Three new ways to fail, and a rebuilt page-serving scheme, for at most 33 KB once per upgrade. If the
+script is ever split, name the entry by hash first, and count the desktop's visualizer and the turntable
+too (`deck.ts` alone is 30 KB of the 830): a phone that never opens them carries about as much of those
+as of the managing pages.
+
+**The duplicate launch requests** (`/library/owned` and `/me/preferences` asked twice as Search first
+shows, noted at player.26) were looked at again and left: both modules already share an ask that is out
+(`useOwned.ts` `asking`/`again`, `useGetSettings.ts` `asking`), so "one in-flight promise per URL" would
+change nothing - if they are still asked twice it is one ask after another, and telling a needed re-ask
+from a wasted one takes a request log from the running app, which this pass did not take.
 
 ## Known performance problems (profiled, not guessed)
 
