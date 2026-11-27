@@ -67,13 +67,16 @@ def mac_path(code: str) -> str:
 
 
 #? the phone's own parts of the shared pieces: what the phone's halves name and the Mac's never do - R1c's flat button,
-#? chip and switch, and (R2b) the switch's measure, the phone's Library row's alone (LibraryTop)
+#? chip and switch, and (R2b) the switch's measure, the phone's Library row's alone (LibraryTop); (27 Nov) and the
+#? switch's lit line, its own piece now for the Library's line too (LibraryLineEnd - drawn on the Mac only where its
+#? Library borrows the phone's Albums page, Downloaded while deadwax is out of reach)
 PHONE_ONLY = {
     "Look/DWButtonStyle.swift": [r"private struct DWFlatButtonBody: View \{"],
     "Look/DWChip.swift": [r"private var flat: some View \{"],
     "Look/DWSegmented.swift": [r"private var phoneSegments: some View \{",
                                r"private func phoneSegment\(_ option: Value\) -> some View \{",
-                               r"struct DWSegmentedNeed: View \{"],
+                               r"struct DWSegmentedNeed: View \{",
+                               r"struct DWChosenLine: ViewModifier \{"],
 }
 #? and the phone's lines of their own, one line each - (R1c's review) the chip's `keepsFace` among them: the Mac's chip
 #? is faced whatever it says

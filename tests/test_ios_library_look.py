@@ -11,7 +11,10 @@ the top is one row - Find's circle, the switch of the pages, the •••'s cir
 its order or New playlist…, then Grid and List (Albums alone) and Yours | All, white where you are and purple what a
 tap goes to; Downloaded is the •••'s again. (R1c, notes/ios.md "The redesign, slice R1c: the phone is flat
 (2026-11-25)") Find and the ••• are bare white glyphs now, and the switch words over a hairline, the chosen one over the
-accent's line. The row and the line fit a 375 pt phone at every text size - the line
+accent's line. (27 Nov, notes/ios.md "The Library's line underlines what is chosen (27 Nov)" - James: "Yeah I like the
+underline") The line's Grid, List, Yours and All too: grey until chosen, the chosen one white over the switch's own lit
+line, with no hairline between Yours and All, and purple words left to what opens something - the order, New
+playlist…. The row and the line fit a 375 pt phone at every text size - the line
 giving way inside itself first, its count's noun dropped, then folding - rather than cutting a word short, by the
 arithmetic below; where each view goes is Core's (LibraryTopFit, MetaLine), tested in LibrarySwitchTests and
 DWLookTests.
@@ -365,19 +368,21 @@ def test_grid_and_list_are_on_albums_alone_and_yours_all_only_where_it_was():
     layouts = line[line.index("if LibraryLine.layouts(on: page) {"):line.index("if let sides {")]
     assert "glyph(.grid, symbol:" in layouts and "glyph(.list, symbol:" in layouts
     raw = source("Library/LibraryLine.swift")
-    assert 'glyph(.grid, symbol: "square.grid.2x2", words: LibrarySwitchWords.grid)' in raw
-    assert 'glyph(.list, symbol: "list.bullet", words: LibrarySwitchWords.list)' in raw
+    assert 'glyph(.grid, symbol: "square.grid.2x2", words: LibrarySwitchWords.grid, after: half)' in raw
+    assert 'glyph(.list, symbol: "list.bullet", words: LibrarySwitchWords.list, before: half)' in raw
     switch = flat(bare((CORE / "LibrarySwitch.swift").read_text(encoding="utf-8")))
     assert "public static func layouts(on page: LibraryPage) -> Bool { page == .albums }" in switch
     # Yours | All: only with a choice handed in - LibraryView hands one only where R2's switch showed (LibraryPages.sides)
     sides = line[line.index("if let sides {"):]
-    assert "word(.yours, sides, after: CGFloat(PhoneLook.sidesGap))" in sides
-    assert "DWRule(colour: DWPalette.metaRule, vertical: true) .frame(height: rule)" in sides
-    assert "word(.all, sides, before: CGFloat(PhoneLook.sidesGap))" in sides
-    assert ".accessibilityElement(children: .contain) .accessibilityLabel(LibrarySwitchWords.sidesLabel)" in sides
+    # (27 Nov) the two words side by side, each holding half the pair's room - no hairline between them now
+    assert ("HStack(spacing: 0) { word(.yours, sides, after: half) word(.all, sides, before: half) } "
+            ".accessibilityElement(children: .contain) .accessibilityLabel(LibrarySwitchWords.sidesLabel)") in sides
     assert "glyph(" not in sides and "word(" not in layouts
-    # .meta .views' margin before Yours | All, only where Yours | All follows
-    assert ".padding(.trailing, sides == nil ? 0 : CGFloat(PhoneLook.metaGlyphsAfter))" in layouts
+    # (27 Nov) iLibrary's first .pair's margin before Yours | All, only where Yours | All follows - on the line's 6
+    assert ("HStack(spacing: 0) { glyph(.grid, symbol: \" \", words: LibrarySwitchWords.grid, after: half) "
+            "glyph(.list, symbol: \" \", words: LibrarySwitchWords.list, before: half) } "
+            ".padding(.trailing, sides == nil ? 0 : CGFloat(PhoneLook.pairAfter))") in layouts, layouts
+    assert line.startswith("var body: some View { HStack(spacing: CGFloat(PhoneLook.metaGap)) {"), line
     # the glyphs set the layout, kept per device; a word chooses its own side through the page's choice - the side shown
     # too, never the other (R2b's review), which LibraryView's choose lets be
     tap = r"return Button \{ (.*?) \} label:"
@@ -388,34 +393,99 @@ def test_grid_and_list_are_on_albums_alone_and_yours_all_only_where_it_was():
     # the side shown stays a button - enabled, VoiceOver hearing it selected - and nothing at the line's end is disabled
     # or untouchable
     assert ".disabled(" not in end and ".allowsHitTesting(" not in end
-    # and the hairline grows with the line's words
-    assert "@ScaledMetric(relativeTo: .footnote) private var rule = CGFloat(PhoneLook.sidesRule)" in end
+    # (27 Nov) each choice holds half the pair's room (.pair's gap) inside its target, so every point of a pair takes a
+    # tap and the pair is as wide as drawn - the room on the inner side alone
+    assert "private var half: CGFloat { CGFloat(PhoneLook.pairGap) / 2 }" in end
+    assert end.count("after: half)") == 2 and end.count("before: half)") == 2
+    assert "@ScaledMetric" not in end, "no hairline to grow with the words"
 
 
-def test_white_is_where_you_are_and_purple_what_a_tap_goes_to():
-    # dw.css (R2b's block): .v the accent, .v.on white; .scope > b white and semibold, the other word a .link, the accent
-    accent = css(".meta .link", "color")
-    assert accent == "#c084fc" and css(".meta .v", "color") == accent
-    assert css(".meta .v.on", "color") == "#fff"
-    assert css(".meta .scope > b", "color") == "#fff" and css(".meta .scope > b", "font-weight") == "600"
+def test_the_chosen_one_is_underlined_and_purple_words_only_open_something():
+    # (27 Nov - notes/ios.md "The Library's line underlines what is chosen (27 Nov)"; James: "it's not immediately clear
+    # which of 'yours' or 'all' is selected", then "Yeah I like the underline") dw.css's block for it: a choice (.opt)
+    # grey, the line's third colour, until chosen; chosen (.opt.on) white and semibold over the accent's 2 pt line -
+    # the very line of the switch above it (.seg button.on) - and purple words left to the order and New playlist…
+    accent, grey = css(".meta .link", "color"), css(".meta .opt", "color")
+    assert accent == "#c084fc" and grey == css(".meta", "color") == css(".dw", "--t3")
+    assert css(".meta .opt.on", "color") == "#fff" and css(".meta .opt.on", "font-weight") == "600"
+    assert css(".meta .opt.on", "box-shadow") == css(".seg button.on", "box-shadow") == "inset 0 -2px 0 #c084fc"
+    assert "font-weight" not in phone_look.resolved(".meta .opt"), "unchosen, the line's own weight"
     palette = source("Look/DWPalette.swift")
     assert "static let text = hex(0xffffff)" in palette and "static let acc = hex(0xc084fc)" in palette
-    assert re.search(r"--acc: #c084fc;", (IOS / "design" / "dw.css").read_text(encoding="utf-8"))
+    t3 = re.search(r"static let t3 = hex\(0x([0-9a-f]{6})\)", palette)
+    assert t3 and f"#{t3.group(1)}" == grey, (t3, grey)
     code = bare(source("Library/LibraryLine.swift"))
+    # each choice: its colour, its room, its height, the switch's lit line under it when chosen - one modifier, the
+    # glyphs' and the words' alike, in that order: the line as wide as the words and their room, the pair's half outside
+    choice = flat(body(code, "private struct LineChoice: ViewModifier {"))
+    assert flat(body(choice, "func body(content: Content) -> some View {")) == (
+        "func body(content: Content) -> some View { content .foregroundStyle(on ? DWPalette.text : DWPalette.t3) "
+        ".padding(.horizontal, CGFloat(PhoneLook.optPadding)) .lookHeight(PhoneLook.opt) .modifier(DWChosenLine(on: on)) "
+        ".padding(.leading, before) .padding(.trailing, after) .contentShape(DWTarget(face: Rectangle())) }")
     glyph = flat(body(code, "private func glyph("))
     assert "let on = library.layout == layout" in glyph
-    assert ".foregroundStyle(on ? DWPalette.text : DWPalette.acc)" in glyph
-    assert ".accessibilityAddTraits(on ? .isSelected : [])" in glyph
+    assert (".font(Typeface.symbol(.body).weight(.medium)) .lookSquare(PhoneLook.optGlyph) "
+            ".modifier(LineChoice(on: on, before: before, after: after))") in glyph
+    assert ".accessibilityAddTraits(on ? .isSelected : [])" in glyph and ".accessibilityLabel(words)" in glyph
     word = flat(body(code, "private func word("))
     assert "let on = each == sides.side" in word
-    assert ".font(Typeface.Phone.text(.meta).weight(on ? .semibold : .regular))" in word
-    assert ".foregroundStyle(on ? DWPalette.text : DWPalette.acc)" in word
+    assert (".font(Typeface.Phone.text(.meta).weight(on ? .semibold : .regular)) .lineLimit(1) "
+            ".modifier(LineChoice(on: on, before: before, after: after))") in word
     assert ".accessibilityAddTraits(on ? .isSelected : [])" in word
+    # VoiceOver hears the chosen one selected - the line is decoration, unheard, and never the only cue: the words are
+    # white (and semibold) besides
+    assert code.count(".accessibilityAddTraits(on ? .isSelected : [])") == 2
+    # the line is the switch's own piece, not a second one drawn here: DWChosenLine, the accent's DWFlat.chosenLine at
+    # the foot of what it marks, hidden from VoiceOver - and DWSegmented's phone segments draw it too
+    seg = bare(source("Look/DWSegmented.swift"))
+    chosen = flat(body(seg, "struct DWChosenLine: ViewModifier {"))
+    assert chosen == ("struct DWChosenLine: ViewModifier { let on: Bool func body(content: Content) -> some View { content "
+                      ".overlay(alignment: .bottom) { if on { Rectangle() .fill(DWPalette.acc) "
+                      ".frame(height: CGFloat(DWFlat.chosenLine)) .accessibilityHidden(true) } } } }"), chosen
+    assert ".modifier(DWChosenLine(on: on))" in flat(body(seg, "private func phoneSegment("))
+    assert seg.count("DWFlat.chosenLine") == 1 and ".fill(" not in code and "chosenLine" not in code
+    assert re.search(r"public static let chosenLine: Double = 2\s+// dw\.ph: \.seg button\.on box-shadow",
+                     (CORE / "DWLook.swift").read_text(encoding="utf-8"))
     # the one rule, and no other colour in the line's end; the count keeps the line's third colour (PhoneMeta's)
-    assert set(re.findall(r"DWPalette\.(\w+)", code)) == {"text", "acc", "metaRule"}
+    assert set(re.findall(r"DWPalette\.(\w+)", code)) == {"text", "t3"}
     assert ".foregroundStyle(DWPalette.t3)" in bare(source("Phone/PhoneMeta.swift"))
+    # no hairline between Yours and All: no rule drawn in the line's end, and its colour gone from the palette
+    assert not re.search(r"DWRule|Divider\(|metaRule|sidesRule|ScaledMetric", code)
+    assert "metaRule" not in palette and "sidesRule" not in (CORE / "DWLook.swift").read_text(encoding="utf-8")
     # nothing boxed: no face, edge or fill behind a glyph or a word
     assert not re.search(r"DWRaised|DWToggleStyle|DWButtonStyle|\.background|strokeBorder|selbg", code)
+    # purple words are for what opens or goes somewhere: the order's link with its caret (PhoneMetaLink, a Menu's label
+    # on Albums and Artists), and Playlists' New playlist…, which opens its sheet
+    link = flat(body(bare(source("Phone/PhoneMeta.swift")), "struct PhoneMetaLink: View {"))
+    assert "DWCaret(colour: DWPalette.acc)" in link and ".foregroundStyle(DWPalette.acc)" in link
+    for name in ("Library/AlbumsScreen.swift", "Library/ArtistsScreen.swift"):
+        meta = flat(body(bare(source(name)), "private func meta("))
+        assert re.search(r"\} label: \{ PhoneMetaLink\(words: \w+\.\w+\.label\) \} \.menuIndicator\(\.hidden\)", meta), name
+    playlists = flat(body(bare(source("Playlists/PlaylistsScreen.swift")), "private func meta("))
+    assert ("Text(PlaylistWords.newPlaylistRow) .font(Typeface.Phone.text(.meta)) .foregroundStyle(DWPalette.acc)"
+            in playlists), playlists
+
+
+def test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens():
+    # (27 Nov) each choice 28 tall, 13 pt, 3 either side of its words or its 17 pt glyph; 6 between the two of a pair;
+    # Grid and List's pair 14 before Yours | All (iLibrary's inline margin), on the line's own 6; the line 32, as
+    # iLibrary, iArtists and iPlaylists still draw it (iLibraryLine's sketches of the three ways alone draw 34)
+    assert [phone_number(n) for n in ("opt", "optPadding", "optGlyph", "pairGap", "pairAfter", "meta", "metaGap")] == [
+        28, 3, 17, 6, 14, 32, 6]
+    assert px(css(".meta .opt", "height")) == 28 and px(css(".meta .opt", "padding-left")) == 3 == px(
+        css(".meta .opt", "padding-right"))
+    assert px(css(".meta .opt svg", "width")) == 17 == px(css(".meta .opt svg", "height"))
+    assert px(css(".meta .pair", "gap")) == 6 and px(css(".meta", "gap")) == 6
+    assert px(css(".meta .opt", "font-size")) == 13 == px(css(".meta", "font-size"))
+    assert re.search(r"case \.meta: return \(13, \.footnote\)\s+// dw\.ph: \.meta font-size", source("Shared/Typeface.swift"))
+    # the 14 and the 32 are the drawings' inline styles, held by test_ios_phone_look.py's PHONE_FROM_DRAWINGS
+    assert phone_look.PHONE_FROM_DRAWINGS["pairAfter"] == 14 and phone_look.PHONE_FROM_DRAWINGS["meta"] == 32
+    # each a token: no size of its own in the line's end - only none (the two pairs' HStacks, no margin without Yours
+    # | All, the four defaults of a choice's half), the halving of the pair's room, and a word's one line
+    code = bare(source("Library/LibraryLine.swift"))
+    numbers = re.findall(r"(?<![\w.])\d+(?:\.\d+)?(?![\w.])", code)
+    assert numbers == ["0", "0", "0", "2"] + ["0"] * 4 + ["1"], numbers
+    assert flat(code).count("HStack(spacing: 0)") == 2
 
 
 # ----------------------------------------------------------------------------- the row and the line fit, by arithmetic
@@ -561,9 +631,22 @@ PHONES = (375, 393, 402)
 
 def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
     lead, trail, gap, link = (phone_number(n) for n in ("metaLead", "metaTrail", "metaGap", "linkGap"))
-    glyph, glyph_gap, after = (phone_number(n) for n in ("metaGlyph", "metaGlyphGap", "metaGlyphsAfter"))
-    sides_gap = phone_number("sidesGap")
+    # (27 Nov) the end's choices: each its words or glyph (a box of 17 at least) and 3 either side, 6 apart in a pair,
+    # and Grid and List's pair 14 before Yours | All, on the line's 6 - Core's MetaLine.end, held here word for word
+    glyph, pad, pair, after = (phone_number(n) for n in ("optGlyph", "optPadding", "pairGap", "pairAfter"))
     assert NARROW - lead - trail == 343
+    core = flat(bare((CORE / "DWLook.swift").read_text(encoding="utf-8")))
+    assert ("public static func end(_ pairs: [[Double]]) -> Double { let drawn = pairs.filter { (pair: [Double]) -> Bool "
+            "in !pair.isEmpty } let each = drawn.map { (pair: [Double]) -> Double in pair.reduce(0) { (sum: Double, "
+            "choice: Double) -> Double in sum + choice + 2 * PhoneLook.optPadding } + Double(pair.count - 1) * "
+            "PhoneLook.pairGap } return each.reduce(0, +) + Double(max(0, drawn.count - 1)) * (PhoneLook.metaGap + "
+            "PhoneLook.pairAfter) }") in core
+
+    def end_of(*pairs: list) -> float:
+        """MetaLine.end, as Core says it: each choice and its room either side, a pair's two apart, the pairs apart."""
+        drawn = [p for p in pairs if p]
+        return (sum(sum(c + 2 * pad for c in p) + (len(p) - 1) * pair for p in drawn)
+                + max(0, len(drawn) - 1) * (gap + after))
 
     def fit(full: float, short: float, end: float, room: float) -> str:
         """MetaLine.fit, as Core says it (the test above holds it): the first of its ways whose width fits."""
@@ -575,12 +658,16 @@ def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
         return "s"
 
     def ends(points: float, size: str) -> dict:
-        """Each line's end at a size: Grid and List (bare glyphs, each its square or the symbol's width, the wider), the
-        room before Yours | All, and Yours | All with its hairline - the side shown semibold, whichever is wider."""
-        glyphs = 2 * max(glyph, SYMBOL * BODY[size]) + glyph_gap
-        sides = max(words_width("Yours", points, "SemiBold") + words_width("All", points),
-                    words_width("Yours", points) + words_width("All", points, "SemiBold")) + 2 * sides_gap + 1
-        return {"albums": glyphs + after + gap + sides, "artists": sides, "playlists": sides, "songs": sides}
+        """Each line's end at a size, MetaLine.end's (27 Nov): Grid and List (bare glyphs, each its box or the symbol's
+        width, the wider), then Yours | All - the side shown semibold, whichever is wider - with no hairline."""
+        glyphs = [max(glyph, SYMBOL * BODY[size])] * 2
+        yours = max((words_width("Yours", points, "SemiBold"), words_width("All", points)),
+                    (words_width("Yours", points), words_width("All", points, "SemiBold")), key=sum)
+        return {"albums": end_of(glyphs, list(yours)), "artists": end_of(list(yours)), "playlists": end_of(list(yours)),
+                "songs": end_of(list(yours))}
+
+    # the end as Core's unit test has it: 17 pt glyphs and words 30 and 15 - 52, then 20, then 63
+    assert end_of([17, 17], [30, 15]) == 135 and end_of([], [30, 15]) == 63 and end_of([17, 17], []) == 52 and not end_of()
 
     def words(points: float, count: str, then: str, linked: bool = True) -> tuple:
         """The line's words, its count in full and its noun dropped (MetaLine.short): the count, the dot, and what
@@ -602,17 +689,21 @@ def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
     # line with the count's noun dropped, f folded, s folded with it dropped): a three- and a four-figure library, and
     # Find's "N of M" in each, under the default order ("Artist"), "Recently added" and the longest. Counts are Core's
     # own (no thousands separator). In Libre Franklin (25 Nov), the face drawn today: another face moves these, and this
-    # table with it - Libre Franklin moved two from R2b's Noto Sans, said beside them
+    # table with it - Libre Franklin moved two from R2b's Noto Sans, said beside them. (27 Nov) The end at the new
+    # spacing moved seven more, said beside them with R2b's: on Albums it is 5.2 wider at the standard size here (152.7
+    # of 147.5; 166.0 of 155.6 at xLarge) - Grid and List 6 apart where they were 2, and 20 before Yours where they were
+    # 16, less the 3 the hairline's room gave back - with the glyphs taken at 1.3 of the symbol's size, the widest; at
+    # their likelier 1.2 it is under 2 wider. Every other page's end is 3 narrower
     expected = {
         "large": {"140 albums": ("FFF", "SFF", "SSF"),
-                  "2318 albums": ("FFF", "SFF", "SSS"),
+                  "2318 albums": ("FFF", "SSF", "SSS"),  # R2b: "SFF" - 393 held it whole
                   "12 of 140 albums": ("FFF", "SSS", "fSS"),
-                  "12 of 2318 albums": ("FFF", "fSS", "fSS"),
+                  "12 of 2318 albums": ("FFF", "fSS", "ffS"),  # R2b: "fSS" - 393 held it on one line
                   "1234 of 2318 albums": ("SFF", "ffS", "fff")},  # Noto Sans: "fSS" - 393 held it
         "xLarge": {"140 albums": ("FFF", "SSS", "fSS"),  # Noto Sans: "SSS" - 375 held it
-                   "2318 albums": ("FFF", "SSS", "fSS"),
-                   "12 of 140 albums": ("SFF", "ffS", "fff"),
-                   "12 of 2318 albums": ("SSF", "fff", "fff"),
+                   "2318 albums": ("FFF", "fSS", "ffS"),  # R2b: "SSS" and "fSS"
+                   "12 of 140 albums": ("SSF", "fff", "fff"),  # R2b: "SFF" and "ffS"
+                   "12 of 2318 albums": ("SSS", "fff", "fff"),  # R2b: "SSF"
                    "1234 of 2318 albums": ("SSS", "fff", "fff")},
     }
     for size, counts in expected.items():
@@ -626,8 +717,8 @@ def test_each_pages_line_fits_or_gives_way_without_cutting_a_word():
     # so, at the standard size: a library's count never folds the line on any of them, under any order - the review's
     # "140 albums · Recently added" (352 of 343 on 375; 351 in Noto Sans) now "140 · Recently added"; on 402 Find's
     # first keystroke never folds it either but for a four-figure find under the longest order, on 393 under "Recently
-    # added" too; on 375, with "Recently added", only in a four-figure library (notes/ios.md "The redesign, slice R2b":
-    # what is left)
+    # added" too - and (27 Nov, the end at its new spacing) a four-figure library's find under the longest; on 375,
+    # with "Recently added", only in a four-figure library (notes/ios.md "The redesign, slice R2b": what is left)
     points = FOOTNOTE["large"]
     for count in ("140 albums", "2318 albums"):
         for order in album_orders:

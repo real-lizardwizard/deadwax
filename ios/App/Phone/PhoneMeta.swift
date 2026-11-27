@@ -6,7 +6,9 @@ import SwiftUI
 /// (PhoneMetaLink) - with what the page's line holds at its end. Since R2b (notes/ios.md "The redesign, slice R2b: the
 /// Library's top, one row again") the Library's quiet line, as iLibrary, iArtists and iPlaylists draw it: 32 tall at
 /// least, 16 in at either side, 6 apart, in the third colour, words and bare glyphs with nothing boxed - its end
-/// LibraryLineEnd's Grid and List and Yours | All. Capped at xxxLarge, as the bars are.
+/// LibraryLineEnd's Grid and List and Yours | All (since 27 Nov grey until chosen, the chosen one white over the
+/// switch's lit line; purple words only for the order and New playlist…, which open something). Capped at xxxLarge, as
+/// the bars are.
 ///
 /// Where all of it doesn't fit on one line it gives way inside itself first (MetaLine - R2b's review): the count's noun
 /// dropped ("2318 · Year, newest first"), VoiceOver still hearing it ("2318 albums"). Only where even that doesn't fit

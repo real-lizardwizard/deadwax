@@ -84,7 +84,7 @@ public struct DWLook: Equatable, Sendable {
 
     /// How far a finger's target reaches past a face `height` tall, above it and below: half what the face lacks of
     /// `target`, none where the face is that tall already - and none on the Mac, whose target is 0. Never sideways: a
-    /// target grown sideways would reach into the control beside it (the Library's Grid and List, 28 wide and 6 apart),
+    /// target grown sideways would reach into the control beside it (the Library's Grid and List, side by side),
     /// so it reaches up and down alone, as LibrarySwitchControl's SegmentReach does ("never into the next segment").
     /// App/Look's DWTarget draws it.
     public func reach(_ height: Double) -> Double {
@@ -277,20 +277,25 @@ public enum PhoneLook {
 
     /// The line, between what it holds, its sides, and between a link's words and its caret. (R2b) The Library's
     /// pages - the only ones drawing it - have it 32 tall and 16 in at the right too (iLibrary's, iArtists' and
-    /// iPlaylists' inline style: `height: 32px; padding-right: 16px`).
+    /// iPlaylists' inline style: `height: 32px; padding-right: 16px` - still 32 on all three since 27 Nov; only
+    /// iLibraryLine's sketches of the three ways offered draw 34).
     public static let meta: Double = 32                 // drawn: iLibrary .meta height
     public static let metaGap: Double = 6               // dw.ph: .meta gap
     public static let metaLead: Double = 16             // dw.ph: .meta padding-left
     public static let metaTrail: Double = 16            // drawn: iLibrary .meta padding-right
     public static let linkGap: Double = 5               // dw.ph: .meta .link gap
-    /// (R2b) Grid and List at the line's end, bare glyphs: each one's square, between the two, and the room after them
-    /// before Yours | All.
-    public static let metaGlyph: Double = 28            // dw.ph: .meta .v width
-    public static let metaGlyphGap: Double = 2          // dw.ph: .meta .views gap
-    public static let metaGlyphsAfter: Double = 10      // dw.ph: .meta .views margin-right
-    /// (R2b) Yours | All: between each word and the hairline, and the hairline's height.
-    public static let sidesGap: Double = 10             // dw.ph: .meta .scope gap
-    public static let sidesRule: Double = 12            // dw.ph: .meta .scope > i height
+    /// (27 Nov - notes/ios.md "The Library's line underlines what is chosen (27 Nov)") A choice at the line's end - Grid
+    /// or List, a bare glyph, Yours or All, a word (`.meta .opt`): 28 tall at least, its room either side of its words
+    /// or glyph (the chosen line as wide as the two), and a glyph's box. James, 27 Nov: "it's not immediately clear which
+    /// of 'yours' or 'all' is selected" - so the chosen one is white over the switch's lit line, the others grey.
+    public static let opt: Double = 28                  // dw.ph: .meta .opt height
+    public static let optPadding: Double = 3            // dw.ph: .meta .opt padding-left
+    public static let optGlyph: Double = 17             // dw.ph: .meta .opt svg width
+    /// (27 Nov) The choices in pairs (`.meta .pair`): the two of a pair 6 apart, with no hairline between Yours and All
+    /// now; and Grid and List's pair 14 before Yours | All - on top of the line's own 6 between them, as iLibrary's
+    /// inline `margin-right: 14px` draws it in the line's flex row (20 between the two pairs).
+    public static let pairGap: Double = 6               // dw.ph: .meta .pair gap
+    public static let pairAfter: Double = 14            // drawn: iLibrary .meta .pair margin-right
 
     // MARK: the Library's one row (.ltop, .circ)
 
@@ -343,7 +348,8 @@ public struct LookBox: Sendable, Equatable {
 }
 
 /// (R2b) The Library's quiet line (PhoneMeta): its words - the count, then the order or New playlist… - and its end
-/// (Grid and List, Yours | All). Where all of it doesn't fit on one line, it gives way inside itself first: the count's
+/// (Grid and List, Yours | All - since 27 Nov two pairs of choices, the chosen one underlined: `end`). Where all of it
+/// doesn't fit on one line, it gives way inside itself first: the count's
 /// noun dropped ("2318 · Year, newest first", "12 of 140 · Recently added" - VoiceOver still hears "2318 albums"). Only
 /// where even that doesn't fit does its end fold onto a line of its own under the words, at the trailing edge - the
 /// count saying its noun again, unless even then the words need more than the line, when they wrap. The order's words
@@ -388,6 +394,21 @@ public enum MetaLine {
     public static func width(words: Double, end: Double, folded: Bool) -> Double {
         if folded { return max(words, end) }
         return end > 0 ? words + 2 * PhoneLook.metaGap + end : words
+    }
+
+    /// (27 Nov - notes/ios.md "The Library's line underlines what is chosen (27 Nov)") How wide the line's end is drawn
+    /// (LibraryLineEnd), from its choices' own widths - each a word or a glyph, in pairs: Grid and List, then Yours and
+    /// All (`.meta .pair`). Each choice its room either side (`.opt`'s 3 - the chosen line as wide as the two), the two
+    /// of a pair 6 apart, and a pair the line's own 6 and its 14 before the next (iLibrary's `margin-right`): no hairline
+    /// between Yours and All now. A pair with nothing in it isn't drawn, and with none the end is 0 (Songs' line without
+    /// Yours | All). What `width` takes as its `end`, for the arithmetic: PhoneMeta measures the end as it is drawn.
+    public static func end(_ pairs: [[Double]]) -> Double {
+        let drawn = pairs.filter { (pair: [Double]) -> Bool in !pair.isEmpty }
+        let each = drawn.map { (pair: [Double]) -> Double in
+            pair.reduce(0) { (sum: Double, choice: Double) -> Double in sum + choice + 2 * PhoneLook.optPadding }
+                + Double(pair.count - 1) * PhoneLook.pairGap
+        }
+        return each.reduce(0, +) + Double(max(0, drawn.count - 1)) * (PhoneLook.metaGap + PhoneLook.pairAfter)
     }
 
     /// The way the line is drawn in `room`: its words `full` wide with the count in full and `short` wide without its

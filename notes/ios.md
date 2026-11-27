@@ -23838,3 +23838,156 @@ which compares both Mac About views whole; `..._more_opens_the_whole_words_besid
   album page's row doing nothing (borderless); VoiceOver reading the words as one element with its More / Less and link
   actions, and the headings rotor stopping on About (its heading a header now).
 - Offline: a page opened before drawing its kept About, one not opened since the app started drawing none (504).
+
+## The Library's line underlines what is chosen (27 Nov)
+
+James, on the phone: **"on iOS in library, it's not immediately clear which of 'yours' or 'all' is selected, and most
+others in that row. Ideas for improving that?"** The design session (App Design) showed him three ways
+(~/Desktop/Code/deadwax-plans/mac-redesign/iLibraryLine.dc.html, kept for the record) and he chose the first: **"Yeah I
+like the underline"**. The design is iphone-redesign.md's "Changed 27 Nov: the Library's line underlines what is
+chosen", dw.css's new block (`.meta .opt`, `.opt.on`, `.opt svg`, `.pair`, and `.said`, option C's - copied into
+ios/design/dw.css whole, at its end: the canvas has the credits block before it, which this copy doesn't yet), drawn on
+iLibrary, iArtists and iPlaylists. It supersedes R2b's "white is where you are and purple is what a tap goes to".
+
+What is his and what is the design session's: the underline is his choice of the three. The rest - grey until chosen,
+the switch's own line, "a purple line means chosen; purple words mean a link" as one rule for the phone, the hairline
+gone, the sizes - is the design session's, drawn and sent with the choice.
+
+Built on the ios branch at b51a90a5. The app is still 0.13 (13), `__version__` untouched, no project change, no engine
+file touched. Other slices ran beside it (the Library's top into iOS's navigation bar, the album, artist and
+release-group bars, Speed A's models): none of their files is touched here - LibraryView.swift, LibraryTop.swift, Core's
+TopClearance and DebugModel are as they were.
+
+### What was built
+
+**A choice** (`LineChoice`, LibraryLine.swift - `.meta .opt`): each of Grid, List, Yours and All. Until it is chosen, in
+the line's third colour (DWPalette.t3, `--t3`, the count's own grey); chosen, white (DWPalette.text) over the accent's
+2 pt line - and a word semibold too (`.opt.on`'s 600; a glyph's weight is the same either way, as the drawing's stroke
+is). 3 either side of its words or glyph (the line as wide as the two, as `.opt.on`'s inset shadow is), 28 tall at
+least, the line at its foot; 13 pt words (Typeface.Phone `.meta`, `.opt`'s font-size). A glyph is the same SF Symbol as
+before (`square.grid.2x2`, `list.bullet`, Typeface.symbol(.body) medium) in a box 17 at least (`.opt svg`), where it
+had a 28 pt square.
+
+**The line under it is the switch's own** - `DWChosenLine` (DWSegmented.swift), the overlay R1c drew inline in
+DWSegmented's phone segment, now a ViewModifier of its own: the accent's DWFlat.chosenLine at the foot, hidden from
+VoiceOver. DWSegmented's phone segment and LibraryLineEnd's choices both take it, so there is one lit line, not a
+second drawn for the line. (PhoneStrip and Sources' strip still draw their own copy of it inline, as R1c and R7 left
+them: outside this change.) It is phone-only by DWSegmented's halves (test_ios_mac_halves.py's PHONE_ONLY), so the Mac's
+pinned half is unchanged.
+
+**Pairs** (`.meta .pair`): Grid and List one pair, Yours and All the other, the two of a pair 6 apart, each choice
+holding its half of that 6 inside its target (as PhoneStrip's words hold half their gap), so every point of a pair
+answers a tap and the pair is as wide as drawn. **No hairline between Yours and All**: DWPalette.metaRule, PhoneLook's
+sidesGap and sidesRule and the hairline's @ScaledMetric are gone. Grid and List's pair is 14 before Yours | All, on the
+line's own 6, only where Yours | All follows.
+
+**Purple words** are only the order with its caret (PhoneMetaLink, a Menu's label) and Playlists' New playlist… - as
+they were; nothing in the line's end names the accent now.
+
+**Nothing else in the line moved**: PhoneMeta, its four ways and its Layout are R2b's review's (a doc comment aside);
+the count and the order lead, Grid and List then Yours | All trail; the callers (AlbumsScreen, ArtistsScreen,
+PlaylistsScreen, SongsScreen) are unchanged.
+
+**The sizes, as tokens** (PhoneLook, Core): `opt` 28 (`.meta .opt height`), `optPadding` 3 (`.opt padding-left`),
+`optGlyph` 17 (`.opt svg width`), `pairGap` 6 (`.pair gap`), `pairAfter` 14 (drawn: iLibrary's first `.pair`'s inline
+`margin-right: 14px` - in PHONE_FROM_DRAWINGS beside `meta` and `metaTrail`). `meta` stays 32 and `metaGap` 6. They
+replace R2b's metaGlyph 28, metaGlyphGap 2, metaGlyphsAfter 10, sidesGap 10 and sidesRule 12.
+
+**VoiceOver**: as before - Grid and List each a button, the shown one selected; Yours | All a group, "Your library or
+all music", the side shown selected. The line is decoration and never heard; the chosen one is also white where the
+others are grey, and a word semibold.
+
+### The fold
+
+The line gives way inside itself exactly as R2b's review made it (MetaLine: one line, the count's noun dropped, then its
+end folded, then folded with the noun dropped - PhoneMeta's ViewThatFits of the four, measured as drawn). What moves is
+the end's width. Core's new `MetaLine.end(_:)` says it from its choices' own widths: each choice plus 3 either side, a
+pair's two 6 apart, the pairs 6 + 14 apart, no pair with nothing in it - what LibraryLineEnd's HStacks draw (PhoneMeta
+measures the real thing; `end` is for the arithmetic, as `fit` is). DWLookTests holds it
+(`aQuietLinesEndIsItsChoicesAtTheirSpacing`, `aQuietLineFoldsAtItsNewEnd`), and test_ios_library_look.py holds Core's
+body word for word and does the arithmetic with it.
+
+In the bundled faces at the standard size, with the glyphs taken at 1.3 of the symbol's size (the arithmetic's widest
+guess): Albums' end is 152.7 where R2b's was 147.5 (166.0 of 155.6 at xLarge) - Grid and List 6 apart where they were
+2, and 20 before Yours where they were 16, less the 3 the hairline's room gave back. At the symbols' likelier 1.2 it is
+under 2 pt wider. Every other page's end (Yours | All alone) is 3 narrower (70.5 of 73.5). Seven cells of R2b's tables
+moved, all on Albums' line with Yours | All, on 393 or 375:
+
+| size | count | order | R2b (375 / 393 / 402) | now |
+| --- | --- | --- | --- | --- |
+| standard | 2318 albums | Recently added | S F F | S **S** F |
+| standard | 12 of 2318 albums | Year, newest first | f S S | f **f** S |
+| xLarge | 2318 albums | Recently added | S S S | **f** S S |
+| xLarge | 2318 albums | Year, newest first | f S S | f **f** S |
+| xLarge | 12 of 140 albums | Artist | S F F | S **S** F |
+| xLarge | 12 of 140 albums | Recently added | f f S | f f **f** |
+| xLarge | 12 of 2318 albums | Artist | S S F | S S **S** |
+
+(F one line, S the count's noun dropped, f folded.) So at the standard size a library's count still never folds the
+line on any of the three phones under any order; Find's count folds it on 393 now for a four-figure library's find under
+"Year, newest first" too. The other pages never fold at the standard size or at xLarge, as before; folded, every end
+fits a line of its own at every size.
+
+### Departures from the brief and the drawing
+
+- **The line is 32, not 34.** The brief said 34; iLibraryLine's sketches of the three ways draw `.meta` 34, but
+  iLibrary, iArtists and iPlaylists - where the design says it is drawn - still draw 32, and the design says nothing
+  else in the line moves. A 28 pt choice sits in 32 with 2 above and below.
+- **"14 between the pairs" is 20 between the pairs' boxes**: the drawing's 14 is the first pair's margin in the line's
+  flex row, whose own gap of 6 comes on top of it, so a browser draws 20 (R2b read `.views`' margin-right 10 the same
+  way: 16). Between the glyph's ink and "Yours", 26.
+- **A glyph's choice is the symbol's width and 6**, about 26, where the drawing's is 23: an SF Symbol at the line's
+  body size is wider than the drawing's 17 px svg. Its box is 17 at least, growing with the symbol.
+- **The pair's 6 is inside the targets**, half each - the drawing has no targets.
+- The drawing writes VoiceOver's label "Grid, chosen" on the chosen glyph; the app says "Grid" with the selected trait,
+  as every other choice in the app.
+
+### The Mac
+
+The Mac's own Library pages (MacAlbumsPage, MacArtistsPage, MacPlaylistsPage) draw neither PhoneMeta nor LibraryLineEnd,
+and change nothing. Its Library root borrows the phone's pager in two places (LibraryView's `desk` is nil there): the
+Songs page, whose line is PhoneMeta with the count alone - LibraryLineEnd(.songs, sides: nil) is empty, Yours | All
+never showing on the Mac (`!Platform.mac && LibraryPages.sides(...)`) - so it is as it was; and the root's Downloaded
+albums while deadwax can't be reached (LibraryRootList's `.downloaded`), whose line ends in Grid and List: those take
+the new look there too (grey, the chosen one white over the lit line, 6 apart, each about 26 wide where they were 28).
+DWSegmented's Mac half is pinned unchanged.
+
+### Tests, and what each was seen catching
+
+- test_ios_library_look.py: `test_the_chosen_one_is_underlined_and_purple_words_only_open_something` (dw.css's
+  `.opt`/`.opt.on` read through the cascade - the grey the line's `--t3`, the line the switch's `inset 0 -2px 0
+  #c084fc` - LineChoice's body exactly, each choice's selected trait, DWChosenLine's body exactly and DWSegmented's use
+  of it, no other colour and no rule in the line's end, metaRule and sidesRule gone, the order's and New playlist…'s
+  accent), `test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens` (the five tokens against dw.css and the
+  drawing, 13 pt, and no number of its own in LibraryLine.swift), and R2b's two rewritten: the end's structure (the
+  pairs, the halves, no hairline) and the fit tables at the new spacing.
+- test_ios_phone_look.py: PHONE_FROM_DRAWINGS gains `pairAfter` 14 (every PhoneLook token is held to dw.css or a
+  drawing, so the five new ones are). test_ios_mac_halves.py: DWChosenLine in DWSegmented's PHONE_ONLY.
+- Core: DWLookTests' `aQuietLinesEndIsItsChoicesAtTheirSpacing` and `aQuietLineFoldsAtItsNewEnd` new, and
+  `thePhonesPiecesFitTogether`'s line (the choice inside the line, the glyph's box and the lit line inside the choice).
+
+Mutations, each made in the source, seen failing, and put back (the files' digests checked after):
+
+| mutation | caught by |
+| --- | --- |
+| the chosen one purple again (LineChoice's `DWPalette.text` as `.acc`) | test_the_chosen_one_is_underlined_and_purple_words_only_open_something |
+| the hairline between Yours and All put back (a vertical DWRule between the two words) | test_grid_and_list_are_on_albums_alone_and_yours_all_only_where_it_was, and the underline test |
+| the accent line on the unchosen one (`DWChosenLine(on: !on)`) | the underline test |
+| New playlist… grey (its `DWPalette.acc` as `.t3`) | the underline test |
+| a word without VoiceOver's selected trait | the underline test |
+| a lit line of its own drawn inline instead of the switch's DWChosenLine | the underline test |
+| the pair's half-6 written as `CGFloat(3)` | test_grid_and_list_..., test_the_lines_choices_are_drawn_at_iLibrarys_sizes_as_tokens |
+| Core's `end` without the pairs' 14 | test_each_pages_line_fits_or_gives_way_without_cutting_a_word; in swift test, aQuietLinesEndIsItsChoicesAtTheirSpacing and aQuietLineFoldsAtItsNewEnd |
+| Core's `end` without a choice's 3 either side | aQuietLinesEndIsItsChoicesAtTheirSpacing, aQuietLineFoldsAtItsNewEnd |
+| Core's `end` with no 6 between a pair's two | aQuietLinesEndIsItsChoicesAtTheirSpacing, aQuietLineFoldsAtItsNewEnd |
+
+### Not verified - only a phone can say (check 654)
+
+- That the chosen one reads at a glance on James's and Ethan's phones, at the standard and the largest text size: the
+  grey (#a8a8bc since the greys lifted) beside the white, the 2 pt line under a word as short as "All" (about 21 pt with
+  its room) and under a glyph.
+- The glyphs' real width at body size (the arithmetic guesses 1.3 of it; 1.1-1.2 likelier), so exactly where Albums'
+  line now gives way; that ViewThatFits still takes the ways in Core's order.
+- A tap in the 6 between two of a pair taking the nearer; the targets' reach above and below, inside the pager.
+- VoiceOver reading each choice as before, the chosen one selected, and never the line.
+- The Mac's offline Downloaded line (built for Mac Catalyst, not looked at).

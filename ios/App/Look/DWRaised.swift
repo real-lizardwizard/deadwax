@@ -93,7 +93,7 @@ extension LayoutSubview {
 /// Where a finger or the pointer takes a control: its face - and on the phone, where the face is shorter than a finger's
 /// target (DWLook's 44, the build plan's "a finger's targets at least 44"), that face reaching above and below it to the
 /// target (DWLook's `reach`). Never sideways: a target grown sideways would reach into the control beside it (the
-/// Library's Grid and List, 28 wide and 6 apart), as LibrarySwitchControl's SegmentReach never does. The Mac's target is
+/// Library's Grid and List, side by side), as LibrarySwitchControl's SegmentReach never does. The Mac's target is
 /// 0: its pointer is exact, so a control there takes its face's own shape, as R1's did.
 struct DWTarget<Face: Shape>: Shape {
     let face: Face
