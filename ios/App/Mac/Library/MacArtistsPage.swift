@@ -101,12 +101,14 @@ struct MacArtistsPage: View {
         .task(id: AskKey(person: server.person, online: reachability.online,
                          generation: library.generations[scope] ?? 0)) {
             guard reachability.online else { return }
-            // the artists, and the scope's albums the totals are summed from (the phone's Your artists asks both too)
+            // the artists, and the scope's albums the totals are summed from (the phone's Your artists asks both too) -
+            // (Speed A, fix 4) the artists only once the list in hand is over a minute old, or a write was told of
             let artists = self.artists
             let library = self.library
             let scope = self.scope
+            let writes = KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library).writes
             await withTaskGroup(of: Void.self) { group in
-                group.addTask { await artists.ask() }
+                group.addTask { await artists.askIfOld(writes: writes) }
                 group.addTask { await library.load(scope) }
             }
         }
@@ -292,7 +294,8 @@ struct MacArtistsPage: View {
         }
         chosen = model
         await model.load(key: "\(server.person)|\(artist.id)", client: server.client, online: reachability.online,
-                         artists: artists)
+                         artists: artists,
+                         kept: KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library))
     }
 
     /// Play can: the selected artist's albums all asked, some with songs in hand, deadwax in reach - never in Grid,

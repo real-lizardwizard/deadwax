@@ -153,7 +153,7 @@ struct AlbumView<Desk: View>: View {
         .task(id: taskKey) {
             model.online = reachability.online
             await model.load(key: taskKey, client: server.client, personal: server.access.hasLibrary, player: player,
-                             downloads: downloads)
+                             downloads: downloads, kept: kept)
         }
         .task { await downloads.followProgress() }
         // (Last.fm, slice A4) About, asked for the page and the album's ids now - the session's answer drawn at once
@@ -174,7 +174,7 @@ struct AlbumView<Desk: View>: View {
             guard online else { return }
             Task {
                 await model.load(key: taskKey, client: server.client, personal: server.access.hasLibrary, player: player,
-                                 downloads: downloads)
+                                 downloads: downloads, kept: kept)
             }
         }
         .appSheet(item: $albumInfo) { album in
@@ -429,8 +429,13 @@ struct AlbumView<Desk: View>: View {
             reachability.tryNow()
             return
         }
-        Task { await model.refresh(client: server.client, player: player, downloads: downloads) }
+        Task { await model.refresh(client: server.client, player: player, downloads: downloads, kept: kept) }
     }
+
+    /// (Speed A, fix 2) The stamp the session's kept album answers are read and kept under now: who is signed in and
+    /// every write deadwax was told of (KeptAlbumAnswers.stamp) - an Edit's write to this album moves it, so the
+    /// refresh that follows keeps its answer under the new one and nothing from before is drawn again.
+    private var kept: KeptAnswers<Album>.Stamp { KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library) }
 
     /// What Play and Shuffle take: the album's songs - offline, or with the album gone from the collection, its songs on
     /// this phone, in its order.

@@ -259,7 +259,7 @@ def test_every_write_asks_the_count_again_and_tells_the_page():
     # an apply, Tags' apply, the cover alone, a Get (wrote), a delete (gone), a mark (mark) - each tells
     assert "told(from: before.path)" in swift_like(edit, "wrote")
     assert "told(from: before.path, deleted: true)" in swift_like(edit, "gone")
-    assert "told(from: from)" in swift_like(edit, "mark")
+    assert "told(from: from, filesChanged: false)" in swift_like(edit, "mark")
     assert edit.count("wrote(before: before)") >= 5
     # the artist tools' Save and Move
     artist = app_file("Artist", "ArtistToolModels.swift")
@@ -284,7 +284,7 @@ def test_a_mark_is_judged_as_every_write_is():
     assert "AccessibilityNotification.Announcement(EditWords.mayHaveFinished).post()" in mark
     # the read and the telling come after the catch - an answered mark and an unanswered one alike
     catch = mark.index("} catch {")
-    assert mark.index("await lookUp()") > catch and mark.index("told(from: from)") > mark.index("await lookUp()")
+    assert mark.index("await lookUp()") > catch and mark.index("told(from: from, filesChanged: false)") > mark.index("await lookUp()")
 
 
 def test_the_page_says_its_own_failures_and_shows_when_deadwax_is_out_of_reach():

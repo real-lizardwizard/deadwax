@@ -14,6 +14,10 @@ public struct HTTPRequest: Sendable, Equatable {
     /// The most of an answer's body to read (bytes), when the route needs a limit (the cover viewer's full size,
     /// `CoverZoom.fullMostBytes`); past it the transport calls the request off and throws `HTTPTooLarge`. nil: all of it.
     public var mostBytes: Int?
+    /// (Speed A, after review) Whether a cover's answer may be kept in the covers' disk cache (CoverDisk.takes) - true
+    /// but for a downloaded album's cover, which is written to a file of its own and asked exactly as before
+    /// (DownloadModel.keepAlbum). Never sent; nothing else reads it.
+    public var mayKeepOnDisk = true
 
     public init(method: String, url: URL, headers: [String: String] = [:], body: Data? = nil, timeout: Double? = nil,
                 mostBytes: Int? = nil) {

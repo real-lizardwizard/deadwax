@@ -24,9 +24,10 @@ struct DrawnArtists {
 /// The Library's artists (Phase 4, slice 4 - phase4-library.md 2.6; the web's LibrarySection.tsx ArtistSection), one per
 /// person:
 ///
-/// - Every artist Navidrome has (`GET /deadwax/navidrome/artists`), asked as an Artists screen shows and again each time
-///   it shows - as the web's, which keeps no list from one look to the next - the newest answer only. A failure keeps
-///   the list in hand (the screen says it couldn't be asked again); kept in memory only, so the app opening asks again.
+/// - Every artist Navidrome has (`GET /deadwax/navidrome/artists`), asked as an Artists screen shows - (Speed A, fix 4)
+///   again only once the list in hand is over a minute old or a write was told of, the album index's rule (`askIfOld`);
+///   a pull and the Library's Refresh ask at once (`ask`) - the newest answer only. A failure keeps the list in hand
+///   (the screen says it couldn't be asked again); kept in memory only, so the app opening asks again.
 /// - What each screen draws of it: the collection's list, Your artists (Core's YourArtists over your albums, counting
 ///   yours - with a library of your own), or, while deadwax can't be reached and no list is in hand, the artists of the
 ///   albums on this phone (ArtistOffline.artists). Each list's ArtistShelf made once, its order once per order, and
@@ -59,6 +60,15 @@ final class ArtistsModel {
     @ObservationIgnored private var asks = 0
     /// One more at every reset: nothing begun for the person before lands after.
     @ObservationIgnored private var epoch = 0
+    /// (Speed A, fix 4) The list in hand: when it landed (Monotonic ms), under how many writes and whether settled - nil
+    /// before one has; the writes the screens last told of, and when they last moved; and the writes the ask on its way
+    /// was asked under (nil for none).
+    @ObservationIgnored private var landed: ListFreshness.Landed?
+    @ObservationIgnored private var told = 0
+    @ObservationIgnored private var toldMoved: Int64?
+    @ObservationIgnored private var asking: Int?
+    /// (Speed A, fix 5) The writes told of when an artist page last asked the library which albums are yours.
+    @ObservationIgnored private var ownedAskedUnder: Int?
     /// Each kind of list's shelf, the order made of it and what was last drawn - and what each was made from.
     @ObservationIgnored private var shelves: [Kind: (stamp: Stamp, shelf: ArtistShelf)] = [:]
     @ObservationIgnored private var sorted: [Kind: (stamp: Stamp, order: ArtistOrder, places: [Int])] = [:]
@@ -85,17 +95,46 @@ final class ArtistsModel {
 
     // MARK: asking
 
+    /// (Speed A, fix 4 - notes/ios.md "Speed A: what's asked again") As an Artists screen shows, or the app comes back
+    /// to the front on one: the list asked again only when none is in hand or the one in hand is over a minute old, and
+    /// nothing asked under the same writes is on its way - the album index's own rule (Core's ListFreshness,
+    /// AlbumIndexState.freshMs). `writes`, every write deadwax was told of (KeptAlbumAnswers.stamp's), asks at once when
+    /// it moved since the list in hand was asked, as the index's generation does - and at each show until a list asked
+    /// AlbumEdit.settleMs after they moved has landed, Navidrome's scan of them being seconds behind; so does a last ask
+    /// that failed. A pull, and the Library's Refresh, still ask at once (`ask`).
+    func askIfOld(writes: Int) async {
+        if writes != told {
+            told = writes
+            toldMoved = Int64(Self.now)
+        }
+        guard ListFreshness.asks(landed: landed, writes: writes, failed: failure != nil, onItsWay: asking,
+                                 now: Int64(Self.now)) else { return }
+        await ask()
+    }
+
     /// `GET /artists`: the list asked again - drawn in place of the one in hand when it lands (when it differs); a
     /// failure keeps the one in hand and says why.
+    ///
+    /// (Speed A, after review) The request is the model's, not the screen's: an unstructured task, as the album index's
+    /// shared request is, so a screen leaving (its task cancelled) can't call it off. `asking` - which keeps the next
+    /// show from asking again - is then only ever a request really on its way, and its answer lands for whichever
+    /// screen shows next.
     func ask() async {
         guard let client = server.client else { return }
         asks += 1
         let asked = asks
         let epoch = self.epoch
         failure = nil
+        let writes = told
+        let settled = ListFreshness.settled(askedAt: Int64(Self.now), writesMovedAt: toldMoved)
+        asking = writes
+        defer { if asked == asks { asking = nil } }
+        let request = Task<[Artist], Error> { try await client.artists() }
         do {
-            let artists = try await client.artists()
+            let artists = try await request.value
             guard asked == asks, epoch == self.epoch else { return }
+            // (Speed A) the list in hand stands as of now, changed or not
+            landed = ListFreshness.Landed(at: Int64(Self.now), writes: writes, settled: settled)
             if artists != list {
                 list = artists
                 serial += 1
@@ -206,6 +245,15 @@ final class ArtistsModel {
         pages[page.route.id] = ShownArtistPage(page)
     }
 
+    /// (Speed A, fix 5 - notes/ios.md "Speed A: what's asked again") An artist page opening: whether it asks the library
+    /// which albums are yours again - not while the index is in hand and no write was told of since a page last asked
+    /// (Core's OwnedCheck), as the album page doesn't. `writes` is KeptAlbumAnswers.stamp's.
+    func asksOwned(inHand: Bool, writes: Int) -> Bool {
+        guard OwnedCheck.asks(inHand: inHand, writes: writes, askedUnder: ownedAskedUnder) else { return false }
+        ownedAskedUnder = writes
+        return true
+    }
+
     /// The artist page showing for the artist, if one still is.
     func page(_ id: String) -> ArtistPageModel? { pages[id]?.page }
 
@@ -249,6 +297,11 @@ final class ArtistsModel {
         asks += 1
         list = nil
         failure = nil
+        landed = nil
+        told = 0
+        toldMoved = nil
+        asking = nil
+        ownedAskedUnder = nil
         serial = 0
         shelves = [:]
         sorted = [:]

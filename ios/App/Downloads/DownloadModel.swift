@@ -1868,7 +1868,11 @@ final class DownloadModel {
                 // kept as an album page's answer is: a song's size learned, or a replaced file fetched again
                 albumAnswered(album, body: response.body)
                 if let cover = album.coverArt, !cover.isEmpty {
-                    let data = try await client.cover(coverID: cover, size: DownloadStore.coverSize)
+                    // (Speed A, after review) asked exactly as before - never through the covers' disk cache: its copy
+                    // is the file below
+                    var asked = client.coverRequest(coverID: cover, size: DownloadStore.coverSize)
+                    asked.mayKeepOnDisk = false
+                    let data = try await client.answer(asked).body
                     guard self.store === store else { return }
                     let name = DownloadStore.coverName(cover, data: data)
                     let url = store.coverURL(name)

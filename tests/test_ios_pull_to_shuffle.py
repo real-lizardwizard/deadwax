@@ -180,7 +180,7 @@ def test_refresh_is_the_bar_menus_now():
     assert menu.index("if let editAlbum {") < item
     assert 'Button(LibrarySwitchWords.refresh, systemImage: "arrow.clockwise") {' in menu[item:item + 160]
     for path, model_call in (
-        (ALBUM, "model.refresh(client: server.client, player: player, downloads: downloads)"),
+        (ALBUM, "model.refresh(client: server.client, player: player, downloads: downloads, kept: kept)"),
         (PLAYLIST, "model.load(key: taskKey, client: server.client, playlists: playlists)"),
     ):
         source = code(path)

@@ -277,7 +277,8 @@ struct MacAlbumsPage: View {
         model.online = reachability.online
         chosen = model
         await model.load(key: "\(server.person)|\(album.id)", client: server.client, personal: false, player: player,
-                         downloads: downloads)
+                         downloads: downloads,
+                         kept: KeptAlbumAnswers.stamp(server: server, navigation: navigation, library: library))
         if chosen !== model { player.albumLeft(id: album.id) }
     }
 

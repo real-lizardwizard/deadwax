@@ -768,7 +768,7 @@ final class EditAlbumModel {
         // an ignore changes no file - only the review row: the folder read again, so the list follows
         await lookUp()
         // (slice 6) Needs a look's row says Marked fine (or nothing, asked about again), and its count follows
-        told(from: from)
+        told(from: from, filesChanged: false)
     }
 
     // MARK: after a write
@@ -776,10 +776,21 @@ final class EditAlbumModel {
     /// (slice 6) A write to the folder that was at `from` landed, or may have, and the folder has been read again: Needs
     /// a look's count asked again, and - in queue mode - its row told what became of the album (the album as this read
     /// has it, nil when it isn't listed; or deleted). The web's `toFolder`.
-    private func told(from: String, deleted: Bool = false) {
+    ///
+    /// (Speed A, after review) A write moves the managing count again once Navidrome has scanned it (AlbumEdit.settleMs),
+    /// as the page path's albumWritten does: an Edit opened by its folder - no page beneath - moved it only before the
+    /// scan, so an album answer or the Artists list asked in those seconds was kept under it as though it stood. A mark
+    /// (`filesChanged: false`) changes no file and moves it once.
+    private func told(from: String, deleted: Bool = false, filesChanged: Bool = true) {
         guard samePerson else { return }
         navigation?.managed()
         queue?.heard(NeedsLook.FolderChange(from: from, album: deleted ? nil : album, deleted: deleted))
+        guard filesChanged else { return }
+        Task {
+            try? await Task.sleep(for: .milliseconds(AlbumEdit.settleMs))
+            guard self.samePerson else { return }
+            self.navigation?.managed()
+        }
     }
 
     /// The id the album page beneath has now (a move changes it).

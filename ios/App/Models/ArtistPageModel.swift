@@ -9,6 +9,9 @@ import Observation
 /// rule) - Core's ArtistAlbumAsks: `ArtistPage.atOnce` at a time in the page's order, the newest round's answers only,
 /// an album that won't come left out and said so under the buttons, Try again asking those again.
 ///
+/// (Speed A, fix 2 - notes/ios.md "Speed A: what's asked again") Each album's answer that comes is kept for the album
+/// pages as well (KeptAlbumAnswers, under the stamp the page asked with): an album opened from here draws at once.
+///
 /// The answer kept for the artist (ArtistsModel, the last `ArtistPage.kept`) draws at once, and deadwax is asked behind
 /// it; a failure keeps it drawn. Only the newest answer draws: each ask takes the next number. The albums' asks are
 /// unstructured tasks, so a page covered by an album's page keeps asking; they land on the page only while it exists.
@@ -56,6 +59,9 @@ final class ArtistPageModel {
     @ObservationIgnored private var fresh = false
     /// One more for each other who-and-which: an album's answer asked for before lands nowhere after.
     @ObservationIgnored private var generation = 0
+    /// (Speed A, fix 2) The stamp the albums' songs are asked under (KeptAlbumAnswers.stamp, as the page last asked):
+    /// each answer is kept for the album pages under it.
+    @ObservationIgnored private var kept: KeptAnswers<Album>.Stamp?
     /// Who they are on MusicBrainz and the page's rows, as last made, with what they were made from (the web's useMemo
     /// over artistRows): the page is drawn again as each album's songs land and as the name scrolls into the bar, and the
     /// id's fallback reads every folder in the library. `owned` is SearchModel's `ownedVersion`.
@@ -139,8 +145,10 @@ final class ArtistPageModel {
 
     /// The page's task: the kept answer drawn at once and its albums' songs asked, the artist asked of deadwax (once a
     /// page's life - again after a failure, and on a pull: `again`), and the songs of any other albums its answer names.
-    /// `key` is who and which artist.
-    func load(key: String, client: DeadwaxClient?, online: Bool, artists: ArtistsModel, again: Bool = false) async {
+    /// `key` is who and which artist; `kept` (Speed A) the stamp the albums' answers are kept under for the album pages.
+    func load(key: String, client: DeadwaxClient?, online: Bool, artists: ArtistsModel, again: Bool = false,
+              kept: KeptAnswers<Album>.Stamp? = nil) async {
+        if let kept { self.kept = kept }
         if key != self.key {
             self.key = key
             answer = nil
@@ -233,14 +241,17 @@ final class ArtistPageModel {
     func factsSettled(for mbid: String?) -> Bool { mbid != nil && factsFor == mbid }
 
     /// Try again under the buttons: the albums that didn't come asked for again.
-    func again(client: DeadwaxClient?) {
+    func again(client: DeadwaxClient?, kept: KeptAnswers<Album>.Stamp? = nil) {
         guard let client else { return }
+        if let kept { self.kept = kept }
         send(asks.again(), client: client)
     }
 
-    /// Each ask made, its answer (or failure) taken by the rule - which hands back the next to make.
+    /// Each ask made, its answer (or failure) taken by the rule - which hands back the next to make. (Speed A) Each
+    /// album that came is kept for the album pages too (KeptAlbumAnswers), under the stamp it was asked under.
     private func send(_ list: [ArtistAlbumAsks<Album>.Ask], client: DeadwaxClient) {
         let generation = self.generation
+        let kept = self.kept
         for ask in list {
             Task { [weak self] in
                 let found: Album?
@@ -254,6 +265,7 @@ final class ArtistPageModel {
                 // an album Navidrome no longer has (`{}`, the client's nil) is one that didn't come - the web takes the
                 // empty answer as in hand, and then says it plays an album it has nothing of
                 if let found {
+                    if let kept { KeptAlbumAnswers.shared.keep(found, stamp: kept) }
                     next = self.asks.answered(ask, with: found)
                 } else {
                     next = self.asks.failed(ask)

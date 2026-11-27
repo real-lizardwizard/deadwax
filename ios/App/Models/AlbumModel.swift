@@ -13,6 +13,11 @@ import Observation
 /// needs deadwax, isn't drawn, and the badge is the kept album's own. An album deadwax no longer has, with songs of it
 /// here, keeps the kept answer drawn - it still plays what is here.
 ///
+/// (Speed A, fix 2 - notes/ios.md "Speed A: what's asked again") Else the album's answer kept for the session
+/// (KeptAlbumAnswers: the last 40, from this page's asks and the artist page's prefetch) draws at once, under the stamp
+/// of who is signed in and the writes deadwax was told of - and deadwax is asked behind it, as for the phone's. A write
+/// (an Edit's apply, a delete, a re-file) or another person drops them all; this page's Add or Remove drops its own.
+///
 /// Only the newest answer draws (AlbumPage.tsx's two latestOnly): each ask takes the next number, and an answer for
 /// an older one is dropped; the page's `.task` is cancelled when the page goes, which calls its requests off. What is
 /// in hand is kept while the page is covered and shown again (a NavigationStack re-runs the task on the way back), so
@@ -65,6 +70,8 @@ final class AlbumModel {
     @ObservationIgnored private var storeAsks = 0
     /// The album its levels were warmed for (once per album, as the web's effect on `album?.id`).
     @ObservationIgnored private var warmed: String?
+    /// (Speed A) The album is drawn from the session's kept answer (KeptAlbumAnswers); deadwax's own replaces it.
+    @ObservationIgnored private var fromKept = false
 
     /// (Last.fm, slice A4 - notes/ios.md "Last.fm, slice A4") About at the page's foot: its answers for the page.
     let about = AboutModel()
@@ -132,8 +139,10 @@ final class AlbumModel {
 
     /// The page's task: the album and - with a library of your own - the bridge, at once, each as it isn't in hand;
     /// the album's levels warmed as its songs come (PlayerModel.albumShown: AlbumPageLines.warms decides). `key` is
-    /// who and which album (the task's id): another than the answers in hand are for drops them all first.
-    func load(key: String, client: DeadwaxClient?, personal: Bool, player: PlayerModel, downloads: DownloadModel) async {
+    /// who and which album (the task's id): another than the answers in hand are for drops them all first. `kept` is the
+    /// stamp the session's kept answers are read and kept under (KeptAlbumAnswers.stamp) - nil keeps none.
+    func load(key: String, client: DeadwaxClient?, personal: Bool, player: PlayerModel, downloads: DownloadModel,
+              kept: KeptAnswers<Album>.Stamp?) async {
         if key != self.key {
             self.key = key
             album = nil
@@ -145,6 +154,7 @@ final class AlbumModel {
             refused = nil
             warmed = nil
             fromPhone = false
+            fromKept = false
             goneButHere = false
         }
         self.personal = personal
@@ -153,12 +163,19 @@ final class AlbumModel {
             album = kept
             fromPhone = true
         }
+        // (Speed A) else the session's kept answer, drawn at once - online or not - under who and which writes now
+        if album == nil, let kept, let answer = KeptAlbumAnswers.shared.answer(route.id, stamp: kept) {
+            album = answer
+            fromKept = true
+        }
         // nothing that needs deadwax is asked while it can't be reached: the page asks again once it is back
         guard let client, online else { return }
-        let wantsAlbum = (album == nil || fromPhone) && !empty && !goneButHere
+        let wantsAlbum = (album == nil || fromPhone || fromKept) && !empty && !goneButHere
         let wantsStore = personal && store == nil
         await withTaskGroup(of: Void.self) { group in
-            if wantsAlbum { group.addTask { await self.askAlbum(client, player: player, downloads: downloads, again: false) } }
+            if wantsAlbum {
+                group.addTask { await self.askAlbum(client, player: player, downloads: downloads, again: false, kept: kept) }
+            }
             if wantsStore { group.addTask { await self.askStore(client, again: false) } }
         }
     }
@@ -166,18 +183,20 @@ final class AlbumModel {
     /// The bar •••'s Refresh, or a failure's Try again (a pull to refresh until 2026-11-15): both asked afresh, drawn
     /// over what is on screen (what the page last did is told by deadwax's answer now); a failure keeps what is drawn -
     /// and with nothing drawn, says it.
-    func refresh(client: DeadwaxClient?, player: PlayerModel, downloads: DownloadModel) async {
+    func refresh(client: DeadwaxClient?, player: PlayerModel, downloads: DownloadModel,
+                 kept: KeptAnswers<Album>.Stamp?) async {
         guard let client, online else { return }
         changed = nil
         refused = nil
         let asksStore = personal
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.askAlbum(client, player: player, downloads: downloads, again: true) }
+            group.addTask { await self.askAlbum(client, player: player, downloads: downloads, again: true, kept: kept) }
             if asksStore { group.addTask { await self.askStore(client, again: true) } }
         }
     }
 
-    private func askAlbum(_ client: DeadwaxClient, player: PlayerModel, downloads: DownloadModel, again: Bool) async {
+    private func askAlbum(_ client: DeadwaxClient, player: PlayerModel, downloads: DownloadModel, again: Bool,
+                          kept: KeptAnswers<Album>.Stamp?) async {
         albumAsks += 1
         let asked = albumAsks
         do {
@@ -188,29 +207,43 @@ final class AlbumModel {
                 album = found
                 empty = false
                 fromPhone = false
+                fromKept = false
                 goneButHere = false
+                // (Speed A) kept for the session under the stamp it was asked under - an answer asked before a write
+                // keeps nothing
+                if let kept { KeptAlbumAnswers.shared.keep(found, stamp: kept) }
                 downloads.albumAnswered(found, body: body)
                 if warmed != found.id {
                     warmed = found.id
                     player.albumShown(found)
                 }
             } else if keepsKept(downloads) {
+                KeptAlbumAnswers.shared.forget(route.id)
                 goneButHere = true
             } else {
+                KeptAlbumAnswers.shared.forget(route.id)
                 album = nil
                 empty = true
+                fromKept = false
                 player.albumGone(id: route.id)
             }
         } catch {
             guard asked == albumAsks, !APIFailure.isCancellation(error) else { return }
-            if AlbumGone.isGone(empty: false, failure: error), keepsKept(downloads) {
+            let gone = AlbumGone.isGone(empty: false, failure: error)
+            if gone { KeptAlbumAnswers.shared.forget(route.id) }
+            if gone, keepsKept(downloads) {
                 goneButHere = true
                 return
             }
-            // a refresh that fails keeps the album drawn - and so does an ask behind the kept answer
-            if again || fromPhone, album != nil { return }
+            // a refresh that fails keeps the album drawn - and so does an ask behind the kept answer, the phone's or
+            // (Speed A) the session's - but not an album deadwax says is gone
+            if again || fromPhone || (fromKept && !gone), album != nil { return }
+            if gone {
+                album = nil
+                fromKept = false
+            }
             failure = error
-            if AlbumGone.isGone(empty: false, failure: error) { player.albumGone(id: route.id) }
+            if gone { player.albumGone(id: route.id) }
         }
     }
 
@@ -257,6 +290,8 @@ final class AlbumModel {
                 _ = try await client.removeFromLibrary(navidromeID: route.id)
             }
             busy = false
+            // (Speed A) the session's kept answer is of the album before: its starred is the other way now
+            KeptAlbumAnswers.shared.forget(route.id)
             let done: AlbumMine.Change = action == .add ? .added : .removed
             changed = done
             answered += 1
@@ -269,4 +304,35 @@ final class AlbumModel {
             answered += 1
         }
     }
+}
+
+/// (Speed A, fix 2 - notes/ios.md "Speed A: what's asked again") The albums' answers kept for the app's run, in memory
+/// only: Core's KeptAnswers, the last `KeptAlbums.most`. Filled by the album page's own asks and the artist page's songs
+/// prefetch (ArtistPageModel); read by an album page as it opens, which draws the answer at once and asks deadwax
+/// behind it. Every read and keep carries the stamp of now (`stamp`): another person, a sign-in again, or any write
+/// deadwax was told of - Edit album's to a folder (albumWrites), an apply, a delete, a re-file, a Get, a mark
+/// (managingWrites), your library changing (LibraryModel.yoursChanged: an Add or Remove anywhere, the store line's
+/// too, the starred count moving) - drops them all at the next look, and an answer asked before lands nowhere. An
+/// album deadwax says is gone, or that its page added or removed, is let go on its own. A star made in Amperfy or the
+/// web that moves no count is healed by the answer asked behind the kept one.
+@MainActor
+final class KeptAlbumAnswers {
+    static let shared = KeptAlbumAnswers()
+
+    private var kept = KeptAnswers<Album>(most: KeptAlbums.most)
+
+    private init() {}
+
+    /// Who is signed in, and every write deadwax was told of since they were - your library's changes among them.
+    static func stamp(server: ServerModel, navigation: AppNavigation, library: LibraryModel) -> KeptAnswers<Album>.Stamp {
+        let edits = navigation.albumWrites.values.reduce(0) { (sum: Int, each: Int) -> Int in sum + each }
+        return KeptAnswers<Album>.Stamp(person: server.person, session: navigation.session,
+                                        writes: edits + navigation.managingWrites + library.yoursChanged)
+    }
+
+    func answer(_ id: String, stamp: KeptAnswers<Album>.Stamp) -> Album? { kept.answer(id, stamp: stamp) }
+
+    func keep(_ album: Album, stamp: KeptAnswers<Album>.Stamp) { kept.keep(album.id, album, stamp: stamp) }
+
+    func forget(_ id: String) { kept.forget(id) }
 }

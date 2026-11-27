@@ -7,14 +7,44 @@ import Foundation
 /// No cache of its own either (`urlCache` nil): a request sent with If-None-Match gets deadwax's 304 back as it
 /// came, for DeadwaxClient.fetch to say "unchanged" - the app keeps the answers worth keeping itself.
 ///
+/// (Speed A, fix 1 - notes/ios.md "Speed A: what's asked again") Covers - a request Core's CoverDisk takes: Navidrome's
+/// and the Cover Art Archive's fronts, never the viewer's full size nor a download's - go through a session of their
+/// own (its own connections), as uncached as every other, and are kept on disk BY HAND (`cover`): looked up and stored
+/// in `coverCache` under CoverDisk.key, the address alone, so no request header - deadwax's session above all - is ever
+/// written beside one. URLSession itself never stores anything (after review: URLCache storing on its own keeps each
+/// request with its headers). Drawn from disk while CoverDisk.ask says it stands (its max-age, a day at most), else
+/// asked again with its validators - a 304 is the copy kept. A cover the disk answered without asking is not deadwax
+/// answering: Reachability hears of a cover only when deadwax was asked.
+///
 /// One URLSession per time to answer: 8 seconds for every route but the few `Routes.timeouts` gives longer (the
 /// album index, 30). The request's own timeoutInterval says the same, so whichever of the two URLSession heeds,
 /// the route gets its time.
 final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
     static let standardTimeout: Double = 8
 
+    /// (Speed A) The covers' cache on disk, in the app's Caches - nil only with no Caches to put it in (the covers are
+    /// then kept in memory alone, as before). Only `cover` stores in it, and only under CoverDisk.key. The first
+    /// build's folder, where URLCache stored on its own, requests' headers and all, is removed as this one is made.
+    static let coverCache: URLCache? = {
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        try? FileManager.default.removeItem(at: caches.appendingPathComponent(CoverDisk.oldFolder, isDirectory: true))
+        let folder = caches.appendingPathComponent(CoverDisk.folder, isDirectory: true)
+        return URLCache(memoryCapacity: 0, diskCapacity: CoverDisk.diskBytes, directory: folder)
+    }()
+
+    /// The request a cover is kept and looked up under (CoverDisk.key): its address alone, no header.
+    static func coverKey(_ request: HTTPRequest) -> URLRequest {
+        URLRequest(CoverDisk.key(request))
+    }
+
+    /// A session's kind: its time to answer, and whether it is the covers' (their own connections) or every other route's.
+    private struct Kind: Hashable {
+        let timeout: Double
+        let covers: Bool
+    }
+
     private let lock = NSLock()
-    private var sessions: [Double: URLSession] = [:]
+    private var sessions: [Kind: URLSession] = [:]
     private var listener: (@Sendable (_ answered: Bool) -> Void)?
 
     init() {}
@@ -39,13 +69,16 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         return configuration
     }
 
-    private func session(waiting timeout: Double) -> URLSession {
+    /// (Speed A) The covers' session is a URLSession of its own - its own connections, so a page's JSON never holds a
+    /// cover back - made from the same configuration as every other: ephemeral, no cache. `cover` keeps them on disk.
+    private func session(waiting timeout: Double, covers: Bool = false) -> URLSession {
         lock.lock()
         defer { lock.unlock() }
-        if let session = sessions[timeout] { return session }
+        let kind = Kind(timeout: timeout, covers: covers)
+        if let session = sessions[kind] { return session }
         let session = URLSession(configuration: Self.configuration(waiting: timeout), delegate: SameOriginRedirects.shared,
                                  delegateQueue: nil)
-        sessions[timeout] = session
+        sessions[kind] = session
         return session
     }
 
@@ -55,10 +88,14 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
         sent.timeoutInterval = timeout
         let data: Data
         let response: URLResponse
+        // (Speed A) whether deadwax answered: always - but a cover the disk answered without asking
+        var answered = true
         do {
             if let most = request.mostBytes {
                 (data, response) = try await CappedRead.read(sent, most: most,
                                                              configuration: Self.configuration(waiting: timeout))
+            } else if CoverDisk.takes(request), let cache = Self.coverCache {
+                (data, response, answered) = try await cover(request, sent: sent, cache: cache, timeout: timeout)
             } else {
                 (data, response) = try await session(waiting: timeout).data(for: sent)
             }
@@ -70,11 +107,59 @@ final class URLSessionTransport: HTTPTransport, @unchecked Sendable {
             heard(true)
             throw error
         }
-        heard(true)
+        if answered { heard(true) }
         guard let http = response as? HTTPURLResponse else {
             throw APIFailure.other("The answer wasn't http.")
         }
         return HTTPResponse(status: http.statusCode, headers: Self.headers(http), body: data)
+    }
+
+    /// (Speed A, after review) A cover, kept on disk by hand: the copy under CoverDisk.key drawn while it stands (nothing
+    /// asked - not deadwax answering), else deadwax asked - with the copy's validators, a 304 being the copy kept again
+    /// - and a 200 kept in its place, only CoverDisk.kept's headers and never the request: the key has none. An answer
+    /// that may not be kept (no-store, not a 200) takes the copy away.
+    private func cover(_ request: HTTPRequest, sent: URLRequest, cache: URLCache,
+                       timeout: Double) async throws -> (Data, URLResponse, Bool) {
+        let key = Self.coverKey(request)
+        let held = cache.cachedResponse(for: key)
+        let heldHeaders = (held?.response as? HTTPURLResponse).map(Self.headers)
+        var asked = sent
+        var revalidating = false
+        switch CoverDisk.ask(held: heldHeaders, now: Date().timeIntervalSince1970) {
+        case .kept:
+            if let held { return (held.data, held.response, false) }
+        case .revalidate(let validators):
+            for (name, value) in validators { asked.setValue(value, forHTTPHeaderField: name) }
+            revalidating = true
+        case .fetch:
+            break
+        }
+        let (data, response) = try await session(waiting: timeout, covers: true).data(for: asked)
+        guard let http = response as? HTTPURLResponse else { return (data, response, true) }
+        let now = Date().timeIntervalSince1970
+        if http.statusCode == 304, revalidating, let held, let heldHeaders {
+            if let again = CoverDisk.revalidated(heldHeaders, by: Self.headers(http), now: now) {
+                Self.store(held.data, headers: again, under: key, in: cache)
+            } else {
+                cache.removeCachedResponse(for: key)
+            }
+            return (held.data, held.response, true)
+        }
+        if let kept = CoverDisk.kept(status: http.statusCode, headers: Self.headers(http), now: now) {
+            Self.store(data, headers: kept, under: key, in: cache)
+        } else if held != nil {
+            cache.removeCachedResponse(for: key)
+        }
+        return (data, response, true)
+    }
+
+    /// A cover written to disk: a 200 with `headers` alone (CoverDisk.kept's), under `key` (CoverDisk.key's, no header).
+    private static func store(_ data: Data, headers: [String: String], under key: URLRequest, in cache: URLCache) {
+        guard let url = key.url,
+              let answer = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: headers) else {
+            return
+        }
+        cache.storeCachedResponse(CachedURLResponse(response: answer, data: data, storagePolicy: .allowed), for: key)
     }
 
     private static func headers(_ http: HTTPURLResponse) -> [String: String] {
