@@ -26,7 +26,7 @@ import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from src import auth, stars
+from src import auth, index_keep, stars
 from src import library_ledger as rules
 from src.api.navidrome_endpoint import NavidromeError, client_for
 from src.config import Config
@@ -248,6 +248,8 @@ async def remove_from_my_library(request: Request, body: Remove, user: str = Dep
     try:
         album = (await client.call("getAlbum", {"id": body.navidrome_id})).get("album")
         await client.call("unstar", {"albumId": body.navidrome_id})
+        #? (2.1.49) their library just changed in Navidrome: their kept album lists are from before it
+        index_keep.forget(user)
         after = (await client.call("getAlbum", {"id": body.navidrome_id})).get("album")
     except NavidromeError as e:
         if e.status == 401:

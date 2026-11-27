@@ -86,6 +86,8 @@ types to find an album ("deluxe" finds "Dummy (Deluxe Edition)"; the spec said f
 here). No debounce; the headers stay, the index goes, the count says "12 of 3012 albums", none found "No albums match
 “…”.". Escape empties it; leaving the page does (it is the section's state).
 
+(Since 2.1.49 the route asks Navidrome's pages four at a time and keeps its answer for 30 seconds - notes/performance.md "The Library's album list: pages together, and kept for a moment".)
+
 **The data: one list per scope, in one request** - `GET /deadwax/navidrome/album_index?scope=yours|store` (a user's
 route, `tests/test_logins.py` ROUTES, `test_there_is_no_general_proxy`, test_player_as_you's WALK both ways): the only
 Subsonic call is getAlbumList2 (already on the list for /albums), as the asker through client_for, `starred` or

@@ -823,3 +823,16 @@ def test_a_kept_answer_is_gzipped_only_for_an_asker_who_accepts_it(tmp_path, mon
         body = b"".join(raw.iter_raw())
         assert raw.headers["content-encoding"] == "gzip"
     assert gzip.decompress(body) == plain.content
+
+
+def test_a_rescan_drops_the_librarys_kept_album_lists(tmp_path, monkeypatch, store):
+    """(2.1.49) src/index_keep.py: Rescan is "show me what is really there"."""
+    from src import index_keep
+
+    client = warm_client(tmp_path, monkeypatch, store)
+    began = index_keep.epoch()
+    client.get("/deadwax/library/albums")
+    assert index_keep.epoch() == began, "a look at the library drops nothing"
+
+    assert client.post("/deadwax/library/rescan").status_code == 200
+    assert index_keep.epoch() != began

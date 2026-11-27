@@ -29,10 +29,10 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
 from starlette.background import BackgroundTask
 
-from src import library_ledger, lyrics, player_cache
+from src import index_keep, library_ledger, lyrics, player_cache
 from src import play_queue as queue_rules
 from src import playlists as playlist_rules
-from src.api.json_etag import json_with_etag
+from src.api.json_etag import answer_packed, json_with_etag, pack
 from src.api.navidrome_endpoint import (CLIENT_NAME, NOT_CONFIGURED, NavidromeError, SignedOut, UserClient, asks_as_shared,
                                         client_for)
 from src.config import Config
@@ -294,40 +294,96 @@ AlbumScope = Literal["yours", "store"]
 #? and never skips one, as an alphabetical list read by offset could
 SCOPE_LIST = {"yours": "starred", "store": "newest"}
 
+#? (2.1.49) How many of Navidrome's pages are asked for at once, after the first - by /album_index, and by the
+#? Library's Shuffle's read of every song (_shuffle_songs). One after another, a library of 5,000 albums was eleven
+#? round trips in a row; four at a time it is three rounds. Bounded: Navidrome answers these from one SQLite
+#? file, and the player's own calls must still get a turn. A list that ends inside a round has asked for up to
+#? three pages past its end - each an empty answer.
+PAGES_AT_ONCE = 4
+
+
+async def _pages_at(ask, offsets: list[int]) -> list:
+    """
+    `ask(offset)` for each of `offsets`, all under way at once - their answers in the offsets' own order, and in
+    place of one that failed its exception: whoever reads the pages reads them in order, stops at the list's end
+    exactly as a page-by-page read does, and raises a failure only if it reaches it - a page past the end failing
+    is nothing.
+    """
+    return await asyncio.gather(*(ask(offset) for offset in offsets), return_exceptions=True)
+
+
+async def _read_album_index(client, scope: str) -> tuple[list[dict], bool]:
+    """
+    Every album of `scope` as `client`'s account sees it, and whether the reading stopped at INDEX_MAX with the
+    last page still full: getAlbumList2 an INDEX_PAGE at a time - the first page alone (most libraries end in
+    it), then PAGES_AT_ONCE at a time - read in order to the first short page. Raises the NavidromeError of the
+    first page it needed that failed.
+    """
+    albums: list[dict] = []
+    seen: set[str] = set()
+
+    async def ask(offset: int) -> list:
+        body = await client.call("getAlbumList2", {"type": SCOPE_LIST[scope], "size": INDEX_PAGE, "offset": offset})
+        return (body.get("albumList2") or {}).get("album") or []
+
+    full = True
+    offset = 0
+    while full and offset < INDEX_MAX:
+        ahead = 1 if offset == 0 else PAGES_AT_ONCE
+        offsets = list(range(offset, min(offset + ahead * INDEX_PAGE, INDEX_MAX), INDEX_PAGE))
+        for page in await _pages_at(ask, offsets):
+            if isinstance(page, BaseException):
+                raise page
+            for entry in page:
+                if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or entry["id"] in seen:
+                    continue
+                seen.add(entry["id"])
+                albums.append({name: entry[name] for name in INDEX_FIELDS if name in entry})
+            full = len(page) >= INDEX_PAGE
+            if not full:
+                break
+        offset = offsets[-1] + INDEX_PAGE
+    return albums, full
+
 
 @router.get("/album_index")
-async def album_index(request: Request, scope: AlbumScope = Query(...)):
+async def album_index(request: Request, scope: AlbumScope = Query(...), user: str = Depends(current_user)):
     """
     Every album of `scope` in one answer (2.0.0-player.59, the Library): `yours` the asker's starred albums, `store`
     every album Navidrome has - getAlbumList2, the one Subsonic call it makes (already on the list for /albums), read
     INDEX_PAGE at a time as the asker until a short page or INDEX_MAX. Each album once (by id - a page boundary can
     repeat one), trimmed to INDEX_FIELDS, the values as Navidrome sent them, in Navidrome's order (starred_at desc,
-    created_at desc). `truncated` when the last page read was still full. Sent with an ETag (json_with_etag), so an
+    created_at desc). `truncated` when the last page read was still full. Sent with an ETag, so an
     unchanged list is a 304. Nothing the page sends is passed on but the scope, which picks the list type; a page
     that fails fails the whole answer (never a partial list), as _fail says it.
+
+    (2.1.49) The pages after the first are asked for PAGES_AT_ONCE at a time (_read_album_index), and the answer
+    is KEPT, encoded, for index_keep.INDEX_KEEP_S - so the asks that follow one (another device, the page opened
+    again) cost Navidrome nothing. Kept per asker AND per Navidrome account that answers for them: the key is
+    who asks (the session's user; `local` with logins off), which account their client asks as, the Navidrome
+    it is, and the scope - one person's list is never another's, and an asker with no login to ask as is never
+    answered from what was kept. What drops it before its time, and when nothing is kept at all, is
+    src/index_keep.py's to say.
     """
     client = client_for(request)
-    albums: list[dict] = []
-    seen: set[str] = set()
-    truncated = False
-    offset = 0
-    while offset < INDEX_MAX:
-        try:
-            body = await client.call("getAlbumList2", {"type": SCOPE_LIST[scope], "size": INDEX_PAGE, "offset": offset})
-        except NavidromeError as e:
-            raise _fail(e)
-        page = (body.get("albumList2") or {}).get("album") or []
-        for entry in page:
-            if not isinstance(entry, dict) or not isinstance(entry.get("id"), str) or entry["id"] in seen:
-                continue
-            seen.add(entry["id"])
-            albums.append({name: entry[name] for name in INDEX_FIELDS if name in entry})
-        if len(page) < INDEX_PAGE:
-            break
-        offset += INDEX_PAGE
-    else:
-        truncated = True
-    return json_with_etag(request, {"albums": albums, "truncated": truncated})
+    #? the account that will answer: the asker's own (a UserClient's), or the shared one - logins off, break-glass
+    account = ("user", client.username) if isinstance(client, UserClient) else (
+        ("shared", Config.NAVIDROME_USER or "") if asks_as_shared(client) else None)
+    key = (user, account, Config.NAVIDROME_URL or "", scope)
+    held = index_keep.kept(key) if account is not None else None
+    if held is not None:
+        return await answer_packed(request, *held)
+
+    began = index_keep.epoch()
+    try:
+        albums, truncated = await _read_album_index(client, scope)
+    except NavidromeError as e:
+        raise _fail(e)
+    #? encoded in a worker thread: ten thousand albums is megabytes of JSON, hashed and gzipped
+    etag, packed = await asyncio.to_thread(pack, {"albums": albums, "truncated": truncated})
+    if account is not None:
+        index_keep.keep(key, etag, packed, began)
+    return await answer_packed(request, etag, packed)
 
 
 @router.get("/albums/{album_id}")

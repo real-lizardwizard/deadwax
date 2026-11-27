@@ -156,6 +156,59 @@ tests), or on James's server.
 
 **Tests**: tests/test_queue_summary.py "the count, kept" (five), tests/test_navidrome_listing.py (one).
 
+#### The Library's album list: pages together, and kept for a moment (2.1.49)
+
+**The cause, confirmed - and narrower than the audit said.** `/navidrome/album_index` read Navidrome's pages
+of 500 one after another on every ask, and its ETag saved the download but not the asking. But it is not
+asked "on every visit": the web app keeps each scope's list for a minute itself (`albumIndex.ts`
+`INDEX_FRESH_MS`), and so does the iPhone app. So the asks that reach the server are a launch, a minute
+going by, and an Add or Remove - and the part worth most is making each of THOSE faster.
+
+**The fix, in two parts.**
+- **Pages together** (`routes/navidrome.py` `_read_album_index`, `PAGES_AT_ONCE` = 4): the first page alone
+  (a library under 500 albums ends in it: one call, as before), then four at a time, read in order to the
+  first short page - so the list is Navidrome's, in its order, each album once, exactly as page by page. A
+  list that ends inside a round has asked for up to three pages past its end, each an empty answer; one of
+  those failing is nothing, while a page the list needed failing still fails the whole answer.
+- **Kept for 30 seconds** (`src/index_keep.py`, `INDEX_KEEP_S`): the encoded answer (its ETag and gzipped
+  body, made in a worker thread - `json_etag.pack`), per asker, per Navidrome account that answers for them,
+  per scope. The key is the session's user (`local` with logins off) AND the account their client asks as
+  (their own, or the shared one - logins off, break-glass), so one person's list is never another's.
+  It is a clock, so everything deadwax does that changes the list drops what is kept:
+  a star or unstar through deadwax (Add's and the worker's `star` in `stars.star_entry`, Remove's `unstar`),
+  the worker's read-back finding their stars changed somewhere else (`stars.sync_user` - the app asks for
+  the list again as it sees their library move), Navidrome seen to have scanned (`navidrome_listing._refresh` taking a new listing), a Rescan. And when
+  deadwax changes the library itself - a filing, a retag, a delete, a move, all through
+  `library.note_library_changed()` - **nothing is kept for `INDEX_SETTLE_S` (3 minutes)**: Navidrome scans
+  in its own time, which nothing here is told of, so until then every ask reads it afresh as before. A list
+  whose reading a drop cut across is not kept (`epoch`).
+
+**Measured** (the route on a loop of its own, against a fake Navidrome that takes 50 ms a call - the notes'
+own figure for a real one was 0.1 s a page, "A better Library"):
+
+| albums | before | after, first ask | asked again within 30 s |
+| --- | --- | --- | --- |
+| 400 | 60 ms, 1 call | 59 ms, 1 call | **0 ms, none** |
+| 1,200 | 170 ms, 3 calls | **115 ms**, 5 calls | **1 ms, none** |
+| 5,000 | 631 ms, 11 calls | **243 ms**, 13 calls | **1 ms, none** |
+| 10,000 | 1,140 ms, 20 calls | **423 ms**, 20 calls | **2 ms, none** |
+
+**What it costs, said plainly.** A change made somewhere else - a star in Amperfy, a play counted from
+another app - can be up to 30 seconds later in a list than it was (on top of the page's own minute), when
+something asked for the same list in that half minute. A sign-in Navidrome has stopped taking is noticed by
+this route up to 30 seconds later (every other call still notices at once, and a session that has ended is
+refused before the route runs - tests hold that).
+
+**Not verified**: against a real Navidrome - that four `getAlbumList2` at once cost it no more than four in
+a row, that an offset past the end is the cheap empty answer its source says, and what a real page takes.
+How often a kept list is actually asked for on James's server (it may be seldom: see the cause).
+
+**Tests**: tests/test_index_keep.py (nine), tests/test_navidrome_album_index.py (fifteen new, three
+changed on purpose: the two that counted calls now count the round, and "a change in the list is a new ETag"
+now lets the kept list lapse first), one each in test_navidrome_listing.py and test_library_cache.py.
+tests/conftest.py is new: it drops what is kept before every test, since a clock-kept list would otherwise
+answer the next test's ask.
+
 ## Known performance problems (profiled, not guessed)
 
 Measured with 148 releases × 12 tracks:

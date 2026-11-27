@@ -62,6 +62,7 @@ import asyncio
 import time
 from dataclasses import dataclass, replace
 
+from src import index_keep
 from src.api.navidrome_endpoint import NavidromeError, navidrome
 from src.artists import _fold as fold_name
 from src.config import Config
@@ -458,6 +459,9 @@ class NavidromeListing:
                     seen_until = began if began is not None else before.last_scan.timestamp() - LISTING_SETTLE_SECONDS
                     settled = quiet and after is not None and not after.scanning and after.last_scan == before.last_scan
                 listing = build_listing(albums, seen_until, settled, asked)
+                #? (2.1.49) Navidrome has scanned since it was last asked (or is scanning): its albums may be
+                #? others now, so no album list kept from before answers anybody (src/index_keep.py)
+                index_keep.forget()
             if generation != self._generation:
                 return
             self.listing, self.problem, self._status = listing, None, before

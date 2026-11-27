@@ -883,8 +883,13 @@ opens on **Artist** (Recently added has its own place: the list's grid and **See
 - **Up to date**: the list is asked for again when you add or remove an album, when your library changes in
   Amperfy (with logins on), and otherwise when you open the Library or a page of it more than a minute after
   it was last asked - so **Recently played** and **Most played** can be up to a minute behind, and an album
-  deadwax has just filed shows the next time you look once Navidrome has scanned it.
-- **Big libraries**: each list comes from deadwax in one request (it reads Navidrome's pages of 500 itself),
+  deadwax has just filed shows the next time you look once Navidrome has scanned it. deadwax itself keeps a
+  list it has just read from Navidrome for 30 seconds, for the same person, so that another device of yours
+  or the page opened again doesn't make Navidrome list everything a second time: something changed in
+  another app in that half minute can be that much later still. It keeps nothing for three minutes after it
+  files, edits or deletes an album, and drops what it kept when you add or remove one.
+- **Big libraries**: each list comes from deadwax in one request (it reads Navidrome's pages of 500 itself,
+  four at a time),
   and only the albums near what's on screen are drawn. deadwax lists at most 10,000 albums; past that the
   page says "Showing the first 10000 albums" ([troubleshooting](troubleshooting.md#the-library-shows-the-first-10000-albums)).
 - **Songs** is in Navidrome's own order, with no Find or sort: Search finds songs.

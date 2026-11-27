@@ -41,7 +41,7 @@ from src.scan_wait import (SCAN_CALL_TIMEOUT_SECONDS, SCAN_MAX_POLLS, SCAN_POLL_
 from src.store_index import index_folder, mark_deleted, reconcile_scan, reindex_merged, reindex_moved
 from src.track_tags import execute_tag_edits, plan_tag_edits
 from src.users import LOCAL_USER, current_user, require
-from src import library_ledger
+from src import index_keep, library_ledger
 
 #? One client for the process, closed with the app in src/api/app.py. Cover art is fetched
 #? rarely and one at a time, so there is nothing to gain from per-request clients and a
@@ -478,6 +478,8 @@ async def rescan(request: Request, tracks: bool = True):
     `?tracks=false` answers as /albums' does (2.1.28).
     """
     try:
+        #? (2.1.49) a Rescan is "show me what is really there": the Library's kept album lists go too
+        index_keep.forget()
         return await _library_response(request, await _scan_with_queue(request, True), tracks)
 
     except Exception as e:

@@ -26,6 +26,7 @@ import threading
 import time
 from pathlib import Path
 
+from src import index_keep
 from src.logger import logger
 from src.artists import ARTIST_ART_STEMS
 from src.matching import AUDIO_EXTENSIONS, file_extension
@@ -88,6 +89,8 @@ def note_library_changed() -> None:
     """Say the library changed behind the cache's back - the poller calls this as it files."""
     global _behind
     _behind = True
+    #? (2.1.49) and Navidrome's album list is about to: nothing of it is kept until it has had time to scan
+    index_keep.unsettle()
 
 
 def written_at(directory: str) -> float | None:

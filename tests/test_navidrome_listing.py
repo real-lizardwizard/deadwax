@@ -839,3 +839,22 @@ def test_the_stamp_moves_with_everything_a_verdict_is_made_from(navidrome_set, m
     moved("a Navidrome setting changed")
     monkeypatch.setattr(Config, "NAVIDROME_URL", "")
     moved("Navidrome unset")
+
+
+def test_navidrome_seen_to_have_scanned_drops_the_librarys_kept_album_lists(navidrome_set):
+    """(2.1.49) src/index_keep.py: a scan may have brought albums the lists kept from before it lack."""
+    from src import index_keep
+
+    fake = FakeNavidrome([nav("Dummy", release=DUMMY_CD)])
+    cache = NavidromeListing(fake)
+    began = index_keep.epoch()
+    run(cache.ask(0))
+    first = index_keep.epoch()
+    assert first != began, "a listing read afresh"
+
+    asked(cache)
+    assert index_keep.epoch() == first, "no scan since: its albums can't have changed"
+
+    fake.statuses = [{"scanning": False, "lastScan": "2099-01-01T00:00:00Z"}]
+    asked(cache)
+    assert index_keep.epoch() != first, "scanned since"
