@@ -496,11 +496,14 @@ def test_played_and_changed_read_a_now_taken_again_at_midnight():
 
 def test_the_add_to_a_playlist_sheet_takes_the_shared_buttons():
     fields = flat(body(bare(source("Playlists/PlaylistPicker.swift")), "struct NewPlaylistFields: View {"))
-    assert ".buttonStyle(DWButtonStyle(kind: .pri))" in fields and ".buttonStyle(DWButtonStyle())" in fields
+    # (R18) each filling the row when stacked through the look's own `fills` (its flat words fill only when it does) -
+    # the labels' `.frame(maxWidth: stacked ? .infinity : nil)` gone with it
+    assert (".buttonStyle(DWButtonStyle(kind: .pri, fills: stacked))" in fields
+            and ".buttonStyle(DWButtonStyle(fills: stacked))" in fields)
     assert ".escapeCloses(" in fields, "Escape still the Playlists sheet's Cancel"
     # (R5's review) Create over Cancel at the accessibility sizes, each across the row - side by side otherwise
     assert "let stacked = typeSize.isAccessibilitySize" in fields
     assert ("let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10)) "
             ": AnyLayout(HStackLayout())") in fields
     assert "layout {" in fields and "if !stacked { Spacer() }" in fields
-    assert fields.count(".frame(maxWidth: stacked ? .infinity : nil)") == 2
+    assert ".frame(maxWidth: stacked ? .infinity : nil)" not in fields

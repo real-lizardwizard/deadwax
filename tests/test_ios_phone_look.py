@@ -1363,15 +1363,19 @@ def test_the_phone_is_flat():
     first = albums[albums.index("struct FirstAskCard"):albums.index("private var ask: some View")]
     mac, phone = halves(first, "if Platform.mac {")
     assert phone == " PhoneCard { ask } .accessibilityElement(children: .contain) .padding(.bottom, 12) ", phone
-    assert "Palette.toggledFill" in mac and "toggledFill" not in phone
-    buttons = albums[albums.index("private var buttons: some View"):]
-    mac, phone = halves(buttons, "if Platform.mac {")
-    assert phone == " Button(AutoDownloadWords.notNow) { asked = true } .buttonStyle(DWButtonStyle()) ", phone
-    assert ".buttonStyle(SecondaryPill())" in mac
-    empty = albums[albums.index("struct EmptyLibraryNote"):]
-    mac, phone = halves(empty, "if Platform.mac {")
-    assert phone == " StoreAlbumsLink { Text(LibraryWords.seeAllMusic) } .buttonStyle(DWButtonStyle()) ", phone
-    assert ".buttonStyle(.bordered)" in mac
+    # (R18) the Mac's half a box now (DWPalette's raised ground, its hairline), the old toggled fill gone from both
+    assert ".background(DWPalette.card, in: DWCorners.boxShape)" in mac and "toggledFill" not in first
+    # (R18) one pair of buttons for both devices, the look's: Turn On the purple, Not Now flat on the phone (the Mac's
+    # `.btn`) - no SecondaryPill, no device split
+    buttons = albums[albums.index("private func buttons(_ stacked: Bool)"):albums.index("struct PlaceGroup")]
+    assert "Platform.mac" not in buttons and "SecondaryPill" not in buttons and "PrimaryFace" not in buttons
+    assert (" Button { asked = true } label: { SheetButtonWords(AutoDownloadWords.notNow) } "
+            ".buttonStyle(DWButtonStyle(fills: stacked)) ") in buttons, buttons
+    assert ".buttonStyle(DWButtonStyle(kind: .pri, fills: stacked))" in buttons
+    # (R18) an empty library's See All music the look's button on both devices (`.bordered`, the system's grey, gone)
+    empty = albums[albums.index("struct EmptyLibraryNote"):albums.index("struct RefreshProblemNote")]
+    assert "Platform.mac" not in empty and ".bordered" not in empty
+    assert " StoreAlbumsLink { Text(LibraryWords.seeAllMusic) } .buttonStyle(DWButtonStyle()) " in empty, empty
     mini = re.sub(r"\s+", " ", bare((APP / "Player" / "MiniPlayerView.swift").read_text(encoding="utf-8")))
     assert (".padding(.vertical, 3) .background(DWPalette.scrubTagFace, in: DWCorners.chipShape) "
             ".overlay(DWCorners.chipShape.strokeBorder(DWPalette.line,") in mini
@@ -1411,7 +1415,8 @@ TEXT_INPUTS = {
     # field (its secret's and its words') on the look's well
     "Manage/PeopleScreen.swift": [OWN], "Manage/PeopleSheets.swift": [OWN] * 7,
     "Manage/ServerSettingsGroupScreen.swift": [WELL, WELL],
-    "Playlists/PlaylistPicker.swift": [SYSTEM],
+    # (R18) New playlist's name on the look's well (NewPlaylistFields: the picker's, and the Playlists pages' sheet)
+    "Playlists/PlaylistPicker.swift": [WELL],
     # (R1c's review) Edit's name and description: a plain List's rows draw no box, so the look's wells
     "Playlists/PlaylistView.swift": [WELL, WELL],
     # (R9) the sign-in's one screen: where deadwax is, then who you are; This phone's address - FieldLook, each
@@ -1735,12 +1740,18 @@ A2_PAGES = {"Artist/AlbumOrderMenu.swift", "Artist/SimilarArtistsSection.swift",
 #? (Last.fm, slice A4) About at the foot of the artist and album pages: the phone's section (the small words, the
 #? link's 44-point target) flat, and the words both devices draw in their own faces (tests/test_ios_lastfm_a4.py)
 A4_PAGES = {"Shared/AboutSection.swift"}
+#? (R18, the panel review's) the sheets, faces and banners left over: Add to a playlist and New playlist, Choose the folder,
+#? the album's Mine block, Can't reach deadwax, the notice, the offline banner, the cover viewer's close - and the
+#? sheets' own measures they share (SheetLook); tests/test_ios_sheets_look.py holds what each draws
+R18_PAGES = {"Playlists/PlaylistPicker.swift", "Edit/ChooseFolderView.swift", "Album/MineBlock.swift",
+             "Root/UnreachableView.swift", "Shared/Notice.swift", "Root/OfflineBanner.swift", "Player/CoverViewer.swift",
+             "Shared/SheetLook.swift"}
 #? R20: the known holdouts - Debug, an artist's Artist images, Move albums and Which artist is this? - flat on the phone
 #? from the holdouts' pieces (DebugView's HoldoutPage, HoldoutGroup...), the Mac's groups on the Mac; Release's pushed
 #? pages are R10's file's (tests/test_ios_holdouts_look.py holds what each draws)
 R20_PAGES = {"You/DebugView.swift", "Artist/ArtistImagesSheet.swift", "Artist/ArtistMoveSheet.swift"}
 SLICES = (R2_LIBRARY | R3B_PAGES | R4_BARS | R5_PAGES | R4B_FACE | R6_PAGES | R7_PAGES | R9_PAGES | R10_PAGES
-          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES | A4_PAGES | R20_PAGES)
+          | R11_PAGES | R12_PAGES | R13_PAGES | R14_PAGES | A2_PAGES | A4_PAGES | R18_PAGES | R20_PAGES)
 PHONE_PIECES_DRAWN_IN: set[str] = {"Player/NowPlayingSheet.swift", "Player/NowPlayingView.swift",
                                    "Requests/RequestCards.swift", "Requests/RequestsScreen.swift"} | SLICES
 LOOK_PIECES_DRAWN_IN = {"Root/MacSidebarView.swift", "Root/DesktopFrame.swift", "Player/PlayerBar.swift",

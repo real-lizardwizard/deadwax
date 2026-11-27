@@ -618,6 +618,11 @@ extension LibraryView where Desk == EmptyView {
 /// Edit order (3.5): the pages the switch shows as rows, each with its drag handle - a List held in edit mode, no
 /// deletions - kept as each move is made; the footer says the Library opens on the first. (slice 5) With a library of
 /// your own, Songs isn't a page of the switch: it isn't listed, and keeps its place in the order kept.
+///
+/// (R18 - notes/ios.md "The panel review, R18: sheets, faces and banners (2026-11-26)") Still a List - a List in edit
+/// mode is what draws the drag handles and moves a row under VoiceOver - but flat: plain, its ground the sheet's own
+/// (the phone's black, the Mac's window ground) with no cell's grey, each page's name in the rows' words on the row's
+/// hairline; the footer a row of its own in the small grey words (a plain List's footer would float on a material).
 private struct EditOrderSheet: View {
     @Binding var saved: String
     let personal: Bool
@@ -628,18 +633,26 @@ private struct EditOrderSheet: View {
         let order = LibraryPages.read(saved)
         NavigationStack {
             List {
-                Section {
-                    ForEach(LibraryPages.shown(order, personal: personal)) { (page: LibraryPage) in
-                        Text(page.title)
-                    }
-                    .onMove { (from: IndexSet, to: Int) -> Void in
-                        saved = LibraryPages.saved(LibraryPages.moved(order, personal: personal, from: from, to: to))
-                    }
-                } footer: {
-                    Text(LibrarySwitchWords.orderFooter)
-                        .font(Typeface.footnote)
+                ForEach(LibraryPages.shown(order, personal: personal)) { (page: LibraryPage) in
+                    Text(page.title)
+                        .font(SheetLook.words)
+                        .foregroundStyle(DWPalette.text)
+                        .listRowBackground(SheetLook.ground)
+                        .listRowSeparatorTint(SheetLook.rule)
                 }
+                .onMove { (from: IndexSet, to: Int) -> Void in
+                    saved = LibraryPages.saved(LibraryPages.moved(order, personal: personal, from: from, to: to))
+                }
+                Text(LibrarySwitchWords.orderFooter)
+                    .font(SheetLook.small)
+                    .foregroundStyle(DWPalette.t2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .listRowBackground(SheetLook.ground)
+                    .listRowSeparator(.hidden)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(SheetLook.ground)
             .environment(\.editMode, .constant(.active))
             .navigationTitle(LibrarySwitchWords.orderTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -651,6 +664,7 @@ private struct EditOrderSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationBackground(SheetLook.ground)
     }
 }
 
@@ -659,7 +673,9 @@ private struct EditOrderSheet: View {
 /// Navidrome - since Phase 8, slice 8 the app's own Server settings, its Connections group page in a sheet over the
 /// Library (SetUpNavidromeSheet) - held and drawn by LibraryView, above the gate, so the gate giving way never takes
 /// it. Saved, the Library asks Navidrome again, and the sheet goes once Navidrome
-/// answers. Navidrome's own words, for whoever runs deadwax, can be selected to copy.
+/// answers. Navidrome's own words, for whoever runs deadwax, can be selected to copy. (R18) In the look's words and
+/// greys (SheetLook: the phone's sizes, the Mac's on the Mac), Try again and Set up Navidrome the look's purple
+/// buttons - each across the page at the largest text sizes - and On this phone's row on its hairline.
 struct NavidromeGateView: View {
     let closed: NavidromeGate.Closed
     /// Set up Navidrome pressed: LibraryView's sheet put up.
@@ -667,17 +683,21 @@ struct NavidromeGateView: View {
 
     @Environment(LibraryModel.self) private var library
     @Environment(DownloadModel.self) private var downloads
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
+        let stacked = typeSize.isAccessibilitySize
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
                 Text(closed.title)
-                    .font(Typeface.title3.weight(.semibold))
+                    .font(SheetLook.title)
+                    .foregroundStyle(DWPalette.text)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 ForEach(closed.lines, id: \.self) { line in
                     Text(line)
-                        .foregroundStyle(Palette.quiet)
+                        .font(SheetLook.words)
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                         .textSelection(.enabled)
                 }
@@ -687,17 +707,20 @@ struct NavidromeGateView: View {
                     } label: {
                         if library.checkingNavidrome {
                             ProgressView()
+                                .tint(DWPalette.text)
                         } else {
-                            Text(NavidromeGate.tryAgain)
+                            SheetButtonWords(NavidromeGate.tryAgain)
                         }
                     }
-                    .buttonStyle(PrimaryFace())
+                    .buttonStyle(DWButtonStyle(kind: .pri, fills: stacked))
                     .disabled(library.checkingNavidrome)
                     .accessibilityLabel(NavidromeGate.tryAgain)
                 }
                 if closed.setUp {
-                    Button(NavidromeGate.setUp) { setUp() }
-                        .buttonStyle(PrimaryFace())
+                    Button { setUp() } label: {
+                        SheetButtonWords(NavidromeGate.setUp)
+                    }
+                    .buttonStyle(DWButtonStyle(kind: .pri, fills: stacked))
                 }
                 if NavidromeGate.showsDownloaded(.closed(closed), anythingHere: downloads.anythingHere) {
                     // Navidrome down is no reason to hide what plays from this phone (5.4)

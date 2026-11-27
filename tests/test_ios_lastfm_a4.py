@@ -318,8 +318,10 @@ def test_the_link_keeps_its_own_target_in_the_phones_list_row():
     credit = body(code(SECTION), "struct AboutCredit: View {")
     assert credit.count(".buttonStyle(.borderless)") == 1
     assert "destination: link) .font(faces.credit) .foregroundStyle(DWPalette.acc) .buttonStyle(.borderless)" in credit
-    for name in ("Requests/RequestCards.swift", "UpNext/UpNextScreen.swift", "Root/OfflineBanner.swift"):
+    for name in ("Requests/RequestCards.swift", "UpNext/UpNextScreen.swift"):
         assert ".buttonStyle(.borderless)" in code(name), name
+    # (R18) OfflineBanner's Try again is the look's button now - a ButtonStyle of its own, which keeps its target too
+    assert ".buttonStyle(DWButtonStyle())" in code("Root/OfflineBanner.swift")
     # the row the phone's album page puts it in: the List's last
     assert ("if let about = model.about.drawn(for: taskKey) { AboutSection(drawn: about) .listRowSeparator(.hidden) "
             ".listRowBackground(Color.clear) } } } .listStyle(.plain)") in code(ALBUM)

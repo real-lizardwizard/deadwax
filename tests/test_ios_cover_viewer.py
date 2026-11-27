@@ -241,7 +241,8 @@ def test_it_closes_by_the_button_a_drag_down_and_voiceovers_escape():
     body = viewer[viewer.index("struct CoverViewer: View"):viewer.index("final class FullCovers")]
     assert "Button(action: action)" in body and ".accessibilityLabel(CoverViewerWords.close)" in body
     assert "CoverCloseButton(action: close)" in body
-    assert "Corners.controlShape" in body
+    # (R18) its key the bare glyph on the phone, the Mac's round key there (tests/test_ios_sheets_look.py)
+    assert ".buttonStyle(CoverCloseKey())" in body
     assert ".accessibilityAction(.escape) { close() }" in body
     assert ".accessibilityAddTraits(.isModal)" in body
     zoom = code(ZOOM)

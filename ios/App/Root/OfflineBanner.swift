@@ -12,13 +12,16 @@ import SwiftUI
 /// and up out (opacity alone with Reduce Motion); VoiceOver hears it come and hears "Back online" as it goes, from
 /// Reachability, once - every page draws its own banner.
 ///
-/// The amber is laid over the bar's own material, so a list scrolling up under the strip never shows through it (a 14%
-/// fill alone would), with the badge's amber hairline at its foot. One line, two at the larger text sizes, capped at
-/// accessibility2: a pinned strip must leave the page room.
+/// (R18 - notes/ios.md "The panel review, R18: sheets, faces and banners (2026-11-26)") No material: a DWPalette ground,
+/// solid, so a list scrolling up under the strip never shows through it - the phone's page black, flat, its words amber
+/// over the amber's hairline at its foot (`.chip.amber`'s edge); the Mac's window ground with the amber chip's tint over
+/// it (`.chip.amber`'s fill - the Mac keeps its faces) and the same hairline. One line, two at the larger text sizes,
+/// capped at accessibility2: a pinned strip must leave the page room. It is a safe-area inset at the page's top, never
+/// laid over the page, so it covers no control; Try again's finger's target (44, round its 36) stays inside the strip's
+/// own room under it (BannerLook.foot).
 struct OfflineBanner: View {
     @Environment(Reachability.self) private var reachability
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.displayScale) private var scale
     /// Opened to its second line.
     @State private var open = false
 
@@ -53,8 +56,8 @@ struct OfflineBanner: View {
                         .rotationEffect(.degrees(open ? 180 : 0))
                         .accessibilityHidden(true)
                 }
-                .font(Typeface.footnote.weight(.semibold))
-                .foregroundStyle(Palette.amber)
+                .font(SheetLook.small.weight(.semibold))
+                .foregroundStyle(DWPalette.amberText)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -63,38 +66,56 @@ struct OfflineBanner: View {
 
             if open {
                 Text(banner.more)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.amber)
+                    .font(SheetLook.small)
+                    .foregroundStyle(DWPalette.amberText)
                     .fixedSize(horizontal: false, vertical: true)
                     .transition(.opacity)
                 if reachability.reach == .unreachable {
+                    // (R18) the look's button - flat accent words on the phone, the Mac's `.btn` - not the system's
                     Button(reachability.probing ? DownloadWords.trying : DownloadWords.tryAgain) {
                         reachability.tryNow()
                     }
-                    .font(Typeface.footnote.weight(.semibold))
-                    .foregroundStyle(Palette.amber)
-                    .buttonStyle(.borderless)
+                    .buttonStyle(DWButtonStyle())
                     .disabled(reachability.probing)
-                    .opacity(reachability.probing ? Palette.off : 1)
                     .transition(.opacity)
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.horizontal, BannerLook.side)
+        .padding(.vertical, BannerLook.foot)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            // the bar's own material under the amber's tint, as the New mark lays its tint over a solid
-            Rectangle().fill(.bar)
-                .overlay(Rectangle().fill(Palette.amberFill))
+        .background { BannerGround() }
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+    }
+}
+
+/// (R18) The offline banner's and Edit album's out-of-reach line's measures: 16 in from the sides (the page's), and 6
+/// above and below their words - room enough under Try again for a finger's 44 round its 36 (DWTarget's reach, 4).
+enum BannerLook {
+    static let side: CGFloat = 16
+    static let foot: CGFloat = 6
+}
+
+/// (R18) What the offline banner and Edit album's out-of-reach line are drawn on: a solid DWPalette ground (the phone's
+/// page black; the Mac's window ground under the amber chip's tint) and the amber's hairline at their foot - no material.
+struct BannerGround: View {
+    @Environment(\.displayScale) private var scale
+
+    var body: some View {
+        Group {
+            if Platform.mac {
+                Rectangle().fill(DWPalette.bg)
+                    .overlay(Rectangle().fill(DWPalette.amberFill))
+            } else {
+                Rectangle().fill(DWPalette.page)
+            }
         }
         .overlay(alignment: .bottom) {
             Rectangle()
-                .fill(Palette.amberEdge)
+                .fill(DWPalette.amberEdge)
                 .frame(height: 1 / max(scale, 1))
-                .accessibilityHidden(true)
         }
-        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
+        .accessibilityHidden(true)
     }
 }
 

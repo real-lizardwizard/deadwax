@@ -185,19 +185,21 @@ struct SongsScreen: View {
     }
 
     /// ShuffleSongs.tsx's button at the head of the list: Shuffle, or Getting ready… dimmed with why under it once its
-    /// first page wouldn't come - none when there is nothing to shuffle.
+    /// first page wouldn't come - none when there is nothing to shuffle. (R18 - notes/ios.md "The panel review, R18:
+    /// sheets, faces and banners (2026-11-26)") The look's button: the phone's flat accent words and glyph (it was the
+    /// grey SecondaryPill R1c took from the phone), the Mac's `.btn` on its borrowed Songs page; why in the small greys.
     @ViewBuilder private var shuffleButton: some View {
         if let face = ShuffleButtonFace.of(allSongsCan) {
             VStack(alignment: .leading, spacing: 6) {
                 Button(action: shuffleAll) {
                     Label(face.words, systemImage: "shuffle")
                 }
-                .buttonStyle(SecondaryPill())
+                .buttonStyle(DWButtonStyle())
                 .disabled(!face.enabled)
                 if let why = face.why {
                     Text(why)
-                        .font(Typeface.footnote)
-                        .foregroundStyle(Palette.quiet)
+                        .font(SheetLook.small)
+                        .foregroundStyle(DWPalette.t2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -243,6 +245,7 @@ struct SongsScreen: View {
                 Button(LibraryWords.tryAgain) {
                     if reachability.online { songs.retry() } else { reachability.tryNow() }
                 }
+                .buttonStyle(DWButtonStyle())
                 .disabled(reachability.probing)
             }
             .padding(.top, 8)
@@ -261,8 +264,8 @@ struct SongsScreen: View {
             } else if page == nil, !paging.countText.isEmpty {
                 // a pushed list's count, in its flow - a page's is its meta line's
                 Text(paging.countText)
-                    .font(Typeface.footnote)
-                    .foregroundStyle(Palette.quiet)
+                    .font(SheetLook.small)
+                    .foregroundStyle(DWPalette.t2)
                     .padding(.top, 8)
                     .padding(.bottom, 4)
             }
@@ -309,6 +312,7 @@ struct SongsScreen: View {
                 Button(LibraryWords.tryAgain) {
                     if reachability.online { songs.retry() } else { reachability.tryNow() }
                 }
+                .buttonStyle(DWButtonStyle())
                 .disabled(reachability.probing)
             }
             .padding(.vertical, 12)

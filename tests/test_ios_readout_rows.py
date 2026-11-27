@@ -117,6 +117,12 @@ ALONE = [
     ("Edit/TagsPages.swift",
      "self.init(file: file, mono: Typeface.Phone.mono(.extraSmall), words: Typeface.Phone.text(.small))",
      "a file's changes in Edit tags' preview, each readout a line of its own in TagFileChanges' VStacks"),
+    # (R18) the sheets' readout face, defined once (SheetLook): read at Choose the folder's path, the last line of
+    # FolderRow's VStack, and Can't reach deadwax's address, a line of its own down UnreachableView's VStack - nothing
+    # beside either
+    ("Shared/SheetLook.swift",
+     "static var mono: Font { Platform.mac ? Typeface.Look.mono(.smallButton) : Typeface.Phone.mono(.small) }",
+     "the folder's path and the address unreached, each a line of its own in a VStack"),
 ]
 
 
